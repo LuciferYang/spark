@@ -76,15 +76,11 @@ jobs:
         cpus: 2
         memory: 6144m
     - name: Show all K8S pods
-      run: kubectl get pods -A
+      run: |
+        kubectl get pods -A
+        kubectl get node -oyaml
     - name: Run K8S integration test
       run: |
-        export TARBALL_TO_TEST=($(pwd)/spark-*.tgz)
-        PVC_TMP_DIR=$(mktemp -d)
-        export PVC_TESTS_HOST_PATH=$PVC_TMP_DIR
-        export PVC_TESTS_VM_PATH=$PVC_TMP_DIR
-        minikube mount ${PVC_TESTS_HOST_PATH}:${PVC_TESTS_VM_PATH} --9p-version=9p2000.L --gid=0 --uid=185 &
-        export MOUNT_PID=$!
         kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts || true
         eval $(minikube docker-env)
-        build/sbt -Pkubernetes -Pkubernetes-integration-tests "kubernetes-integration-tests/test"
+        build/sbt -Dtest.exclude.tags=minikube,r -Pkubernetes -Pkubernetes-integration-tests "kubernetes-integration-tests/test"
