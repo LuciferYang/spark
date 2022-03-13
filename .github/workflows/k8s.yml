@@ -1,0 +1,90 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Spark on Kubernetes Integration Test
+
+on:
+  push:
+    branches:
+    - '**'
+    - '!branch-*.*'
+  schedule:
+    # K8S
+    - cron: '0 * * * *'
+
+jobs:
+  k8s-integration-tests:
+    name: Run K8S integration tests
+    runs-on: ubuntu-20.04
+    env:
+      SPARK_LOCAL_IP: localhost
+    steps:
+    - name: Checkout Spark repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        repository: apache/spark
+        ref: master
+    - name: Sync the current branch with the latest in Apache Spark
+      if: github.repository != 'apache/spark'
+      run: |
+        git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
+        git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit"
+    - name: Cache Scala, SBT and Maven
+      uses: actions/cache@v2
+      with:
+        path: |
+          build/apache-maven-*
+          build/scala-*
+          build/*.jar
+          ~/.sbt
+        key: build-${{ hashFiles('**/pom.xml', 'project/build.properties', 'build/mvn', 'build/sbt', 'build/sbt-launch-lib.bash', 'build/spark-build-info') }}
+        restore-keys: |
+          build-
+    - name: Cache Coursier local repository
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/coursier
+        key: k8s-integration-coursier-${{ hashFiles('**/pom.xml', '**/plugins.sbt') }}
+        restore-keys: |
+          k8s-integration-coursier-
+    - name: Install Java 8
+      uses: actions/setup-java@v1
+      with:
+        java-version: 8
+    - name: start minikube
+      id: minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        cpus: 2
+        memory: 6144m
+    - name: Show all K8S pods
+      run: kubectl get pods -A
+    - name: Run K8S integration test
+      run: |
+        export TARBALL_TO_TEST=($(pwd)/spark-*.tgz)
+        PVC_TMP_DIR=$(mktemp -d)
+        export PVC_TESTS_HOST_PATH=$PVC_TMP_DIR
+        export PVC_TESTS_VM_PATH=$PVC_TMP_DIR
+        minikube mount ${PVC_TESTS_HOST_PATH}:${PVC_TESTS_VM_PATH} --9p-version=9p2000.L --gid=0 --uid=185 &
+        export MOUNT_PID=$!
+        kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts || true
+        eval $(minikube docker-env)
+        build/sbt -Pkubernetes -Pkubernetes-integration-tests "kubernetes-integration-tests/test"
