@@ -16,6 +16,8 @@
  */
 package org.apache.spark.deploy.k8s.integrationtest
 
+import java.net.URL
+
 import scala.collection.JavaConverters._
 
 import io.fabric8.kubernetes.api.model.Pod
@@ -121,8 +123,12 @@ private[spark] trait BasicTestsSuite { k8sSuite: KubernetesSuite =>
   test("Run SparkRemoteFileTest using a remote data file", k8sTestTag, localTestTag) {
     assert(sys.props.contains("spark.test.home"), "spark.test.home is not set!")
     TestUtils.withHttpServer(sys.props("spark.test.home")) { baseURL =>
-      sparkAppConf.set("spark.files", baseURL.toString +
-          REMOTE_PAGE_RANK_DATA_FILE.replace(sys.props("spark.test.home"), "").substring(1))
+      val url = baseURL.toString +
+        REMOTE_PAGE_RANK_DATA_FILE.replace(sys.props("spark.test.home"), "").substring(1)
+      sparkAppConf.set("spark.files", url)
+      Eventually.eventually(TIMEOUT, INTERVAL) {
+        TestUtils.httpResponseCode(new URL(url), "GET") should be (200)
+      }
       runSparkRemoteCheckAndVerifyCompletion(appArgs = Array(REMOTE_PAGE_RANK_FILE_NAME))
     }
   }
