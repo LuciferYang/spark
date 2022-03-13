@@ -83,4 +83,4 @@ jobs:
       run: |
         kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts || true
         eval $(minikube docker-env)
-        build/sbt -Dtest.exclude.tags=minikube,r -Pkubernetes -Pkubernetes-integration-tests "kubernetes-integration-tests/test"
+        build/sbt -Dtest.exclude.tags=minikube,r,local -Pkubernetes -Pkubernetes-integration-tests "kubernetes-integration-tests/test"
