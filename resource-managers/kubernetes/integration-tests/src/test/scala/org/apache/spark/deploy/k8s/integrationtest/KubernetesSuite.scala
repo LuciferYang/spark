@@ -191,6 +191,8 @@ class KubernetesSuite extends SparkFunSuite
       .set("spark.kubernetes.driver.pod.name", driverPodName)
       .set("spark.kubernetes.driver.label.spark-app-locator", appLocator)
       .set("spark.kubernetes.executor.label.spark-app-locator", appLocator)
+      .set("spark.kubernetes.executor.request.cores", "0.5")
+      .set("spark.kubernetes.driver.request.cores", "0.2")
       .set(NETWORK_AUTH_ENABLED.key, "true")
     if (!kubernetesTestComponents.hasUserSpecifiedNamespace) {
       kubernetesTestComponents.createNamespace()
