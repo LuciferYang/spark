@@ -84,7 +84,7 @@ public abstract class DBIteratorSuite {
    */
   protected abstract KVStore createStore() throws Exception;
 
-  @BeforeClass
+  @BeforeAll
   public static void setupClass() {
     long seed = RND.nextLong();
     LOG.info("Random seed: {}", seed);
@@ -92,12 +92,12 @@ public abstract class DBIteratorSuite {
   }
 
   @AfterAll
-  public static void cleanupData() throws Exception {
+  public static void cleanupData() {
     allEntries = null;
     db = null;
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     if (db != null) {
       return;
@@ -382,7 +382,7 @@ public abstract class DBIteratorSuite {
     IntKeyType i = new IntKeyType();
     i.key = 1;
     i.id = "1";
-    i.values = Arrays.asList("1");
+    i.values = Collections.singletonList("1");
 
     db.write(i);
 
@@ -485,21 +485,21 @@ public abstract class DBIteratorSuite {
       message = "stray";
     }
 
-    assertEquals(String.format("Found %s elements: %s", message, Arrays.asList(remaining)),
-      expectedCount, actualCount);
+    assertEquals(expectedCount, actualCount,
+      String.format("Found %s elements: %s", message, Arrays.asList(remaining)));
   }
 
   private KVStoreView<CustomType1> view() throws Exception {
     return db.view(CustomType1.class);
   }
 
-  private List<CustomType1> collect(KVStoreView<CustomType1> view) throws Exception {
+  private List<CustomType1> collect(KVStoreView<CustomType1> view) {
     return Arrays.asList(Iterables.toArray(view, CustomType1.class));
   }
 
   private List<CustomType1> sortBy(Comparator<CustomType1> comp) {
     List<CustomType1> copy = new ArrayList<>(allEntries);
-    Collections.sort(copy, comp);
+    copy.sort(comp);
     return copy;
   }
 

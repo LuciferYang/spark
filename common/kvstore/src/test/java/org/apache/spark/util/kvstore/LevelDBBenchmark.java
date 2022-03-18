@@ -29,11 +29,7 @@ import com.codahale.metrics.Slf4jReporter;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.Ignore;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -48,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - iterate over natural index, ascending and descending
  * - iterate over ref index, ascending and descending
  */
-@Ignore
+@Disabled
 public class LevelDBBenchmark {
 
   private static final int COUNT = 1024;
@@ -60,7 +56,7 @@ public class LevelDBBenchmark {
   private LevelDB db;
   private File dbpath;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     dbpath = File.createTempFile("test.", ".ldb");
     dbpath.delete();
@@ -69,7 +65,7 @@ public class LevelDBBenchmark {
     }
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     if (db != null) {
       try(Timer.Context ctx = dbClose.time()) {
@@ -254,7 +250,7 @@ public class LevelDBBenchmark {
   }
 
   private Timer newTimer(String name) {
-    assertNull("Timer already exists: " + name, metrics.getTimers().get(name));
+    assertNull(metrics.getTimers().get(name), "Timer already exists: " + name);
     return metrics.timer(name);
   }
 
