@@ -16,7 +16,7 @@
  */
 package org.apache.spark.io;
 
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.io.InputStream;
 import java.io.IOException;

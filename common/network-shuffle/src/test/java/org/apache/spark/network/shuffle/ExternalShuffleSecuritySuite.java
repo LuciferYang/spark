@@ -22,10 +22,10 @@ import java.util.Arrays;
 
 import com.google.common.collect.ImmutableMap;
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.apache.spark.network.TestUtils;
 import org.apache.spark.network.TransportContext;

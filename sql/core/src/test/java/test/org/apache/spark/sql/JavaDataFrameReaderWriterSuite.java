@@ -26,8 +26,8 @@ import org.apache.spark.sql.test.TestSparkSession;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.util.Utils;
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class JavaDataFrameReaderWriterSuite {
   private SparkSession spark = new TestSparkSession();

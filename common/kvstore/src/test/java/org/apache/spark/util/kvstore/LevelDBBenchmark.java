@@ -30,12 +30,12 @@ import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * A set of small benchmarks for the LevelDB implementation.
@@ -81,7 +81,7 @@ public class LevelDBBenchmark {
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void report() {
     if (metrics.getTimers().isEmpty()) {
       return;

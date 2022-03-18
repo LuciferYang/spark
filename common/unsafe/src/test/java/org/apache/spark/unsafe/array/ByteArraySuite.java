@@ -19,8 +19,8 @@ package org.apache.spark.unsafe.array;
 
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.ByteArray;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class ByteArraySuite {
   private long getPrefixByByte(byte[] bytes) {
@@ -45,7 +45,7 @@ public class ByteArraySuite {
 
       long result = ByteArray.getPrefix(bytes);
       long expected = getPrefixByByte(bytes);
-      Assert.assertEquals(result, expected);
+      Assertions.assertEquals(result, expected);
     }
   }
 

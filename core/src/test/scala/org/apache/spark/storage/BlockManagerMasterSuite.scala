@@ -17,7 +17,7 @@
 
 package org.apache.spark.storage
 
-import org.junit.Assert.assertTrue
+import org.junit.Assertions.assertTrue
 
 import org.apache.spark.{SparkConf, SparkFunSuite}
 

@@ -21,8 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.HashPartitioner;
 import org.apache.spark.SparkConf;
@@ -54,7 +54,7 @@ public class ShuffleInMemorySorterSuite {
     final ShuffleInMemorySorter sorter = new ShuffleInMemorySorter(
       consumer, 100, shouldUseRadixSort());
     final ShuffleInMemorySorter.ShuffleSorterIterator iter = sorter.getSortedIterator();
-    Assert.assertFalse(iter.hasNext());
+    Assertions.assertFalse(iter.hasNext());
   }
 
   @Test
@@ -102,11 +102,11 @@ public class ShuffleInMemorySorterSuite {
     int prevPartitionId = -1;
     Arrays.sort(dataToSort);
     for (int i = 0; i < dataToSort.length; i++) {
-      Assert.assertTrue(iter.hasNext());
+      Assertions.assertTrue(iter.hasNext());
       iter.loadNext();
       final int partitionId = iter.packedRecordPointer.getPartitionId();
-      Assert.assertTrue(partitionId >= 0 && partitionId <= 3);
-      Assert.assertTrue("Partition id " + partitionId + " should be >= prev id " + prevPartitionId,
+      Assertions.assertTrue(partitionId >= 0 && partitionId <= 3);
+      Assertions.assertTrue("Partition id " + partitionId + " should be >= prev id " + prevPartitionId,
         partitionId >= prevPartitionId);
       final long recordAddress = iter.packedRecordPointer.getRecordPointer();
       final int recordLength = Platform.getInt(
@@ -115,9 +115,9 @@ public class ShuffleInMemorySorterSuite {
         memoryManager.getPage(recordAddress),
         memoryManager.getOffsetInPage(recordAddress) + 4, // skip over record length
         recordLength);
-      Assert.assertTrue(Arrays.binarySearch(dataToSort, str) != -1);
+      Assertions.assertTrue(Arrays.binarySearch(dataToSort, str) != -1);
     }
-    Assert.assertFalse(iter.hasNext());
+    Assertions.assertFalse(iter.hasNext());
   }
 
   @Test
@@ -141,6 +141,6 @@ public class ShuffleInMemorySorterSuite {
       sorterResult[j] = iter.packedRecordPointer.getPartitionId();
       j += 1;
     }
-    Assert.assertArrayEquals(numbersToSort, sorterResult);
+    Assertions.assertArrayEquals(numbersToSort, sorterResult);
   }
 }

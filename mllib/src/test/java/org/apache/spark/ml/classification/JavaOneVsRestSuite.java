@@ -22,8 +22,8 @@ import java.util.List;
 
 import scala.collection.JavaConverters;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
 import org.apache.spark.api.java.JavaRDD;
@@ -62,12 +62,12 @@ public class JavaOneVsRestSuite extends SharedSparkSession {
   public void oneVsRestDefaultParams() {
     OneVsRest ova = new OneVsRest();
     ova.setClassifier(new LogisticRegression());
-    Assert.assertEquals("label", ova.getLabelCol());
-    Assert.assertEquals("prediction", ova.getPredictionCol());
+    Assertions.assertEquals("label", ova.getLabelCol());
+    Assertions.assertEquals("prediction", ova.getPredictionCol());
     OneVsRestModel ovaModel = ova.fit(dataset);
     Dataset<Row> predictions = ovaModel.transform(dataset).select("label", "prediction");
     predictions.collectAsList();
-    Assert.assertEquals("label", ovaModel.getLabelCol());
-    Assert.assertEquals("prediction", ovaModel.getPredictionCol());
+    Assertions.assertEquals("label", ovaModel.getLabelCol());
+    Assertions.assertEquals("prediction", ovaModel.getPredictionCol());
   }
 }

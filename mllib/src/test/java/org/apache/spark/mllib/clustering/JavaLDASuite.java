@@ -25,8 +25,8 @@ import java.util.List;
 import scala.Tuple2;
 import scala.Tuple3;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.apache.spark.SharedSparkSession;
 import org.apache.spark.api.java.JavaPairRDD;

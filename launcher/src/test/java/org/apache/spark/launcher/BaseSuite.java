@@ -21,7 +21,7 @@ import java.time.Duration;
 
 import org.junit.After;
 import org.slf4j.bridge.SLF4JBridgeHandler;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Handles configuring the JUL -> SLF4J bridge, and provides some utility methods for tests.

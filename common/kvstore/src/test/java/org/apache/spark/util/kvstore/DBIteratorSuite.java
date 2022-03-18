@@ -28,13 +28,13 @@ import java.util.Random;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public abstract class DBIteratorSuite {
 
@@ -79,7 +79,7 @@ public abstract class DBIteratorSuite {
 
   /**
    * Implementations should override this method; it is called only once, before all tests are
-   * run. Any state can be safely stored in static variables and cleaned up in a @AfterClass
+   * run. Any state can be safely stored in static variables and cleaned up in a @AfterAll
    * handler.
    */
   protected abstract KVStore createStore() throws Exception;
@@ -91,7 +91,7 @@ public abstract class DBIteratorSuite {
     RND.setSeed(seed);
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanupData() throws Exception {
     allEntries = null;
     db = null;

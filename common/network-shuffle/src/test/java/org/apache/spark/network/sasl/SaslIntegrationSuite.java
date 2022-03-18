@@ -23,11 +23,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import org.apache.spark.network.TestUtils;
@@ -75,7 +75,7 @@ public class SaslIntegrationSuite {
   }
 
 
-  @AfterClass
+  @AfterAll
   public static void afterAll() {
     server.close();
     context.close();

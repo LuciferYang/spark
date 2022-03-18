@@ -29,12 +29,12 @@ import com.codahale.metrics.Metric;
 import com.codahale.metrics.Timer;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.roaringbitmap.RoaringBitmap;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 

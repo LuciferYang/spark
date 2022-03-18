@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 
 import org.junit.*;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SparkSubmitCommandBuilderSuite extends BaseSuite {
 
@@ -41,7 +41,7 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
     parser = new SparkSubmitOptionParser();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanUp() throws Exception {
     dummyPropsFile.delete();
   }
@@ -214,7 +214,7 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
       parser.MASTER + "=foo"
     );
     Map<String, String> env = new HashMap<>();
-    Assert.assertThrows("Missing example class name.", IllegalArgumentException.class,
+    Assertions.assertThrows("Missing example class name.", IllegalArgumentException.class,
       () -> buildCommand(sparkSubmitArgs, env));
   }
 

@@ -20,8 +20,8 @@ package org.apache.spark.ml.classification;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
 import org.apache.spark.api.java.JavaRDD;
@@ -77,7 +77,7 @@ public class JavaRandomForestClassifierSuite extends SharedSparkSession {
         rf.setFeatureSubsetStrategy(strategy);
         Assert.fail("Expected exception to be thrown for invalid strategies");
       } catch (Exception e) {
-        Assert.assertTrue(e instanceof IllegalArgumentException);
+        Assertions.assertTrue(e instanceof IllegalArgumentException);
       }
     }
 

@@ -27,9 +27,9 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.rdd.JdbcRDD;
 import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class JavaJdbcRDDSuite implements Serializable {
   private transient JavaSparkContext sc;
@@ -90,7 +90,7 @@ public class JavaJdbcRDDSuite implements Serializable {
       r -> r.getInt(1)
     ).cache();
 
-    Assert.assertEquals(100, rdd.count());
-    Assert.assertEquals(Integer.valueOf(10100), rdd.reduce((i1, i2) -> i1 + i2));
+    Assertions.assertEquals(100, rdd.count());
+    Assertions.assertEquals(Integer.valueOf(10100), rdd.reduce((i1, i2) -> i1 + i2));
   }
 }

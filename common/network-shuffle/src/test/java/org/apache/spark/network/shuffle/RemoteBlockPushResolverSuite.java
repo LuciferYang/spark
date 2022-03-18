@@ -37,14 +37,14 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.apache.spark.network.buffer.FileSegmentManagedBuffer;
 import org.apache.spark.network.client.StreamCallbackWithID;
@@ -537,7 +537,7 @@ public class RemoteBlockPushResolverSuite {
     // deleted.
     deleted.acquire();
     for (String mergeDir : mergeDirs) {
-      Assert.assertFalse(Files.exists(Paths.get(mergeDir)));
+      Assertions.assertFalse(Files.exists(Paths.get(mergeDir)));
     }
   }
 

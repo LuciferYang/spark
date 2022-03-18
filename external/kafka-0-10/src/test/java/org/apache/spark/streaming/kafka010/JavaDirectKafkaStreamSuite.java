@@ -25,9 +25,9 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
@@ -100,7 +100,7 @@ public class JavaDirectKafkaStreamSuite implements Serializable {
         JavaRDD<ConsumerRecord<String, String>>>) rdd -> {
         OffsetRange[] offsets = ((HasOffsetRanges) rdd.rdd()).offsetRanges();
         offsetRanges.set(offsets);
-        Assert.assertEquals(topic1, offsets[0].topic());
+        Assertions.assertEquals(topic1, offsets[0].topic());
         return rdd;
       }
     ).map(
@@ -123,7 +123,7 @@ public class JavaDirectKafkaStreamSuite implements Serializable {
         JavaRDD<ConsumerRecord<String, String>>>) rdd -> {
         OffsetRange[] offsets = ((HasOffsetRanges) rdd.rdd()).offsetRanges();
         offsetRanges.set(offsets);
-        Assert.assertEquals(topic2, offsets[0].topic());
+        Assertions.assertEquals(topic2, offsets[0].topic());
         return rdd;
       }
     ).map(
@@ -142,7 +142,7 @@ public class JavaDirectKafkaStreamSuite implements Serializable {
       matches = sent.size() == result.size();
       Thread.sleep(50);
     }
-    Assert.assertEquals(sent, result);
+    Assertions.assertEquals(sent, result);
     ssc.stop();
   }
 

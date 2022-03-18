@@ -28,11 +28,11 @@ import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
 import org.apache.spark.network.shuffle.ExternalShuffleBlockResolver.AppExecId;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ExternalShuffleBlockResolverSuite {
   private static final String sortBlock0 = "Hello!";
@@ -55,7 +55,7 @@ public class ExternalShuffleBlockResolverSuite {
         sortBlock1.getBytes(StandardCharsets.UTF_8)});
   }
 
-  @AfterClass
+  @AfterAll
   public static void afterAll() {
     dataContext.cleanup();
   }

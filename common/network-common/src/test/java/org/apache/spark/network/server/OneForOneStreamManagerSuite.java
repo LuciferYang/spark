@@ -22,9 +22,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import io.netty.channel.Channel;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import org.apache.spark.network.TestManagedBuffer;
@@ -34,7 +34,7 @@ public class OneForOneStreamManagerSuite {
 
   List<ManagedBuffer> managedBuffersToRelease = new ArrayList<>();
 
-  @After
+  @AfterEach
   public void tearDown() {
     managedBuffersToRelease.forEach(managedBuffer -> managedBuffer.release());
     managedBuffersToRelease.clear();
@@ -66,10 +66,10 @@ public class OneForOneStreamManagerSuite {
 
     Channel dummyChannel = Mockito.mock(Channel.class, Mockito.RETURNS_SMART_NULLS);
     long streamId = manager.registerStream("appId", buffers.iterator(), dummyChannel);
-    Assert.assertEquals(1, manager.numStreamStates());
-    Assert.assertNotNull(getChunk(manager, streamId, 0));
-    Assert.assertNull(getChunk(manager, streamId, 1));
-    Assert.assertNotNull(getChunk(manager, streamId, 2));
+    Assertions.assertEquals(1, manager.numStreamStates());
+    Assertions.assertNotNull(getChunk(manager, streamId, 0));
+    Assertions.assertNull(getChunk(manager, streamId, 1));
+    Assertions.assertNotNull(getChunk(manager, streamId, 2));
     manager.connectionTerminated(dummyChannel);
 
     // loaded buffers are not released yet as in production a ManagedBuffer returned by getChunk()
@@ -90,12 +90,12 @@ public class OneForOneStreamManagerSuite {
 
     Channel dummyChannel = Mockito.mock(Channel.class, Mockito.RETURNS_SMART_NULLS);
     manager.registerStream("appId", buffers.iterator(), dummyChannel);
-    Assert.assertEquals(1, manager.numStreamStates());
+    Assertions.assertEquals(1, manager.numStreamStates());
     manager.connectionTerminated(dummyChannel);
 
     Mockito.verify(buffer1, Mockito.times(1)).release();
     Mockito.verify(buffer2, Mockito.times(1)).release();
-    Assert.assertEquals(0, manager.numStreamStates());
+    Assertions.assertEquals(0, manager.numStreamStates());
   }
 
   @Test
@@ -116,11 +116,11 @@ public class OneForOneStreamManagerSuite {
     manager.registerStream("appId", buffers, dummyChannel);
     manager.registerStream("appId", buffers2, dummyChannel);
 
-    Assert.assertEquals(2, manager.numStreamStates());
+    Assertions.assertEquals(2, manager.numStreamStates());
 
     try {
       manager.connectionTerminated(dummyChannel);
-      Assert.fail("connectionTerminated should throw exception when fails to release all buffers");
+      Assertions.fail("connectionTerminated should throw exception when fails to release all buffers");
 
     } catch (RuntimeException e) {
 
@@ -132,7 +132,7 @@ public class OneForOneStreamManagerSuite {
 
       Mockito.verify(mockManagedBuffer, Mockito.times(1)).release();
 
-      Assert.assertEquals(0, manager.numStreamStates());
+      Assertions.assertEquals(0, manager.numStreamStates());
     }
   }
 }

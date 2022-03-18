@@ -27,8 +27,8 @@ import org.apache.spark.sql.connector.catalog.InMemoryTableCatalog;
 import org.apache.spark.sql.test.TestSparkSession;
 import org.apache.spark.sql.types.StructType;
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.spark.sql.functions.*;
 

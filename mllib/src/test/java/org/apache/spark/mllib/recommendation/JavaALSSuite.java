@@ -23,8 +23,8 @@ import java.util.List;
 import scala.Tuple2;
 import scala.Tuple3;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -48,12 +48,12 @@ public class JavaALSSuite extends SharedSparkSession {
     }
     JavaPairRDD<Integer, Integer> usersProducts = jsc.parallelizePairs(localUsersProducts);
     List<Rating> predictedRatings = model.predict(usersProducts).collect();
-    Assert.assertEquals(users * products, predictedRatings.size());
+    Assertions.assertEquals(users * products, predictedRatings.size());
     if (!implicitPrefs) {
       for (Rating r : predictedRatings) {
         double prediction = r.rating();
         double correct = trueRatings[r.product() * users + r.user()];
-        Assert.assertTrue(String.format("Prediction=%2.4f not below match threshold of %2.2f",
+        Assertions.assertTrue(String.format("Prediction=%2.4f not below match threshold of %2.2f",
           prediction, matchThreshold), Math.abs(prediction - correct) < matchThreshold);
       }
     } else {
@@ -71,7 +71,7 @@ public class JavaALSSuite extends SharedSparkSession {
         denom += confidence;
       }
       double rmse = Math.sqrt(sqErr / denom);
-      Assert.assertTrue(String.format("Confidence-weighted RMSE=%2.4f above threshold of %2.2f",
+      Assertions.assertTrue(String.format("Confidence-weighted RMSE=%2.4f above threshold of %2.2f",
         rmse, matchThreshold), rmse < matchThreshold);
     }
   }
@@ -176,11 +176,11 @@ public class JavaALSSuite extends SharedSparkSession {
   }
 
   private static void validateRecommendations(Rating[] recommendations, int howMany) {
-    Assert.assertEquals(howMany, recommendations.length);
+    Assertions.assertEquals(howMany, recommendations.length);
     for (int i = 1; i < recommendations.length; i++) {
-      Assert.assertTrue(recommendations[i - 1].rating() >= recommendations[i].rating());
+      Assertions.assertTrue(recommendations[i - 1].rating() >= recommendations[i].rating());
     }
-    Assert.assertTrue(recommendations[0].rating() > 0.7);
+    Assertions.assertTrue(recommendations[0].rating() > 0.7);
   }
 
 }

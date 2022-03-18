@@ -31,9 +31,11 @@ import io.netty.channel.FileRegion;
 import org.apache.spark.network.util.ByteArrayWritableChannel;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
-import static org.junit.Assert.*;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -56,7 +58,7 @@ public class AuthEngineSuite {
   private static final String outputIv = "a72709baf00785cad6329ce09f631f71";
   private static TransportConf conf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() {
     conf = new TransportConf("rpc", MapConfigProvider.EMPTY);
   }
@@ -79,7 +81,7 @@ public class AuthEngineSuite {
     }
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testCorruptChallengeAppId() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
@@ -87,33 +89,34 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage corruptChallenge =
               new AuthMessage("junk", clientChallenge.salt, clientChallenge.ciphertext);
-      AuthMessage serverResponse = server.response(corruptChallenge);
+      Assertions.assertThrows(IllegalArgumentException.class,
+        () -> server.response(corruptChallenge));
     }
   }
 
-  @Test(expected = GeneralSecurityException.class)
+  @Test
   public void testCorruptChallengeSalt() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.salt[0] ^= 1;
-      AuthMessage serverResponse = server.response(clientChallenge);
+      Assertions.assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
     }
   }
 
-  @Test(expected = GeneralSecurityException.class)
+  @Test
   public void testCorruptChallengeCiphertext() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.ciphertext[0] ^= 1;
-      AuthMessage serverResponse = server.response(clientChallenge);
+      Assertions.assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
     }
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testCorruptResponseAppId() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
@@ -122,11 +125,12 @@ public class AuthEngineSuite {
       AuthMessage serverResponse = server.response(clientChallenge);
       AuthMessage corruptResponse =
               new AuthMessage("junk", serverResponse.salt, serverResponse.ciphertext);
-      client.deriveSessionCipher(clientChallenge, corruptResponse);
+      Assertions.assertThrows(IllegalArgumentException.class,
+        () -> client.deriveSessionCipher(clientChallenge, corruptResponse));
     }
   }
 
-  @Test(expected = GeneralSecurityException.class)
+  @Test
   public void testCorruptResponseSalt() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
@@ -134,11 +138,12 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage serverResponse = server.response(clientChallenge);
       serverResponse.salt[0] ^= 1;
-      client.deriveSessionCipher(clientChallenge, serverResponse);
+      Assertions.assertThrows(GeneralSecurityException.class,
+        () -> client.deriveSessionCipher(clientChallenge, serverResponse));
     }
   }
 
-  @Test(expected = GeneralSecurityException.class)
+  @Test
   public void testCorruptServerCiphertext() throws Exception {
 
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
@@ -146,7 +151,8 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage serverResponse = server.response(clientChallenge);
       serverResponse.ciphertext[0] ^= 1;
-      client.deriveSessionCipher(clientChallenge, serverResponse);
+      Assertions.assertThrows(GeneralSecurityException.class,
+        () -> client.deriveSessionCipher(clientChallenge, serverResponse));
     }
   }
 
@@ -157,7 +163,7 @@ public class AuthEngineSuite {
               AuthMessage.decodeMessage(ByteBuffer.wrap(Hex.decode(clientChallengeHex)));
       // This tests that the server will accept an old challenge as expected. However,
       // it will generate a fresh ephemeral keypair, so we can't replay an old session.
-      AuthMessage freshServerResponse = server.response(clientChallenge);
+      server.response(clientChallenge);
     }
   }
 
@@ -179,23 +185,25 @@ public class AuthEngineSuite {
     }
   }
 
-  @Test(expected = GeneralSecurityException.class)
+  @Test
   public void testMismatchedSecret() throws Exception {
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
          AuthEngine server = new AuthEngine("appId", "different_secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
-      server.response(clientChallenge);
+      Assertions.assertThrows(GeneralSecurityException.class,
+        () -> server.response(clientChallenge));
     }
   }
 
-  @Test(expected = AssertionError.class)
+  @Test
   public void testBadKeySize() throws Exception {
     Map<String, String> mconf = ImmutableMap.of("spark.network.crypto.keyLength", "42");
     TransportConf conf = new TransportConf("rpc", new MapConfigProvider(mconf));
 
     try (AuthEngine engine = new AuthEngine("appId", "secret", conf)) {
       engine.challenge();
-      fail("Should have failed to create challenge message.");
+      Assertions.assertThrows(AssertionError.class,
+        () -> fail("Should have failed to create challenge message."));
       // Call close explicitly to make sure it's idempotent.
       engine.close();
     }

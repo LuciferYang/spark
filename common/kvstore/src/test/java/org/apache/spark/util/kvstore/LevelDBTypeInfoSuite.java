@@ -19,8 +19,8 @@ package org.apache.spark.util.kvstore;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class LevelDBTypeInfoSuite {
 

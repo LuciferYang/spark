@@ -20,8 +20,8 @@ package org.apache.spark.ml.util;
 import java.io.File;
 import java.io.IOException;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
 import org.apache.spark.util.Utils;
@@ -58,8 +58,8 @@ public class JavaDefaultReadWriteSuite extends SharedSparkSession {
     }
     instance.write().session(spark).overwrite().save(outputPath);
     MyParams newInstance = MyParams.load(outputPath);
-    Assert.assertEquals("UID should match.", instance.uid(), newInstance.uid());
-    Assert.assertEquals("Params should be preserved.",
+    Assertions.assertEquals("UID should match.", instance.uid(), newInstance.uid());
+    Assertions.assertEquals("Params should be preserved.",
       2, newInstance.getOrDefault(newInstance.intParam()));
   }
 }

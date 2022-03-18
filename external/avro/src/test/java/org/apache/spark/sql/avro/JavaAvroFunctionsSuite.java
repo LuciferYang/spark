@@ -18,8 +18,8 @@
 package org.apache.spark.sql.avro;
 
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.QueryTest$;

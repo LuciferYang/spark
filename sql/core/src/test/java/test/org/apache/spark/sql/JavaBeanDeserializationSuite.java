@@ -83,7 +83,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
       .as(encoder);
 
     List<ArrayRecord> records = dataset.collectAsList();
-    Assert.assertEquals(ARRAY_RECORDS, records);
+    Assertions.assertEquals(ARRAY_RECORDS, records);
   }
 
   private static final List<MapRecord> MAP_RECORDS = new ArrayList<>();
@@ -126,7 +126,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
     List<MapRecord> records = dataset.collectAsList();
 
-    Assert.assertEquals(MAP_RECORDS, records);
+    Assertions.assertEquals(MAP_RECORDS, records);
   }
 
   @Test
@@ -164,7 +164,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
     List<RecordSpark22000> records = dataset.collectAsList();
 
-    Assert.assertEquals(expectedRecords, records);
+    Assertions.assertEquals(expectedRecords, records);
   }
 
   @Test
@@ -190,7 +190,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
       // Here we need to handle weird case: compiler complains AnalysisException never be thrown
       // in try statement, but it can be thrown actually. Maybe Scala-Java interop issue?
       if (e instanceof AnalysisException) {
-        Assert.assertTrue(e.getMessage().contains("Cannot up cast "));
+        Assertions.assertTrue(e.getMessage().contains("Cannot up cast "));
       } else {
         throw e;
       }
@@ -556,7 +556,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
       List<LocalDateInstantRecord> records = dataset.collectAsList();
 
-      Assert.assertEquals(expectedRecords, records);
+      Assertions.assertEquals(expectedRecords, records);
     } finally {
         spark.conf().set(SQLConf.DATETIME_JAVA8API_ENABLED().key(), originConf);
     }

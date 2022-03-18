@@ -25,9 +25,9 @@ import org.apache.spark.streaming.api.java.JavaStreamingContext;
 
 import com.google.common.io.Closeables;
 import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.streaming.receiver.Receiver;
@@ -84,7 +84,7 @@ public class JavaReceiverAPISuite implements Serializable {
         Thread.sleep(100);
       }
       ssc.stop();
-      Assert.assertTrue(dataCounter.get() > 0);
+      Assertions.assertTrue(dataCounter.get() > 0);
     } finally {
       server.stop();
     }

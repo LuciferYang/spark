@@ -34,13 +34,13 @@ class PythonHadoopUtilSuite extends SparkFunSuite {
     val writableToJavaConverter = new WritableToJavaConverter(broadcast)
     val result = writableToJavaConverter.convert(input)
     expected match {
-      case _: Array[Byte] => Assert.assertArrayEquals(
+      case _: Array[Byte] => Assertions.assertArrayEquals(
         expected.asInstanceOf[Array[Byte]], result.asInstanceOf[Array[Byte]])
-      case _ => Assert.assertEquals(expected, result)
+      case _ => Assertions.assertEquals(expected, result)
     }
     val javaToWritableConverter = new JavaToWritableConverter()
     val reConverted = javaToWritableConverter.convert(result)
-    Assert.assertEquals("Round trip conversion failed", input, reConverted)
+    Assertions.assertEquals("Round trip conversion failed", input, reConverted)
   }
 
   test("Testing roundtrip conversion of various types") {

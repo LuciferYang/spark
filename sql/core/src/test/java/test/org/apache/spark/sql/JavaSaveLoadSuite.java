@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.types.DataTypes;

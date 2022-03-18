@@ -33,11 +33,11 @@ import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Layout;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.LogEvent;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.Assume.*;
 
 import static org.apache.spark.launcher.CommandBuilderUtils.*;
@@ -55,7 +55,7 @@ public class ChildProcAppHandleSuite extends BaseSuite {
 
   private static File TEST_SCRIPT_PATH;
 
-  @AfterClass
+  @AfterAll
   public static void cleanupClass() throws Exception {
     if (TEST_SCRIPT_PATH != null) {
       TEST_SCRIPT_PATH.delete();

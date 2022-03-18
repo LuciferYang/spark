@@ -20,8 +20,8 @@ package org.apache.spark.sql.connector.catalog;
 import org.apache.spark.SparkException;
 import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.Callable;
 
@@ -32,13 +32,13 @@ public class CatalogLoadingSuite {
     conf.setConfString("spark.sql.catalog.test-name", TestCatalogPlugin.class.getCanonicalName());
 
     CatalogPlugin plugin = Catalogs.load("test-name", conf);
-    Assert.assertNotNull("Should instantiate a non-null plugin", plugin);
-    Assert.assertEquals("Plugin should have correct implementation",
+    Assertions.assertNotNull("Should instantiate a non-null plugin", plugin);
+    Assertions.assertEquals("Plugin should have correct implementation",
         TestCatalogPlugin.class, plugin.getClass());
 
     TestCatalogPlugin testPlugin = (TestCatalogPlugin) plugin;
-    Assert.assertEquals("Options should contain no keys", 0, testPlugin.options.size());
-    Assert.assertEquals("Catalog should have correct name", "test-name", testPlugin.name());
+    Assertions.assertEquals("Options should contain no keys", 0, testPlugin.options.size());
+    Assertions.assertEquals("Catalog should have correct name", "test-name", testPlugin.name());
   }
 
   @Test
@@ -49,16 +49,16 @@ public class CatalogLoadingSuite {
     conf.setConfString("spark.sql.catalog.test-name.kEy", "valUE");
 
     CatalogPlugin plugin = Catalogs.load("test-name", conf);
-    Assert.assertNotNull("Should instantiate a non-null plugin", plugin);
-    Assert.assertEquals("Plugin should have correct implementation",
+    Assertions.assertNotNull("Should instantiate a non-null plugin", plugin);
+    Assertions.assertEquals("Plugin should have correct implementation",
         TestCatalogPlugin.class, plugin.getClass());
 
     TestCatalogPlugin testPlugin = (TestCatalogPlugin) plugin;
 
-    Assert.assertEquals("Options should contain only two keys", 2, testPlugin.options.size());
-    Assert.assertEquals("Options should contain correct value for name (not overwritten)",
+    Assertions.assertEquals("Options should contain only two keys", 2, testPlugin.options.size());
+    Assertions.assertEquals("Options should contain correct value for name (not overwritten)",
         "not-catalog-name", testPlugin.options.get("name"));
-    Assert.assertEquals("Options should contain correct value for key",
+    Assertions.assertEquals("Options should contain correct value for key",
         "valUE", testPlugin.options.get("key"));
   }
 
@@ -69,10 +69,10 @@ public class CatalogLoadingSuite {
     SparkException exc = intercept(CatalogNotFoundException.class,
         () -> Catalogs.load("missing", conf));
 
-    Assert.assertTrue("Should complain that implementation is not configured",
+    Assertions.assertTrue("Should complain that implementation is not configured",
         exc.getMessage()
             .contains("plugin class not found: spark.sql.catalog.missing is not defined"));
-    Assert.assertTrue("Should identify the catalog by name",
+    Assertions.assertTrue("Should identify the catalog by name",
         exc.getMessage().contains("missing"));
   }
 
@@ -83,11 +83,11 @@ public class CatalogLoadingSuite {
 
     SparkException exc = intercept(SparkException.class, () -> Catalogs.load("missing", conf));
 
-    Assert.assertTrue("Should complain that the class is not found",
+    Assertions.assertTrue("Should complain that the class is not found",
         exc.getMessage().contains("Cannot find catalog plugin class"));
-    Assert.assertTrue("Should identify the catalog by name",
+    Assertions.assertTrue("Should identify the catalog by name",
         exc.getMessage().contains("missing"));
-    Assert.assertTrue("Should identify the missing class",
+    Assertions.assertTrue("Should identify the missing class",
         exc.getMessage().contains("com.example.NoSuchCatalogPlugin"));
   }
 
@@ -99,11 +99,11 @@ public class CatalogLoadingSuite {
 
     SparkException exc = intercept(SparkException.class, () -> Catalogs.load("invalid", conf));
 
-    Assert.assertTrue("Should complain that class does not implement CatalogPlugin",
+    Assertions.assertTrue("Should complain that class does not implement CatalogPlugin",
         exc.getMessage().contains("does not implement CatalogPlugin"));
-    Assert.assertTrue("Should identify the catalog by name",
+    Assertions.assertTrue("Should identify the catalog by name",
         exc.getMessage().contains("invalid"));
-    Assert.assertTrue("Should identify the class",
+    Assertions.assertTrue("Should identify the class",
         exc.getMessage().contains(invalidClassName));
   }
 
@@ -115,9 +115,9 @@ public class CatalogLoadingSuite {
 
     SparkException exc = intercept(SparkException.class, () -> Catalogs.load("invalid", conf));
 
-    Assert.assertTrue("Should identify the constructor error",
+    Assertions.assertTrue("Should identify the constructor error",
         exc.getMessage().contains("Failed during instantiating constructor for catalog"));
-    Assert.assertTrue("Should have expected error message",
+    Assertions.assertTrue("Should have expected error message",
         exc.getCause().getMessage().contains("Expected failure"));
   }
 
@@ -129,11 +129,11 @@ public class CatalogLoadingSuite {
 
     SparkException exc = intercept(SparkException.class, () -> Catalogs.load("invalid", conf));
 
-    Assert.assertTrue("Should complain that no public constructor is provided",
+    Assertions.assertTrue("Should complain that no public constructor is provided",
         exc.getMessage().contains("Failed to call public no-arg constructor for catalog"));
-    Assert.assertTrue("Should identify the catalog by name",
+    Assertions.assertTrue("Should identify the catalog by name",
         exc.getMessage().contains("invalid"));
-    Assert.assertTrue("Should identify the class",
+    Assertions.assertTrue("Should identify the class",
         exc.getMessage().contains(invalidClassName));
   }
 
@@ -145,7 +145,7 @@ public class CatalogLoadingSuite {
           expected.getName());
     } catch (Exception actual) {
       try {
-        Assert.assertEquals(expected, actual.getClass());
+        Assertions.assertEquals(expected, actual.getClass());
         return (E) actual;
       } catch (AssertionError e) {
         e.addSuppressed(actual);

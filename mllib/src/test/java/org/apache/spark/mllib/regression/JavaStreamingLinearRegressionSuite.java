@@ -23,8 +23,8 @@ import java.util.List;
 import scala.Tuple2;
 
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.mllib.linalg.Vector;
