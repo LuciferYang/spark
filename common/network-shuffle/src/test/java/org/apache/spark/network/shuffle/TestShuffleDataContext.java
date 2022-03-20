@@ -125,7 +125,7 @@ public class TestShuffleDataContext {
   private void insertFile(String filename, byte[] block) throws IOException {
     OutputStream dataStream = null;
     File file = new File(ExecutorDiskUtils.getFilePath(localDirs, subDirsPerLocalDir, filename));
-    Assertions.assertFalse("this test file has been already generated", file.exists());
+    Assertions.assertFalse(file.exists(), "this test file has been already generated");
     try {
       dataStream = new FileOutputStream(
         new File(ExecutorDiskUtils.getFilePath(localDirs, subDirsPerLocalDir, filename)));

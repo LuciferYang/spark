@@ -196,7 +196,7 @@ public class CleanupNonShuffleServiceServedFilesSuite {
 
   private static void assertStillThere(TestShuffleDataContext dataContext) {
     for (String localDir : dataContext.localDirs) {
-      assertTrue(localDir + " was cleaned up prematurely", new File(localDir).exists());
+      assertTrue(new File(localDir).exists(), localDir + " was cleaned up prematurely");
     }
   }
 

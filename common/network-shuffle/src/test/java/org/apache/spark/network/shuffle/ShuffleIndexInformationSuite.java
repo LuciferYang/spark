@@ -34,7 +34,7 @@ public class ShuffleIndexInformationSuite {
   private static TestShuffleDataContext dataContext;
   private static String blockId;
 
-  @BeforeClass
+  @BeforeAll
   public static void before() throws IOException {
     dataContext = new TestShuffleDataContext(2, 5);
 

@@ -73,7 +73,7 @@ public class ExternalBlockHandlerSuite {
     new NioManagedBuffer(ByteBuffer.wrap(new byte[7]))
   };
 
-  @Before
+  @BeforeEach
   public void beforeEach() {
     streamManager = mock(OneForOneStreamManager.class);
     blockResolver = mock(ExternalShuffleBlockResolver.class);
@@ -404,9 +404,9 @@ public class ExternalBlockHandlerSuite {
         ArgumentCaptor.forClass(ManagedBuffer.class);
       verify(callback, times(1)).onSuccess(numChunksResponse.capture(),
         chunkBitmapResponse.capture());
-      assertEquals("num chunks in merged block " + reduceId, expectedCount[reduceId],
-        numChunksResponse.getValue().intValue());
-      assertNotNull("chunks bitmap buffer " + reduceId, chunkBitmapResponse.getValue());
+      assertEquals(expectedCount[reduceId], numChunksResponse.getValue(),
+        "num chunks in merged block " + reduceId);
+      assertNotNull(chunkBitmapResponse.getValue(), "chunks bitmap buffer " + reduceId);
     }
   }
 

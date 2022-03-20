@@ -44,7 +44,7 @@ public class ExternalShuffleBlockResolverSuite {
   private static final TransportConf conf =
       new TransportConf("shuffle", MapConfigProvider.EMPTY);
 
-  @BeforeClass
+  @BeforeAll
   public static void beforeAll() throws IOException {
     dataContext = new TestShuffleDataContext(2, 5);
 
@@ -68,7 +68,7 @@ public class ExternalShuffleBlockResolverSuite {
       resolver.getBlockData("app0", "exec1", 1, 1, 0);
       fail("Should have failed");
     } catch (RuntimeException e) {
-      assertTrue("Bad error message: " + e, e.getMessage().contains("not registered"));
+      assertTrue(e.getMessage().contains("not registered"), "Bad error message: " + e);
     }
 
     // Nonexistent shuffle block

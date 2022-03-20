@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ public class SaslIntegrationSuite {
 
   TransportClientFactory clientFactory;
 
-  @BeforeClass
+  @BeforeAll
   public static void beforeAll() throws IOException {
     conf = new TransportConf("shuffle", MapConfigProvider.EMPTY);
     context = new TransportContext(conf, new TestRpcHandler());
@@ -81,7 +81,7 @@ public class SaslIntegrationSuite {
     context.close();
   }
 
-  @After
+  @AfterEach
   public void afterEach() {
     if (clientFactory != null) {
       clientFactory.close();
@@ -113,7 +113,7 @@ public class SaslIntegrationSuite {
       clientFactory.createClient(TestUtils.getLocalHost(), server.getPort());
       fail("Connection should have failed.");
     } catch (Exception e) {
-      assertTrue(e.getMessage(), e.getMessage().contains("Mismatched response"));
+      assertTrue(e.getMessage().contains("Mismatched response"), e.getMessage());
     }
   }
 
@@ -126,7 +126,7 @@ public class SaslIntegrationSuite {
       client.sendRpcSync(ByteBuffer.allocate(13), TIMEOUT_MS);
       fail("Should have failed");
     } catch (Exception e) {
-      assertTrue(e.getMessage(), e.getMessage().contains("Expected SaslMessage"));
+      assertTrue(e.getMessage().contains("Expected SaslMessage"), e.getMessage());
     }
 
     try {
@@ -134,7 +134,7 @@ public class SaslIntegrationSuite {
       client.sendRpcSync(ByteBuffer.wrap(new byte[] { (byte) 0xEA }), TIMEOUT_MS);
       fail("Should have failed");
     } catch (Exception e) {
-      assertTrue(e.getMessage(), e.getMessage().contains("java.lang.IndexOutOfBoundsException"));
+      assertTrue(e.getMessage().contains("java.lang.IndexOutOfBoundsException"), e.getMessage());
     }
   }
 
@@ -147,7 +147,7 @@ public class SaslIntegrationSuite {
       try (TransportServer server = context.createServer()) {
         clientFactory.createClient(TestUtils.getLocalHost(), server.getPort());
       } catch (Exception e) {
-        assertTrue(e.getMessage(), e.getMessage().contains("Digest-challenge format violation"));
+        assertTrue(e.getMessage().contains("Digest-challenge format violation"), e.getMessage());
       }
     }
   }

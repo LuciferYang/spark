@@ -124,13 +124,13 @@ public class ExternalShuffleCleanupSuite {
 
   private static void assertStillThere(TestShuffleDataContext dataContext) {
     for (String localDir : dataContext.localDirs) {
-      assertTrue(localDir + " was cleaned up prematurely", new File(localDir).exists());
+      assertTrue(new File(localDir).exists(), localDir + " was cleaned up prematurely");
     }
   }
 
   private static void assertCleanedUp(TestShuffleDataContext dataContext) {
     for (String localDir : dataContext.localDirs) {
-      assertFalse(localDir + " wasn't cleaned up", new File(localDir).exists());
+      assertFalse(new File(localDir).exists(), localDir + " wasn't cleaned up");
     }
   }
 

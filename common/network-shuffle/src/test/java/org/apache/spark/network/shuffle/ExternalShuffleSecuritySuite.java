@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import com.google.common.collect.ImmutableMap;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +43,7 @@ public class ExternalShuffleSecuritySuite {
   TransportServer server;
   TransportContext transportContext;
 
-  @Before
+  @BeforeEach
   public void beforeEach() throws IOException {
     transportContext = new TransportContext(conf, new ExternalBlockHandler(conf, null));
     TransportServerBootstrap bootstrap = new SaslServerBootstrap(conf,
@@ -51,7 +51,7 @@ public class ExternalShuffleSecuritySuite {
     this.server = transportContext.createServer(Arrays.asList(bootstrap));
   }
 
-  @After
+  @AfterEach
   public void afterEach() {
     if (server != null) {
       server.close();
@@ -73,7 +73,7 @@ public class ExternalShuffleSecuritySuite {
     try {
       validate("wrong-app-id", "secret", false);
     } catch (Exception e) {
-      assertTrue(e.getMessage(), e.getMessage().contains("Wrong appId!"));
+      assertTrue(e.getMessage().contains("Wrong appId!"), e.getMessage());
     }
   }
 
@@ -82,7 +82,7 @@ public class ExternalShuffleSecuritySuite {
     try {
       validate("my-app-id", "bad-secret", false);
     } catch (Exception e) {
-      assertTrue(e.getMessage(), e.getMessage().contains("Mismatched response"));
+      assertTrue(e.getMessage().contains("Mismatched response"), e.getMessage());
     }
   }
 

@@ -17,21 +17,6 @@
 
 package org.apache.spark.network.shuffle;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
 import org.apache.spark.network.TestUtils;
 import org.apache.spark.network.TransportContext;
 import org.apache.spark.network.buffer.ManagedBuffer;
@@ -47,13 +32,24 @@ import org.apache.spark.network.sasl.SecretKeyHolder;
 import org.apache.spark.network.server.OneForOneStreamManager;
 import org.apache.spark.network.server.TransportServer;
 import org.apache.spark.network.server.TransportServerBootstrap;
-import org.apache.spark.network.shuffle.protocol.BlockTransferMessage;
-import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
-import org.apache.spark.network.shuffle.protocol.OpenBlocks;
-import org.apache.spark.network.shuffle.protocol.RegisterExecutor;
-import org.apache.spark.network.shuffle.protocol.StreamHandle;
+import org.apache.spark.network.shuffle.protocol.*;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
 public class AppIsolationSuite {
 
@@ -64,7 +60,7 @@ public class AppIsolationSuite {
   private static SecretKeyHolder secretKeyHolder;
   private static TransportConf conf;
 
-  @BeforeClass
+  @BeforeAll
   public static void beforeAll() {
     Map<String, String> confMap = new HashMap<>();
     confMap.put("spark.network.crypto.enabled", "true");
@@ -177,8 +173,8 @@ public class AppIsolationSuite {
   }
 
   private static void checkSecurityException(Throwable t) {
-    assertNotNull("No exception was caught.", t);
-    assertTrue("Expected SecurityException.",
-      t.getMessage().contains(SecurityException.class.getName()));
+    assertNotNull(t,"No exception was caught.");
+    assertTrue(t.getMessage().contains(SecurityException.class.getName()),
+      "Expected SecurityException.");
   }
 }

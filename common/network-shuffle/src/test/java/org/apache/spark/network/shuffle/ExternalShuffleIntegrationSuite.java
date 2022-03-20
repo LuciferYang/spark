@@ -36,8 +36,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.spark.network.buffer.FileSegmentManagedBuffer;
 import org.apache.spark.network.server.OneForOneStreamManager;
-import org.junit.After;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -86,7 +86,7 @@ public class ExternalShuffleIntegrationSuite {
     new byte[54321],
   };
 
-  @BeforeClass
+  @BeforeAll
   public static void beforeAll() throws IOException {
     Random rand = new Random();
 
@@ -140,7 +140,7 @@ public class ExternalShuffleIntegrationSuite {
     transportContext.close();
   }
 
-  @After
+  @AfterEach
   public void afterEach() {
     handler.applicationRemoved(APP_ID, false /* cleanupLocalDirs */);
   }
