@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
@@ -38,6 +39,7 @@ public class JavaCrossValidatorSuite extends SharedSparkSession {
   private transient Dataset<Row> dataset;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     List<LabeledPoint> points = generateLogisticInputAsList(1.0, 1.0, 100, 42);

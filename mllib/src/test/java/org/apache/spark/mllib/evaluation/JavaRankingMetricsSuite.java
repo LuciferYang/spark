@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import scala.Tuple2;
 import scala.Tuple2$;
 
@@ -34,6 +35,7 @@ public class JavaRankingMetricsSuite extends SharedSparkSession {
   private transient JavaRDD<Tuple2<List<Integer>, List<Integer>>> predictionAndLabels;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     predictionAndLabels = jsc.parallelize(Arrays.asList(

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +37,7 @@ public class JavaKMeansSuite extends SharedSparkSession {
   private transient Dataset<Row> dataset;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     dataset = KMeansSuite.generateKMeansData(spark, 50, 3, k);

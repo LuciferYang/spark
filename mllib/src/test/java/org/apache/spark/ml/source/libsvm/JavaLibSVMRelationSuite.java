@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import com.google.common.io.Files;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
@@ -43,6 +44,7 @@ public class JavaLibSVMRelationSuite extends SharedSparkSession {
   private String path;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     tempDir = Utils.createTempDir(System.getProperty("java.io.tmpdir"), "datasource");

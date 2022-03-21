@@ -20,6 +20,7 @@ package org.apache.spark.ml.classification;
 import java.io.IOException;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import scala.collection.JavaConverters;
 
 import org.junit.jupiter.api.Assertions;
@@ -38,6 +39,7 @@ public class JavaOneVsRestSuite extends SharedSparkSession {
   private transient JavaRDD<LabeledPoint> datasetRDD;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     int nPoints = 3;

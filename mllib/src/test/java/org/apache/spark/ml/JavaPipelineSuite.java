@@ -19,6 +19,7 @@ package org.apache.spark.ml;
 
 import java.io.IOException;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
@@ -38,6 +39,7 @@ public class JavaPipelineSuite extends SharedSparkSession {
   private transient Dataset<Row> dataset;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     JavaRDD<LabeledPoint> points =

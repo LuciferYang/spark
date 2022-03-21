@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.spark.sql.Encoders;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
@@ -37,6 +38,7 @@ public class JavaKolmogorovSmirnovTestSuite extends SharedSparkSession {
   private transient Dataset<Row> dataset;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     List<java.lang.Double> points = Arrays.asList(0.1, 1.1, 10.1, -1.1);

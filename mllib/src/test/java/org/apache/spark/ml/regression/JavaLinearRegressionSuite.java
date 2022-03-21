@@ -20,6 +20,7 @@ package org.apache.spark.ml.regression;
 import java.io.IOException;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -35,6 +36,7 @@ public class JavaLinearRegressionSuite extends SharedSparkSession {
   private transient JavaRDD<LabeledPoint> datasetRDD;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     List<LabeledPoint> points = generateLogisticInputAsList(1.0, 1.0, 100, 42);
