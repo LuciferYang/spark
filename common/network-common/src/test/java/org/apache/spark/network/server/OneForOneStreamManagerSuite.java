@@ -118,21 +118,13 @@ public class OneForOneStreamManagerSuite {
 
     Assertions.assertEquals(2, manager.numStreamStates());
 
-    try {
-      manager.connectionTerminated(dummyChannel);
-      Assertions.fail("connectionTerminated should throw exception when fails to release all buffers");
-
-    } catch (RuntimeException e) {
-
-      Mockito.verify(buffers, Mockito.times(1)).hasNext();
-      Mockito.verify(buffers, Mockito.times(1)).next();
-
-      Mockito.verify(buffers2, Mockito.times(2)).hasNext();
-      Mockito.verify(buffers2, Mockito.times(2)).next();
-
-      Mockito.verify(mockManagedBuffer, Mockito.times(1)).release();
-
-      Assertions.assertEquals(0, manager.numStreamStates());
-    }
+    Assertions.assertThrows(RuntimeException.class,
+      () -> manager.connectionTerminated(dummyChannel));
+    Mockito.verify(buffers, Mockito.times(1)).hasNext();
+    Mockito.verify(buffers, Mockito.times(1)).next();
+    Mockito.verify(buffers2, Mockito.times(2)).hasNext();
+    Mockito.verify(buffers2, Mockito.times(2)).next();
+    Mockito.verify(mockManagedBuffer, Mockito.times(1)).release();
+    Assertions.assertEquals(0, manager.numStreamStates());
   }
 }

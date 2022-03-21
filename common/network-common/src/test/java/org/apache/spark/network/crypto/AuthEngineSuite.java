@@ -101,7 +101,8 @@ public class AuthEngineSuite {
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.salt[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
+      Assertions.assertThrows(GeneralSecurityException.class,
+        () -> server.response(clientChallenge));
     }
   }
 
@@ -112,7 +113,8 @@ public class AuthEngineSuite {
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.ciphertext[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
+      Assertions.assertThrows(GeneralSecurityException.class,
+        () -> server.response(clientChallenge));
     }
   }
 
