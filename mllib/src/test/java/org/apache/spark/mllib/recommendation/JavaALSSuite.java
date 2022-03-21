@@ -53,8 +53,9 @@ public class JavaALSSuite extends SharedSparkSession {
       for (Rating r : predictedRatings) {
         double prediction = r.rating();
         double correct = trueRatings[r.product() * users + r.user()];
-        Assertions.assertTrue(String.format("Prediction=%2.4f not below match threshold of %2.2f",
-          prediction, matchThreshold), Math.abs(prediction - correct) < matchThreshold);
+        Assertions.assertTrue(Math.abs(prediction - correct) < matchThreshold,
+          String.format("Prediction=%2.4f not below match threshold of %2.2f",
+            prediction, matchThreshold));
       }
     } else {
       // For implicit prefs we use the confidence-weighted RMSE to test
@@ -71,8 +72,9 @@ public class JavaALSSuite extends SharedSparkSession {
         denom += confidence;
       }
       double rmse = Math.sqrt(sqErr / denom);
-      Assertions.assertTrue(String.format("Confidence-weighted RMSE=%2.4f above threshold of %2.2f",
-        rmse, matchThreshold), rmse < matchThreshold);
+      Assertions.assertTrue(rmse < matchThreshold,
+        String.format("Confidence-weighted RMSE=%2.4f above threshold of %2.2f",
+          rmse, matchThreshold));
     }
   }
 

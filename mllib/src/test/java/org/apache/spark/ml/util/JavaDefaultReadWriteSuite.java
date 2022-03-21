@@ -51,7 +51,7 @@ public class JavaDefaultReadWriteSuite extends SharedSparkSession {
     instance.save(outputPath);
     try {
       instance.save(outputPath);
-      Assert.fail(
+      Assertions.fail(
         "Write without overwrite enabled should fail if the output directory already exists.");
     } catch (IOException e) {
       // expected
@@ -59,7 +59,7 @@ public class JavaDefaultReadWriteSuite extends SharedSparkSession {
     instance.write().session(spark).overwrite().save(outputPath);
     MyParams newInstance = MyParams.load(outputPath);
     Assertions.assertEquals("UID should match.", instance.uid(), newInstance.uid());
-    Assertions.assertEquals("Params should be preserved.",
-      2, newInstance.getOrDefault(newInstance.intParam()));
+    Assertions.assertEquals(2, newInstance.getOrDefault(newInstance.intParam()),
+      "Params should be preserved.");
   }
 }

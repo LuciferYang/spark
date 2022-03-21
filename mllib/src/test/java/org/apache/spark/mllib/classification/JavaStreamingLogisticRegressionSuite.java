@@ -40,7 +40,7 @@ public class JavaStreamingLogisticRegressionSuite {
 
   protected transient JavaStreamingContext ssc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     SparkConf conf = new SparkConf()
       .setMaster("local[2]")
@@ -50,7 +50,7 @@ public class JavaStreamingLogisticRegressionSuite {
     ssc.checkpoint("checkpoint");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     ssc.stop();
     ssc = null;

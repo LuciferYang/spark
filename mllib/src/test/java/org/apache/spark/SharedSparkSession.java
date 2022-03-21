@@ -31,7 +31,7 @@ public abstract class SharedSparkSession implements Serializable {
   protected transient SparkSession spark;
   protected transient JavaSparkContext jsc;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     spark = SparkSession.builder()
       .master("local[2]")
@@ -40,7 +40,7 @@ public abstract class SharedSparkSession implements Serializable {
     jsc = new JavaSparkContext(spark.sparkContext());
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     try {
       spark.stop();

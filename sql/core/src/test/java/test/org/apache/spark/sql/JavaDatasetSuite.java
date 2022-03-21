@@ -39,7 +39,6 @@ import scala.Tuple5;
 
 import com.google.common.base.Objects;
 import org.apache.spark.sql.streaming.TestGroupState;
-import org.junit.*;
 
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;

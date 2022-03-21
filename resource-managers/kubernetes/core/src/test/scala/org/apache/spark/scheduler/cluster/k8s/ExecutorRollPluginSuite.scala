@@ -18,7 +18,7 @@ package org.apache.spark.scheduler.cluster.k8s
 
 import java.util.Date
 
-import org.junit.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.scalatest.PrivateMethodTester
 
 import org.apache.spark.SparkFunSuite

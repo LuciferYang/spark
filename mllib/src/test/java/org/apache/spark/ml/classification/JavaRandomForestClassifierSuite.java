@@ -75,7 +75,7 @@ public class JavaRandomForestClassifierSuite extends SharedSparkSession {
     for (String strategy : invalidStrategies) {
       try {
         rf.setFeatureSubsetStrategy(strategy);
-        Assert.fail("Expected exception to be thrown for invalid strategies");
+        Assertions.fail("Expected exception to be thrown for invalid strategies");
       } catch (Exception e) {
         Assertions.assertTrue(e instanceof IllegalArgumentException);
       }

@@ -33,7 +33,7 @@ import org.apache.hadoop.mapred.TextInputFormat
 import org.apache.hadoop.mapreduce.lib.input.{TextInputFormat => NewTextInputFormat}
 import org.apache.logging.log4j.{Level, LogManager}
 import org.json4s.{DefaultFormats, Extraction}
-import org.junit.Assert.{assertEquals, assertFalse}
+import org.junit.jupiter.api.Assertions.{assertEquals, assertFalse}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.must.Matchers._
 

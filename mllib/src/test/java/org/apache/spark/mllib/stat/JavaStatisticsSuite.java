@@ -46,7 +46,7 @@ public class JavaStatisticsSuite {
   private transient JavaSparkContext jsc;
   private transient JavaStreamingContext ssc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     SparkConf conf = new SparkConf()
       .set("spark.streaming.clock", "org.apache.spark.util.ManualClock");
@@ -60,7 +60,7 @@ public class JavaStatisticsSuite {
     ssc.checkpoint("checkpoint");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     ssc.stop();

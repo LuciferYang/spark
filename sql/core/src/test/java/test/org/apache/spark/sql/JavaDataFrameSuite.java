@@ -30,7 +30,6 @@ import scala.collection.Seq;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Ints;
-import org.junit.*;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;

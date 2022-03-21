@@ -39,7 +39,7 @@ public class JavaStreamingKMeansSuite {
 
   protected transient JavaStreamingContext ssc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     SparkConf conf = new SparkConf()
       .setMaster("local[2]")
@@ -49,7 +49,7 @@ public class JavaStreamingKMeansSuite {
     ssc.checkpoint("checkpoint");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     ssc.stop();
     ssc = null;
