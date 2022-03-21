@@ -35,10 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -754,7 +751,7 @@ public class RemoteBlockPushResolverSuite {
       t.getMessage());
   }
 
-  @Test
+  @Disabled
   public void testWritingPendingBufsIsAbortedImmediatelyDuringComplete() throws IOException {
     useTestFiles(true, false);
     RemoteBlockPushResolver.PushBlockStreamCallback callback =

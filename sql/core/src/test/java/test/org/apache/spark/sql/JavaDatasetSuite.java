@@ -1771,7 +1771,7 @@ public class JavaDatasetSuite implements Serializable {
   public void testNullInTopLevelBean() {
     NestedSmallBean bean = new NestedSmallBean();
     // We cannot set null in top-level bean
-    Assertions.assertThrows(UnsupportedOperationException.class,
+    Assertions.assertThrows(RuntimeException.class,
       () -> spark.createDataset(Arrays.asList(bean, null), Encoders.bean(NestedSmallBean.class)));
   }
 

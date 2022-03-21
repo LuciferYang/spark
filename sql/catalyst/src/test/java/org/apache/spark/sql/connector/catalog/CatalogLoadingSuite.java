@@ -37,7 +37,7 @@ public class CatalogLoadingSuite {
     TestCatalogPlugin testPlugin = (TestCatalogPlugin) plugin;
     Assertions.assertEquals(0, testPlugin.options.size(),
       "Options should contain no keys");
-    Assertions.assertEquals("Catalog should have correct name", "test-name", testPlugin.name());
+    Assertions.assertEquals("test-name", testPlugin.name(), "Catalog should have correct name");
   }
 
   @Test
@@ -55,10 +55,10 @@ public class CatalogLoadingSuite {
     TestCatalogPlugin testPlugin = (TestCatalogPlugin) plugin;
 
     Assertions.assertEquals(2, testPlugin.options.size(), "Options should contain only two keys");
-    Assertions.assertEquals("Options should contain correct value for name (not overwritten)",
-        "not-catalog-name", testPlugin.options.get("name"));
-    Assertions.assertEquals("Options should contain correct value for key",
-        "valUE", testPlugin.options.get("key"));
+    Assertions.assertEquals("not-catalog-name", testPlugin.options.get("name"),
+      "Options should contain correct value for name (not overwritten)");
+    Assertions.assertEquals("valUE", testPlugin.options.get("key"),
+      "Options should contain correct value for key");
   }
 
   @Test
