@@ -42,7 +42,7 @@ public class JavaDirectKafkaStreamSuite implements Serializable {
   private transient JavaStreamingContext ssc = null;
   private transient KafkaTestUtils kafkaTestUtils = null;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     kafkaTestUtils = new KafkaTestUtils();
     kafkaTestUtils.setup();
@@ -51,7 +51,7 @@ public class JavaDirectKafkaStreamSuite implements Serializable {
     ssc = new JavaStreamingContext(sparkConf, Durations.milliseconds(200));
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (ssc != null) {
       ssc.stop();

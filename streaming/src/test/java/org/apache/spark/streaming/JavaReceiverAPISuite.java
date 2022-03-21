@@ -44,12 +44,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class JavaReceiverAPISuite implements Serializable {
 
-  @Before
+  @BeforeEach
   public void setUp() {
     System.clearProperty("spark.streaming.clock");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     System.clearProperty("spark.streaming.clock");
   }

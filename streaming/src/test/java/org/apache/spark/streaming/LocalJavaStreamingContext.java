@@ -26,7 +26,7 @@ public abstract class LocalJavaStreamingContext {
 
     protected transient JavaStreamingContext ssc;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         SparkConf conf = new SparkConf()
             .setMaster("local[2]")
@@ -36,7 +36,7 @@ public abstract class LocalJavaStreamingContext {
         ssc.checkpoint("checkpoint");
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         ssc.stop();
         ssc = null;
