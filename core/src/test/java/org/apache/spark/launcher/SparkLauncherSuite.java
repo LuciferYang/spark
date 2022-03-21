@@ -27,7 +27,7 @@ import java.util.Properties;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.Assume.*;
+import static org.junit.jupiter.api.Assumptions.*;
 import static org.mockito.Mockito.*;
 
 import org.apache.spark.SparkContext;
@@ -289,9 +289,8 @@ public class SparkLauncherSuite extends BaseSuite {
     // Here DAGScheduler is stopped, while SparkContext.clearActiveContext may not be called yet.
     // Wait for a reasonable amount of time to avoid creating two active SparkContext in JVM.
     // See SPARK-23019 and SparkContext.stop() for details.
-    eventually(Duration.ofSeconds(5), Duration.ofMillis(10), () -> {
-      assertTrue("SparkContext is still alive.", SparkContext$.MODULE$.getActive().isEmpty());
-    });
+    eventually(Duration.ofSeconds(5), Duration.ofMillis(10), () ->
+      assertTrue(SparkContext$.MODULE$.getActive().isEmpty(), "SparkContext is still alive."));
   }
 
   public static class SparkLauncherTestApp {

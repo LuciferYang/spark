@@ -19,7 +19,7 @@ package org.apache.spark.streaming;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
 public abstract class LocalJavaStreamingContext {

@@ -82,24 +82,24 @@ public class TaskMemoryManagerSuite {
     Assertions.assertEquals(MemoryBlock.FREED_IN_ALLOCATOR_PAGE_NUMBER, dataPage.pageNumber);
   }
 
-  @Test(expected = AssertionError.class)
+  @Test
   public void freeingPageDirectlyInAllocatorTriggersAssertionError() {
     final TaskMemoryManager manager = new TaskMemoryManager(
       new TestMemoryManager(
         new SparkConf().set(package$.MODULE$.MEMORY_OFFHEAP_ENABLED(), false)), 0);
     final MemoryConsumer c = new TestMemoryConsumer(manager, MemoryMode.ON_HEAP);
     final MemoryBlock dataPage = manager.allocatePage(256, c);
-    MemoryAllocator.HEAP.free(dataPage);
+    Assertions.assertThrows(AssertionError.class, () -> MemoryAllocator.HEAP.free(dataPage));
   }
 
-  @Test(expected = AssertionError.class)
+  @Test
   public void callingFreePageOnDirectlyAllocatedPageTriggersAssertionError() {
     final TaskMemoryManager manager = new TaskMemoryManager(
       new TestMemoryManager(
         new SparkConf().set(package$.MODULE$.MEMORY_OFFHEAP_ENABLED(), false)), 0);
     final MemoryConsumer c = new TestMemoryConsumer(manager, MemoryMode.ON_HEAP);
     final MemoryBlock dataPage = MemoryAllocator.HEAP.allocate(256);
-    manager.freePage(dataPage, c);
+    Assertions.assertThrows(AssertionError.class, () -> manager.freePage(dataPage, c));
   }
 
   @Test
@@ -170,7 +170,8 @@ public class TaskMemoryManagerSuite {
 
     c3.use(10);
     Assertions.assertEquals(0, c1.getUsed());   // c1: spilled as it has required size of memory
-    Assertions.assertEquals(80, c2.getUsed());  // c2: not spilled as spilling c1 already satisfies c3
+    Assertions
+      .assertEquals(80, c2.getUsed());  // c2: not spilled as spilling c1 already satisfies c3
     Assertions.assertEquals(10, c3.getUsed());
 
     c1.free(0);

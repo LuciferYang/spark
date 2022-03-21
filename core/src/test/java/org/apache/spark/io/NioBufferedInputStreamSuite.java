@@ -26,7 +26,7 @@ import java.io.IOException;
  */
 public class NioBufferedInputStreamSuite extends GenericFileInputStreamSuite {
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     inputStreams = new InputStream[] {

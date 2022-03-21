@@ -24,7 +24,7 @@ import java.util.*;
 
 import scala.Tuple2$;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +72,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Mock(answer = RETURNS_SMART_NULLS) BlockManager blockManager;
   @Mock(answer = RETURNS_SMART_NULLS) DiskBlockManager diskBlockManager;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     memoryManager =
       new TestMemoryManager(
@@ -113,7 +113,7 @@ public abstract class AbstractBytesToBytesMapSuite {
       });
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     Utils.deleteRecursively(tempDir);
     tempDir = null;
@@ -168,7 +168,8 @@ public abstract class AbstractBytesToBytesMapSuite {
       final int keyLengthInWords = 10;
       final int keyLengthInBytes = keyLengthInWords * 8;
       final byte[] key = getRandomByteArray(keyLengthInWords);
-      Assertions.assertFalse(map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
+      Assertions.assertFalse(
+        map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
       Assertions.assertFalse(map.iterator().hasNext());
       Assertions.assertFalse(map.iteratorWithKeyIndex().hasNext());
     } finally {
@@ -267,7 +268,7 @@ public abstract class AbstractBytesToBytesMapSuite {
         final long value = Platform.getLong(loc.getValueBase(), loc.getValueOffset());
         final long keyLength = loc.getKeyLength();
         if (keyLength == 0) {
-          assertEquals("value " + value + " was not divisible by 5", 0, value % 5);
+          assertEquals(0, value % 5, "value " + value + " was not divisible by 5");
         } else {
           final long key = Platform.getLong(loc.getKeyBase(), loc.getKeyOffset());
           Assertions.assertEquals(value, key);
@@ -566,8 +567,8 @@ public abstract class AbstractBytesToBytesMapSuite {
     } finally {
       map.free();
       for (File spillFile : spillFilesCreated) {
-        assertFalse("Spill file " + spillFile.getPath() + " was not cleaned up",
-          spillFile.exists());
+        assertFalse(spillFile.exists(),
+          "Spill file " + spillFile.getPath() + " was not cleaned up");
       }
     }
   }
@@ -618,33 +619,16 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   @Test
   public void initialCapacityBoundsChecking() {
-    try {
-      new BytesToBytesMap(taskMemoryManager, 0, PAGE_SIZE_BYTES);
-      Assert.fail("Expected IllegalArgumentException to be thrown");
-    } catch (IllegalArgumentException e) {
-      // expected exception
-    }
+    assertThrows(IllegalArgumentException.class,
+      () -> new BytesToBytesMap(taskMemoryManager, 0, PAGE_SIZE_BYTES));
 
-    try {
-      new BytesToBytesMap(
-        taskMemoryManager,
-        BytesToBytesMap.MAX_CAPACITY + 1,
-        PAGE_SIZE_BYTES);
-      Assert.fail("Expected IllegalArgumentException to be thrown");
-    } catch (IllegalArgumentException e) {
-      // expected exception
-    }
+    assertThrows(IllegalArgumentException.class,
+      () -> new BytesToBytesMap(taskMemoryManager,
+              BytesToBytesMap.MAX_CAPACITY + 1, PAGE_SIZE_BYTES));
 
-    try {
-      new BytesToBytesMap(
-        taskMemoryManager,
-        1,
-        TaskMemoryManager.MAXIMUM_PAGE_SIZE_BYTES + 1);
-      Assert.fail("Expected IllegalArgumentException to be thrown");
-    } catch (IllegalArgumentException e) {
-      // expected exception
-    }
-
+    assertThrows(IllegalArgumentException.class,
+      () -> new BytesToBytesMap(taskMemoryManager, 1,
+              TaskMemoryManager.MAXIMUM_PAGE_SIZE_BYTES + 1));
   }
 
   @Test
@@ -727,8 +711,8 @@ public abstract class AbstractBytesToBytesMapSuite {
       map.free();
       thread.join();
       for (File spillFile : spillFilesCreated) {
-        assertFalse("Spill file " + spillFile.getPath() + " was not cleaned up",
-          spillFile.exists());
+        assertFalse(spillFile.exists(),
+          "Spill file " + spillFile.getPath() + " was not cleaned up");
       }
     }
   }
@@ -742,10 +726,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     // Force OOM on next memory allocation.
     memoryManager.markExecutionAsOutOfMemoryOnce();
     try {
-      map.reset();
-      Assert.fail("Expected SparkOutOfMemoryError to be thrown");
-    } catch (SparkOutOfMemoryError e) {
-      // Expected exception; do nothing.
+      assertThrows(SparkOutOfMemoryError.class, map::reset);
     } finally {
       map.free();
     }

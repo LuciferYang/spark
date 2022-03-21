@@ -22,7 +22,7 @@ import java.util.List;
 
 import scala.Tuple2;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

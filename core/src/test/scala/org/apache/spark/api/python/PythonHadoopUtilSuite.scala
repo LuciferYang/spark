@@ -21,7 +21,7 @@ import java.util.HashMap
 
 import org.apache.hadoop.io.{BooleanWritable, BytesWritable, ByteWritable, DoubleWritable, FloatWritable, IntWritable, LongWritable,
   MapWritable, NullWritable, ShortWritable, Text, Writable}
-import org.junit.Assert
+import org.junit.jupiter.api.Assertions
 import org.mockito.Mockito.mock
 
 import org.apache.spark.SparkFunSuite
@@ -40,7 +40,7 @@ class PythonHadoopUtilSuite extends SparkFunSuite {
     }
     val javaToWritableConverter = new JavaToWritableConverter()
     val reConverted = javaToWritableConverter.convert(result)
-    Assertions.assertEquals("Round trip conversion failed", input, reConverted)
+    Assertions.assertEquals(input, reConverted, "Round trip conversion failed")
   }
 
   test("Testing roundtrip conversion of various types") {

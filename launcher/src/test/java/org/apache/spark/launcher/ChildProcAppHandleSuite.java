@@ -38,7 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.Assume.*;
+import static org.junit.jupiter.api.Assumptions.*;
 
 import static org.apache.spark.launcher.CommandBuilderUtils.*;
 
@@ -63,7 +63,7 @@ public class ChildProcAppHandleSuite extends BaseSuite {
     }
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void setupClass() throws Exception {
     TEST_SCRIPT_PATH = File.createTempFile("output-redir-test", ".sh");
     Files.setPosixFilePermissions(TEST_SCRIPT_PATH.toPath(),
@@ -71,7 +71,7 @@ public class ChildProcAppHandleSuite extends BaseSuite {
     Files.write(TEST_SCRIPT_PATH.toPath(), TEST_SCRIPT);
   }
 
-  @Before
+  @BeforeEach
   public void cleanupLog() {
     MESSAGES.clear();
   }
@@ -164,27 +164,29 @@ public class ChildProcAppHandleSuite extends BaseSuite {
     assertEquals(Arrays.asList("output"), Files.lines(out).collect(Collectors.toList()));
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testBadLogRedirect() throws Exception {
     File out = Files.createTempFile("stdout", "txt").toFile();
     out.deleteOnExit();
-    new SparkLauncher()
-      .redirectError()
-      .redirectOutput(out)
-      .redirectToLog("foo")
-      .launch()
-      .waitFor();
+    assertThrows(IllegalArgumentException.class,
+      () -> new SparkLauncher()
+              .redirectError()
+              .redirectOutput(out)
+              .redirectToLog("foo")
+              .launch()
+              .waitFor());
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testRedirectErrorTwiceFails() throws Exception {
     File err = Files.createTempFile("stderr", "txt").toFile();
     err.deleteOnExit();
-    new SparkLauncher()
-      .redirectError()
-      .redirectError(err)
-      .launch()
-      .waitFor();
+    assertThrows(IllegalArgumentException.class,
+      () -> new SparkLauncher()
+              .redirectError()
+              .redirectError(err)
+              .launch()
+              .waitFor());
   }
 
   @Test

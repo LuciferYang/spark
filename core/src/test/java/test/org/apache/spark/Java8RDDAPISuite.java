@@ -28,7 +28,7 @@ import com.google.common.io.Files;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,12 +49,12 @@ public class Java8RDDAPISuite implements Serializable {
   private static int foreachCalls = 0;
   private transient JavaSparkContext sc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     sc = new JavaSparkContext("local", "JavaAPISuite");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     sc.stop();
     sc = null;
@@ -335,8 +335,8 @@ public class Java8RDDAPISuite implements Serializable {
 
     List<Tuple2<Integer, Integer>>[] parts2 = rdd2.collectPartitions(new int[]{1, 2});
     Assertions.assertEquals(Arrays.asList(new Tuple2<>(3, 1), new Tuple2<>(4, 0)), parts2[0]);
-    Assertions.assertEquals(Arrays.asList(new Tuple2<>(5, 1), new Tuple2<>(6, 0), new Tuple2<>(7, 1)),
-      parts2[1]);
+    Assertions.assertEquals(
+      Arrays.asList(new Tuple2<>(5, 1), new Tuple2<>(6, 0), new Tuple2<>(7, 1)), parts2[1]);
   }
 
   @Test

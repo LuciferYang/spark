@@ -58,7 +58,7 @@ public class ShuffleInMemorySorterSuite {
   }
 
   @Test
-  public void testBasicSorting() throws Exception {
+  public void testBasicSorting() {
     final String[] dataToSort = new String[] {
       "Boba",
       "Pearls",
@@ -106,8 +106,8 @@ public class ShuffleInMemorySorterSuite {
       iter.loadNext();
       final int partitionId = iter.packedRecordPointer.getPartitionId();
       Assertions.assertTrue(partitionId >= 0 && partitionId <= 3);
-      Assertions.assertTrue("Partition id " + partitionId + " should be >= prev id " + prevPartitionId,
-        partitionId >= prevPartitionId);
+      Assertions.assertTrue(partitionId >= prevPartitionId,
+        "Partition id " + partitionId + " should be >= prev id " + prevPartitionId);
       final long recordAddress = iter.packedRecordPointer.getRecordPointer();
       final int recordLength = Platform.getInt(
         memoryManager.getPage(recordAddress), memoryManager.getOffsetInPage(recordAddress));
@@ -121,7 +121,7 @@ public class ShuffleInMemorySorterSuite {
   }
 
   @Test
-  public void testSortingManyNumbers() throws Exception {
+  public void testSortingManyNumbers() {
     ShuffleInMemorySorter sorter = new ShuffleInMemorySorter(consumer, 4, shouldUseRadixSort());
     int[] numbersToSort = new int[128000];
     Random random = new Random(16);

@@ -26,7 +26,7 @@ import java.io.InputStream;
  */
 public class ReadAheadInputStreamSuite extends GenericFileInputStreamSuite {
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     inputStreams = new InputStream[] {

@@ -18,7 +18,7 @@ package org.apache.spark.io;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ public abstract class GenericFileInputStreamSuite {
 
   protected InputStream[] inputStreams;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     // Create a byte array of size 2 MB with random bytes
     randomBytes =  RandomUtils.nextBytes(2 * 1024 * 1024);
@@ -47,7 +47,7 @@ public abstract class GenericFileInputStreamSuite {
     FileUtils.writeByteArrayToFile(inputFile, randomBytes);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     inputFile.delete();
 

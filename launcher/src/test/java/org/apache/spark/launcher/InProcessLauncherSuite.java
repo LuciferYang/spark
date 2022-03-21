@@ -38,7 +38,7 @@ public class InProcessLauncherSuite extends BaseSuite {
 
   private static Throwable lastError;
 
-  @Before
+  @BeforeEach
   public void testSetup() {
     lastError = null;
   }

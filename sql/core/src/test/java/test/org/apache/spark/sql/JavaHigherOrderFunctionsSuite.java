@@ -24,7 +24,7 @@ import static java.util.stream.Collectors.toList;
 
 import static scala.collection.JavaConverters.mapAsScalaMap;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

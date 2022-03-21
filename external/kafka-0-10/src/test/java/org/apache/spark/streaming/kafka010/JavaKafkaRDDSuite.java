@@ -25,7 +25,7 @@ import java.util.Random;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ public class JavaKafkaRDDSuite implements Serializable {
   private transient JavaSparkContext sc = null;
   private transient KafkaTestUtils kafkaTestUtils = null;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     kafkaTestUtils = new KafkaTestUtils();
     kafkaTestUtils.setup();
@@ -48,7 +48,7 @@ public class JavaKafkaRDDSuite implements Serializable {
     sc = new JavaSparkContext(sparkConf);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (sc != null) {
       sc.stop();

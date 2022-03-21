@@ -25,7 +25,7 @@ import java.util.UUID;
 
 import scala.Tuple2$;
 
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -90,7 +90,7 @@ public class UnsafeExternalSorterSuite {
   private final int spillThreshold =
     (int) conf.get(package$.MODULE$.SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD());
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     MockitoAnnotations.openMocks(this).close();
     tempDir = Utils.createTempDir(System.getProperty("java.io.tmpdir"), "unsafe-test");
@@ -124,7 +124,7 @@ public class UnsafeExternalSorterSuite {
       });
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     try {
       assertEquals(0L, taskMemoryManager.cleanUpAllAllocatedMemory());
@@ -136,8 +136,8 @@ public class UnsafeExternalSorterSuite {
 
   private void assertSpillFilesWereCleanedUp() {
     for (File spillFile : spillFilesCreated) {
-      assertFalse("Spill file " + spillFile.getPath() + " was not cleaned up",
-        spillFile.exists());
+      assertFalse(spillFile.exists(),
+        "Spill file " + spillFile.getPath() + " was not cleaned up");
     }
   }
 
