@@ -47,7 +47,7 @@ public class JavaRowSuite {
   private Date dateValue;
   private Timestamp timestampValue;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     byteValue = (byte)127;
     shortValue = (short)32767;

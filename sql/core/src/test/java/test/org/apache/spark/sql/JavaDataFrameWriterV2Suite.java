@@ -40,14 +40,14 @@ public class JavaDataFrameWriterV2Suite {
     return spark.read().schema(schema).text();
   }
 
-  @Before
+  @BeforeEach
   public void createTestTable() {
     this.spark = new TestSparkSession();
     spark.conf().set("spark.sql.catalog.testcat", InMemoryTableCatalog.class.getName());
     spark.sql("CREATE TABLE testcat.t (s string) USING foo");
   }
 
-  @After
+  @AfterEach
   public void dropTestTable() {
     spark.sql("DROP TABLE testcat.t");
     spark.stop();

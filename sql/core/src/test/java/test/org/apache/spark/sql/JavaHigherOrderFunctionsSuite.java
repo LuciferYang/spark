@@ -99,14 +99,14 @@ public class JavaHigherOrderFunctionsSuite {
         mapDf = spark.createDataFrame(data, schema);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         spark = new TestSparkSession();
         setUpArrDf();
         setUpMapDf();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         spark.stop();
         spark = null;

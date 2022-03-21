@@ -46,7 +46,7 @@ public class JavaApplySchemaSuite implements Serializable {
   private transient SparkSession spark;
   private transient JavaSparkContext jsc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = SparkSession.builder()
       .master("local[*]")
@@ -55,7 +55,7 @@ public class JavaApplySchemaSuite implements Serializable {
     jsc = new JavaSparkContext(spark.sparkContext());
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;

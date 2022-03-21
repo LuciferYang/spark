@@ -41,7 +41,7 @@ import org.apache.spark.sql.types.DataTypes;
 public class JavaUDFSuite implements Serializable {
   private transient SparkSession spark;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = SparkSession.builder()
       .master("local[*]")
@@ -49,7 +49,7 @@ public class JavaUDFSuite implements Serializable {
       .getOrCreate();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
@@ -107,10 +107,11 @@ public class JavaUDFSuite implements Serializable {
     Assertions.assertEquals(55, sum);
   }
 
-  @Test(expected = AnalysisException.class)
+  @Test
   public void udf5Test() {
     spark.udf().register("inc", (Long i) -> i + 1, DataTypes.LongType);
-    List<Row> results = spark.sql("SELECT inc(1, 5)").collectAsList();
+    Assertions.assertThrows(AnalysisException.class,
+      () -> spark.sql("SELECT inc(1, 5)").collectAsList());
   }
 
   @Test

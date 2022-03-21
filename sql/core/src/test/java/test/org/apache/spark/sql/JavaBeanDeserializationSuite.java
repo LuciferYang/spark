@@ -26,7 +26,10 @@ import java.util.*;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.junit.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.catalyst.expressions.GenericRow;
@@ -42,12 +45,12 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
   private TestSparkSession spark;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = new TestSparkSession();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
@@ -182,19 +185,9 @@ public class JavaBeanDeserializationSuite implements Serializable {
     StructType schema = new StructType().add("id", DataTypes.StringType);
 
     Dataset<Row> dataFrame = spark.createDataFrame(inputRows, schema);
-
-    try {
-      dataFrame.as(encoder).collect();
-      Assert.fail("Expected AnalysisException, but passed.");
-    } catch (Throwable e) {
-      // Here we need to handle weird case: compiler complains AnalysisException never be thrown
-      // in try statement, but it can be thrown actually. Maybe Scala-Java interop issue?
-      if (e instanceof AnalysisException) {
-        Assertions.assertTrue(e.getMessage().contains("Cannot up cast "));
-      } else {
-        throw e;
-      }
-    }
+    AnalysisException e = Assertions.assertThrows(AnalysisException.class,
+      () -> dataFrame.as(encoder).collect());
+    Assertions.assertTrue(e.getMessage().contains("Cannot up cast "));
   }
 
   private static Row createRecordSpark22000Row(Long index) {

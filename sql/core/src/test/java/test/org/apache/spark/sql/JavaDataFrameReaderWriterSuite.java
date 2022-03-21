@@ -35,7 +35,7 @@ public class JavaDataFrameReaderWriterSuite {
   private transient String input;
   private transient String output;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     input = Utils.createTempDir(System.getProperty("java.io.tmpdir"), "input").toString();
     File f = Utils.createTempDir(System.getProperty("java.io.tmpdir"), "output");
@@ -43,7 +43,7 @@ public class JavaDataFrameReaderWriterSuite {
     output = f.toString();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;

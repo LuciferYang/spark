@@ -36,13 +36,13 @@ public class JavaDataStreamReaderWriterSuite {
   private SparkSession spark;
   private String input;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = new TestSparkSession();
     input = Utils.createTempDir(System.getProperty("java.io.tmpdir"), "input").toString();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     try {
       Utils.deleteRecursively(new File(input));

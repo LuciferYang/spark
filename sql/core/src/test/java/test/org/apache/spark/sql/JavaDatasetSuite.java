@@ -28,6 +28,10 @@ import javax.annotation.Nonnull;
 import org.apache.spark.api.java.Optional;
 import org.apache.spark.sql.streaming.GroupStateTimeout;
 import org.apache.spark.sql.streaming.OutputMode;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import scala.Tuple2;
 import scala.Tuple3;
 import scala.Tuple4;
@@ -54,7 +58,7 @@ public class JavaDatasetSuite implements Serializable {
   private transient TestSparkSession spark;
   private transient JavaSparkContext jsc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     // Trigger static initializer of TestData
     spark = new TestSparkSession();
@@ -62,7 +66,7 @@ public class JavaDatasetSuite implements Serializable {
     spark.loadTestData();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
@@ -215,28 +219,22 @@ public class JavaDatasetSuite implements Serializable {
   public void testIllegalTestGroupStateCreations() {
     // SPARK-35800: test code throws upon illegal TestGroupState create() calls
     Assertions.assertThrows(
-      "eventTimeWatermarkMs must be 0 or positive if present",
       IllegalArgumentException.class,
-      () -> {
-        TestGroupState.create(
-          Optional.of(5), GroupStateTimeout.EventTimeTimeout(), 0L, Optional.of(-1000L), false);
-      });
+      () -> TestGroupState.create(
+        Optional.of(5), GroupStateTimeout.EventTimeTimeout(), 0L, Optional.of(-1000L), false),
+      "eventTimeWatermarkMs must be 0 or positive if present");
 
     Assertions.assertThrows(
-      "batchProcessingTimeMs must be 0 or positive",
       IllegalArgumentException.class,
-      () -> {
-        TestGroupState.create(
-          Optional.of(5), GroupStateTimeout.EventTimeTimeout(), -100L, Optional.of(1000L), false);
-      });
+      () -> TestGroupState.create(
+        Optional.of(5), GroupStateTimeout.EventTimeTimeout(), -100L, Optional.of(1000L), false),
+      "batchProcessingTimeMs must be 0 or positive");
 
     Assertions.assertThrows(
-      "hasTimedOut is true however there's no timeout configured",
       UnsupportedOperationException.class,
-      () -> {
-        TestGroupState.create(
-          Optional.of(5), GroupStateTimeout.NoTimeout(), 100L, Optional.empty(), true);
-      });
+      () -> TestGroupState.create(
+        Optional.of(5), GroupStateTimeout.NoTimeout(), 100L, Optional.empty(), true),
+      "hasTimedOut is true however there's no timeout configured");
   }
 
   @Test
@@ -418,7 +416,7 @@ public class JavaDatasetSuite implements Serializable {
       namedMetrics = namedObservation.getAsJava();
       unnamedMetrics = unnamedObservation.getAsJava();
     } catch (InterruptedException e) {
-      Assert.fail();
+      Assertions.fail();
     }
     Map<String, Object> expectedNamedMetrics = new HashMap<String, Object>() {{
       put("min_val", 0L);
@@ -438,7 +436,7 @@ public class JavaDatasetSuite implements Serializable {
       namedMetrics = namedObservation.getAsJava();
       unnamedMetrics = unnamedObservation.getAsJava();
     } catch (InterruptedException e) {
-      Assert.fail();
+      Assertions.fail();
     }
     Assertions.assertEquals(expectedNamedMetrics, namedMetrics);
     Assertions.assertEquals(expectedUnnamedMetrics, unnamedMetrics);
@@ -698,7 +696,7 @@ public class JavaDatasetSuite implements Serializable {
     double[] arraySplit = {1, 2, 3};
 
     List<Dataset<String>> randomSplit =  ds.randomSplitAsList(arraySplit, 1);
-    Assertions.assertEquals("wrong number of splits", randomSplit.size(), 3);
+    Assertions.assertEquals(randomSplit.size(), 3, "wrong number of splits");
   }
 
   /**
@@ -707,14 +705,16 @@ public class JavaDatasetSuite implements Serializable {
    */
   private static class PrivateClassTest { }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testJavaEncoderErrorMessageForPrivateClass() {
-    Encoders.javaSerialization(PrivateClassTest.class);
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> Encoders.javaSerialization(PrivateClassTest.class));
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testKryoEncoderErrorMessageForPrivateClass() {
-    Encoders.kryo(PrivateClassTest.class);
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> Encoders.kryo(PrivateClassTest.class));
   }
 
   public static class SimpleJavaBean implements Serializable {
@@ -1163,8 +1163,8 @@ public class JavaDatasetSuite implements Serializable {
       Dataset<Row> df = spark.createDataFrame(Collections.singletonList(row), schema);
       Dataset<NestedSmallBean> ds = df.as(Encoders.bean(NestedSmallBean.class));
 
-      Assertions.assertThrows("Null value appeared in non-nullable field", RuntimeException.class,
-        ds::collect);
+      Assertions.assertThrows(RuntimeException.class, ds::collect,
+        "Null value appeared in non-nullable field");
     }
   }
 
@@ -1747,29 +1747,33 @@ public class JavaDatasetSuite implements Serializable {
     }
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testCircularReferenceBean1() {
     CircularReference1Bean bean = new CircularReference1Bean();
-    spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference1Bean.class));
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () ->  spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference1Bean.class)));
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testCircularReferenceBean2() {
     CircularReference3Bean bean = new CircularReference3Bean();
-    spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference3Bean.class));
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference3Bean.class)));
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testCircularReferenceBean3() {
     CircularReference4Bean bean = new CircularReference4Bean();
-    spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference4Bean.class));
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> spark.createDataset(Arrays.asList(bean), Encoders.bean(CircularReference4Bean.class)));
   }
 
-  @Test(expected = RuntimeException.class)
+  @Test
   public void testNullInTopLevelBean() {
     NestedSmallBean bean = new NestedSmallBean();
     // We cannot set null in top-level bean
-    spark.createDataset(Arrays.asList(bean, null), Encoders.bean(NestedSmallBean.class));
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> spark.createDataset(Arrays.asList(bean, null), Encoders.bean(NestedSmallBean.class)));
   }
 
   @Test

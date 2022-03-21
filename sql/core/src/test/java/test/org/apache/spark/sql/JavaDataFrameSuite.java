@@ -24,6 +24,7 @@ import java.util.*;
 import java.math.BigInteger;
 import java.math.BigDecimal;
 
+import org.junit.jupiter.api.*;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -49,7 +50,7 @@ public class JavaDataFrameSuite {
   private transient TestSparkSession spark;
   private transient JavaSparkContext jsc;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     // Trigger static initializer of TestData
     spark = new TestSparkSession();
@@ -57,7 +58,7 @@ public class JavaDataFrameSuite {
     spark.loadTestData();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
@@ -121,7 +122,7 @@ public class JavaDataFrameSuite {
     df2.select(col("*"), randn(5L));
   }
 
-  @Ignore
+  @Disabled
   public void testShow() {
     // This test case is intended ignored, but to make sure it compiles correctly
     Dataset<Row> df = spark.table("testData");
@@ -523,10 +524,11 @@ public class JavaDataFrameSuite {
 
   // Checks a simple case for DataFrame here and put exhaustive tests for the issue
   // of circular references in `JavaDatasetSuite`.
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void testCircularReferenceBean() {
     CircularReference1Bean bean = new CircularReference1Bean();
-    spark.createDataFrame(Arrays.asList(bean), CircularReference1Bean.class);
+    Assertions.assertThrows(UnsupportedOperationException.class,
+      () -> spark.createDataFrame(Arrays.asList(bean), CircularReference1Bean.class));
   }
 
   @Test

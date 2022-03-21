@@ -57,7 +57,7 @@ public class RecordBinaryComparatorSuite {
   private LongArray array;
   private int pos;
 
-  @Before
+  @BeforeEach
   public void beforeEach() {
     // Only compare between two input rows.
     array = consumer.allocateArray(2);
@@ -67,7 +67,7 @@ public class RecordBinaryComparatorSuite {
     pageCursor = dataPage.getBaseOffset();
   }
 
-  @After
+  @AfterEach
   public void afterEach() {
     consumer.freePage(dataPage);
     dataPage = null;

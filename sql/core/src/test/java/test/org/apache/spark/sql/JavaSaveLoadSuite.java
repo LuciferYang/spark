@@ -45,7 +45,7 @@ public class JavaSaveLoadSuite {
     QueryTest$.MODULE$.checkAnswer(actual, expected);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     spark = SparkSession.builder()
       .master("local[*]")
@@ -67,7 +67,7 @@ public class JavaSaveLoadSuite {
     df.createOrReplaceTempView("jsonTable");
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;

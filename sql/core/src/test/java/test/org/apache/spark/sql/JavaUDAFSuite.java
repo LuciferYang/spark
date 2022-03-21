@@ -29,7 +29,7 @@ public class JavaUDAFSuite {
 
   private transient SparkSession spark;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = SparkSession.builder()
         .master("local[*]")
@@ -37,7 +37,7 @@ public class JavaUDAFSuite {
         .getOrCreate();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
