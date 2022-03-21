@@ -33,12 +33,12 @@ import static org.apache.spark.sql.avro.functions.from_avro;
 public class JavaAvroFunctionsSuite {
   private transient TestSparkSession spark;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     spark = new TestSparkSession();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
   }

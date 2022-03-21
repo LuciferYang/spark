@@ -50,7 +50,7 @@ public class JavaMetastoreDataSourcesSuite {
   FileSystem fs;
   Dataset<Row> df;
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     sqlContext = TestHive$.MODULE$;
     sc = new JavaSparkContext(sqlContext.sparkContext());
@@ -74,7 +74,7 @@ public class JavaMetastoreDataSourcesSuite {
     df.createOrReplaceTempView("jsonTable");
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     // Clean up tables.
     if (sqlContext != null) {

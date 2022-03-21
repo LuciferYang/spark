@@ -41,7 +41,7 @@ public class JavaDataFrameSuite {
     QueryTest$.MODULE$.checkAnswer(actual, expected);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     hc = TestHive$.MODULE$;
     List<String> jsonObjects = new ArrayList<>(10);
@@ -52,7 +52,7 @@ public class JavaDataFrameSuite {
     df.createOrReplaceTempView("window_table");
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     // Clean up tables.
     if (hc != null) {
