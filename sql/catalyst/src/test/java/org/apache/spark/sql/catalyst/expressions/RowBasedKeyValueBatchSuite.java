@@ -102,7 +102,7 @@ public class RowBasedKeyValueBatchSuite {
     return (row.getLong(0) == v1) && (row.getLong(1) == v2);
   }
 
-  @Before
+  @BeforeEach
   public void setup() {
     memoryManager = new TestMemoryManager(new SparkConf()
             .set(package$.MODULE$.MEMORY_OFFHEAP_ENABLED(), false)
@@ -111,7 +111,7 @@ public class RowBasedKeyValueBatchSuite {
     taskMemoryManager = new TaskMemoryManager(memoryManager, 0);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (taskMemoryManager != null) {
       Assertions.assertEquals(0L, taskMemoryManager.cleanUpAllAllocatedMemory());
@@ -135,7 +135,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row -1", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row -1");
 
       asserted = false;
       try {
@@ -144,7 +144,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row -1", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row -1");
 
       asserted = false;
       try {
@@ -153,7 +153,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row 0 when batch is empty", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row 0 when batch is empty");
 
       asserted = false;
       try {
@@ -162,7 +162,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row 0 when batch is empty", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row 0 when batch is empty");
 
       Assertions.assertFalse(batch.rowIterator().next());
     }
@@ -206,7 +206,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row 3", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row 3");
 
       asserted = false;
       try {
@@ -215,7 +215,7 @@ public class RowBasedKeyValueBatchSuite {
         // Expected exception; do nothing.
         asserted = true;
       }
-      Assertions.assertTrue("Should not be able to get row 3", asserted);
+      Assertions.assertTrue(asserted, "Should not be able to get row 3");
     }
   }
 
