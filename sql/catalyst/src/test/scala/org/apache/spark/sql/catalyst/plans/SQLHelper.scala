@@ -23,7 +23,6 @@ import scala.util.control.NonFatal
 
 import org.scalatest.Assertions.fail
 
-import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.util.DateTimeTestUtils
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.getZoneId
 import org.apache.spark.sql.internal.SQLConf
