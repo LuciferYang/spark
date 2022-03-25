@@ -128,10 +128,4 @@ public final class NioBufferedFileInputStream extends InputStream {
     fileChannel.close();
     StorageUtils.dispose(byteBuffer);
   }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  protected void finalize() throws IOException {
-    close();
-  }
 }
