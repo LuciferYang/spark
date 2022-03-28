@@ -979,7 +979,8 @@ public class RemoteBlockPushResolverSuite {
       prepareLocalDirs(attempt2LocalDirs, MERGE_DIRECTORY + "_" + ATTEMPT_ID_2),
       MERGE_DIRECTORY_META_2);
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-      () -> pushResolver.finalizeShuffleMerge(new FinalizeShuffleMerge(testApp, ATTEMPT_ID_1, 0, 0)));
+      () -> pushResolver.finalizeShuffleMerge(
+              new FinalizeShuffleMerge(testApp, ATTEMPT_ID_1, 0, 0)));
     assertEquals(e.getMessage(),
       String.format("The attempt id %s in this FinalizeShuffleMerge message does not " +
         "match with the current attempt id %s stored in shuffle service for application %s",
@@ -1075,7 +1076,8 @@ public class RemoteBlockPushResolverSuite {
     // stream 2 now completes
     stream2.onComplete(stream2.getID());
     RuntimeException re = assertThrows(RuntimeException.class,
-      () -> pushResolver.finalizeShuffleMerge(new FinalizeShuffleMerge(TEST_APP, NO_ATTEMPT_ID, 0, 1)));
+      () -> pushResolver.finalizeShuffleMerge(
+              new FinalizeShuffleMerge(TEST_APP, NO_ATTEMPT_ID, 0, 1)));
     assertEquals("Shuffle merge finalize request for shuffle 0 with shuffleMergeId 1 is stale"
       + " shuffle finalize request as shuffle blocks of a higher shuffleMergeId for the shuffle"
       + " is already being pushed", re.getMessage());
@@ -1133,7 +1135,8 @@ public class RemoteBlockPushResolverSuite {
       + " is stale shuffle block fetch request as shuffle blocks of a higher shuffleMergeId for"
       + " the shuffle is available", re0.getMessage());
     RuntimeException re1 = assertThrows(RuntimeException.class,
-      () -> pushResolver.finalizeShuffleMerge(new FinalizeShuffleMerge(TEST_APP, NO_ATTEMPT_ID, 0, 1)));
+      () -> pushResolver.finalizeShuffleMerge(
+              new FinalizeShuffleMerge(TEST_APP, NO_ATTEMPT_ID, 0, 1)));
     assertEquals("Shuffle merge finalize request for shuffle 0 with shuffleMergeId 1 is stale"
       + " shuffle finalize request as shuffle blocks of a higher shuffleMergeId for the shuffle"
       + " is already being pushed", re1.getMessage());
