@@ -781,9 +781,11 @@ public class RemoteBlockPushResolverSuite {
     // This is deferred
     callback.onData(callback.getID(), ByteBuffer.wrap(new byte[4]));
     // Callback2 completes which will throw another exception.
-    IllegalStateException e = assertThrows(IllegalStateException.class,
-      () -> callback2.onComplete(callback2.getID()));
-    callback2.onFailure(callback2.getID(), e);
+    try {
+      callback2.onComplete(callback2.getID());
+    } catch (Throwable t) {
+      callback2.onFailure(callback2.getID(), t);
+    }
     assertEquals(5, partitionInfo.getNumIOExceptions());
     // Restore index file so that any further writes to it are successful and any exceptions are
     // due to IOExceptions exceeding threshold.
