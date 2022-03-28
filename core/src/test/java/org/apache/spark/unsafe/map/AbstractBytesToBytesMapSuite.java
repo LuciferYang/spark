@@ -723,10 +723,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     // Force OOM on next memory allocation.
     memoryManager.markExecutionAsOutOfMemoryOnce();
     try {
-      map.reset();
-      Assert.fail("Expected SparkOutOfMemoryError to be thrown");
-    } catch (SparkOutOfMemoryError e) {
-      // Expected exception; do nothing.
+      assertThrows(SparkOutOfMemoryError.class, map::reset);
     } finally {
       map.free();
     }
