@@ -660,12 +660,10 @@ public class RemoteBlockPushResolverSuite {
       RemoteBlockPushResolver.PushBlockStreamCallback callback1 =
         (RemoteBlockPushResolver.PushBlockStreamCallback) pushResolver.receiveBlockDataAsStream(
           new PushBlockStream(TEST_APP, NO_ATTEMPT_ID, 0, 0, i, 0, 0));
-      try {
-        callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[2]));
-      } catch (IOException ioe) {
-        // this will throw IOException so the client can retry.
-        callback1.onFailure(callback1.getID(), ioe);
-      }
+      IOException ioe = assertThrows(IOException.class,
+        () -> callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[2])));
+      // this will throw IOException so the client can retry.
+      callback1.onFailure(callback1.getID(), ioe);
     }
     assertEquals(4, partitionInfo.getNumIOExceptions());
     // After 4 IOException, the server will respond with IOExceptions exceeded threshold
@@ -735,11 +733,12 @@ public class RemoteBlockPushResolverSuite {
       RemoteBlockPushResolver.PushBlockStreamCallback callback1 =
         (RemoteBlockPushResolver.PushBlockStreamCallback) pushResolver.receiveBlockDataAsStream(
           new PushBlockStream(TEST_APP, NO_ATTEMPT_ID, 0, 0, i, 0, 0));
-      try {
-        callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[5]));
+      callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[5]));
+      if ( i < 5) {
         // This will complete without any exceptions but the exception count is increased.
         callback1.onComplete(callback1.getID());
-      } catch (Throwable t) {
+      } else {
+        Throwable t = assertThrows(Throwable.class, () -> callback1.onComplete(callback1.getID()));
         callback1.onFailure(callback1.getID(), t);
       }
     }
@@ -765,13 +764,9 @@ public class RemoteBlockPushResolverSuite {
       RemoteBlockPushResolver.PushBlockStreamCallback callback1 =
         (RemoteBlockPushResolver.PushBlockStreamCallback) pushResolver.receiveBlockDataAsStream(
           new PushBlockStream(TEST_APP, NO_ATTEMPT_ID, 0, 0, i, 0, 0));
-      try {
-        callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[5]));
-        // This will complete without any exceptions but the exception count is increased.
-        callback1.onComplete(callback1.getID());
-      } catch (Throwable t) {
-        callback1.onFailure(callback1.getID(), t);
-      }
+      callback1.onData(callback1.getID(), ByteBuffer.wrap(new byte[5]));
+      // This will complete without any exceptions but the exception count is increased.
+      callback1.onComplete(callback1.getID());
     }
     assertEquals(4, partitionInfo.getNumIOExceptions());
     RemoteBlockPushResolver.PushBlockStreamCallback callback2 =
@@ -781,11 +776,8 @@ public class RemoteBlockPushResolverSuite {
     // This is deferred
     callback.onData(callback.getID(), ByteBuffer.wrap(new byte[4]));
     // Callback2 completes which will throw another exception.
-    try {
-      callback2.onComplete(callback2.getID());
-    } catch (Throwable t) {
-      callback2.onFailure(callback2.getID(), t);
-    }
+    Throwable t = assertThrows(Throwable.class, () -> callback2.onComplete(callback2.getID()));
+    callback2.onFailure(callback2.getID(), t);
     assertEquals(5, partitionInfo.getNumIOExceptions());
     // Restore index file so that any further writes to it are successful and any exceptions are
     // due to IOExceptions exceeding threshold.
