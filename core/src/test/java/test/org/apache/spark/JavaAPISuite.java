@@ -1502,7 +1502,8 @@ public class JavaAPISuite implements Serializable {
     List<Integer> data = Arrays.asList(1, 2, 3, 4, 5);
     JavaRDD<Integer> rdd = sc.parallelize(data, 1);
     JavaFutureAction<Long> future = rdd.map(new BuggyMapFunction<>()).countAsync();
-    ExecutionException ee = assertThrows(ExecutionException.class, () -> future.get(2, TimeUnit.SECONDS));
+    ExecutionException ee = assertThrows(ExecutionException.class,
+      () -> future.get(2, TimeUnit.SECONDS));
     assertTrue(Throwables.getStackTraceAsString(ee).contains("Custom exception!"));
     assertTrue(future.isDone());
   }

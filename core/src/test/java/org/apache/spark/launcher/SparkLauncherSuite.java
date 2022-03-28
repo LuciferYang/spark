@@ -54,7 +54,8 @@ public class SparkLauncherSuite extends BaseSuite {
     assertThrows(IllegalArgumentException.class, () -> launcher.addSparkArg(opts.PROXY_USER));
 
     launcher.addSparkArg(opts.PROXY_USER, "someUser");
-    assertThrows(IllegalArgumentException.class, () -> launcher.addSparkArg(opts.HELP, "someValue"));
+    assertThrows(IllegalArgumentException.class,
+      () -> launcher.addSparkArg(opts.HELP, "someValue"));
 
     launcher.addSparkArg("--future-argument");
     launcher.addSparkArg("--future-argument", "someValue");
