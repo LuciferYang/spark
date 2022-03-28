@@ -239,6 +239,7 @@ public class LauncherServerSuite extends BaseSuite {
         }
         fail("Expected error but message went through.");
       } catch (IllegalStateException | IOException e) {
+        e.printStackTrace();
         // Expected.
       }
     });
