@@ -306,9 +306,10 @@ public class SparkSaslSuite {
     // the encryption handler from the client side. This should cause the server to not be
     // able to understand RPCs sent to it and thus close the connection.
     try (SaslTestCtx ctx = new SaslTestCtx(mock(RpcHandler.class), true, true)) {
-      assertThrows(TimeoutException.class,
+      Exception e = assertThrows(Exception.class,
         () -> ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"),
                 TimeUnit.SECONDS.toMillis(10)));
+      assertFalse(e.getCause() instanceof TimeoutException);
     }
   }
 
