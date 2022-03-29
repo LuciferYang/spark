@@ -45,6 +45,7 @@ import org.apache.hadoop.yarn.server.api.*;
 import org.apache.spark.network.shuffle.MergedShuffleFileManager;
 import org.apache.spark.network.shuffle.NoOpMergedShuffleFileManager;
 import org.apache.spark.network.util.LevelDBProvider;
+import org.apache.spark.network.util.StoreVersion;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 
@@ -131,8 +132,7 @@ public class YarnShuffleService extends AuxiliaryService {
   static int boundPort = -1;
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final String APP_CREDS_KEY_PREFIX = "AppCreds";
-  private static final LevelDBProvider.StoreVersion CURRENT_VERSION = new LevelDBProvider
-      .StoreVersion(1, 0);
+  private static final StoreVersion CURRENT_VERSION = new StoreVersion(1, 0);
 
   /**
    * The name of the resource to search for on the classpath to find a shuffle service-specific

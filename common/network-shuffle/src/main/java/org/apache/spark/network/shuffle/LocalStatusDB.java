@@ -17,11 +17,11 @@
 
 package org.apache.spark.network.shuffle;
 
-public class Constants {
+import java.io.IOException;
 
-  public static final String SHUFFLE_SERVICE_FETCH_RDD_ENABLED =
-    "spark.shuffle.service.fetch.rdd.enabled";
-
-  public static final String SHUFFLE_SERVICE_LOCAL_DB_IMPL =
-          "spark.shuffle.service.local.db.impl";
+public interface LocalStatusDB {
+    void put(byte[] key, byte[] value) throws RuntimeException;
+    void delete(byte[] key) throws RuntimeException;
+    void close() throws IOException;
+    LocalStatusDBIterator iterator();
 }

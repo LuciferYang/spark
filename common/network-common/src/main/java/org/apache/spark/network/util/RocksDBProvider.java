@@ -17,18 +17,15 @@
 
 package org.apache.spark.network.util;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
+import java.util.Objects;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Objects;
 
 /**
  * RocksDB utility class available in the network package.
@@ -41,7 +38,7 @@ public class RocksDBProvider {
 
   private static final Logger logger = LoggerFactory.getLogger(RocksDBProvider.class);
 
-  public static RocksDB initLevelDB(File dbFile, StoreVersion version, ObjectMapper mapper) throws
+  public static RocksDB initRockDB(File dbFile, StoreVersion version, ObjectMapper mapper) throws
       IOException {
     RocksDB tmpDb = null;
     if (dbFile != null) {
@@ -145,36 +142,5 @@ public class RocksDBProvider {
   public static void storeVersion(RocksDB db, StoreVersion version, ObjectMapper mapper)
      throws IOException, RocksDBException {
     db.put(StoreVersion.KEY, mapper.writeValueAsBytes(version));
-  }
-
-  public static class StoreVersion {
-
-    static final byte[] KEY = "StoreVersion".getBytes(StandardCharsets.UTF_8);
-
-    public final int major;
-    public final int minor;
-
-    @JsonCreator
-    public StoreVersion(@JsonProperty("major") int major, @JsonProperty("minor") int minor) {
-      this.major = major;
-      this.minor = minor;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-
-      StoreVersion that = (StoreVersion) o;
-
-      return major == that.major && minor == that.minor;
-    }
-
-    @Override
-    public int hashCode() {
-      int result = major;
-      result = 31 * result + minor;
-      return result;
-    }
   }
 }

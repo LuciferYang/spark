@@ -49,7 +49,7 @@ import org.apache.spark.network.shuffle.checksum.Cause;
 import org.apache.spark.network.shuffle.checksum.ShuffleChecksumHelper;
 import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
 import org.apache.spark.network.util.LevelDBProvider;
-import org.apache.spark.network.util.LevelDBProvider.StoreVersion;
+import org.apache.spark.network.util.StoreVersion;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.NettyUtils;
 import org.apache.spark.network.util.TransportConf;
@@ -92,7 +92,7 @@ public class ExternalShuffleBlockResolver {
   @VisibleForTesting
   final File registeredExecutorFile;
   @VisibleForTesting
-  final DB db;
+  final LocalStatusDB db;
 
   public ExternalShuffleBlockResolver(TransportConf conf, File registeredExecutorFile)
       throws IOException {
@@ -123,7 +123,8 @@ public class ExternalShuffleBlockResolver {
       .weigher((Weigher<String, ShuffleIndexInformation>)
         (filePath, indexInfo) -> indexInfo.getRetainedMemorySize())
       .build(indexCacheLoader);
-    db = LevelDBProvider.initLevelDB(this.registeredExecutorFile, CURRENT_VERSION, mapper);
+    String dbImpl = conf.get(Constants.SHUFFLE_SERVICE_LOCAL_DB_IMPL, "ldb");
+    db = LocalStatusDBProvider.initDB(dbImpl, this.registeredExecutorFile, CURRENT_VERSION, mapper);
     if (db != null) {
       executors = reloadRegisteredExecutors(db);
     } else {
@@ -452,11 +453,11 @@ public class ExternalShuffleBlockResolver {
   }
 
   @VisibleForTesting
-  static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(DB db)
+  static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(LocalStatusDB db)
       throws IOException {
     ConcurrentMap<AppExecId, ExecutorShuffleInfo> registeredExecutors = Maps.newConcurrentMap();
     if (db != null) {
-      DBIterator itr = db.iterator();
+      LocalStatusDBIterator itr = db.iterator();
       itr.seek(APP_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
       while (itr.hasNext()) {
         Map.Entry<byte[], byte[]> e = itr.next();
