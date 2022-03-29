@@ -20,8 +20,6 @@ import java.io.File
 import java.util.concurrent.ConcurrentMap
 
 import org.apache.hadoop.yarn.api.records.ApplicationId
-import org.fusesource.leveldbjni.JniDBFactory
-import org.iq80.leveldb.{DB, Options}
 
 import org.apache.spark.network.shuffle.ExternalShuffleBlockResolver.AppExecId
 import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo
@@ -48,23 +46,25 @@ object ShuffleTestAccessor {
     resolver.registeredExecutorFile
   }
 
-  def shuffleServiceLevelDB(resolver: ExternalShuffleBlockResolver): DB = {
+  def shuffleServiceLocalDB(resolver: ExternalShuffleBlockResolver): LocalStatusDB = {
     resolver.db
   }
 
   def reloadRegisteredExecutors(
+    dbImpl: String,
     file: File): ConcurrentMap[ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo] = {
-    val options: Options = new Options
-    options.createIfMissing(true)
-    val factory = new JniDBFactory
-    val db = factory.open(file, options)
+    import com.fasterxml.jackson.databind.ObjectMapper
+    import org.apache.spark.network.util.StoreVersion
+    val version = new StoreVersion(1, 0)
+    val mapper = new ObjectMapper()
+    val db = LocalStatusDBProvider.initDB(dbImpl, file, version, mapper)
     val result = ExternalShuffleBlockResolver.reloadRegisteredExecutors(db)
     db.close()
     result
   }
 
-  def reloadRegisteredExecutors(
-      db: DB): ConcurrentMap[ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo] = {
+  def reloadRegisteredExecutors(db: LocalStatusDB):
+      ConcurrentMap[ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo] = {
     ExternalShuffleBlockResolver.reloadRegisteredExecutors(db)
   }
 }

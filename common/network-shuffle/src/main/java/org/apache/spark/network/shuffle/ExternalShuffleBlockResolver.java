@@ -38,8 +38,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.Maps;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.DBIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +46,6 @@ import org.apache.spark.network.buffer.ManagedBuffer;
 import org.apache.spark.network.shuffle.checksum.Cause;
 import org.apache.spark.network.shuffle.checksum.ShuffleChecksumHelper;
 import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
-import org.apache.spark.network.util.LevelDBProvider;
 import org.apache.spark.network.util.StoreVersion;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.NettyUtils;
@@ -69,7 +66,7 @@ public class ExternalShuffleBlockResolver {
    * This a common prefix to the key for each app registration we stick in leveldb, so they
    * are easy to find, since leveldb lets you search based on prefix.
    */
-  private static final String APP_KEY_PREFIX = "AppExecShuffleInfo";
+  public static final String APP_KEY_PREFIX = "AppExecShuffleInfo";
   private static final StoreVersion CURRENT_VERSION = new StoreVersion(1, 0);
 
   // Map containing all registered executors' metadata.
@@ -123,7 +120,7 @@ public class ExternalShuffleBlockResolver {
       .weigher((Weigher<String, ShuffleIndexInformation>)
         (filePath, indexInfo) -> indexInfo.getRetainedMemorySize())
       .build(indexCacheLoader);
-    String dbImpl = conf.get(Constants.SHUFFLE_SERVICE_LOCAL_DB_IMPL, "ldb");
+    String dbImpl = conf.get(Constants.SHUFFLE_SERVICE_LOCAL_DB_IMPL, "rdb");
     db = LocalStatusDBProvider.initDB(dbImpl, this.registeredExecutorFile, CURRENT_VERSION, mapper);
     if (db != null) {
       executors = reloadRegisteredExecutors(db);
@@ -443,34 +440,17 @@ public class ExternalShuffleBlockResolver {
     return key.getBytes(StandardCharsets.UTF_8);
   }
 
-  private static AppExecId parseDbAppExecKey(String s) throws IOException {
+  public static AppExecId parseDbAppExecKey(String s) throws IOException {
     if (!s.startsWith(APP_KEY_PREFIX)) {
       throw new IllegalArgumentException("expected a string starting with " + APP_KEY_PREFIX);
     }
     String json = s.substring(APP_KEY_PREFIX.length() + 1);
-    AppExecId parsed = mapper.readValue(json, AppExecId.class);
-    return parsed;
+    return mapper.readValue(json, AppExecId.class);
   }
 
   @VisibleForTesting
   static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(LocalStatusDB db)
       throws IOException {
-    ConcurrentMap<AppExecId, ExecutorShuffleInfo> registeredExecutors = Maps.newConcurrentMap();
-    if (db != null) {
-      LocalStatusDBIterator itr = db.iterator();
-      itr.seek(APP_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
-      while (itr.hasNext()) {
-        Map.Entry<byte[], byte[]> e = itr.next();
-        String key = new String(e.getKey(), StandardCharsets.UTF_8);
-        if (!key.startsWith(APP_KEY_PREFIX)) {
-          break;
-        }
-        AppExecId id = parseDbAppExecKey(key);
-        logger.info("Reloading registered executors: " +  id.toString());
-        ExecutorShuffleInfo shuffleInfo = mapper.readValue(e.getValue(), ExecutorShuffleInfo.class);
-        registeredExecutors.put(id, shuffleInfo);
-      }
-    }
-    return registeredExecutors;
+    return db.reloadRegisteredExecutors(APP_KEY_PREFIX);
   }
 }

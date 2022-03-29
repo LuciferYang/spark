@@ -17,11 +17,17 @@
 
 package org.apache.spark.network.shuffle;
 
+import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
+
 import java.io.IOException;
+import java.util.concurrent.ConcurrentMap;
 
 public interface LocalStatusDB {
     void put(byte[] key, byte[] value) throws RuntimeException;
     void delete(byte[] key) throws RuntimeException;
     void close() throws IOException;
-    LocalStatusDBIterator iterator();
+
+    ConcurrentMap<ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(
+      String appKeyPrefix) throws IOException;
+    Object backend();
 }

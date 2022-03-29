@@ -17,13 +17,27 @@
 
 package org.apache.spark.network.shuffle;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Maps;
+import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.apache.spark.network.shuffle.ExternalShuffleBlockResolver.parseDbAppExecKey;
+
 
 public class RocksDBStatusDB implements LocalStatusDB {
+
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBStatusDB.class);
+
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     private RocksDB backend;
 
@@ -55,8 +69,30 @@ public class RocksDBStatusDB implements LocalStatusDB {
     }
 
     @Override
-    public LocalStatusDBIterator iterator() {
-        RocksIterator rocksIterator = backend.newIterator();
-        return null;
+    public ConcurrentMap<ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(
+        String appKeyPrefix) throws IOException {
+        ConcurrentMap<ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo> registeredExecutors =
+                Maps.newConcurrentMap();
+        if (backend != null) {
+            RocksIterator itr = backend.newIterator();
+            itr.seek(appKeyPrefix.getBytes(StandardCharsets.UTF_8));
+            while (itr.isValid()) {
+                String key = new String(itr.key(), StandardCharsets.UTF_8);
+                if (!key.startsWith(appKeyPrefix)) {
+                    break;
+                }
+                ExternalShuffleBlockResolver.AppExecId id = parseDbAppExecKey(key);
+                logger.info("Reloading registered executors: " + id.toString());
+                ExecutorShuffleInfo shuffleInfo = mapper.readValue(itr.value(), ExecutorShuffleInfo.class);
+                registeredExecutors.put(id, shuffleInfo);
+                itr.next();
+            }
+        }
+        return registeredExecutors;
+    }
+
+    @Override
+    public Object backend() {
+        return backend;
     }
 }

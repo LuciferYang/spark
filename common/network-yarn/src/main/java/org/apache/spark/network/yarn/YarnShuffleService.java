@@ -42,13 +42,14 @@ import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.api.*;
-import org.apache.spark.network.shuffle.MergedShuffleFileManager;
-import org.apache.spark.network.shuffle.NoOpMergedShuffleFileManager;
+import org.apache.spark.network.shuffle.*;
 import org.apache.spark.network.util.LevelDBProvider;
 import org.apache.spark.network.util.StoreVersion;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +58,6 @@ import org.apache.spark.network.crypto.AuthServerBootstrap;
 import org.apache.spark.network.sasl.ShuffleSecretManager;
 import org.apache.spark.network.server.TransportServer;
 import org.apache.spark.network.server.TransportServerBootstrap;
-import org.apache.spark.network.shuffle.ExternalBlockHandler;
 import org.apache.spark.network.util.TransportConf;
 import org.apache.spark.network.yarn.util.HadoopConfigProvider;
 
@@ -174,7 +174,7 @@ public class YarnShuffleService extends AuxiliaryService {
   @VisibleForTesting
   File secretsFile;
 
-  private DB db;
+  private LocalStatusDB db;
 
   public YarnShuffleService() {
     // The name of the auxiliary service configured within the NodeManager
@@ -309,23 +309,39 @@ public class YarnShuffleService extends AuxiliaryService {
     // Make sure this is protected in case its not in the NM recovery dir
     FileSystem fs = FileSystem.getLocal(_conf);
     fs.mkdirs(new Path(secretsFile.getPath()), new FsPermission((short) 0700));
-
-    db = LevelDBProvider.initLevelDB(secretsFile, CURRENT_VERSION, mapper);
+    String dbImpl = _conf.get("spark.shuffle.service.local.db.impl", "rdb");
+    db = LocalStatusDBProvider.initDB(dbImpl, secretsFile, CURRENT_VERSION, mapper);
     logger.info("Recovery location is: " + secretsFile.getPath());
     if (db != null) {
       logger.info("Going to reload spark shuffle data");
-      DBIterator itr = db.iterator();
-      itr.seek(APP_CREDS_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
-      while (itr.hasNext()) {
-        Map.Entry<byte[], byte[]> e = itr.next();
-        String key = new String(e.getKey(), StandardCharsets.UTF_8);
-        if (!key.startsWith(APP_CREDS_KEY_PREFIX)) {
-          break;
+      if("rdb".equals(dbImpl)) {
+        RocksIterator itr = ((RocksDB)db.backend()).newIterator();
+        itr.seek(APP_CREDS_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
+        while (itr.isValid()) {
+          String key = new String(itr.key(), StandardCharsets.UTF_8);
+          if (!key.startsWith(APP_CREDS_KEY_PREFIX)) {
+            break;
+          }
+          String id = parseDbAppKey(key);
+          ByteBuffer secret = mapper.readValue(itr.value(), ByteBuffer.class);
+          logger.info("Reloading tokens for app: " + id);
+          secretManager.registerApp(id, secret);
+          itr.next();
         }
-        String id = parseDbAppKey(key);
-        ByteBuffer secret = mapper.readValue(e.getValue(), ByteBuffer.class);
-        logger.info("Reloading tokens for app: " + id);
-        secretManager.registerApp(id, secret);
+      } else {
+        DBIterator itr = ((DB)db.backend()).iterator();
+        itr.seek(APP_CREDS_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
+        while (itr.hasNext()) {
+          Map.Entry<byte[], byte[]> e = itr.next();
+          String key = new String(e.getKey(), StandardCharsets.UTF_8);
+          if (!key.startsWith(APP_CREDS_KEY_PREFIX)) {
+            break;
+          }
+          String id = parseDbAppKey(key);
+          ByteBuffer secret = mapper.readValue(e.getValue(), ByteBuffer.class);
+          logger.info("Reloading tokens for app: " + id);
+          secretManager.registerApp(id, secret);
+        }
       }
     }
   }
