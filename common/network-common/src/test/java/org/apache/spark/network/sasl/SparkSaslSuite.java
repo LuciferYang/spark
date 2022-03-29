@@ -149,7 +149,7 @@ public class SparkSaslSuite {
 
     try (SaslTestCtx ctx = new SaslTestCtx(rpcHandler, encrypt, false)) {
       ByteBuffer response = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"),
-              TimeUnit.SECONDS.toMillis(10));
+        TimeUnit.SECONDS.toMillis(10));
       assertEquals("Pong", JavaUtils.bytesToString(response));
     } finally {
       // There should be 2 terminated events; one for the client, one for the server.
