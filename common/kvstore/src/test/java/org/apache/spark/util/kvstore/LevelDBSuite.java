@@ -78,14 +78,14 @@ public class LevelDBSuite {
   public void testObjectWriteReadDelete() throws Exception {
     CustomType1 t = createCustomType1(1);
 
-    assertThrows(UnsupportedStoreVersionException.class, () -> db.read(CustomType1.class, t.key));
+    assertThrows(NoSuchElementException.class, () -> db.read(CustomType1.class, t.key));
 
     db.write(t);
     assertEquals(t, db.read(t.getClass(), t.key));
     assertEquals(1L, db.count(t.getClass()));
 
     db.delete(t.getClass(), t.key);
-    assertThrows(UnsupportedStoreVersionException.class, () -> db.read(t.getClass(), t.key));
+    assertThrows(NoSuchElementException.class, () -> db.read(t.getClass(), t.key));
 
     // Look into the actual DB and make sure that all the keys related to the type have been
     // removed.

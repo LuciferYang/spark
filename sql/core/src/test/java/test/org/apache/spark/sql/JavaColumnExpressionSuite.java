@@ -81,8 +81,10 @@ public class JavaColumnExpressionSuite {
     Dataset<Row> df = spark.createDataFrame(rows, schema);
     Exception e = Assert.assertThrows(Exception.class,
       () -> df.filter(df.col("a").isInCollection(Arrays.asList(new Column("b")))));
-    Arrays.asList("cannot resolve", "due to data type mismatch: Arguments must be same type but were")
-      .forEach(s ->
-        Assert.assertTrue(e.getMessage().toLowerCase(Locale.ROOT).contains(s.toLowerCase(Locale.ROOT))));
+    Arrays.asList("cannot resolve",
+      "due to data type mismatch: Arguments must be same type but were")
+        .forEach(s ->
+          Assert.assertTrue(e.getMessage().toLowerCase(Locale.ROOT)
+            .contains(s.toLowerCase(Locale.ROOT))));
   }
 }
