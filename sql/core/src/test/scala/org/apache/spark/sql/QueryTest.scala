@@ -21,7 +21,6 @@ import java.util.TimeZone
 
 import scala.collection.JavaConverters._
 
-import org.junit.jupiter.api.{Assertions => JAssertions}
 import org.scalatest.Assertions
 
 import org.apache.spark.sql.catalyst.plans._
@@ -420,7 +419,7 @@ object QueryTest extends Assertions {
 
   def checkAnswer(df: DataFrame, expectedAnswer: java.util.List[Row]): Unit = {
     getErrorMessageInCheckAnswer(df, expectedAnswer.asScala.toSeq) match {
-      case Some(errorMessage) => JAssertions.fail(errorMessage)
+      case Some(errorMessage) => fail(errorMessage)
       case None =>
     }
   }

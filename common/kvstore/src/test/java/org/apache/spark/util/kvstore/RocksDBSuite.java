@@ -27,14 +27,12 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.RocksIterator;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 public class RocksDBSuite {
 
@@ -53,7 +51,6 @@ public class RocksDBSuite {
 
   @BeforeEach
   public void setup() throws Exception {
-    assumeFalse(SystemUtils.IS_OS_MAC_OSX && SystemUtils.OS_ARCH.equals("aarch64"));
     dbpath = File.createTempFile("test.", ".rdb");
     dbpath.delete();
     db = new RocksDB(dbpath);
