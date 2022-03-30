@@ -69,11 +69,11 @@ trait DataSourceScanExec extends LeafExecNode {
   }
 
   override def verboseStringWithOperatorId(): String = {
-    val metadataStr = metadata.toSeq.sorted.filterNot {
+    val metadataStr = metadata.toSeq.filterNot {
       case (_, value) if (value.isEmpty || value.equals("[]")) => true
       case (key, _) if (key.equals("DataFilters") || key.equals("Format")) => true
       case (_, _) => false
-    }.map {
+    }.sorted.map {
       case (key, value) => s"$key: ${redact(value)}"
     }
 
@@ -421,11 +421,11 @@ case class FileSourceScanExec(
   }
 
   override def verboseStringWithOperatorId(): String = {
-    val metadataStr = metadata.toSeq.sorted.filterNot {
+    val metadataStr = metadata.toSeq.filterNot {
       case (_, value) if (value.isEmpty || value.equals("[]")) => true
       case (key, _) if (key.equals("DataFilters") || key.equals("Format")) => true
       case (_, _) => false
-    }.map {
+    }.sorted.map {
       case (key, _) if (key.equals("Location")) =>
         val location = relation.location
         val numPaths = location.rootPaths.length
