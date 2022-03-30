@@ -347,11 +347,11 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
 
     String libPath = env.get(CommandBuilderUtils.getLibPathEnvName());
     if (isDriver) {
-      assertNotNull("Native library path should be set.", libPath);
+      assertNotNull(libPath, "Native library path should be set.");
       assertTrue(contains("/native", libPath.split(Pattern.quote(File.pathSeparator))),
         "Native library path should contain provided entry.");
     } else {
-      assertNull("Native library should not be set.", libPath);
+      assertNull(libPath, "Native library should not be set.");
     }
 
     // Checks below are the same for both driver and non-driver mode.
