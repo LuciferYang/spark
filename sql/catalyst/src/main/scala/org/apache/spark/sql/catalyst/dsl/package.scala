@@ -459,6 +459,13 @@ package object dsl {
           orderSpec: Seq[SortOrder]): LogicalPlan =
         Window(windowExpressions, partitionSpec, orderSpec, logicalPlan)
 
+      def rankLimit(
+          partitionSpec: Seq[Expression],
+          orderSpec: Seq[SortOrder],
+          rankFunction: Expression,
+          limit: Int): LogicalPlan =
+        RankLimit(partitionSpec, orderSpec, rankFunction, limit, logicalPlan)
+
       def subquery(alias: Symbol): LogicalPlan = SubqueryAlias(alias.name, logicalPlan)
 
       def except(otherPlan: LogicalPlan, isAll: Boolean): LogicalPlan =
