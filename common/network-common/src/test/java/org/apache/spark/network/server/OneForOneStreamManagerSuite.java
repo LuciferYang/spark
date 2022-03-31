@@ -118,8 +118,7 @@ public class OneForOneStreamManagerSuite {
 
     Assertions.assertEquals(2, manager.numStreamStates());
 
-    Assertions.assertThrows(RuntimeException.class,
-      () -> manager.connectionTerminated(dummyChannel));
+    Assertions.assertThrows(RuntimeException.class, () -> manager.connectionTerminated(dummyChannel));
     Mockito.verify(buffers, Mockito.times(1)).hasNext();
     Mockito.verify(buffers, Mockito.times(1)).next();
     Mockito.verify(buffers2, Mockito.times(2)).hasNext();

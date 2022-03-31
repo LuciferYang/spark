@@ -18,7 +18,10 @@
 package test.org.apache.spark.sql;
 
 import org.apache.spark.api.java.function.FilterFunction;
-import org.apache.spark.sql.*;
+import org.apache.spark.sql.Column;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.test.TestSparkSession;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterEach;
@@ -76,11 +79,12 @@ public class JavaColumnExpressionSuite {
       createStructField("a", IntegerType, false),
       createStructField("b", createArrayType(IntegerType, false), false)));
     Dataset<Row> df = spark.createDataFrame(rows, schema);
-    AnalysisException e = Assertions.assertThrows(AnalysisException.class,
+    Exception e = Assertions.assertThrows(Exception.class,
       () -> df.filter(df.col("a").isInCollection(Arrays.asList(new Column("b")))));
     Arrays.asList("cannot resolve",
       "due to data type mismatch: Arguments must be same type but were")
-      .forEach(s -> Assertions.assertTrue(
-        e.getMessage().toLowerCase(Locale.ROOT).contains(s.toLowerCase(Locale.ROOT))));
+        .forEach(s ->
+          Assertions.assertTrue(e.getMessage().toLowerCase(Locale.ROOT)
+            .contains(s.toLowerCase(Locale.ROOT))));
   }
 }

@@ -70,20 +70,16 @@ public class ExternalShuffleSecuritySuite {
 
   @Test
   public void testBadAppId() {
-    try {
-      validate("wrong-app-id", "secret", false);
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Wrong appId!"), e.getMessage());
-    }
+    Exception e = assertThrows(Exception.class,
+      () -> validate("wrong-app-id", "secret", false));
+    assertTrue(e.getMessage().contains("Wrong appId!"), e.getMessage());
   }
 
   @Test
   public void testBadSecret() {
-    try {
-      validate("my-app-id", "bad-secret", false);
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Mismatched response"), e.getMessage());
-    }
+    Exception e = assertThrows(Exception.class,
+      () -> validate("my-app-id", "bad-secret", false));
+    assertTrue(e.getMessage().contains("Mismatched response"), e.getMessage());
   }
 
   @Test

@@ -75,12 +75,8 @@ public class JavaRandomForestRegressorSuite extends SharedSparkSession {
     }
     String[] invalidStrategies = {"-.1", "-.10", "-0.10", ".0", "0.0", "1.1", "0"};
     for (String strategy : invalidStrategies) {
-      try {
-        rf.setFeatureSubsetStrategy(strategy);
-        Assertions.fail("Expected exception to be thrown for invalid strategies");
-      } catch (Exception e) {
-        Assertions.assertTrue(e instanceof IllegalArgumentException);
-      }
+      Assertions.assertThrows(IllegalArgumentException.class,
+        () -> rf.setFeatureSubsetStrategy(strategy));
     }
 
     RandomForestRegressionModel model = rf.fit(dataFrame);

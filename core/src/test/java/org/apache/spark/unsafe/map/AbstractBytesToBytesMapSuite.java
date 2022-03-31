@@ -168,8 +168,7 @@ public abstract class AbstractBytesToBytesMapSuite {
       final int keyLengthInWords = 10;
       final int keyLengthInBytes = keyLengthInWords * 8;
       final byte[] key = getRandomByteArray(keyLengthInWords);
-      Assertions.assertFalse(
-        map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
+      Assertions.assertFalse(map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
       Assertions.assertFalse(map.iterator().hasNext());
       Assertions.assertFalse(map.iteratorWithKeyIndex().hasNext());
     } finally {
@@ -621,11 +620,9 @@ public abstract class AbstractBytesToBytesMapSuite {
   public void initialCapacityBoundsChecking() {
     assertThrows(IllegalArgumentException.class,
       () -> new BytesToBytesMap(taskMemoryManager, 0, PAGE_SIZE_BYTES));
-
     assertThrows(IllegalArgumentException.class,
       () -> new BytesToBytesMap(taskMemoryManager,
               BytesToBytesMap.MAX_CAPACITY + 1, PAGE_SIZE_BYTES));
-
     assertThrows(IllegalArgumentException.class,
       () -> new BytesToBytesMap(taskMemoryManager, 1,
               TaskMemoryManager.MAXIMUM_PAGE_SIZE_BYTES + 1));
