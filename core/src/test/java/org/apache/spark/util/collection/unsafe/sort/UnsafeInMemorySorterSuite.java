@@ -21,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.apache.spark.unsafe.array.LongArray;
-import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.spark.HashPartitioner;
@@ -33,8 +32,7 @@ import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.memory.MemoryBlock;
 import org.apache.spark.internal.config.package$;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 
 public class UnsafeInMemorySorterSuite {
@@ -60,7 +58,7 @@ public class UnsafeInMemorySorterSuite {
       100,
       shouldUseRadixSort());
     final UnsafeSorterIterator iter = sorter.getSortedIterator();
-    Assert.assertFalse(iter.hasNext());
+    assertFalse(iter.hasNext());
   }
 
   @Test
@@ -175,7 +173,7 @@ public class UnsafeInMemorySorterSuite {
     testMemoryManager.markconsequentOOM(Integer.MAX_VALUE);
     sorter.freeMemory();
     testMemoryManager.resetConsequentOOM();
-    Assert.assertFalse(sorter.hasSpaceForAnotherRecord());
+    assertFalse(sorter.hasSpaceForAnotherRecord());
 
     // Get the sorter in an usable state again by allocating a new pointer array.
     LongArray array = consumer.allocateArray(1000);
@@ -186,7 +184,7 @@ public class UnsafeInMemorySorterSuite {
     sorter.freeMemory();
     sorter.freeMemory();
     testMemoryManager.resetConsequentOOM();
-    Assert.assertFalse(sorter.hasSpaceForAnotherRecord());
+    assertFalse(sorter.hasSpaceForAnotherRecord());
 
     assertEquals(0L, memoryManager.cleanUpAllAllocatedMemory());
   }

@@ -19,7 +19,6 @@ package org.apache.spark.network.shuffle.protocol;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.junit.Assert;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -30,9 +29,9 @@ public class FetchShuffleBlockChunksSuite {
   public void testFetchShuffleBlockChunksEncodeDecode() {
     FetchShuffleBlockChunks shuffleBlockChunks =
       new FetchShuffleBlockChunks("app0", "exec1", 0, 0, new int[] {0}, new int[][] {{0, 1}});
-    Assert.assertEquals(2, shuffleBlockChunks.getNumBlocks());
+    assertEquals(2, shuffleBlockChunks.getNumBlocks());
     int len = shuffleBlockChunks.encodedLength();
-    Assert.assertEquals(49, len);
+    assertEquals(49, len);
     ByteBuf buf = Unpooled.buffer(len);
     shuffleBlockChunks.encode(buf);
 

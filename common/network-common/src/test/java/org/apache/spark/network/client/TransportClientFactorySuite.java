@@ -27,13 +27,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import org.apache.spark.network.TestUtils;
 import org.apache.spark.network.TransportContext;
@@ -116,8 +113,8 @@ public class TransportClientFactorySuite {
         attempt.join();
       }
 
-      Assert.assertEquals(0, failed.get());
-      Assert.assertTrue(clients.size() <= maxConnections);
+      assertEquals(0, failed.get());
+      assertTrue(clients.size() <= maxConnections);
 
       for (TransportClient client : clients) {
         client.close();
@@ -231,9 +228,9 @@ public class TransportClientFactorySuite {
     TransportServer server = context.createServer();
     int unreachablePort = server.getPort();
     server.close();
-    Assert.assertThrows(IOException.class,
+    assertThrows(IOException.class,
       () -> factory.createClient(TestUtils.getLocalHost(), unreachablePort, true));
-    Assert.assertThrows("fail this connection directly", IOException.class,
+    assertThrows("fail this connection directly", IOException.class,
       () -> factory.createClient(TestUtils.getLocalHost(), unreachablePort, true));
   }
 }

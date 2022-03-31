@@ -36,7 +36,6 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.roaringbitmap.RoaringBitmap;
@@ -510,7 +509,7 @@ public class RemoteBlockPushResolverSuite {
     // deleted.
     deleted.acquire();
     for (String mergeDir : mergeDirs) {
-      Assert.assertFalse(Files.exists(Paths.get(mergeDir)));
+      assertFalse(Files.exists(Paths.get(mergeDir)));
     }
   }
 
