@@ -168,7 +168,8 @@ public abstract class AbstractBytesToBytesMapSuite {
       final int keyLengthInWords = 10;
       final int keyLengthInBytes = keyLengthInWords * 8;
       final byte[] key = getRandomByteArray(keyLengthInWords);
-      Assertions.assertFalse(map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
+      Assertions.assertFalse(
+        map.lookup(key, Platform.BYTE_ARRAY_OFFSET, keyLengthInBytes).isDefined());
       Assertions.assertFalse(map.iterator().hasNext());
       Assertions.assertFalse(map.iteratorWithKeyIndex().hasNext());
     } finally {
