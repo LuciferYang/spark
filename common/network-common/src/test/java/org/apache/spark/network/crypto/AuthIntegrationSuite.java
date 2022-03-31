@@ -17,18 +17,8 @@
 
 package org.apache.spark.network.crypto;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.Channel;
-import org.junit.After;
-import org.junit.Test;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 import org.apache.spark.network.TestUtils;
 import org.apache.spark.network.TransportContext;
 import org.apache.spark.network.client.RpcResponseCallback;
@@ -43,60 +33,63 @@ import org.apache.spark.network.server.TransportServerBootstrap;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
+import org.junit.Test;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 public class AuthIntegrationSuite {
 
-  private AuthTestCtx ctx;
-
-  @After
-  public void cleanUp() throws Exception {
-    if (ctx != null) {
-      ctx.close();
-    }
-    ctx = null;
-  }
-
   @Test
   public void testNewAuth() throws Exception {
-    ctx = new AuthTestCtx();
-    ctx.createServer("secret");
-    ctx.createClient("secret");
+    try (AuthTestCtx ctx = new AuthTestCtx()) {
+      ctx.createServer("secret");
+      ctx.createClient("secret");
 
-    ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
-    assertEquals("Pong", JavaUtils.bytesToString(reply));
-    assertNull(ctx.authRpcHandler.saslHandler);
+      ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
+      assertEquals("Pong", JavaUtils.bytesToString(reply));
+      assertNull(ctx.authRpcHandler.saslHandler);
+    }
   }
 
   @Test
-  public void testAuthFailure() throws Exception {
-    ctx = new AuthTestCtx();
-    ctx.createServer("server");
+  public void testAuthFailure() {
+    try (AuthTestCtx ctx = new AuthTestCtx()) {
+      ctx.createServer("server");
 
-    assertThrows(Exception.class, () -> ctx.createClient("client"));
-    assertFalse(ctx.authRpcHandler.isAuthenticated());
-    assertFalse(ctx.serverChannel.isActive());
+      assertThrows(Exception.class, () -> ctx.createClient("client"));
+      assertFalse(ctx.authRpcHandler.isAuthenticated());
+      assertFalse(ctx.serverChannel.isActive());
+    }
   }
 
   @Test
   public void testSaslServerFallback() throws Exception {
-    ctx = new AuthTestCtx();
-    ctx.createServer("secret", true);
-    ctx.createClient("secret", false);
+    try (AuthTestCtx ctx = new AuthTestCtx()) {
+      ctx.createServer("secret", true);
+      ctx.createClient("secret", false);
 
-    ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
-    assertEquals("Pong", JavaUtils.bytesToString(reply));
-    assertNotNull(ctx.authRpcHandler.saslHandler);
-    assertTrue(ctx.authRpcHandler.isAuthenticated());
+      ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
+      assertEquals("Pong", JavaUtils.bytesToString(reply));
+      assertNotNull(ctx.authRpcHandler.saslHandler);
+      assertTrue(ctx.authRpcHandler.isAuthenticated());
+    }
   }
 
   @Test
   public void testSaslClientFallback() throws Exception {
-    ctx = new AuthTestCtx();
-    ctx.createServer("secret", false);
-    ctx.createClient("secret", true);
+    try (AuthTestCtx ctx = new AuthTestCtx()) {
+      ctx.createServer("secret", false);
+      ctx.createClient("secret", true);
 
-    ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
-    assertEquals("Pong", JavaUtils.bytesToString(reply));
+      ByteBuffer reply = ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000);
+      assertEquals("Pong", JavaUtils.bytesToString(reply));
+    }
   }
 
   @Test
@@ -105,22 +98,23 @@ public class AuthIntegrationSuite {
     // network, but doesn't know the actual secret. The server should close the connection as
     // soon as a message is sent after authentication is performed. This is emulated by removing
     // the client encryption handler after authentication.
-    ctx = new AuthTestCtx();
-    ctx.createServer("secret");
-    ctx.createClient("secret");
+    try (AuthTestCtx ctx = new AuthTestCtx()) {
+      ctx.createServer("secret");
+      ctx.createClient("secret");
 
-    assertNotNull(ctx.client.getChannel().pipeline()
-      .remove(TransportCipher.ENCRYPTION_HANDLER_NAME));
-    assertThrows(Exception.class,
-      () -> ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000));
-    assertTrue(ctx.authRpcHandler.isAuthenticated());
+      assertNotNull(ctx.client.getChannel().pipeline()
+              .remove(TransportCipher.ENCRYPTION_HANDLER_NAME));
+      assertThrows(Exception.class,
+              () -> ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000));
+      assertTrue(ctx.authRpcHandler.isAuthenticated());
+    }
   }
 
   @Test
   public void testLargeMessageEncryption() throws Exception {
     // Use a big length to create a message that cannot be put into the encryption buffer completely
     final int testErrorMessageLength = TransportCipher.STREAM_BUFFER_SIZE;
-    ctx = new AuthTestCtx(new RpcHandler() {
+    try (AuthTestCtx ctx = new AuthTestCtx(new RpcHandler() {
       @Override
       public void receive(
           TransportClient client,
@@ -135,21 +129,22 @@ public class AuthIntegrationSuite {
       public StreamManager getStreamManager() {
         return null;
       }
-    });
-    ctx.createServer("secret");
-    ctx.createClient("secret");
+    })) {
+      ctx.createServer("secret");
+      ctx.createClient("secret");
 
-    Exception e = assertThrows(Exception.class,
-      () -> ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000));
-    assertTrue(ctx.authRpcHandler.isAuthenticated());
-    assertTrue(e.getMessage() + " is not an expected error", e.getMessage().contains("DDDDD"));
-    // Verify we receive the complete error message
-    int messageStart = e.getMessage().indexOf("DDDDD");
-    int messageEnd = e.getMessage().lastIndexOf("DDDDD") + 5;
-    assertEquals(testErrorMessageLength, messageEnd - messageStart);
+      Exception e = assertThrows(Exception.class,
+        () -> ctx.client.sendRpcSync(JavaUtils.stringToBytes("Ping"), 5000));
+      assertTrue(ctx.authRpcHandler.isAuthenticated());
+      assertTrue(e.getMessage() + " is not an expected error", e.getMessage().contains("DDDDD"));
+      // Verify we receive the complete error message
+      int messageStart = e.getMessage().indexOf("DDDDD");
+      int messageEnd = e.getMessage().lastIndexOf("DDDDD") + 5;
+      assertEquals(testErrorMessageLength, messageEnd - messageStart);
+    }
   }
 
-  private static class AuthTestCtx {
+  private static class AuthTestCtx implements AutoCloseable {
 
     private final String appId = "testAppId";
     private final TransportConf conf;
@@ -160,7 +155,7 @@ public class AuthIntegrationSuite {
     volatile Channel serverChannel;
     volatile AuthRpcHandler authRpcHandler;
 
-    AuthTestCtx() throws Exception {
+    AuthTestCtx() {
       this(new RpcHandler() {
         @Override
         public void receive(
@@ -178,17 +173,17 @@ public class AuthIntegrationSuite {
       });
     }
 
-    AuthTestCtx(RpcHandler rpcHandler) throws Exception {
+    AuthTestCtx(RpcHandler rpcHandler) {
       Map<String, String> testConf = ImmutableMap.of("spark.network.crypto.enabled", "true");
       this.conf = new TransportConf("rpc", new MapConfigProvider(testConf));
       this.ctx = new TransportContext(conf, rpcHandler);
     }
 
-    void createServer(String secret) throws Exception {
+    void createServer(String secret) {
       createServer(secret, true);
     }
 
-    void createServer(String secret, boolean enableAes) throws Exception {
+    void createServer(String secret, boolean enableAes) {
       TransportServerBootstrap introspector = (channel, rpcHandler) -> {
         this.serverChannel = channel;
         if (rpcHandler instanceof AuthRpcHandler) {
@@ -215,7 +210,7 @@ public class AuthIntegrationSuite {
         .createClient(TestUtils.getLocalHost(), server.getPort());
     }
 
-    void close() {
+    public void close() {
       if (client != null) {
         client.close();
       }
@@ -233,7 +228,5 @@ public class AuthIntegrationSuite {
       when(keyHolder.getSecretKey(anyString())).thenReturn(secret);
       return keyHolder;
     }
-
   }
-
 }
