@@ -146,7 +146,7 @@ public class OneForOneStreamManagerSuite {
     manager.registerStream("appId", buffers1, dummyChannel, false);
     // should NOT Release
     manager.registerStream("appId", buffers2, dummyChannel, true);
-    Assert.assertEquals(2, manager.numStreamStates());
+    Assertions.assertEquals(2, manager.numStreamStates());
 
     // connectionTerminated
     manager.connectionTerminated(dummyChannel);
@@ -158,6 +158,6 @@ public class OneForOneStreamManagerSuite {
     Mockito.verify(buffers2, Mockito.times(0)).next();
     // only buffers1 has been released
     Mockito.verify(mockManagedBuffer, Mockito.times(1)).release();
-    Assert.assertEquals(0, manager.numStreamStates());
+    Assertions.assertEquals(0, manager.numStreamStates());
   }
 }
