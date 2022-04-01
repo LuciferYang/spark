@@ -382,7 +382,7 @@ public abstract class DBIteratorSuite {
     IntKeyType i = new IntKeyType();
     i.key = 1;
     i.id = "1";
-    i.values = Collections.singletonList("1");
+    i.values = Arrays.asList("1");
 
     db.write(i);
 
@@ -499,7 +499,7 @@ public abstract class DBIteratorSuite {
 
   private List<CustomType1> sortBy(Comparator<CustomType1> comp) {
     List<CustomType1> copy = new ArrayList<>(allEntries);
-    copy.sort(comp);
+    Collections.sort(copy, comp);
     return copy;
   }
 

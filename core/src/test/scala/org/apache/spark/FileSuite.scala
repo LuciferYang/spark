@@ -57,6 +57,7 @@ class FileSuite extends SparkFunSuite with LocalSparkContext {
   }
 
   test("text files") {
+    withTempDir()
     sc = new SparkContext("local", "test")
     val outputDir = new File(tempDir, "output").getAbsolutePath
     val nums = sc.makeRDD(1 to 4)
