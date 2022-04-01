@@ -32,8 +32,6 @@ import org.apache.spark.network.util.ByteArrayWritableChannel;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
 import static org.junit.jupiter.api.Assertions.*;
-
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
@@ -89,8 +87,7 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage corruptChallenge =
               new AuthMessage("junk", clientChallenge.salt, clientChallenge.ciphertext);
-      Assertions.assertThrows(IllegalArgumentException.class,
-        () -> server.response(corruptChallenge));
+      assertThrows(IllegalArgumentException.class, () -> server.response(corruptChallenge));
     }
   }
 
@@ -101,8 +98,7 @@ public class AuthEngineSuite {
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.salt[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class,
-        () -> server.response(clientChallenge));
+      assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
     }
   }
 
@@ -113,8 +109,7 @@ public class AuthEngineSuite {
          AuthEngine server = new AuthEngine("appId", "secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
       clientChallenge.ciphertext[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class,
-        () -> server.response(clientChallenge));
+      assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
     }
   }
 
@@ -127,7 +122,7 @@ public class AuthEngineSuite {
       AuthMessage serverResponse = server.response(clientChallenge);
       AuthMessage corruptResponse =
               new AuthMessage("junk", serverResponse.salt, serverResponse.ciphertext);
-      Assertions.assertThrows(IllegalArgumentException.class,
+      assertThrows(IllegalArgumentException.class,
         () -> client.deriveSessionCipher(clientChallenge, corruptResponse));
     }
   }
@@ -140,7 +135,7 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage serverResponse = server.response(clientChallenge);
       serverResponse.salt[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class,
+      assertThrows(GeneralSecurityException.class,
         () -> client.deriveSessionCipher(clientChallenge, serverResponse));
     }
   }
@@ -153,7 +148,7 @@ public class AuthEngineSuite {
       AuthMessage clientChallenge = client.challenge();
       AuthMessage serverResponse = server.response(clientChallenge);
       serverResponse.ciphertext[0] ^= 1;
-      Assertions.assertThrows(GeneralSecurityException.class,
+      assertThrows(GeneralSecurityException.class,
         () -> client.deriveSessionCipher(clientChallenge, serverResponse));
     }
   }
@@ -192,8 +187,7 @@ public class AuthEngineSuite {
     try (AuthEngine client = new AuthEngine("appId", "secret", conf);
          AuthEngine server = new AuthEngine("appId", "different_secret", conf)) {
       AuthMessage clientChallenge = client.challenge();
-      Assertions.assertThrows(GeneralSecurityException.class,
-        () -> server.response(clientChallenge));
+      assertThrows(GeneralSecurityException.class, () -> server.response(clientChallenge));
     }
   }
 
@@ -204,7 +198,7 @@ public class AuthEngineSuite {
 
     try (AuthEngine engine = new AuthEngine("appId", "secret", conf)) {
       engine.challenge();
-      Assertions.assertThrows(AssertionError.class,
+      assertThrows(AssertionError.class,
         () -> fail("Should have failed to create challenge message."));
       // Call close explicitly to make sure it's idempotent.
       engine.close();
