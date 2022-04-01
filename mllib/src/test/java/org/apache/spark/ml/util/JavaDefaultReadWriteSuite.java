@@ -20,7 +20,9 @@ package org.apache.spark.ml.util;
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.SharedSparkSession;
@@ -30,6 +32,7 @@ public class JavaDefaultReadWriteSuite extends SharedSparkSession {
   File tempDir = null;
 
   @Override
+  @BeforeEach
   public void setUp() throws IOException {
     super.setUp();
     tempDir = Utils.createTempDir(
@@ -37,6 +40,7 @@ public class JavaDefaultReadWriteSuite extends SharedSparkSession {
   }
 
   @Override
+  @AfterEach
   public void tearDown() {
     super.tearDown();
     Utils.deleteRecursively(tempDir);
