@@ -626,7 +626,11 @@ object Decimal {
       }
     } catch {
       case _: NumberFormatException =>
-        throw QueryExecutionErrors.invalidInputSyntaxForNumericError(str)
+      // scalastyle:off
+      println("fuck fromStringANSI(str: UTF8String)")
+      // scalastyle:on
+      throw QueryExecutionErrors
+          .cannotCastToDataTypeError(str, StringType, DecimalType.SYSTEM_DEFAULT)
     }
   }
 

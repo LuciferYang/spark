@@ -18,6 +18,7 @@
 package org.apache.spark.sql.catalyst.util
 
 import org.apache.spark.sql.errors.QueryExecutionErrors
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
 /**
@@ -25,20 +26,20 @@ import org.apache.spark.unsafe.types.UTF8String
  */
 object UTF8StringUtils {
 
-  def toLongExact(s: UTF8String): Long = withException(s.toLongExact)
+  def toLongExact(s: UTF8String): Long = withException(s, LongType)(s.toLongExact)
 
-  def toIntExact(s: UTF8String): Int = withException(s.toIntExact)
+  def toIntExact(s: UTF8String): Int = withException(s, IntegerType)(s.toIntExact)
 
-  def toShortExact(s: UTF8String): Short = withException(s.toShortExact)
+  def toShortExact(s: UTF8String): Short = withException(s, ShortType)(s.toShortExact)
 
-  def toByteExact(s: UTF8String): Byte = withException(s.toByteExact)
+  def toByteExact(s: UTF8String): Byte = withException(s, ByteType)(s.toByteExact)
 
-  private def withException[A](f: => A): A = {
+  private def withException[A](from: UTF8String, toDataType: DataType)(f: => A): A = {
     try {
       f
     } catch {
-      case e: NumberFormatException =>
-        throw QueryExecutionErrors.invalidInputSyntaxForNumericError(e)
+      case _: NumberFormatException =>
+        throw QueryExecutionErrors.cannotCastToDataTypeError(from, StringType, toDataType)
     }
   }
 }

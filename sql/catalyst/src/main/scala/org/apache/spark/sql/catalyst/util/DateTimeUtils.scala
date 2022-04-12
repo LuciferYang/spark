@@ -30,7 +30,7 @@ import sun.util.calendar.ZoneInfo
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 import org.apache.spark.sql.catalyst.util.RebaseDateTime._
 import org.apache.spark.sql.errors.QueryExecutionErrors
-import org.apache.spark.sql.types.{DateType, Decimal, DoubleExactNumeric, TimestampNTZType, TimestampType}
+import org.apache.spark.sql.types.{DateType, Decimal, DoubleExactNumeric, StringType, TimestampNTZType, TimestampType}
 import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 
 /**
@@ -450,13 +450,13 @@ object DateTimeUtils {
 
   def stringToTimestampAnsi(s: UTF8String, timeZoneId: ZoneId): Long = {
     stringToTimestamp(s, timeZoneId).getOrElse {
-      throw QueryExecutionErrors.cannotCastToDateTimeError(s, TimestampType)
+      throw QueryExecutionErrors.cannotCastToDataTypeError(s, StringType, TimestampType)
     }
   }
 
   def doubleToTimestampAnsi(d: Double): Long = {
     if (d.isNaN || d.isInfinite) {
-      throw QueryExecutionErrors.cannotCastToDateTimeError(d, TimestampType)
+      throw QueryExecutionErrors.cannotCastToDataTypeError(d, StringType, TimestampType)
     } else {
       DoubleExactNumeric.toLong(d * MICROS_PER_SECOND)
     }
@@ -505,7 +505,7 @@ object DateTimeUtils {
 
   def stringToTimestampWithoutTimeZoneAnsi(s: UTF8String): Long = {
     stringToTimestampWithoutTimeZone(s, true).getOrElse {
-      throw QueryExecutionErrors.cannotCastToDateTimeError(s, TimestampNTZType)
+      throw QueryExecutionErrors.cannotCastToDataTypeError(s, StringType, TimestampNTZType)
     }
   }
 
@@ -623,7 +623,7 @@ object DateTimeUtils {
 
   def stringToDateAnsi(s: UTF8String): Int = {
     stringToDate(s).getOrElse {
-      throw QueryExecutionErrors.cannotCastToDateTimeError(s, DateType)
+      throw QueryExecutionErrors.cannotCastToDataTypeError(s, StringType, DateType)
     }
   }
 

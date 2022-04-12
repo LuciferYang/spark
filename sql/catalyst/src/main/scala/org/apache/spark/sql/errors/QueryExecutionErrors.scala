@@ -104,14 +104,11 @@ object QueryExecutionErrors extends QueryErrorsBase {
         decimalPrecision.toString, decimalScale.toString, SQLConf.ANSI_ENABLED.key, context))
   }
 
-  def invalidInputSyntaxForNumericError(e: NumberFormatException): NumberFormatException = {
-    new NumberFormatException(s"${e.getMessage}. To return NULL instead, use 'try_cast'. " +
-      s"If necessary set ${SQLConf.ANSI_ENABLED.key} to false to bypass this error.")
-  }
-
-  def invalidInputSyntaxForNumericError(s: UTF8String): NumberFormatException = {
-    new SparkNumberFormatException(errorClass = "INVALID_INPUT_SYNTAX_FOR_NUMERIC_TYPE",
-      messageParameters = Array(toSQLValue(s, StringType), SQLConf.ANSI_ENABLED.key))
+  def cannotCastToDataTypeError(
+      from: Any, fromDataType: DataType, toDataType: DataType): SparkIllegalArgumentException = {
+    new SparkIllegalArgumentException(errorClass = "CANNOT_CAST_TO_DATATYPE",
+      messageParameters = Array(
+        toSQLValue(from, fromDataType), toDataType.catalogString, SQLConf.ANSI_ENABLED.key))
   }
 
   def cannotCastFromNullTypeError(to: DataType): Throwable = {
@@ -590,8 +587,10 @@ object QueryExecutionErrors extends QueryErrorsBase {
 
   def failedToCastValueToDataTypeForPartitionColumnError(
       value: String, dataType: DataType, columnName: String): Throwable = {
-    new RuntimeException(s"Failed to cast value `$value` to " +
-      s"`$dataType` for partition column `$columnName`")
+    new SparkIllegalArgumentException(
+      errorClass = "CANNOT_CAST_PARTITION_COL",
+      messageParameters = Array(value, dataType.catalogString, columnName)
+    )
   }
 
   def endOfStreamError(): Throwable = {
@@ -1007,11 +1006,6 @@ object QueryExecutionErrors extends QueryErrorsBase {
       e)
   }
 
-  def cannotCastToDateTimeError(value: Any, to: DataType): Throwable = {
-    new DateTimeException(s"Cannot cast $value to $to. To return NULL instead, use 'try_cast'. " +
-      s"If necessary set ${SQLConf.ANSI_ENABLED.key} to false to bypass this error.")
-  }
-
   def registeringStreamingQueryListenerError(e: Exception): Throwable = {
     new SparkException("Exception when registering StreamingQueryListener", e)
   }
@@ -1141,12 +1135,6 @@ object QueryExecutionErrors extends QueryErrorsBase {
   def userDefinedTypeNotAnnotatedAndRegisteredError(udt: UserDefinedType[_]): Throwable = {
     new SparkException(s"${udt.userClass.getName} is not annotated with " +
       "SQLUserDefinedType nor registered with UDTRegistration.}")
-  }
-
-  def invalidInputSyntaxForBooleanError(s: UTF8String): UnsupportedOperationException = {
-    new UnsupportedOperationException(s"invalid input syntax for type boolean: $s. " +
-      s"To return NULL instead, use 'try_cast'. If necessary set ${SQLConf.ANSI_ENABLED.key} " +
-      "to false to bypass this error.")
   }
 
   def unsupportedOperandTypeForSizeFunctionError(dataType: DataType): Throwable = {
@@ -1586,7 +1574,10 @@ object QueryExecutionErrors extends QueryErrorsBase {
   }
 
   def nullLiteralsCannotBeCastedError(name: String): Throwable = {
-    new UnsupportedOperationException(s"null literals can't be casted to $name")
+    new SparkUnsupportedOperationException(
+      errorClass = "CANNOT_CAST_DATATYPE",
+      messageParameters = Array("null literals", name)
+    )
   }
 
   def notUserDefinedTypeError(name: String, userClass: String): Throwable = {
