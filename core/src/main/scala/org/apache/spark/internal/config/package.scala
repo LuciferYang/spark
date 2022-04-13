@@ -714,6 +714,19 @@ package object config {
       .booleanConf
       .createWithDefault(true)
 
+  object ShuffleServiceDBImplementation extends Enumeration {
+    val LEVELDB, ROCKSDB = Value
+  }
+
+  private[spark] val SHUFFLE_SERVICE_DB_IMPLEMENTATION =
+    ConfigBuilder("spark.shuffle.service.db.implementation")
+      .doc("will do")
+      .version("3.4.0")
+      .stringConf
+      .transform(_.toUpperCase(Locale.ROOT))
+      .checkValues(ShuffleServiceDBImplementation.values.map(_.toString))
+      .createWithDefault(ShuffleServiceDBImplementation.LEVELDB.toString)
+
   private[spark] val SHUFFLE_SERVICE_PORT =
     ConfigBuilder("spark.shuffle.service.port").version("1.2.0").intConf.createWithDefault(7337)
 

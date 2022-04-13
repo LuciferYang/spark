@@ -23,7 +23,9 @@ import java.util.concurrent.CountDownLatch
 import scala.collection.JavaConverters._
 
 import org.apache.spark.{SecurityManager, SparkConf}
-import org.apache.spark.internal.{config, Logging}
+import org.apache.spark.internal.{Logging, config}
+import org.apache.spark.internal.config.ShuffleServiceDBImplementation
+import org.apache.spark.internal.config.ShuffleServiceDBImplementation._
 import org.apache.spark.metrics.{MetricsSystem, MetricsSystemInstances}
 import org.apache.spark.network.TransportContext
 import org.apache.spark.network.crypto.AuthServerBootstrap
@@ -32,6 +34,7 @@ import org.apache.spark.network.server.{TransportServer, TransportServerBootstra
 import org.apache.spark.network.shuffle.ExternalBlockHandler
 import org.apache.spark.network.util.TransportConf
 import org.apache.spark.util.{ShutdownHookManager, Utils}
+
 
 /**
  * Provides a server from which Executors can read shuffle files (rather than reading directly from
@@ -43,13 +46,21 @@ import org.apache.spark.util.{ShutdownHookManager, Utils}
 private[deploy]
 class ExternalShuffleService(sparkConf: SparkConf, securityManager: SecurityManager)
   extends Logging {
+
   protected val masterMetricsSystem =
     MetricsSystem.createMetricsSystem(MetricsSystemInstances.SHUFFLE_SERVICE, sparkConf)
 
   private val enabled = sparkConf.get(config.SHUFFLE_SERVICE_ENABLED)
   private val port = sparkConf.get(config.SHUFFLE_SERVICE_PORT)
 
-  private val registeredExecutorsDB = "registeredExecutors.ldb"
+  private val registeredExecutorsDB = {
+    val dbImpl = sparkConf.get(config.SHUFFLE_SERVICE_DB_IMPLEMENTATION)
+    ShuffleServiceDBImplementation.withName(dbImpl) match {
+      case LEVELDB => "registeredExecutors.ldb"
+      case ROCKSDB => "registeredExecutors.rdb"
+    }
+  }
+
 
   private val transportConf =
     SparkTransportConf.fromSparkConf(sparkConf, "shuffle", numUsableCores = 0)
