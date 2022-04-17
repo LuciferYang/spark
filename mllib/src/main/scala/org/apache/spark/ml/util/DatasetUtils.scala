@@ -27,12 +27,16 @@ import org.apache.spark.sql.types._
 
 private[spark] object DatasetUtils {
 
-  private[ml] def checkRegressionLabels(labelCol: String): Column = {
-    val casted = col(labelCol).cast(DoubleType)
-    when(casted.isNull || casted.isNaN, raise_error(lit("Labels MUST NOT be Null or NaN")))
+  private[ml] def checkNonNanValues(colName: String, displayed: String): Column = {
+    val casted = col(colName).cast(DoubleType)
+    when(casted.isNull || casted.isNaN, raise_error(lit(s"$displayed MUST NOT be Null or NaN")))
       .when(casted === Double.NegativeInfinity || casted === Double.PositiveInfinity,
-        raise_error(concat(lit("Labels MUST NOT be Infinity, but got "), casted)))
+        raise_error(concat(lit(s"$displayed MUST NOT be Infinity, but got "), casted)))
       .otherwise(casted)
+  }
+
+  private[ml] def checkRegressionLabels(labelCol: String): Column = {
+    checkNonNanValues(labelCol, "Labels")
   }
 
   private[ml] def checkClassificationLabels(
@@ -71,13 +75,16 @@ private[spark] object DatasetUtils {
     case _ => lit(1.0)
   }
 
-  private[ml] def checkNonNanVectors(vectorCol: String): Column = {
-    val vecCol = col(vectorCol)
-    when(vecCol.isNull, raise_error(lit("Vectors MUST NOT be Null")))
-      .when(!validateVector(vecCol),
+  private[ml] def checkNonNanVectors(vectorCol: Column): Column = {
+    when(vectorCol.isNull, raise_error(lit("Vectors MUST NOT be Null")))
+      .when(!validateVector(vectorCol),
         raise_error(concat(lit("Vector values MUST NOT be NaN or Infinity, but got "),
-          vecCol.cast(StringType))))
-      .otherwise(vecCol)
+          vectorCol.cast(StringType))))
+      .otherwise(vectorCol)
+  }
+
+  private[ml] def checkNonNanVectors(vectorCol: String): Column = {
+    checkNonNanVectors(col(vectorCol))
   }
 
   private lazy val validateVector = udf { vector: Vector =>

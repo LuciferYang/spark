@@ -686,6 +686,16 @@ package object config {
       .booleanConf
       .createWithDefault(false)
 
+  private[spark] val SHUFFLE_SERVICE_REMOVE_SHUFFLE_ENABLED =
+    ConfigBuilder("spark.shuffle.service.removeShuffle")
+      .doc("Whether to use the ExternalShuffleService for deleting shuffle blocks for " +
+        "deallocated executors when the shuffle is no longer needed. Without this enabled, " +
+        "shuffle data on executors that are deallocated will remain on disk until the " +
+        "application ends.")
+      .version("3.3.0")
+      .booleanConf
+      .createWithDefault(false)
+
   private[spark] val SHUFFLE_SERVICE_FETCH_RDD_ENABLED =
     ConfigBuilder(Constants.SHUFFLE_SERVICE_FETCH_RDD_ENABLED)
       .doc("Whether to use the ExternalShuffleService for fetching disk persisted RDD blocks. " +
@@ -1483,6 +1493,14 @@ package object config {
       .version("0.9.0")
       .longConf
       .createWithDefault(10000)
+
+  private[spark] val SHUFFLE_MERGE_PREFER_NIO =
+    ConfigBuilder("spark.file.transferTo")
+      .doc("If true, NIO's `transferTo` API will be preferentially used when merging " +
+        "Spark shuffle spill files")
+      .version("1.4.0")
+      .booleanConf
+      .createWithDefault(true)
 
   private[spark] val SHUFFLE_SORT_BYPASS_MERGE_THRESHOLD =
     ConfigBuilder("spark.shuffle.sort.bypassMergeThreshold")
