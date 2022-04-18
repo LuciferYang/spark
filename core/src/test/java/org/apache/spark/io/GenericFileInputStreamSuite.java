@@ -25,6 +25,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 
@@ -45,6 +46,7 @@ public abstract class GenericFileInputStreamSuite {
     randomBytes =  RandomUtils.nextBytes(2 * 1024 * 1024);
     inputFile = File.createTempFile("temp-file", ".tmp");
     FileUtils.writeByteArrayToFile(inputFile, randomBytes);
+    NioBufferedFileInputStream.CREATES.clear();
   }
 
   @After
@@ -53,6 +55,10 @@ public abstract class GenericFileInputStreamSuite {
 
     for (InputStream is : inputStreams) {
       is.close();
+    }
+    long count = NioBufferedFileInputStream.CREATES.stream().filter(NioBufferedFileInputStream::isOpen).count();
+    if(count > 0) {
+      throw new IllegalStateException("has not closed NioBufferedFileInputStream");
     }
   }
 
