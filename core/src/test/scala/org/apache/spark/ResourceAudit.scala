@@ -22,7 +22,7 @@ import scala.collection.JavaConverters._
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.NioBufferedFileInputStream
 
-class ResourceAudit extends Logging {
+trait ResourceAudit extends Logging {
 
   protected def doResourcePreAudit(): Unit = {
     NioBufferedFileInputStream.CREATES.clear();
