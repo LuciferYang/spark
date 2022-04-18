@@ -134,7 +134,7 @@ public final class NioBufferedFileInputStream extends InputStream {
   public synchronized void close() throws IOException {
     fileChannel.close();
     StorageUtils.dispose(byteBuffer);
-    open = true;
+    open = false;
   }
 
   public boolean isOpen() {
