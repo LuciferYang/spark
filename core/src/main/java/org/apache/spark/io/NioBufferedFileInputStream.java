@@ -21,6 +21,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * {@link InputStream} implementation which uses direct buffer
@@ -38,10 +40,15 @@ public final class NioBufferedFileInputStream extends InputStream {
 
   private final FileChannel fileChannel;
 
+  private volatile boolean open = true;
+
+  public static final List<NioBufferedFileInputStream> CREATES = new ArrayList<>();
+
   public NioBufferedFileInputStream(File file, int bufferSizeInBytes) throws IOException {
     byteBuffer = ByteBuffer.allocateDirect(bufferSizeInBytes);
     fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ);
     byteBuffer.flip();
+    CREATES.add(this);
   }
 
   public NioBufferedFileInputStream(File file) throws IOException {
@@ -127,11 +134,10 @@ public final class NioBufferedFileInputStream extends InputStream {
   public synchronized void close() throws IOException {
     fileChannel.close();
     StorageUtils.dispose(byteBuffer);
+    open = true;
   }
 
-  @SuppressWarnings("deprecation")
-  @Override
-  protected void finalize() throws IOException {
-    close();
+  public boolean isOpen() {
+    return open;
   }
 }

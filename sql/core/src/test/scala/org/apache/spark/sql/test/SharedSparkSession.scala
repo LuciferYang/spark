@@ -43,6 +43,7 @@ trait SharedSparkSession extends SQLTestUtils with SharedSparkSessionBase {
 
   protected override def beforeAll(): Unit = {
     doThreadPreAudit()
+    doResourcePreAudit()
     super.beforeAll()
   }
 
@@ -51,6 +52,7 @@ trait SharedSparkSession extends SQLTestUtils with SharedSparkSessionBase {
       super.afterAll()
     } finally {
       doThreadPostAudit()
+      doResourcePostAudit()
     }
   }
 }
