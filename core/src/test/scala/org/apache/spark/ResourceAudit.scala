@@ -25,7 +25,11 @@ import org.apache.spark.io.NioBufferedFileInputStream
 trait ResourceAudit extends Logging {
 
   protected def doResourcePreAudit(): Unit = {
-    NioBufferedFileInputStream.CREATES.clear();
+    val creates = NioBufferedFileInputStream.CREATES
+    if (creates.asScala.nonEmpty) {
+      logWarning("creates not empty before test")
+    }
+    NioBufferedFileInputStream.CREATES.clear()
   }
 
   protected def doResourcePostAudit(): Unit = {
