@@ -35,7 +35,7 @@ trait ResourceAudit extends Logging {
   protected def doResourcePostAudit(): Unit = {
     val opt = NioBufferedFileInputStream.CREATES.asScala.find(_.isOpen)
     if (opt.isDefined) {
-      // throw new IllegalStateException(opt.get.toString)
+      throw new IllegalStateException(opt.get.toString)
     } else {
       NioBufferedFileInputStream.CREATES.clear()
     }

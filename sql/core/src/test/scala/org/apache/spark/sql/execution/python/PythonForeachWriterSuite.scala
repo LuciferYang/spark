@@ -110,7 +110,7 @@ class PythonForeachWriterSuite extends SparkFunSuite with Eventually with Mockit
             Thread.sleep(sleepPerRowReadMs)
           }
         } catch {
-          case _: InterruptedException => iterator.closeIfNeeded()
+          case _: InterruptedException => buffer.close()
         }
       }
     }

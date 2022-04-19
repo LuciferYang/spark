@@ -107,7 +107,7 @@ object PythonForeachWriter {
         if (row == null) finished = true
         row
       }
-      override protected def close(): Unit = queue.close()
+      override protected def close(): Unit = { }
     }
 
     def add(row: UnsafeRow): Unit = withLock {
