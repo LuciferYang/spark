@@ -55,8 +55,7 @@ public abstract class GenericFileInputStreamSuite {
     for (InputStream is : inputStreams) {
       is.close();
     }
-    long count = NioBufferedFileInputStream.CREATES.stream()
-        .filter(NioBufferedFileInputStream::isOpen).count();
+    long count = NioBufferedFileInputStream.CREATES.size();
     if(count > 0) {
       throw new IllegalStateException("has not closed NioBufferedFileInputStream");
     }
