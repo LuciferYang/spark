@@ -20,7 +20,7 @@ package org.apache.spark.sql.catalyst.parser
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.{AnalysisTest, RelationTimeTravel, UnresolvedAlias, UnresolvedAttribute, UnresolvedFunction, UnresolvedGenerator, UnresolvedInlineTable, UnresolvedRelation, UnresolvedStar, UnresolvedSubqueryColumnAliases, UnresolvedTableValuedFunction}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.PercentileCont
+import org.apache.spark.sql.catalyst.expressions.aggregate.{PercentileCont, PercentileDisc}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.internal.SQLConf
@@ -688,7 +688,10 @@ class PlanParserSuite extends AnalysisTest {
       UnresolvedTableValuedFunction("range", Literal(2) :: Nil, Seq.empty).select(star()))
     // SPARK-34627
     intercept("select * from default.range(2)",
-      "table valued function cannot specify database name: default.range")
+      "table valued function cannot specify database name")
+    // SPARK-38957
+    intercept("select * from spark_catalog.default.range(2)",
+      "table valued function cannot specify database name")
   }
 
   test("SPARK-20311 range(N) as alias") {
@@ -1250,7 +1253,7 @@ class PlanParserSuite extends AnalysisTest {
         |    "escapeChar" = "\\")
         |FROM testData
       """.stripMargin,
-      "TRANSFORM with serde is only supported in hive mode")
+      "\"TRANSFORM\" with serde is only supported in hive mode")
   }
 
 
@@ -1299,24 +1302,36 @@ class PlanParserSuite extends AnalysisTest {
       "timestamp expression cannot contain subqueries")
   }
 
-  test("PERCENTILE_CONT function") {
-    def assertPercentileContPlans(inputSQL: String, expectedExpression: Expression): Unit = {
+  test("PERCENTILE_CONT & PERCENTILE_DISC") {
+    def assertPercentilePlans(inputSQL: String, expectedExpression: Expression): Unit = {
       comparePlans(
         parsePlan(inputSQL),
         Project(Seq(UnresolvedAlias(expectedExpression)), OneRowRelation())
       )
     }
 
-    assertPercentileContPlans(
+    assertPercentilePlans(
       "SELECT PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY col)",
       PercentileCont(UnresolvedAttribute("col"), Literal(Decimal(0.1), DecimalType(1, 1)))
         .toAggregateExpression()
     )
 
-    assertPercentileContPlans(
+    assertPercentilePlans(
       "SELECT PERCENTILE_CONT(0.1) WITHIN GROUP (ORDER BY col DESC)",
       PercentileCont(UnresolvedAttribute("col"),
-        Subtract(Literal(1), Literal(Decimal(0.1), DecimalType(1, 1)))).toAggregateExpression()
+        Literal(Decimal(0.1), DecimalType(1, 1)), true).toAggregateExpression()
+    )
+
+    assertPercentilePlans(
+      "SELECT PERCENTILE_DISC(0.1) WITHIN GROUP (ORDER BY col)",
+      PercentileDisc(UnresolvedAttribute("col"), Literal(Decimal(0.1), DecimalType(1, 1)))
+        .toAggregateExpression()
+    )
+
+    assertPercentilePlans(
+      "SELECT PERCENTILE_DISC(0.1) WITHIN GROUP (ORDER BY col DESC)",
+      new PercentileDisc(UnresolvedAttribute("col"),
+        Literal(Decimal(0.1), DecimalType(1, 1)), true).toAggregateExpression()
     )
   }
 }
