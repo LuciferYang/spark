@@ -23,6 +23,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * {@link InputStream} implementation which uses direct buffer
@@ -40,15 +41,13 @@ public final class NioBufferedFileInputStream extends InputStream {
 
   private final FileChannel fileChannel;
 
-  private volatile boolean open = true;
-
-  public static final List<NioBufferedFileInputStream> CREATES = new ArrayList<>();
+  public static final List<CreateStack> CREATES = new ArrayList<>();
 
   public NioBufferedFileInputStream(File file, int bufferSizeInBytes) throws IOException {
     byteBuffer = ByteBuffer.allocateDirect(bufferSizeInBytes);
     fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ);
     byteBuffer.flip();
-    CREATES.add(this);
+    CREATES.add(new CreateStack(this, new Throwable().getStackTrace()));
   }
 
   public NioBufferedFileInputStream(File file) throws IOException {
@@ -134,10 +133,11 @@ public final class NioBufferedFileInputStream extends InputStream {
   public synchronized void close() throws IOException {
     fileChannel.close();
     StorageUtils.dispose(byteBuffer);
-    open = false;
-  }
-
-  public boolean isOpen() {
-    return open;
+    CREATES.removeIf(new Predicate<CreateStack>() {
+      @Override
+      public boolean test(CreateStack createStack) {
+        return createStack.getStream().equals(this);
+      }
+    });
   }
 }
