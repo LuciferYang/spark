@@ -344,7 +344,7 @@ private[deploy] class Master(
           worker.state = WorkerState.ALIVE
 
           val validExecutors = execResponses.filter(
-            exec => idToApp.get(exec.desc.appId).isDefined)
+            exec => idToApp.contains(exec.desc.appId))
           for (exec <- validExecutors) {
             val (execDesc, execResources) = (exec.desc, exec.resources)
             val app = idToApp(execDesc.appId)

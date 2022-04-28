@@ -46,11 +46,11 @@ object DriverRegistry extends Logging {
     val cls = Utils.getContextOrSparkClassLoader.loadClass(className)
     if (cls.getClassLoader == null) {
       logTrace(s"$className has been loaded with bootstrap ClassLoader, wrapper is not required")
-    } else if (wrapperMap.get(className).isDefined) {
+    } else if (wrapperMap.contains(className)) {
       logTrace(s"Wrapper for $className already exists")
     } else {
       synchronized {
-        if (wrapperMap.get(className).isEmpty) {
+        if (!wrapperMap.contains(className)) {
           val wrapper = new DriverWrapper(cls.getConstructor().newInstance().asInstanceOf[Driver])
           DriverManager.registerDriver(wrapper)
           wrapperMap(className) = wrapper

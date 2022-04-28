@@ -612,7 +612,7 @@ object StructType extends AbstractDataType {
 
       val leftMapped = fieldsMap(leftFields)
       rightFields
-        .filterNot(f => leftMapped.get(f.name).nonEmpty)
+        .filterNot(f => leftMapped.contains(f.name))
         .foreach { f =>
           newFields += f
         }
