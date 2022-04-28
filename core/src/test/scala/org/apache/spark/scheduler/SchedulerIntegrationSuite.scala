@@ -61,6 +61,7 @@ abstract class SchedulerIntegrationSuite[T <: MockBackend: ClassTag] extends Spa
     if (taskScheduler != null) {
       taskScheduler.runningTaskSets.clear()
     }
+    logWarning("before call results.clear()")
     results.clear()
     failure = null
     backendException.set(null)
