@@ -207,8 +207,8 @@ class HistoryServer(
   }
 
   override def getApplicationInfoList(
-      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
-    provider.getListing(max)(f)
+      max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+    provider.getListing(max)(filter)
   }
 
   /**

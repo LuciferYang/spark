@@ -156,7 +156,7 @@ private[spark] class SparkUI private (
   }
 
   override def getApplicationInfoList(
-      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+      max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
     Seq(ApplicationInfo(
       id = appId,
       name = appName,
@@ -173,7 +173,7 @@ private[spark] class SparkUI private (
         sparkUser = getSparkUser,
         appSparkVersion = appSparkVersion
       ))
-    )).filter(f)
+    )).filter(filter)
   }
 
   def getApplicationInfoList: Iterator[ApplicationInfo] = {

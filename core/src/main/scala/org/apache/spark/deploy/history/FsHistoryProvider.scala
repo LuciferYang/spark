@@ -332,12 +332,12 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
   }
 
   override def getListing(
-      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+      max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
     Utils.tryWithResource(
       // Return the listing in end time descending order.
       listing.view(classOf[ApplicationInfoWrapper])
         .index("endTime").reverse().closeableIterator()) { iter =>
-      iter.asScala.map(_.toApplicationInfo()).filter(f).take(max).toList
+      iter.asScala.map(_.toApplicationInfo()).filter(filter).take(max).toList
     }
   }
 

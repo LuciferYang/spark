@@ -97,7 +97,7 @@ private[history] abstract class ApplicationHistoryProvider {
     0
   }
 
-  def getListing(max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo]
+  def getListing(max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo]
 
   /**
    * Returns a list of applications available for the history server to show.
