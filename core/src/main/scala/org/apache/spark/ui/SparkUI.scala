@@ -155,6 +155,27 @@ private[spark] class SparkUI private (
     securityManager.checkUIViewPermissions(user)
   }
 
+  override def getApplicationInfoList(
+      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+    Seq(ApplicationInfo(
+      id = appId,
+      name = appName,
+      coresGranted = None,
+      maxCores = None,
+      coresPerExecutor = None,
+      memoryPerExecutorMB = None,
+      attempts = Seq(ApplicationAttemptInfo(
+        attemptId = None,
+        startTime = new Date(startTime),
+        endTime = new Date(-1),
+        duration = 0,
+        lastUpdated = new Date(startTime),
+        sparkUser = getSparkUser,
+        appSparkVersion = appSparkVersion
+      ))
+    )).filter(f)
+  }
+
   def getApplicationInfoList: Iterator[ApplicationInfo] = {
     Iterator(new ApplicationInfo(
       id = appId,

@@ -323,6 +323,24 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     }
   }
 
+  override def applicationExists(f: ApplicationInfo => Boolean): Boolean = {
+    Utils.tryWithResource(
+      listing.view(classOf[ApplicationInfoWrapper])
+        .index("endTime").reverse().closeableIterator()) { iter =>
+      iter.asScala.map(_.toApplicationInfo()).exists(f)
+    }
+  }
+
+  override def getListing(
+      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+    Utils.tryWithResource(
+      // Return the listing in end time descending order.
+      listing.view(classOf[ApplicationInfoWrapper])
+        .index("endTime").reverse().closeableIterator()) { iter =>
+      iter.asScala.map(_.toApplicationInfo()).filter(f).take(max).toList
+    }
+  }
+
   override def getListing(): Iterator[ApplicationInfo] = {
     // Return the listing in end time descending order.
     KVUtils.mapToSeq(listing.view(classOf[ApplicationInfoWrapper])

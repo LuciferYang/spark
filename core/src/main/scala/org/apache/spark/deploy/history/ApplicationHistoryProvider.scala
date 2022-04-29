@@ -69,6 +69,11 @@ private[history] case class LoadedAppUI(ui: SparkUI) {
 private[history] abstract class ApplicationHistoryProvider {
 
   /**
+   * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
+   */
+  def applicationExists(f: ApplicationInfo => Boolean): Boolean
+
+  /**
    * Returns the count of application event logs that the provider is currently still processing.
    * History Server UI can use this to indicate to a user that the application listing on the UI
    * can be expected to list additional known applications once the processing of these
@@ -91,6 +96,8 @@ private[history] abstract class ApplicationHistoryProvider {
   def getLastUpdatedTime(): Long = {
     0
   }
+
+  def getListing(max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo]
 
   /**
    * Returns a list of applications available for the history server to show.

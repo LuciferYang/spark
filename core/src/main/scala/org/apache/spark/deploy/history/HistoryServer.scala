@@ -200,6 +200,18 @@ class HistoryServer(
   }
 
   /**
+   * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
+   */
+  def applicationExists(f: ApplicationInfo => Boolean): Boolean = {
+    provider.applicationExists(f)
+  }
+
+  override def getApplicationInfoList(
+     max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+    provider.getListing(max)(f)
+  }
+
+  /**
    * Returns a list of available applications, in descending order according to their end time.
    *
    * @return List of all known applications.
