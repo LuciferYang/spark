@@ -203,11 +203,11 @@ class HistoryServer(
    * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
    */
   def applicationExists(f: ApplicationInfo => Boolean): Boolean = {
-    provider.applicationExists(f)
+    provider.exists(f)
   }
 
   override def getApplicationInfoList(
-     max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+      max: Int)(f: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
     provider.getListing(max)(f)
   }
 
