@@ -97,6 +97,11 @@ private[history] abstract class ApplicationHistoryProvider {
     0
   }
 
+  /**
+   * Returns first n applications for the history server to show, applying a filter.
+   *
+   * @return First n qualified applications
+   */
   def getListing(max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo]
 
   /**
