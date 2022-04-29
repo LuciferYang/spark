@@ -18,7 +18,7 @@
 package org.apache.spark
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.util.kvstore. KVStoreIteratorTracker
+import org.apache.spark.util.kvstore.KVStoreIteratorTracker
 
 trait DBIteratorAudit extends Logging {
 
