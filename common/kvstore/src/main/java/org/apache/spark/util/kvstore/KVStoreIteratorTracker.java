@@ -17,46 +17,37 @@
 
 package org.apache.spark.util.kvstore;
 
-import java.io.File;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
+public final class KVStoreIteratorTracker {
+    public static final ConcurrentLinkedQueue<KVStoreIterator<?>> TRACKER =
+      new ConcurrentLinkedQueue<>();
 
-public class RocksDBIteratorSuite extends DBIteratorSuite {
-
-  private static File dbpath;
-  private static RocksDB db;
-
-  @AfterClass
-  public static void cleanup() throws Exception {
-    if (db != null) {
-      db.close();
+    private static boolean isTesting() {
+      return System.getenv("SPARK_TESTING") != null || System.getProperty("spark.testing") != null;
     }
-    if (dbpath != null) {
-      FileUtils.deleteQuietly(dbpath);
+
+    public static void add(KVStoreIterator<?> iterator) {
+        if (isTesting()) {
+          TRACKER.add(iterator);
+        }
     }
-  }
 
-  @Before
-  public void setup() throws Exception {
-    KVStoreIteratorTracker.clear();
-    super.setup();
-  }
+    public static void remove(KVStoreIterator<?> iterator) {
+        if (isTesting()) {
+          TRACKER.remove(iterator);
+        }
+    }
 
-  @After
-  public void afterEach() {
-    Assert.assertTrue(KVStoreIteratorTracker.isEmpty());
-  }
+    public static boolean isEmpty() {
+        return TRACKER.isEmpty();
+    }
 
-  @Override
-  protected KVStore createStore() throws Exception {
-    dbpath = File.createTempFile("test.", ".rdb");
-    dbpath.delete();
-    db = new RocksDB(dbpath);
-    return db;
-  }
+    public static int size() {
+        return TRACKER.size();
+    }
 
+    public static void clear() {
+        TRACKER.clear();
+    }
 }

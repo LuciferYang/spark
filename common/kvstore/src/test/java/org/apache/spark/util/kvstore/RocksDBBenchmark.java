@@ -67,6 +67,7 @@ public class RocksDBBenchmark {
     try(Timer.Context ctx = dbCreation.time()) {
       db = new RocksDB(dbpath);
     }
+    KVStoreIteratorTracker.clear();
   }
 
   @After
@@ -79,6 +80,7 @@ public class RocksDBBenchmark {
     if (dbpath != null) {
       FileUtils.deleteQuietly(dbpath);
     }
+    assertTrue(KVStoreIteratorTracker.isEmpty());
   }
 
   @AfterClass

@@ -47,6 +47,7 @@ public class RocksDBSuite {
     if (dbpath != null) {
       FileUtils.deleteQuietly(dbpath);
     }
+    assertTrue(KVStoreIteratorTracker.isEmpty());
   }
 
   @Before
@@ -54,6 +55,7 @@ public class RocksDBSuite {
     dbpath = File.createTempFile("test.", ".rdb");
     dbpath.delete();
     db = new RocksDB(dbpath);
+    KVStoreIteratorTracker.clear();
   }
 
   @Test

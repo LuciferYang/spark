@@ -48,6 +48,7 @@ public class LevelDBSuite {
     if (dbpath != null) {
       FileUtils.deleteQuietly(dbpath);
     }
+    assertTrue(KVStoreIteratorTracker.isEmpty());
   }
 
   @Before
@@ -56,6 +57,7 @@ public class LevelDBSuite {
     dbpath = File.createTempFile("test.", ".ldb");
     dbpath.delete();
     db = new LevelDB(dbpath);
+    KVStoreIteratorTracker.clear();
   }
 
   @Test

@@ -271,7 +271,9 @@ public class RocksDB implements KVStore {
       @Override
       public Iterator<T> iterator() {
         try {
-          return new RocksDBIterator<>(type, RocksDB.this, this);
+          RocksDBIterator<T> it = new RocksDBIterator<>(type, RocksDB.this, this);
+          KVStoreIteratorTracker.add(it);
+          return it;
         } catch (Exception e) {
           throw Throwables.propagate(e);
         }

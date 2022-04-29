@@ -21,7 +21,11 @@ import java.io.File;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Before;
+
 import static org.junit.Assume.assumeFalse;
 
 public class LevelDBIteratorSuite extends DBIteratorSuite {
@@ -37,6 +41,17 @@ public class LevelDBIteratorSuite extends DBIteratorSuite {
     if (dbpath != null) {
       FileUtils.deleteQuietly(dbpath);
     }
+  }
+
+  @Before
+  public void setup() throws Exception {
+    KVStoreIteratorTracker.clear();
+    super.setup();
+  }
+
+  @After
+  public void afterEach() {
+    Assert.assertTrue(KVStoreIteratorTracker.isEmpty());
   }
 
   @Override

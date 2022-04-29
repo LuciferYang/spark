@@ -66,6 +66,7 @@ abstract class SparkFunSuite
   with BeforeAndAfterAll
   with BeforeAndAfterEach
   with ThreadAudit
+  with DBIteratorAudit
   with Logging {
 // scalastyle:on
 
@@ -87,6 +88,7 @@ abstract class SparkFunSuite
     if (enableAutoThreadAudit) {
       doThreadPreAudit()
     }
+    doDBIteratorPreCLear()
     super.beforeAll()
   }
 
@@ -99,6 +101,7 @@ abstract class SparkFunSuite
       if (enableAutoThreadAudit) {
         doThreadPostAudit()
       }
+      doDBIteratorPostAudit()
     }
   }
 

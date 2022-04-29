@@ -67,6 +67,7 @@ public class LevelDBBenchmark {
     try(Timer.Context ctx = dbCreation.time()) {
       db = new LevelDB(dbpath);
     }
+    KVStoreIteratorTracker.clear();
   }
 
   @After
@@ -79,6 +80,7 @@ public class LevelDBBenchmark {
     if (dbpath != null) {
       FileUtils.deleteQuietly(dbpath);
     }
+    assertTrue(KVStoreIteratorTracker.isEmpty());
   }
 
   @AfterClass
