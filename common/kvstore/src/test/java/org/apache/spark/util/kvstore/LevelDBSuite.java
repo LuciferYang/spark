@@ -282,18 +282,12 @@ public class LevelDBSuite {
     for (int i = 0; i < 8192; i++) {
       dbForCloseTest.write(createCustomType1(i));
     }
-    try (KVStoreIterator<CustomType1> iterator =
-      dbForCloseTest.view(CustomType1.class).closeableIterator()) {
-      String key = iterator.next().key;
-      assertEquals("key0", key);
-    }
     try (KVStoreIterator<CustomType1> it0 =
       dbForCloseTest.view(CustomType1.class).max(1).closeableIterator()) {
       while (it0.hasNext()) {
         it0.next();
       }
     }
-    System.gc();
     try (KVStoreIterator<CustomType1> it1 =
       dbForCloseTest.view(CustomType1.class).closeableIterator()) {
       assertEquals("key0", it1.next().key);
