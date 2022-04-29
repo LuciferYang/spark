@@ -206,9 +206,10 @@ class HistoryServer(
     provider.exists(f)
   }
 
+  /** Return first n applications , applying a filter. */
   override def getApplicationInfoList(
-      max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
-    provider.getListing(max)(filter)
+      n: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+    provider.getListing(n)(filter)
   }
 
   /**

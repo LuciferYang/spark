@@ -331,6 +331,7 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     }
   }
 
+  /** Return first n applications , applying a filter. */
   override def getListing(
       max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
     Utils.tryWithResource(

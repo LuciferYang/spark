@@ -155,8 +155,9 @@ private[spark] class SparkUI private (
     securityManager.checkUIViewPermissions(user)
   }
 
+  /** Returns a list containing at most one application, applying a filter. */
   override def getApplicationInfoList(
-      max: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
+      n: Int)(filter: ApplicationInfo => Boolean): Seq[ApplicationInfo] = {
     Seq(ApplicationInfo(
       id = appId,
       name = appName,
