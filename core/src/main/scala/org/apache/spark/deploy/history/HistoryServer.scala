@@ -203,7 +203,7 @@ class HistoryServer(
    * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
    */
   def applicationExists(f: ApplicationInfo => Boolean): Boolean = {
-    provider.exists(f)
+    provider.applicationExists(f)
   }
 
   /** Return first n applications , applying a filter. */

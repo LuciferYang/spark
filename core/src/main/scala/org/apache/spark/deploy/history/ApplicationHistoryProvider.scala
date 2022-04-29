@@ -71,7 +71,7 @@ private[history] abstract class ApplicationHistoryProvider {
   /**
    * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
    */
-  def exists(f: ApplicationInfo => Boolean): Boolean
+  def applicationExists(f: ApplicationInfo => Boolean): Boolean
 
   /**
    * Returns the count of application event logs that the provider is currently still processing.

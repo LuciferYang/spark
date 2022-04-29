@@ -323,7 +323,10 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     }
   }
 
-  override def exists(f: ApplicationInfo => Boolean): Boolean = {
+  /**
+   * Test whether there is [[ApplicationInfo]] satisfies the conditions specified in `f`.
+   */
+  override def applicationExists(f: ApplicationInfo => Boolean): Boolean = {
     Utils.tryWithResource(
       listing.view(classOf[ApplicationInfoWrapper])
         .index("endTime").reverse().closeableIterator()) { iter =>
