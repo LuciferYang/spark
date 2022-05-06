@@ -179,6 +179,7 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   @Override
   public synchronized void close() throws IOException {
+    GlobalKVStoreIteratorTracker.removeIfInTesting(this);
     db.notifyIteratorClosed(this);
     if (!closed) {
       it.close();

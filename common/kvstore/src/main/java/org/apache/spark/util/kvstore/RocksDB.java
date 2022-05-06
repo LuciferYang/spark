@@ -285,6 +285,7 @@ public class RocksDB implements KVStore {
         try {
           RocksDBIterator<T> it = new RocksDBIterator<>(type, RocksDB.this, this);
           iteratorTracker.add(new WeakReference<>(it));
+          GlobalKVStoreIteratorTracker.addIfInTesting(it);
           return it;
         } catch (Exception e) {
           throw Throwables.propagate(e);

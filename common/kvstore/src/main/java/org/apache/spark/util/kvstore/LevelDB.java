@@ -252,6 +252,7 @@ public class LevelDB implements KVStore {
         try {
           LevelDBIterator<T> it = new LevelDBIterator<>(type, LevelDB.this, this);
           iteratorTracker.add(new WeakReference<>(it));
+          GlobalKVStoreIteratorTracker.addIfInTesting(it);
           return it;
         } catch (Exception e) {
           throw Throwables.propagate(e);
