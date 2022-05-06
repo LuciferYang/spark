@@ -34,6 +34,10 @@ trait KVStoreIteratorAudit extends Logging {
     if (GlobalKVStoreIteratorTracker.nonEmpty()) {
       logWarning(s"\n\n===== ${GlobalKVStoreIteratorTracker.size()} " +
         s"KVStoreIterator LEAK IN SUITE $shortSuiteName =====\n")
+      // scalastyle:off throwerror
+      throw new AssertionError(s"${GlobalKVStoreIteratorTracker.size()} " +
+        s"KVStoreIterator LEAK IN SUITE $shortSuiteName")
+      // scalastyle:on throwerror
     }
   }
 }
