@@ -30,10 +30,11 @@ object JacksonBenchmark extends BenchmarkBase {
   def testReadJsonToMap(valuesPerIteration: Int): Unit = {
     val input =
       """
-        |{"mergeDir":"/a/b/c/mergeDirName","attemptId":"yarn_appattempt_1648454518011_994053_000001"}
+        |{"mergeDir":"/a/b/c/mergeDirName","attemptId":"appattempt_1648454518011_994053_000001"}
       """.stripMargin
 
-    val benchmark = new Benchmark("Test read json to map", valuesPerIteration, output = output)
+    val benchmark = new Benchmark("Test read json to map",
+      valuesPerIteration, output = output)
 
     benchmark.addCase("Test Multiple") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
@@ -61,7 +62,8 @@ object JacksonBenchmark extends BenchmarkBase {
     map.put("attemptId", "yarn_appattempt_1648454518011_994053_000001")
 
 
-    val benchmark = new Benchmark("Test write map to json", valuesPerIteration, output = output)
+    val benchmark = new Benchmark("Test write map to json",
+      valuesPerIteration, output = output)
 
     benchmark.addCase("Test Multiple") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
@@ -80,13 +82,27 @@ object JacksonBenchmark extends BenchmarkBase {
     }
 
     benchmark.run()
+  }
 
+  def testCreateObjectMapper(valuesPerIteration: Int): Unit = {
 
+    val benchmark = new Benchmark("Test create ObjectMapper",
+      valuesPerIteration, output = output)
+
+    benchmark.addCase("Test create ObjectMapper") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val mapper = new ObjectMapper()
+        mapper.registerModule(DefaultScalaModule)
+      }
+    }
+
+    benchmark.run()
   }
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 10000
 
+    testCreateObjectMapper(valuesPerIteration = valuesPerIteration)
     testWriteMapToJson(valuesPerIteration = valuesPerIteration)
     testReadJsonToMap(valuesPerIteration = valuesPerIteration)
   }
