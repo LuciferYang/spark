@@ -60,7 +60,8 @@ object FileStreamBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Files.newInputStream") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        Utils.tryWithResource(Files.newInputStream(file.toPath)) { input =>
+        import java.nio.file.StandardOpenOption
+        Utils.tryWithResource(Files.newInputStream(file.toPath, StandardOpenOption.READ)) { input =>
           doRead(input)
         }
       }
