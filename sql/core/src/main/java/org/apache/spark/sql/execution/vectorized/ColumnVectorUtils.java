@@ -84,9 +84,8 @@ public class ColumnVectorUtils {
         } else {
           final BigInteger integer = d.toJavaBigDecimal().unscaledValue();
           byte[] bytes = integer.toByteArray();
-          for (int i = 0; i < capacity; i++) {
-            col.putByteArray(i, bytes, 0, bytes.length);
-          }
+          col.setDictionary(new ColumnDictionary(bytes));
+          col.reserveDictionaryIds(col.capacity);
         }
       } else if (t instanceof CalendarIntervalType) {
         CalendarInterval c = (CalendarInterval)row.get(fieldIdx, t);
