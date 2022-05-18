@@ -39,6 +39,23 @@ import org.apache.spark.unsafe.UTF8StringBuilder
  */
 object ColumnVectorUtilsBenchmark extends BenchmarkBase {
 
+  import org.apache.spark.sql.vectorized.ColumnVector
+
+  private def readValues(dataType: DataType, batchSize: Int, vector: ColumnVector): Unit = {
+    dataType match {
+      case IntegerType =>
+        (0 until batchSize).foreach(i => vector.getInt(i))
+      case LongType =>
+        (0 until batchSize).foreach(i => vector.getLong(i))
+      case FloatType =>
+        (0 until batchSize).foreach(i => vector.getFloat(i))
+      case DoubleType =>
+        (0 until batchSize).foreach(i => vector.getDouble(i))
+      case StringType =>
+        (0 until batchSize).foreach(i => vector.getUTF8String(i))
+    }
+  }
+
   def testPopulate(
       valuesPerIteration: Int,
       batchSize: Int,
@@ -63,6 +80,7 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
       for (_ <- 0L until valuesPerIteration) {
         onHeapColumnVector.reset()
         ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
+        readValues(dataType, batchSize, onHeapColumnVector)
       }
     }
 
@@ -70,6 +88,7 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
       for (_ <- 0L until valuesPerIteration) {
         offHeapColumnVector.reset()
         ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
+        readValues(dataType, batchSize, offHeapColumnVector)
       }
     }
     benchmark.run()
