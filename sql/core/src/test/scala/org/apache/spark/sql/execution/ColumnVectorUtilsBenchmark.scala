@@ -23,8 +23,8 @@ import org.apache.spark.benchmark.Benchmark
 import org.apache.spark.benchmark.BenchmarkBase
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.vectorized.{ColumnVectorUtils, OffHeapColumnVector, OnHeapColumnVector}
-import org.apache.spark.sql.types.StringType
-
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.UTF8StringBuilder
 
 /**
  * Benchmark for ColumnVectorUtils.populate use OnHeapColumnVector with OffHeapColumnVector
@@ -39,141 +39,25 @@ import org.apache.spark.sql.types.StringType
  */
 object ColumnVectorUtilsBenchmark extends BenchmarkBase {
 
-  def testPopulateStringType(valuesPerIteration: Int, length: Int): Unit = {
-    import org.apache.spark.unsafe.UTF8StringBuilder
+  def testPopulate(
+      valuesPerIteration: Int,
+      batchSize: Int,
+      dataType: DataType,
+      row: InternalRow): Unit = {
 
-    val batchSize = 4096
-    val onHeapColumnVector = new OnHeapColumnVector(batchSize, StringType)
-    val offHeapColumnVector = new OffHeapColumnVector(batchSize, StringType)
+    val onHeapColumnVector = new OnHeapColumnVector(batchSize, dataType)
+    val offHeapColumnVector = new OffHeapColumnVector(batchSize, dataType)
+
+    val other = if (dataType == StringType) {
+      s", row length = ${row.getUTF8String(0).toString.length}"
+    } else {
+      ""
+    }
 
     val benchmark = new Benchmark(
-      s"Test ColumnVectorUtils.populate, row length = $length",
+      s"Test ColumnVectorUtils.populate with $dataType$other",
       valuesPerIteration * batchSize,
       output = output)
-
-    val builder = new UTF8StringBuilder()
-    builder.append(RandomStringUtils.random(length))
-    val row = InternalRow(builder.build())
-
-    benchmark.addCase("OnHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        onHeapColumnVector.reset()
-        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-      }
-    }
-
-    benchmark.addCase("OffHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        offHeapColumnVector.reset()
-        ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
-      }
-    }
-    benchmark.run()
-  }
-
-  def testPopulateIntType(valuesPerIteration: Int): Unit = {
-    import org.apache.spark.sql.types.IntegerType
-
-    val batchSize = 4096
-    val onHeapColumnVector = new OnHeapColumnVector(batchSize, IntegerType)
-    val offHeapColumnVector = new OffHeapColumnVector(batchSize, IntegerType)
-
-    val benchmark = new Benchmark(
-      s"Test ColumnVectorUtils.populate",
-      valuesPerIteration * batchSize,
-      output = output)
-
-    val row = InternalRow(100)
-
-    benchmark.addCase("OnHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        onHeapColumnVector.reset()
-        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-      }
-    }
-
-    benchmark.addCase("OffHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        offHeapColumnVector.reset()
-        ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
-      }
-    }
-    benchmark.run()
-  }
-
-  def testPopulateLongType(valuesPerIteration: Int): Unit = {
-    import org.apache.spark.sql.types.LongType
-
-    val batchSize = 4096
-    val onHeapColumnVector = new OnHeapColumnVector(batchSize, LongType)
-    val offHeapColumnVector = new OffHeapColumnVector(batchSize, LongType)
-
-    val benchmark = new Benchmark(
-      s"Test ColumnVectorUtils.populate",
-      valuesPerIteration * batchSize,
-      output = output)
-
-    val row = InternalRow(100L)
-
-    benchmark.addCase("OnHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        onHeapColumnVector.reset()
-        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-      }
-    }
-
-    benchmark.addCase("OffHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        offHeapColumnVector.reset()
-        ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
-      }
-    }
-    benchmark.run()
-  }
-
-  def testPopulateFloatType(valuesPerIteration: Int): Unit = {
-    import org.apache.spark.sql.types.FloatType
-
-    val batchSize = 4096
-    val onHeapColumnVector = new OnHeapColumnVector(batchSize, FloatType)
-    val offHeapColumnVector = new OffHeapColumnVector(batchSize, FloatType)
-
-    val benchmark = new Benchmark(
-      s"Test ColumnVectorUtils.populate",
-      valuesPerIteration * batchSize,
-      output = output)
-
-    val row = InternalRow(100F)
-
-    benchmark.addCase("OnHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        onHeapColumnVector.reset()
-        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-      }
-    }
-
-    benchmark.addCase("OffHeapColumnVector") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        offHeapColumnVector.reset()
-        ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
-      }
-    }
-    benchmark.run()
-  }
-
-  def testPopulateDoubleType(valuesPerIteration: Int): Unit = {
-    import org.apache.spark.sql.types.DoubleType
-
-    val batchSize = 4096
-    val onHeapColumnVector = new OnHeapColumnVector(batchSize, DoubleType)
-    val offHeapColumnVector = new OffHeapColumnVector(batchSize, DoubleType)
-
-    val benchmark = new Benchmark(
-      s"Test ColumnVectorUtils.populate",
-      valuesPerIteration * batchSize,
-      output = output)
-
-    val row = InternalRow(100D)
 
     benchmark.addCase("OnHeapColumnVector") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
@@ -193,13 +77,18 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
+    val batchSize = 4096
+
     Seq(1, 5, 10, 15, 20).foreach { length =>
-      testPopulateStringType(valuesPerIteration, length)
+      val builder = new UTF8StringBuilder()
+      builder.append(RandomStringUtils.random(length))
+      val row = InternalRow(builder.build())
+      testPopulate(valuesPerIteration, batchSize, StringType, row)
     }
 
-    testPopulateIntType(valuesPerIteration)
-    testPopulateLongType(valuesPerIteration)
-    testPopulateFloatType(valuesPerIteration)
-    testPopulateDoubleType(valuesPerIteration)
+    testPopulate(valuesPerIteration, batchSize, IntegerType, InternalRow(100))
+    testPopulate(valuesPerIteration, batchSize, LongType, InternalRow(100L))
+    testPopulate(valuesPerIteration, batchSize, FloatType, InternalRow(100F))
+    testPopulate(valuesPerIteration, batchSize, DoubleType, InternalRow(100D))
   }
 }
