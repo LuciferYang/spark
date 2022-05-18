@@ -69,9 +69,11 @@ public class ColumnVectorUtils {
         col.setDictionary(ColumnDictionary.of(row.getLong(fieldIdx)));
         col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.FloatType) {
-        col.putFloats(0, capacity, row.getFloat(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getFloat(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.DoubleType) {
-        col.putDoubles(0, capacity, row.getDouble(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getDouble(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.StringType) {
         UTF8String v = row.getUTF8String(fieldIdx);
         byte[] bytes = v.getBytes();

@@ -22,8 +22,11 @@ import org.apache.spark.sql.execution.vectorized.Dictionary;
 public final class ColumnDictionary implements Dictionary {
   private int[] intDictionary;
   private long[] longDictionary;
-
   private Binary[] binaryDictionary;
+
+  private float[] floatDictionary;
+
+  private double[] doubleDictionary;
 
   public ColumnDictionary(int[] dictionary) {
     this.intDictionary = dictionary;
@@ -31,6 +34,14 @@ public final class ColumnDictionary implements Dictionary {
 
   public ColumnDictionary(long[] dictionary) {
     this.longDictionary = dictionary;
+  }
+
+  public ColumnDictionary(float[] dictionary) {
+    this.floatDictionary = dictionary;
+  }
+
+  public ColumnDictionary(double[] dictionary) {
+    this.doubleDictionary = dictionary;
   }
 
   public ColumnDictionary(Binary[] dictionary) {
@@ -49,12 +60,12 @@ public final class ColumnDictionary implements Dictionary {
 
   @Override
   public float decodeToFloat(int id) {
-    throw new UnsupportedOperationException("Dictionary encoding does not support float");
+    return floatDictionary[id];
   }
 
   @Override
   public double decodeToDouble(int id) {
-    throw new UnsupportedOperationException("Dictionary encoding does not support double");
+    return doubleDictionary[id];
   }
 
   @Override
@@ -72,6 +83,14 @@ public final class ColumnDictionary implements Dictionary {
 
   public static ColumnDictionary of(int value) {
     return new ColumnDictionary(new int[]{value});
+  }
+
+  public static ColumnDictionary of(float value) {
+    return new ColumnDictionary(new float[]{value});
+  }
+
+  public static ColumnDictionary of(double value) {
+    return new ColumnDictionary(new double[]{value});
   }
 
   public static class Binary {
