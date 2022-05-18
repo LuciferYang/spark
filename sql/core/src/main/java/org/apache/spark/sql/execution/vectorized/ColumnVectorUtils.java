@@ -72,9 +72,8 @@ public class ColumnVectorUtils {
       } else if (t == DataTypes.StringType) {
         UTF8String v = row.getUTF8String(fieldIdx);
         byte[] bytes = v.getBytes();
-        ColumnDictionary dictionary = new ColumnDictionary(bytes);
-        col.setDictionary(dictionary);
-        col.putInts(0, capacity, 0);
+        col.setDictionary(new ColumnDictionary(bytes));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t instanceof DecimalType) {
         DecimalType dt = (DecimalType)t;
         Decimal d = row.getDecimal(fieldIdx, dt.precision(), dt.scale());
