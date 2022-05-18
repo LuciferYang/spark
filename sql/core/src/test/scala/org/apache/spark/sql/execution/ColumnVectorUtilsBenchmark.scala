@@ -79,7 +79,7 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
     benchmark.addCase("OnHeapColumnVector") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         onHeapColumnVector.reset()
-        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
+        ColumnVectorUtils.populateOnheap(onHeapColumnVector, row, 0)
         readValues(dataType, batchSize, onHeapColumnVector)
       }
     }
@@ -98,7 +98,7 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
     val valuesPerIteration = 100000
     val batchSize = 4096
 
-    Seq(1, 5, 10, 15, 20).foreach { length =>
+    Seq(5, 10, 15, 20, 30).foreach { length =>
       val builder = new UTF8StringBuilder()
       builder.append(RandomStringUtils.random(length))
       val row = InternalRow(builder.build())
