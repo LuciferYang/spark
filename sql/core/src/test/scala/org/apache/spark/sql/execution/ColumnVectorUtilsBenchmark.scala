@@ -39,7 +39,7 @@ import org.apache.spark.sql.types.StringType
  */
 object ColumnVectorUtilsBenchmark extends BenchmarkBase {
 
-  def testPopulate(valuesPerIteration: Int, length: Int): Unit = {
+  def testPopulateStringType(valuesPerIteration: Int, length: Int): Unit = {
     import org.apache.spark.unsafe.UTF8StringBuilder
 
     val batchSize = 4096
@@ -71,10 +71,42 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  def testPopulateIntType(valuesPerIteration: Int): Unit = {
+    import org.apache.spark.sql.types.IntegerType
+
+    val batchSize = 4096
+    val onHeapColumnVector = new OnHeapColumnVector(batchSize, IntegerType)
+    val offHeapColumnVector = new OffHeapColumnVector(batchSize, IntegerType)
+
+    val benchmark = new Benchmark(
+      s"Test ColumnVectorUtils.populate",
+      valuesPerIteration * batchSize,
+      output = output)
+
+    val row = InternalRow(100)
+
+    benchmark.addCase("OnHeapColumnVector") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        onHeapColumnVector.reset()
+        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
+      }
+    }
+
+    benchmark.addCase("OffHeapColumnVector") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        offHeapColumnVector.reset()
+        ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
+      }
+    }
+    benchmark.run()
+  }
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
     Seq(1, 5, 10, 15, 20).foreach { length =>
-      testPopulate(valuesPerIteration, length)
+      testPopulateStringType(valuesPerIteration, length)
     }
+
+    testPopulateIntType(valuesPerIteration)
   }
 }

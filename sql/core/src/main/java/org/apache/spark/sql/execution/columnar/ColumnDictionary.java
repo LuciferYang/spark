@@ -37,10 +37,6 @@ public final class ColumnDictionary implements Dictionary {
     this.binaryDictionary = dictionary;
   }
 
-  public ColumnDictionary(byte[] one) {
-    this.binaryDictionary = new Binary[]{new Binary(one)};
-  }
-
   @Override
   public int decodeToInt(int id) {
     return intDictionary[id];
@@ -64,6 +60,18 @@ public final class ColumnDictionary implements Dictionary {
   @Override
   public byte[] decodeToBinary(int id) {
     return binaryDictionary[id].getBytes();
+  }
+
+  public static ColumnDictionary of(byte[] bytes) {
+    return new ColumnDictionary(new Binary[]{new Binary(bytes)});
+  }
+
+  public static ColumnDictionary of(long value) {
+    return new ColumnDictionary(new long[]{value});
+  }
+
+  public static ColumnDictionary of(int value) {
+    return new ColumnDictionary(new int[]{value});
   }
 
   public static class Binary {

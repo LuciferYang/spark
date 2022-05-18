@@ -56,15 +56,18 @@ public class ColumnVectorUtils {
       if (t == DataTypes.BooleanType) {
         col.putBooleans(0, capacity, row.getBoolean(fieldIdx));
       } else if (t == DataTypes.BinaryType) {
-        col.putByteArray(0, row.getBinary(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getBinary(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.ByteType) {
         col.putBytes(0, capacity, row.getByte(fieldIdx));
       } else if (t == DataTypes.ShortType) {
         col.putShorts(0, capacity, row.getShort(fieldIdx));
       } else if (t == DataTypes.IntegerType) {
-        col.putInts(0, capacity, row.getInt(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getInt(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.LongType) {
-        col.putLongs(0, capacity, row.getLong(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getLong(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t == DataTypes.FloatType) {
         col.putFloats(0, capacity, row.getFloat(fieldIdx));
       } else if (t == DataTypes.DoubleType) {
@@ -72,19 +75,21 @@ public class ColumnVectorUtils {
       } else if (t == DataTypes.StringType) {
         UTF8String v = row.getUTF8String(fieldIdx);
         byte[] bytes = v.getBytes();
-        col.setDictionary(new ColumnDictionary(bytes));
+        col.setDictionary(ColumnDictionary.of(bytes));
         col.reserveDictionaryIds(col.capacity);
       } else if (t instanceof DecimalType) {
         DecimalType dt = (DecimalType)t;
         Decimal d = row.getDecimal(fieldIdx, dt.precision(), dt.scale());
         if (dt.precision() <= Decimal.MAX_INT_DIGITS()) {
-          col.putInts(0, capacity, (int)d.toUnscaledLong());
+          col.setDictionary(ColumnDictionary.of((int)d.toUnscaledLong()));
+          col.reserveDictionaryIds(col.capacity);
         } else if (dt.precision() <= Decimal.MAX_LONG_DIGITS()) {
-          col.putLongs(0, capacity, d.toUnscaledLong());
+          col.setDictionary(ColumnDictionary.of(d.toUnscaledLong()));
+          col.reserveDictionaryIds(col.capacity);
         } else {
           final BigInteger integer = d.toJavaBigDecimal().unscaledValue();
           byte[] bytes = integer.toByteArray();
-          col.setDictionary(new ColumnDictionary(bytes));
+          col.setDictionary(ColumnDictionary.of(bytes));
           col.reserveDictionaryIds(col.capacity);
         }
       } else if (t instanceof CalendarIntervalType) {
@@ -93,10 +98,12 @@ public class ColumnVectorUtils {
         col.getChild(1).putInts(0, capacity, c.days);
         col.getChild(2).putLongs(0, capacity, c.microseconds);
       } else if (t instanceof DateType || t instanceof YearMonthIntervalType) {
-        col.putInts(0, capacity, row.getInt(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getInt(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else if (t instanceof TimestampType || t instanceof TimestampNTZType ||
         t instanceof DayTimeIntervalType) {
-        col.putLongs(0, capacity, row.getLong(fieldIdx));
+        col.setDictionary(ColumnDictionary.of(row.getLong(fieldIdx)));
+        col.reserveDictionaryIds(col.capacity);
       } else {
         throw new RuntimeException(String.format("DataType %s is not supported" +
             " in column vectorized reader.", t.sql()));
