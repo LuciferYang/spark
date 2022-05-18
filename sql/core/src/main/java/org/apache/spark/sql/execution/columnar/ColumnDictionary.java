@@ -23,12 +23,22 @@ public final class ColumnDictionary implements Dictionary {
   private int[] intDictionary;
   private long[] longDictionary;
 
+  private Binary[] binaryDictionary;
+
   public ColumnDictionary(int[] dictionary) {
     this.intDictionary = dictionary;
   }
 
   public ColumnDictionary(long[] dictionary) {
     this.longDictionary = dictionary;
+  }
+
+  public ColumnDictionary(Binary[] dictionary) {
+    this.binaryDictionary = dictionary;
+  }
+
+  public ColumnDictionary(byte[] one) {
+    this.binaryDictionary = new Binary[]{new Binary(one)};
   }
 
   @Override
@@ -53,6 +63,18 @@ public final class ColumnDictionary implements Dictionary {
 
   @Override
   public byte[] decodeToBinary(int id) {
-    throw new UnsupportedOperationException("Dictionary encoding does not support String");
+    return binaryDictionary[id].getBytes();
+  }
+
+  public static class Binary {
+    private final byte[] bytes;
+
+    public Binary(byte[] bytes) {
+      this.bytes = bytes;
+    }
+
+    public byte[] getBytes() {
+      return bytes;
+    }
   }
 }
