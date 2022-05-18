@@ -771,7 +771,7 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
       repeatedStringScanBenchmark(1024 * 1024 * 10)
     }
     runBenchmark("Partitioned Table Scan") {
-      Seq(LongType, StringType).foreach {
+      Seq(IntegerType, LongType, FloatType, DoubleType, StringType).foreach {
         dataType => partitionTableScanBenchmark(1024 * 1024 * 15, dataType)
       }
     }
