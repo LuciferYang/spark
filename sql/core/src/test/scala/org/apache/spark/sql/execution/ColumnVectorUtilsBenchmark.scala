@@ -76,13 +76,13 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
       valuesPerIteration * batchSize,
       output = output)
 
-//    benchmark.addCase("OnHeapColumnVector") { _: Int =>
-//      for (_ <- 0L until valuesPerIteration) {
-//        onHeapColumnVector.reset()
-//        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-//        readValues(dataType, batchSize, onHeapColumnVector)
-//      }
-//    }
+    benchmark.addCase("OnHeapColumnVector") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        onHeapColumnVector.reset()
+        ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
+        readValues(dataType, batchSize, onHeapColumnVector)
+      }
+    }
 
     benchmark.addCase("OffHeapColumnVector") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
