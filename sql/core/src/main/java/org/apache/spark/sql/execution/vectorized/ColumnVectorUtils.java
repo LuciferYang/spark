@@ -29,6 +29,7 @@ import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.util.DateTimeUtils;
+import org.apache.spark.sql.execution.columnar.ConstantDictionary;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnarArray;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
@@ -71,9 +72,8 @@ public class ColumnVectorUtils {
       } else if (t == DataTypes.StringType) {
         UTF8String v = row.getUTF8String(fieldIdx);
         byte[] bytes = v.getBytes();
-        for (int i = 0; i < capacity; i++) {
-          col.putByteArray(i, bytes);
-        }
+        col.reserveDictionaryIds(capacity);
+        col.setDictionary(new ConstantDictionary(bytes));
       } else if (t instanceof DecimalType) {
         DecimalType dt = (DecimalType)t;
         Decimal d = row.getDecimal(fieldIdx, dt.precision(), dt.scale());

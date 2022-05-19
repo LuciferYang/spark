@@ -73,14 +73,16 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
 
     val benchmark = new Benchmark(
       s"Test ColumnVectorUtils.populate with $dataType$other",
-      valuesPerIteration * batchSize,
+      valuesPerIteration * batchSize * 3,
       output = output)
 
     benchmark.addCase("OnHeapColumnVector") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         onHeapColumnVector.reset()
         ColumnVectorUtils.populate(onHeapColumnVector, row, 0)
-        readValues(dataType, batchSize, onHeapColumnVector)
+        for (_ <- 0L until 3) {
+          readValues(dataType, batchSize, onHeapColumnVector)
+        }
       }
     }
 
@@ -88,7 +90,9 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
       for (_ <- 0L until valuesPerIteration) {
         offHeapColumnVector.reset()
         ColumnVectorUtils.populate(offHeapColumnVector, row, 0)
-        readValues(dataType, batchSize, offHeapColumnVector)
+        for (_ <- 0L until 3) {
+          readValues(dataType, batchSize, offHeapColumnVector)
+        }
       }
     }
     benchmark.run()
@@ -105,9 +109,9 @@ object ColumnVectorUtilsBenchmark extends BenchmarkBase {
       testPopulate(valuesPerIteration, batchSize, StringType, row)
     }
 
-    testPopulate(valuesPerIteration, batchSize, IntegerType, InternalRow(100))
-    testPopulate(valuesPerIteration, batchSize, LongType, InternalRow(100L))
-    testPopulate(valuesPerIteration, batchSize, FloatType, InternalRow(100F))
-    testPopulate(valuesPerIteration, batchSize, DoubleType, InternalRow(100D))
+//    testPopulate(valuesPerIteration, batchSize, IntegerType, InternalRow(100))
+//    testPopulate(valuesPerIteration, batchSize, LongType, InternalRow(100L))
+//    testPopulate(valuesPerIteration, batchSize, FloatType, InternalRow(100F))
+//    testPopulate(valuesPerIteration, batchSize, DoubleType, InternalRow(100D))
   }
 }
