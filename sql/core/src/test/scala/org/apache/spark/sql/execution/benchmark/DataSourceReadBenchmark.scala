@@ -70,10 +70,10 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
   }
 
   private def prepareTable(
-      dir: File,
-      df: DataFrame,
-      partition: Option[String] = None,
-      onlyParquetOrc: Boolean = false): Unit = {
+                            dir: File,
+                            df: DataFrame,
+                            partition: Option[String] = None,
+                            onlyParquetOrc: Boolean = false): Unit = {
     val testDf = if (partition.isDefined) {
       df.write.partitionBy(partition.get)
     } else {
@@ -312,14 +312,14 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
           }
 
           sqlBenchmark.addCase(s"SQL Parquet Vectorized: DataPage$version " +
-              "(Nested Column Disabled)") { _ =>
+            "(Nested Column Disabled)") { _ =>
             withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED.key -> "false") {
               spark.sql(s"select sum(col.f) from parquet${version}Table").noop()
             }
           }
 
           sqlBenchmark.addCase(s"SQL Parquet Vectorized: DataPage$version " +
-              "(Nested Column Enabled)") { _ =>
+            "(Nested Column Enabled)") { _ =>
             withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED.key -> "true") {
               spark.sql(s"select sum(col.f) from parquet${version}Table").noop()
             }
@@ -377,7 +377,7 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
           }
 
           benchmark.addCase(s"SQL Parquet Vectorized: DataPage$version " +
-              s"(Nested Column Disabled)") { _ =>
+            s"(Nested Column Disabled)") { _ =>
             withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED.key -> "false") {
               spark.sql(s"SELECT SUM(SIZE(col1)), SUM(SIZE(col2)) FROM parquet${version}Table")
                 .noop()
@@ -385,10 +385,10 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
           }
 
           benchmark.addCase(s"SQL Parquet Vectorized: DataPage$version " +
-              s"(Nested Column Enabled)") { _ =>
+            s"(Nested Column Enabled)") { _ =>
             withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED.key -> "true") {
               spark.sql(s"SELECT SUM(SIZE(col1)), SUM(SIZE(col2)) FROM parquet${version}Table")
-                  .noop()
+                .noop()
             }
           }
         }
@@ -496,15 +496,20 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
     }
   }
 
-  def partitionTableScanBenchmark(values: Int): Unit = {
-    val benchmark = new Benchmark("Partitioned Table", values, output = output)
+  def partitionTableScanBenchmark(values: Int, partitionType: DataType): Unit = {
+    val benchmark = new Benchmark(s"Partitioned Table(Partition Column Type = $partitionType)",
+      values, output = output)
 
     withTempPath { dir =>
       withTempTable("t1", "csvTable", "jsonTable", "parquetV1Table", "parquetV2Table", "orcTable") {
         import spark.implicits._
         spark.range(values).map(_ => Random.nextLong).createOrReplaceTempView("t1")
 
-        prepareTable(dir, spark.sql("SELECT value % 2 AS p, value AS id FROM t1"), Some("p"))
+        val columnType = partitionType.catalogString
+        prepareTable(
+          dir,
+          spark.sql(s"SELECT cast(value % 2 as $columnType) AS p, value AS id FROM t1"),
+          Some("p"))
 
         benchmark.addCase("Data column - CSV") { _ =>
           spark.sql("select sum(id) from csvTable").noop()
@@ -620,7 +625,7 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
           dir,
           spark.sql(
             s"SELECT IF(RAND(1) < $fractionOfNulls, NULL, CAST(id as STRING)) AS c1, " +
-            s"IF(RAND(2) < $fractionOfNulls, NULL, CAST(id as STRING)) AS c2 FROM t1"))
+              s"IF(RAND(2) < $fractionOfNulls, NULL, CAST(id as STRING)) AS c2 FROM t1"))
 
         benchmark.addCase("SQL CSV") { _ =>
           spark.sql("select sum(length(c2)) from csvTable where c1 is " +
@@ -766,7 +771,9 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
       repeatedStringScanBenchmark(1024 * 1024 * 10)
     }
     runBenchmark("Partitioned Table Scan") {
-      partitionTableScanBenchmark(1024 * 1024 * 15)
+      Seq(IntegerType, LongType, FloatType, DoubleType, StringType).foreach {
+        dataType => partitionTableScanBenchmark(1024 * 1024 * 15, dataType)
+      }
     }
     runBenchmark("String with Nulls Scan") {
       for (fractionOfNulls <- List(0.0, 0.50, 0.95)) {
