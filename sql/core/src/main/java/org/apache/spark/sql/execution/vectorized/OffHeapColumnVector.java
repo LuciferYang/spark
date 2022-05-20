@@ -22,6 +22,7 @@ import java.nio.ByteOrder;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.spark.sql.types.*;
+import org.apache.spark.sql.vectorized.ColumnVector;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
 
@@ -40,6 +41,20 @@ public final class OffHeapColumnVector extends WritableColumnVector {
    */
   public static OffHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
     return allocateColumns(capacity, schema.fields());
+  }
+
+  public static ColumnVector[] allocateColumns(
+      int capacity, StructType schema, int constantColumnLength) {
+    StructField[] fields = schema.fields();
+    int fieldsLength = fields.length;
+    ColumnVector[] vectors = new ColumnVector[fieldsLength];
+    for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
+      vectors[i] = new OffHeapColumnVector(capacity, fields[i].dataType());
+    }
+    for (int i = fieldsLength - constantColumnLength; i < fieldsLength; i++) {
+      vectors[i] = new ConstantColumnVector(capacity, fields[i].dataType());
+    }
+    return vectors;
   }
 
   /**
