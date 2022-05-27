@@ -1529,7 +1529,7 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
       store.putIterator(
         blockId, list.iterator, StorageLevel.MEMORY_ONLY, tellMaster = true)
     }
-    val matchedBlockIds = store.master.getMatchingBlockIds(_ match {
+    val matchedBlockIds = store.master.getMatchingBlockIds({
       case RDDBlockId(1, _) => true
       case _ => false
     }, askStorageEndpoints = true)

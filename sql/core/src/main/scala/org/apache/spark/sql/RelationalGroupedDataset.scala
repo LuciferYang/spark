@@ -451,7 +451,7 @@ class RelationalGroupedDataset protected[sql](
   def pivot(pivotColumn: Column, values: Seq[Any]): RelationalGroupedDataset = {
     groupType match {
       case RelationalGroupedDataset.GroupByType =>
-        val valueExprs = values.map(_ match {
+        val valueExprs = values.map {
           case c: Column => c.expr
           case v =>
             try {
@@ -460,7 +460,7 @@ class RelationalGroupedDataset protected[sql](
               case _: SparkRuntimeException =>
                 throw QueryExecutionErrors.pivotColumnUnsupportedError(v, pivotColumn.expr.dataType)
             }
-        })
+        }
         new RelationalGroupedDataset(
           df,
           groupingExprs,

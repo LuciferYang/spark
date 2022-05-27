@@ -121,10 +121,10 @@ private[netty] class Dispatcher(nettyEnv: NettyRpcEnv, numUsableCores: Int) exte
     val iter = endpoints.keySet().iterator()
     while (iter.hasNext) {
       val name = iter.next
-        postMessage(name, message, (e) => { e match {
+        postMessage(name, message, {
           case e: RpcEnvStoppedException => logDebug(s"Message $message dropped. ${e.getMessage}")
           case e: Throwable => logWarning(s"Message $message dropped. ${e.getMessage}")
-        }}
+        }
       )}
   }
 

@@ -520,25 +520,23 @@ class EventLoggingListenerSuite extends SparkFunSuite with LocalSparkContext wit
       assert(lines(1).contains("SparkListenerApplicationStart"))
       assert(JsonProtocol.sparkEventFromJson(parse(lines(0))) === logStart)
       var logIdx = 1
-      events.foreach { event =>
-        event match {
-          case metricsUpdate: SparkListenerExecutorMetricsUpdate
-            if metricsUpdate.execId != SparkContext.DRIVER_IDENTIFIER =>
-          case stageCompleted: SparkListenerStageCompleted =>
-            val execIds = Set[String]()
-            (1 to 3).foreach { _ =>
-              val execId = checkStageExecutorMetrics(lines(logIdx),
-                stageCompleted.stageInfo.stageId, expectedMetricsEvents)
-              execIds += execId
-              logIdx += 1
-            }
-            assert(execIds.size == 3) // check that each executor/driver was logged
-            checkEvent(lines(logIdx), event)
+      events.foreach {
+        case metricsUpdate: SparkListenerExecutorMetricsUpdate
+          if metricsUpdate.execId != SparkContext.DRIVER_IDENTIFIER =>
+        case event@(stageCompleted: SparkListenerStageCompleted) =>
+          val execIds = Set[String]()
+          (1 to 3).foreach { _ =>
+            val execId = checkStageExecutorMetrics(lines(logIdx),
+              stageCompleted.stageInfo.stageId, expectedMetricsEvents)
+            execIds += execId
             logIdx += 1
-          case _ =>
-            checkEvent(lines(logIdx), event)
-            logIdx += 1
-        }
+          }
+          assert(execIds.size == 3) // check that each executor/driver was logged
+          checkEvent(lines(logIdx), event)
+          logIdx += 1
+        case event =>
+          checkEvent(lines(logIdx), event)
+          logIdx += 1
       }
     } finally {
       logData.close()

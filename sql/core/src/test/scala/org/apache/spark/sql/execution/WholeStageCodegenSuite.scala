@@ -542,13 +542,13 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
       .sum()
     val plan = ds.queryExecution.executedPlan
 
-    val wholeStageCodeGenExec = plan.find(p => p match {
+    val wholeStageCodeGenExec = plan.find {
       case wp: WholeStageCodegenExec => wp.child match {
         case hp: HashAggregateExec if (hp.child.isInstanceOf[ProjectExec]) => true
         case _ => false
       }
       case _ => false
-    })
+    }
 
     assert(wholeStageCodeGenExec.isDefined)
     wholeStageCodeGenExec.get.asInstanceOf[WholeStageCodegenExec].doCodeGen()._2
@@ -596,10 +596,10 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     Seq(true, false).foreach { config =>
       withSQLConf(SQLConf.WHOLESTAGE_SPLIT_CONSUME_FUNC_BY_OPERATOR.key -> s"$config") {
         val plan = df.queryExecution.executedPlan
-        val wholeStageCodeGenExec = plan.find(p => p match {
+        val wholeStageCodeGenExec = plan.find {
           case wp: WholeStageCodegenExec => true
           case _ => false
-        })
+        }
         assert(wholeStageCodeGenExec.isDefined)
         val code = wholeStageCodeGenExec.get.asInstanceOf[WholeStageCodegenExec].doCodeGen()._2
         assert(code.body.contains("project_doConsume") == config)

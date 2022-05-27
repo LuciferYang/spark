@@ -177,10 +177,10 @@ object PartitionPruning extends Rule[LogicalPlan] with PredicateHelper with Join
    * only memory.
    */
   private def calculatePlanOverhead(plan: LogicalPlan): Float = {
-    val (cached, notCached) = plan.collectLeaves().partition(p => p match {
+    val (cached, notCached) = plan.collectLeaves().partition {
       case _: InMemoryRelation => true
       case _ => false
-    })
+    }
     val scanOverhead = notCached.map(_.stats.sizeInBytes).sum.toFloat
     val cachedOverhead = cached.map {
       case m: InMemoryRelation if m.cacheBuilder.storageLevel.useDisk &&
