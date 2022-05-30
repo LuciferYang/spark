@@ -22,9 +22,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.CharStreams;
 import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
+import org.apache.spark.network.util.JacksonMapper;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
 import org.apache.spark.network.shuffle.ExternalShuffleBlockResolver.AppExecId;
@@ -105,26 +105,25 @@ public class ExternalShuffleBlockResolverSuite {
 
   @Test
   public void jsonSerializationOfExecutorRegistration() throws IOException {
-    ObjectMapper mapper = new ObjectMapper();
     AppExecId appId = new AppExecId("foo", "bar");
-    String appIdJson = mapper.writeValueAsString(appId);
-    AppExecId parsedAppId = mapper.readValue(appIdJson, AppExecId.class);
+    String appIdJson = JacksonMapper.Default.toJson(appId);
+    AppExecId parsedAppId = JacksonMapper.Default.fromJson(appIdJson, AppExecId.class);
     assertEquals(parsedAppId, appId);
 
     ExecutorShuffleInfo shuffleInfo =
       new ExecutorShuffleInfo(new String[]{"/bippy", "/flippy"}, 7, SORT_MANAGER);
-    String shuffleJson = mapper.writeValueAsString(shuffleInfo);
+    String shuffleJson = JacksonMapper.Default.toJson(shuffleInfo);
     ExecutorShuffleInfo parsedShuffleInfo =
-      mapper.readValue(shuffleJson, ExecutorShuffleInfo.class);
+      JacksonMapper.Default.fromJson(shuffleJson, ExecutorShuffleInfo.class);
     assertEquals(parsedShuffleInfo, shuffleInfo);
 
     // Intentionally keep these hard-coded strings in here, to check backwards-compatibility.
     // its not legacy yet, but keeping this here in case anybody changes it
     String legacyAppIdJson = "{\"appId\":\"foo\", \"execId\":\"bar\"}";
-    assertEquals(appId, mapper.readValue(legacyAppIdJson, AppExecId.class));
+    assertEquals(appId, JacksonMapper.Default.fromJson(legacyAppIdJson, AppExecId.class));
     String legacyShuffleJson = "{\"localDirs\": [\"/bippy\", \"/flippy\"], " +
       "\"subDirsPerLocalDir\": 7, \"shuffleManager\": " + "\"" + SORT_MANAGER + "\"}";
-    assertEquals(shuffleInfo, mapper.readValue(legacyShuffleJson, ExecutorShuffleInfo.class));
+    assertEquals(shuffleInfo, JacksonMapper.Default.fromJson(legacyShuffleJson, ExecutorShuffleInfo.class));
   }
 
 }

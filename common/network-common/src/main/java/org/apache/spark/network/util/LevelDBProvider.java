@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.fusesource.leveldbjni.internal.NativeDB;
 import org.iq80.leveldb.DB;
@@ -37,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class LevelDBProvider {
   private static final Logger logger = LoggerFactory.getLogger(LevelDBProvider.class);
 
-  public static DB initLevelDB(File dbFile, StoreVersion version, ObjectMapper mapper) throws
+  public static DB initLevelDB(File dbFile, StoreVersion version) throws
       IOException {
     DB tmpDb = null;
     if (dbFile != null) {
@@ -80,7 +79,7 @@ public class LevelDBProvider {
         }
       }
       // if there is a version mismatch, we throw an exception, which means the service is unusable
-      checkVersion(tmpDb, version, mapper);
+      checkVersion(tmpDb, version);
     }
     return tmpDb;
   }
@@ -99,24 +98,24 @@ public class LevelDBProvider {
    * versions.  Minor version differences are allowed -- meaning we should be able to read
    * dbs that are either earlier *or* later on the minor version.
    */
-  public static void checkVersion(DB db, StoreVersion newversion, ObjectMapper mapper) throws
+  public static void checkVersion(DB db, StoreVersion newversion) throws
       IOException {
     byte[] bytes = db.get(StoreVersion.KEY);
     if (bytes == null) {
-      storeVersion(db, newversion, mapper);
+      storeVersion(db, newversion);
     } else {
-      StoreVersion version = mapper.readValue(bytes, StoreVersion.class);
+      StoreVersion version = JacksonMapper.Default.fromJson(bytes, StoreVersion.class);
       if (version.major != newversion.major) {
         throw new IOException("cannot read state DB with version " + version + ", incompatible " +
             "with current version " + newversion);
       }
-      storeVersion(db, newversion, mapper);
+      storeVersion(db, newversion);
     }
   }
 
-  public static void storeVersion(DB db, StoreVersion version, ObjectMapper mapper)
+  public static void storeVersion(DB db, StoreVersion version)
       throws IOException {
-    db.put(StoreVersion.KEY, mapper.writeValueAsBytes(version));
+    db.put(StoreVersion.KEY, JacksonMapper.Default.toJsonByteArray(version));
   }
 
   public static class StoreVersion {

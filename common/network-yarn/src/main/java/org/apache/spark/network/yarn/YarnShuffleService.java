@@ -44,6 +44,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.api.*;
 import org.apache.spark.network.shuffle.MergedShuffleFileManager;
 import org.apache.spark.network.shuffle.NoOpMergedShuffleFileManager;
+import org.apache.spark.network.util.JacksonMapper;
 import org.apache.spark.network.util.LevelDBProvider;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
@@ -129,7 +130,6 @@ public class YarnShuffleService extends AuxiliaryService {
   // just for testing when you want to find an open port
   @VisibleForTesting
   static int boundPort = -1;
-  private static final ObjectMapper mapper = new ObjectMapper();
   private static final String APP_CREDS_KEY_PREFIX = "AppCreds";
   private static final LevelDBProvider.StoreVersion CURRENT_VERSION = new LevelDBProvider
       .StoreVersion(1, 0);
@@ -310,7 +310,7 @@ public class YarnShuffleService extends AuxiliaryService {
     FileSystem fs = FileSystem.getLocal(_conf);
     fs.mkdirs(new Path(secretsFile.getPath()), new FsPermission((short) 0700));
 
-    db = LevelDBProvider.initLevelDB(secretsFile, CURRENT_VERSION, mapper);
+    db = LevelDBProvider.initLevelDB(secretsFile, CURRENT_VERSION);
     logger.info("Recovery location is: " + secretsFile.getPath());
     if (db != null) {
       logger.info("Going to reload spark shuffle data");
@@ -323,7 +323,7 @@ public class YarnShuffleService extends AuxiliaryService {
           break;
         }
         String id = parseDbAppKey(key);
-        ByteBuffer secret = mapper.readValue(e.getValue(), ByteBuffer.class);
+        ByteBuffer secret = JacksonMapper.Default.fromJson(e.getValue(), ByteBuffer.class);
         logger.info("Reloading tokens for app: " + id);
         secretManager.registerApp(id, secret);
       }
@@ -335,13 +335,13 @@ public class YarnShuffleService extends AuxiliaryService {
       throw new IllegalArgumentException("expected a string starting with " + APP_CREDS_KEY_PREFIX);
     }
     String json = s.substring(APP_CREDS_KEY_PREFIX.length() + 1);
-    AppId parsed = mapper.readValue(json, AppId.class);
+    AppId parsed = JacksonMapper.Default.fromJson(json, AppId.class);
     return parsed.appId;
   }
 
   private static byte[] dbAppKey(AppId appExecId) throws IOException {
     // we stick a common prefix on all the keys so we can find them in the DB
-    String appExecJson = mapper.writeValueAsString(appExecId);
+    String appExecJson = JacksonMapper.Default.toJson(appExecId);
     String key = (APP_CREDS_KEY_PREFIX + ";" + appExecJson);
     return key.getBytes(StandardCharsets.UTF_8);
   }
@@ -355,7 +355,7 @@ public class YarnShuffleService extends AuxiliaryService {
         AppId fullId = new AppId(appId);
         if (db != null) {
           byte[] key = dbAppKey(fullId);
-          byte[] value = mapper.writeValueAsString(shuffleSecret).getBytes(StandardCharsets.UTF_8);
+          byte[] value = JacksonMapper.Default.toJson(shuffleSecret).getBytes(StandardCharsets.UTF_8);
           db.put(key, value);
         }
         secretManager.registerApp(appId, shuffleSecret);

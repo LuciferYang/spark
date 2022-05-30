@@ -31,13 +31,13 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.Pair;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.Maps;
+import org.apache.spark.network.util.*;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.slf4j.Logger;
@@ -48,11 +48,7 @@ import org.apache.spark.network.buffer.ManagedBuffer;
 import org.apache.spark.network.shuffle.checksum.Cause;
 import org.apache.spark.network.shuffle.checksum.ShuffleChecksumHelper;
 import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo;
-import org.apache.spark.network.util.LevelDBProvider;
 import org.apache.spark.network.util.LevelDBProvider.StoreVersion;
-import org.apache.spark.network.util.JavaUtils;
-import org.apache.spark.network.util.NettyUtils;
-import org.apache.spark.network.util.TransportConf;
 
 /**
  * Manages converting shuffle BlockIds into physical segments of local files, from a process outside
@@ -62,8 +58,6 @@ import org.apache.spark.network.util.TransportConf;
  */
 public class ExternalShuffleBlockResolver {
   private static final Logger logger = LoggerFactory.getLogger(ExternalShuffleBlockResolver.class);
-
-  private static final ObjectMapper mapper = new ObjectMapper();
 
   /**
    * This a common prefix to the key for each app registration we stick in leveldb, so they
@@ -124,7 +118,7 @@ public class ExternalShuffleBlockResolver {
       .weigher((Weigher<String, ShuffleIndexInformation>)
         (filePath, indexInfo) -> indexInfo.getRetainedMemorySize())
       .build(indexCacheLoader);
-    db = LevelDBProvider.initLevelDB(this.registeredExecutorFile, CURRENT_VERSION, mapper);
+    db = LevelDBProvider.initLevelDB(this.registeredExecutorFile, CURRENT_VERSION);
     if (db != null) {
       executors = reloadRegisteredExecutors(db);
     } else {
@@ -147,7 +141,8 @@ public class ExternalShuffleBlockResolver {
     try {
       if (db != null) {
         byte[] key = dbAppExecKey(fullId);
-        byte[] value = mapper.writeValueAsString(executorInfo).getBytes(StandardCharsets.UTF_8);
+        byte[] value =
+          JacksonMapper.Default.toJson(executorInfo).getBytes(StandardCharsets.UTF_8);
         db.put(key, value);
       }
     } catch (Exception e) {
@@ -438,7 +433,7 @@ public class ExternalShuffleBlockResolver {
 
   private static byte[] dbAppExecKey(AppExecId appExecId) throws IOException {
     // we stick a common prefix on all the keys so we can find them in the DB
-    String appExecJson = mapper.writeValueAsString(appExecId);
+    String appExecJson = JacksonMapper.Default.toJson(appExecId);
     String key = (APP_KEY_PREFIX + ";" + appExecJson);
     return key.getBytes(StandardCharsets.UTF_8);
   }
@@ -448,8 +443,7 @@ public class ExternalShuffleBlockResolver {
       throw new IllegalArgumentException("expected a string starting with " + APP_KEY_PREFIX);
     }
     String json = s.substring(APP_KEY_PREFIX.length() + 1);
-    AppExecId parsed = mapper.readValue(json, AppExecId.class);
-    return parsed;
+    return JacksonMapper.Default.fromJson(json, AppExecId.class);
   }
 
   @VisibleForTesting
@@ -467,7 +461,8 @@ public class ExternalShuffleBlockResolver {
         }
         AppExecId id = parseDbAppExecKey(key);
         logger.info("Reloading registered executors: " +  id.toString());
-        ExecutorShuffleInfo shuffleInfo = mapper.readValue(e.getValue(), ExecutorShuffleInfo.class);
+        ExecutorShuffleInfo shuffleInfo =
+          JacksonMapper.Default.fromJson(e.getValue(), ExecutorShuffleInfo.class);
         registeredExecutors.put(id, shuffleInfo);
       }
     }

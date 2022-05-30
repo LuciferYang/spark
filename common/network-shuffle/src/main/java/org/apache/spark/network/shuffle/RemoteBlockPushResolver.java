@@ -50,6 +50,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import org.apache.spark.network.util.JacksonMapper;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -600,10 +601,9 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
       String mergeDirInfo =
         shuffleManagerMeta.substring(shuffleManagerMeta.indexOf(SHUFFLE_META_DELIMITER) + 1);
       try {
-        ObjectMapper mapper = new ObjectMapper();
         TypeReference<Map<String, String>> typeRef
           = new TypeReference<Map<String, String>>(){};
-        Map<String, String> metaMap = mapper.readValue(mergeDirInfo, typeRef);
+        Map<String, String> metaMap = JacksonMapper.Default.fromJson(mergeDirInfo, typeRef);
         String mergeDir = metaMap.get(MERGE_DIR_KEY);
         int attemptId = Integer.valueOf(
           metaMap.getOrDefault(ATTEMPT_ID_KEY, String.valueOf(UNDEFINED_ATTEMPT_ID)));
