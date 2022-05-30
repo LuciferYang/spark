@@ -19,15 +19,13 @@ package org.apache.spark.status.api.v1
 import java.util.Date
 
 import com.fasterxml.jackson.core.`type`.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.util.ScalaJacksonMapper
 
 class ExecutorSummarySuite extends SparkFunSuite {
 
   test("Check ExecutorSummary serialize and deserialize with empty peakMemoryMetrics") {
-    val mapper = new ObjectMapper().registerModule(DefaultScalaModule)
     val executorSummary = new ExecutorSummary("id", "host:port", true, 1,
       10, 10, 1, 1, 1,
       0, 0, 1, 100,
@@ -44,9 +42,10 @@ class ExecutorSummarySuite extends SparkFunSuite {
       "\"executorLogs\":{},\"memoryMetrics\":null,\"blacklistedInStages\":[]," +
       "\"peakMemoryMetrics\":null,\"attributes\":{},\"resources\":{},\"resourceProfileId\":1," +
       "\"isExcluded\":false,\"excludedInStages\":[]}"
-    val json = mapper.writeValueAsString(executorSummary)
+    val json = ScalaJacksonMapper.Default.toJson(executorSummary)
     assert(expectedJson.equals(json))
-    val deserializeExecutorSummary = mapper.readValue(json, new TypeReference[ExecutorSummary] {})
+    val deserializeExecutorSummary =
+      ScalaJacksonMapper.Default.fromJson(json, new TypeReference[ExecutorSummary] {})
     assert(deserializeExecutorSummary.peakMemoryMetrics == None)
   }
 

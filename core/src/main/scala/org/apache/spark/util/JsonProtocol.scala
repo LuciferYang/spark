@@ -59,7 +59,7 @@ private[spark] object JsonProtocol {
 
   private implicit val format = DefaultFormats
 
-  private val mapper = new ObjectMapper().registerModule(DefaultScalaModule)
+  private val mapper = ScalaJacksonMapper.withDefaultScalaModule()
     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
   /** ------------------------------------------------- *

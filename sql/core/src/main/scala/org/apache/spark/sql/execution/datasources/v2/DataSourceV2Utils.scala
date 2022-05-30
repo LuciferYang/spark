@@ -21,9 +21,8 @@ import java.util.regex.Pattern
 
 import scala.collection.JavaConverters._
 
-import com.fasterxml.jackson.databind.ObjectMapper
-
 import org.apache.spark.internal.Logging
+import org.apache.spark.network.util.JacksonMapper
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.TimeTravelSpec
 import org.apache.spark.sql.catalyst.expressions.Literal
@@ -150,8 +149,7 @@ private[sql] object DataSourceV2Utils extends Logging {
     } else if (paths.length == 1) {
       extraOptions + ("path" -> paths.head)
     } else {
-      val objectMapper = new ObjectMapper()
-      extraOptions + ("paths" -> objectMapper.writeValueAsString(paths.toArray))
+      extraOptions + ("paths" -> JacksonMapper.Default.toJson(paths.toArray))
     }
   }
 }

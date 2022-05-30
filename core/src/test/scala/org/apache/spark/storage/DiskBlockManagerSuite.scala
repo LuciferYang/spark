@@ -129,13 +129,14 @@ class DiskBlockManagerSuite extends SparkFunSuite with BeforeAndAfterEach with B
   }
 
   test("Encode merged directory name and attemptId in shuffleManager field") {
+    import org.apache.spark.network.util.JacksonMapper
     testConf.set(config.APP_ATTEMPT_ID, "1");
     diskBlockManager = new DiskBlockManager(testConf, deleteFilesOnStop = true, isDriver = false)
     val mergedShuffleMeta = diskBlockManager.getMergeDirectoryAndAttemptIDJsonString();
-    val mapper: ObjectMapper = new ObjectMapper
     val typeRef: TypeReference[HashMap[String, String]] =
       new TypeReference[HashMap[String, String]]() {}
-    val metaMap: HashMap[String, String] = mapper.readValue(mergedShuffleMeta, typeRef)
+    val metaMap: HashMap[String, String] =
+      JacksonMapper.Default.fromJson(mergedShuffleMeta, typeRef)
     val mergeDir = metaMap.get(DiskBlockManager.MERGE_DIR_KEY)
     assert(mergeDir.equals(DiskBlockManager.MERGE_DIRECTORY + "_1"))
     val attemptId = metaMap.get(DiskBlockManager.ATTEMPT_ID_KEY)

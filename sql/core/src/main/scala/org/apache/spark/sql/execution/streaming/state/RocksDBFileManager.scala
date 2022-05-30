@@ -28,9 +28,8 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
-import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.module.scala.{ClassTagExtensions, DefaultScalaModule}
 import org.apache.commons.io.{FilenameUtils, IOUtils}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
@@ -39,7 +38,7 @@ import org.json4s.jackson.Serialization
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.streaming.CheckpointFileManager
-import org.apache.spark.util.Utils
+import org.apache.spark.util.{ScalaJacksonMapper, Utils}
 
 /**
  * Class responsible for syncing RocksDB checkpoint files from local disk to DFS.
@@ -574,10 +573,9 @@ object RocksDBCheckpointMetadata {
 
   /** Used to convert between classes and JSON. */
   lazy val mapper = {
-    val _mapper = new ObjectMapper with ClassTagExtensions
+    val _mapper = ScalaJacksonMapper.withClassTagExtensions()
     _mapper.setSerializationInclusion(Include.NON_ABSENT)
     _mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    _mapper.registerModule(DefaultScalaModule)
     _mapper
   }
 
