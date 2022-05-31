@@ -128,11 +128,11 @@ private[kafka010] class KafkaOffsetReaderAdmin(
     val partitions = consumerStrategy.assignedTopicPartitions(admin)
     // Obtain TopicPartition offsets with late binding support
     offsetRangeLimit match {
-      case EarliestOffsetRangeLimit => partitions.map { tp =>
-        tp -> KafkaOffsetRangeLimit.EARLIEST
+      case EarliestOffsetRangeLimit => partitions.map {
+        tp => tp -> KafkaOffsetRangeLimit.EARLIEST
       }.toMap
-      case LatestOffsetRangeLimit => partitions.map { tp =>
-        tp -> KafkaOffsetRangeLimit.LATEST
+      case LatestOffsetRangeLimit => partitions.map {
+        tp => tp -> KafkaOffsetRangeLimit.LATEST
       }.toMap
       case SpecificOffsetRangeLimit(partitionOffsets) =>
         validateTopicPartitions(partitions, partitionOffsets)
