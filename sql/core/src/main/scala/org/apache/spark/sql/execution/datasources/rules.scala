@@ -458,7 +458,7 @@ object PreReadCheck extends (LogicalPlan => Unit) {
     plan.foreach {
       operator: LogicalPlan =>
         operator transformExpressionsUp {
-          case e@(_: InputFileName | _: InputFileBlockLength | _: InputFileBlockStart) =>
+          case e @ (_: InputFileName | _: InputFileBlockLength | _: InputFileBlockStart) =>
             checkNumInputFileBlockSources(e, operator)
             e
         }
