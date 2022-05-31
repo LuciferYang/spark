@@ -105,7 +105,7 @@ private[ml] object ValidatorParams {
     // Check to make sure all Params apply to this estimator.  Throw an error if any do not.
     // Extraneous Params would cause problems when loading the estimatorParamMaps.
     val uidToInstance: Map[String, Params] = MetaAlgorithmReadWrite.getUidMap(instance)
-    instance.getEstimatorParamMaps.foreach { case pMap: ParamMap =>
+    instance.getEstimatorParamMaps.foreach { pMap: ParamMap =>
       pMap.toSeq.foreach { case ParamPair(p, v) =>
         require(uidToInstance.contains(p.parent), s"ValidatorParams save requires all Params in" +
           s" estimatorParamMaps to apply to this ValidatorParams, its Estimator, or its" +
@@ -128,7 +128,7 @@ private[ml] object ValidatorParams {
 
     var numParamsNotJson = 0
     val estimatorParamMapsJson = compact(render(
-      instance.getEstimatorParamMaps.map { case paramMap =>
+      instance.getEstimatorParamMaps.map { paramMap =>
         paramMap.toSeq.map { case ParamPair(p, v) =>
           v match {
             case writeableObj: DefaultParamsWritable =>
@@ -190,12 +190,12 @@ private[ml] object ValidatorParams {
     val estimatorParamMaps: Array[ParamMap] =
       (metadata.params \ "estimatorParamMaps").extract[Seq[Seq[Map[String, String]]]].map {
         pMap =>
-          val paramPairs = pMap.map { case pInfo: Map[String, String] =>
+          val paramPairs = pMap.map { pInfo: Map[String, String] =>
             val est = uidToParams(pInfo("parent"))
             val param = est.getParam(pInfo("name"))
             // [Spark-21221] introduced the isJson field
             if (!pInfo.contains("isJson") ||
-                (pInfo.contains("isJson") && pInfo("isJson").toBoolean.booleanValue())) {
+              (pInfo.contains("isJson") && pInfo("isJson").toBoolean.booleanValue())) {
               val value = param.jsonDecode(pInfo("value"))
               param -> value
             } else {

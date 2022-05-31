@@ -251,7 +251,7 @@ trait MesosSchedulerUtils extends Logging {
     var remain = amountToUse
     var requestedResources = new ArrayBuffer[Resource]
     val remainingResources = resources.asScala.map {
-      case r =>
+      r =>
         val reservation = getReservation(r)
         if (remain > 0 &&
           r.getType == Value.Type.SCALAR &&

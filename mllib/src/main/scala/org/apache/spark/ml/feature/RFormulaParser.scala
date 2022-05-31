@@ -269,16 +269,16 @@ private[ml] object RFormulaParser extends RegexParsers {
   }
 
   private val intercept: Parser[Term] =
-    "([01])".r ^^ { case a => Intercept(a == "1") }
+    "([01])".r ^^ (a => Intercept(a == "1"))
 
   private val columnRef: Parser[ColumnRef] =
-    "([a-zA-Z]|\\.[a-zA-Z_])[a-zA-Z0-9._]*".r ^^ { case a => ColumnRef(a) }
+    "([a-zA-Z]|\\.[a-zA-Z_])[a-zA-Z0-9._]*".r ^^ (a => ColumnRef(a))
 
-  private val empty: Parser[ColumnRef] = "" ^^ { case a => ColumnRef("") }
+  private val empty: Parser[ColumnRef] = "" ^^ (_ => ColumnRef(""))
 
   private val label: Parser[ColumnRef] = columnRef | empty
 
-  private val dot: Parser[Term] = "\\.".r ^^ { case _ => Dot }
+  private val dot: Parser[Term] = "\\.".r ^^ (_ => Dot)
 
   private val parens: Parser[Term] = "(" ~> expr <~ ")"
 

@@ -344,7 +344,7 @@ abstract class DStream[T: ClassTag] (
           }
         }
 
-        rddOption.foreach { case newRDD =>
+        rddOption.foreach { newRDD =>
           // Register the generated RDD for caching and checkpointing
           if (storageLevel != StorageLevel.NONE) {
             newRDD.persist(storageLevel)

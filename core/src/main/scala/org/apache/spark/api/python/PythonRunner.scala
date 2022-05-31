@@ -361,9 +361,8 @@ private[spark] abstract class BasePythonRunner[IN, OUT](
           PythonRDD.writeUTF(k, dataOut)
           PythonRDD.writeUTF(v.name, dataOut)
           dataOut.writeInt(v.addresses.size)
-          v.addresses.foreach { case addr =>
-            PythonRDD.writeUTF(addr, dataOut)
-          }
+          v.addresses.foreach(addr =>
+            PythonRDD.writeUTF(addr, dataOut))
         }
         val localProps = context.getLocalProperties.asScala
         dataOut.writeInt(localProps.size)

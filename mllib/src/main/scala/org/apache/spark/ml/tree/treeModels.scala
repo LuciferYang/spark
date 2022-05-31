@@ -438,7 +438,7 @@ private[ml] object DecisionTreeModelReadWrite {
     // We fill `finalNodes` in reverse order.  Since node IDs are assigned via a pre-order
     // traversal, this guarantees that child nodes will be built before parent nodes.
     val finalNodes = new Array[Node](nodes.length)
-    nodes.reverseIterator.foreach { case n: NodeData =>
+    nodes.reverseIterator.foreach { n: NodeData =>
       val impurityStats =
         ImpurityCalculator.getCalculator(impurityType, n.impurityStats, n.rawCount)
       val node = if (n.leftChild != -1) {

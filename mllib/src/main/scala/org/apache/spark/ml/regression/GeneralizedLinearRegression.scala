@@ -1576,7 +1576,7 @@ class GeneralizedLinearRegressionTrainingSummary private[regression] (
         StringUtils.leftPad(colName, colWidths(i))
       }.addString(sb, "", " ", "\n")
 
-      data.foreach { case strRow: Array[String] =>
+      data.foreach { strRow: Array[String] =>
         strRow.zipWithIndex.map { case (cell: String, i: Int) =>
           StringUtils.leftPad(cell, colWidths(i))
         }.addString(sb, "", " ", "\n")

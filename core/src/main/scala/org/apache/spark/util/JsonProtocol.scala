@@ -598,11 +598,11 @@ private[spark] object JsonProtocol {
   }
 
   def stackTraceToJson(stackTrace: Array[StackTraceElement]): JValue = {
-    JArray(stackTrace.map { case line =>
+    JArray(stackTrace.map { line =>
       ("Declaring Class" -> line.getClassName) ~
-      ("Method Name" -> line.getMethodName) ~
-      ("File Name" -> line.getFileName) ~
-      ("Line Number" -> line.getLineNumber)
+        ("Method Name" -> line.getMethodName) ~
+        ("File Name" -> line.getFileName) ~
+        ("Line Number" -> line.getLineNumber)
     }.toList)
   }
 

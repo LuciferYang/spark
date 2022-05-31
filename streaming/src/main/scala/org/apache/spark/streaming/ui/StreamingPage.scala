@@ -342,7 +342,7 @@ private[ui] class StreamingPage(parent: StreamingTab)
       maxX: Long,
       minY: Double): Seq[Node] = {
     val maxYCalculated = listener.receivedRecordRateWithBatchTime.values
-      .flatMap { case streamAndRates => streamAndRates.map { case (_, recordRate) => recordRate } }
+      .flatMap(streamAndRates => streamAndRates.map { case (_, recordRate) => recordRate })
       .reduceOption[Double](math.max)
       .map(_.ceil.toLong)
       .getOrElse(0L)

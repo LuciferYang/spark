@@ -2231,7 +2231,7 @@ private[spark] class DAGScheduler(
         shuffleMergeFinalizeScheduler.schedule(new Runnable {
           override def run(): Unit = {
             stage.shuffleDep.getMergerLocs.foreach {
-              case shuffleServiceLoc =>
+              shuffleServiceLoc =>
                 // Sends async request to shuffle service to finalize shuffle merge on that host.
                 // Since merge statuses will not be registered in this case,
                 // we pass a no-op listener.

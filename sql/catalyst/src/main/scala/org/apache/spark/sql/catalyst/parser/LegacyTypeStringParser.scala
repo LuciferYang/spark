@@ -71,8 +71,8 @@ object LegacyTypeStringParser extends RegexParsers {
       )
 
   protected lazy val structType: Parser[DataType] =
-    "StructType\\([A-zA-z]*\\(".r ~> repsep(structField, ",") <~ "))" ^^ {
-      case fields => StructType(fields)
+    "StructType\\([A-zA-z]*\\(".r ~> repsep(structField, ",") <~ "))" ^^ { fields =>
+      StructType(fields)
     }
 
   protected lazy val dataType: Parser[DataType] =

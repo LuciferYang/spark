@@ -456,9 +456,9 @@ object HiveOnlyCheck extends (LogicalPlan => Unit) {
 object PreReadCheck extends (LogicalPlan => Unit) {
   def apply(plan: LogicalPlan): Unit = {
     plan.foreach {
-      case operator: LogicalPlan =>
+      operator: LogicalPlan =>
         operator transformExpressionsUp {
-          case e @ (_: InputFileName | _: InputFileBlockLength | _: InputFileBlockStart) =>
+          case e@(_: InputFileName | _: InputFileBlockLength | _: InputFileBlockStart) =>
             checkNumInputFileBlockSources(e, operator)
             e
         }
