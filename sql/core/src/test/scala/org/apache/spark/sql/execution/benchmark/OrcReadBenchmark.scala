@@ -108,7 +108,7 @@ object OrcReadBenchmark extends SqlBasedBenchmark {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     runBenchmark("Filter Single Column Scan From Wide Columns") {
       for (columnWidth <- List(10, 50, 100)) {
-        filterFromWideTableBenchmark(1024 * 1024 * 1, columnWidth, 1000)
+        filterFromWideTableBenchmark(1024 * 1024 * 1, columnWidth, 3000)
       }
     }
   }
