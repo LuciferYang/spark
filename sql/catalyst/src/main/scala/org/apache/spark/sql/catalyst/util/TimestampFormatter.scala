@@ -176,6 +176,22 @@ class Iso8601TimestampFormatter(
     } catch checkParsedDiff(s, legacyFormatter.parse)
   }
 
+  override def parseOptional(s: String): Option[Long] = {
+    try {
+      val parsed = formatter.parse(s)
+      val parsedZoneId = parsed.query(TemporalQueries.zone())
+      val timeZoneId = if (parsedZoneId == null) zoneId else parsedZoneId
+      val zonedDateTime = toZonedDateTime(parsed, timeZoneId)
+      val epochSeconds = zonedDateTime.toEpochSecond
+      val microsOfSecond = zonedDateTime.get(MICRO_OF_SECOND)
+
+      Some(Math.addExact(Math.multiplyExact(epochSeconds, MICROS_PER_SECOND), microsOfSecond))
+    } catch {
+      import scala.util.control.NonFatal
+      case NonFatal(_) => None
+    }
+  }
+
   override def parseWithoutTimeZone(s: String, allowTimeZone: Boolean): Long = {
     try {
       val parsed = formatter.parse(s)
@@ -186,6 +202,21 @@ class Iso8601TimestampFormatter(
       val localTime = toLocalTime(parsed)
       DateTimeUtils.localDateTimeToMicros(LocalDateTime.of(localDate, localTime))
     } catch checkParsedDiff(s, legacyFormatter.parse)
+  }
+
+  override def parseWithoutTimeZoneOptional(s: String, allowTimeZone: Boolean): Option[Long] = {
+    try {
+      val parsed = formatter.parse(s)
+      if (!allowTimeZone && parsed.query(TemporalQueries.zone()) != null) {
+        return None
+      }
+      val localDate = toLocalDate(parsed)
+      val localTime = toLocalTime(parsed)
+      Some(DateTimeUtils.localDateTimeToMicros(LocalDateTime.of(localDate, localTime)))
+    } catch {
+      import scala.util.control.NonFatal
+      case NonFatal(_) => None
+    }
   }
 
   override def format(instant: Instant): String = {
