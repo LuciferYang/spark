@@ -34,7 +34,6 @@ import org.apache.orc.mapred.OrcInputFormat;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.orc.OrcShimUtils.VectorizedRowBatchWrap;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
-import org.apache.spark.sql.execution.vectorized.ConstantColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
@@ -169,8 +168,9 @@ public class OrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
     for (int i = 0; i < requiredFields.length; i++) {
       DataType dt = requiredFields[i].dataType();
       if (requestedPartitionColIds[i] != -1) {
-        ConstantColumnVector partitionCol = new ConstantColumnVector(capacity, dt);
+        OnHeapColumnVector partitionCol = new OnHeapColumnVector(capacity, dt);
         ColumnVectorUtils.populate(partitionCol, partitionValues, requestedPartitionColIds[i]);
+        partitionCol.setIsConstant();
         orcVectorWrappers[i] = partitionCol;
       } else {
         int colId = requestedDataColIds[i];
