@@ -22,7 +22,7 @@ import scala.collection.mutable
 import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
 
 /**
- * Benchmark for min function of ArrayBuffer with different buffer size.
+ * Benchmark for min and max of ArrayBuffer with different buffer size.
  * To run this benchmark:
  * {{{
  *   1. without sbt:
@@ -30,17 +30,26 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  *   2. build/sbt "core/test:runMain <this class>"
  *   3. generate result:
  *      SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "core/test:runMain <this class>"
- *      Results will be written to "benchmarks/ArrayBufferMinBenchmark-results.txt".
+ *      Results will be written to "benchmarks/ArrayBufferMinMaxBenchmark-results.txt".
  * }}}
  * */
-object ArrayBufferMinBenchmark extends BenchmarkBase {
+object ArrayBufferMinMaxBenchmark extends BenchmarkBase {
 
   private def min(numIters: Int, bufferSize: Int, loops: Int): Unit = {
     val benchmark = new Benchmark("Array Buffer", loops, output = output)
     val buffer = new mutable.ArrayBuffer[Int]()
     (0 until bufferSize).foreach(i => buffer += i)
-    benchmark.addCase(s"buffer add $bufferSize items", numIters) { _ =>
+    benchmark.addCase(s"buffer min with $bufferSize items", numIters) { _ =>
       (0 until loops).foreach(_ => buffer.min)
+    }
+    benchmark.addCase(s"buffer sorted head with $bufferSize items", numIters) { _ =>
+      (0 until loops).foreach(_ => buffer.sorted.head)
+    }
+    benchmark.addCase(s"buffer max with $bufferSize items", numIters) { _ =>
+      (0 until loops).foreach(_ => buffer.max)
+    }
+    benchmark.addCase(s"buffer sorted last with $bufferSize items", numIters) { _ =>
+      (0 until loops).foreach(_ => buffer.sorted.last)
     }
     benchmark.run()
   }
