@@ -176,18 +176,17 @@ public class OrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
         int colId = requestedDataColIds[i];
         // Initialize the missing columns once.
         if (colId == -1) {
-          OnHeapColumnVector missingCol = new OnHeapColumnVector(capacity, dt);
+          ConstantColumnVector missingCol = new ConstantColumnVector(capacity, dt);
           // Check if the missing column has an associated default value in the schema metadata.
           // If so, fill the corresponding column vector with the value.
           Object defaultValue = requiredSchema.existenceDefaultValues()[i];
           if (defaultValue == null) {
-            missingCol.putNulls(0, capacity);
+            missingCol.setNull();
           } else if (!missingCol.appendObjects(capacity, defaultValue).isPresent()) {
             throw new IllegalArgumentException("Cannot assign default column value to result " +
               "column batch in vectorized Orc reader because the data type is not supported: " +
               defaultValue);
           }
-          missingCol.setIsConstant();
           orcVectorWrappers[i] = missingCol;
         } else {
           orcVectorWrappers[i] = OrcColumnVectorUtils.toOrcColumnVector(
