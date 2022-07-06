@@ -35,7 +35,6 @@ import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.datasources.orc.OrcShimUtils.VectorizedRowBatchWrap;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.ConstantColumnVector;
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 
@@ -182,7 +181,7 @@ public class OrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
           Object defaultValue = requiredSchema.existenceDefaultValues()[i];
           if (defaultValue == null) {
             missingCol.setNull();
-          } else if (!missingCol.appendObjects(capacity, defaultValue).isPresent()) {
+          } else if (!missingCol.setValue(defaultValue)) {
             throw new IllegalArgumentException("Cannot assign default column value to result " +
               "column batch in vectorized Orc reader because the data type is not supported: " +
               defaultValue);

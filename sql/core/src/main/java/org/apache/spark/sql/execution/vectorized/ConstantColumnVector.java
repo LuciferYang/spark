@@ -18,7 +18,6 @@ package org.apache.spark.sql.execution.vectorized;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Optional;
 
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnVector;
@@ -309,16 +308,12 @@ public class ConstantColumnVector extends ColumnVector {
     this.childData[2].setLong(value.microseconds);
   }
 
-  public Optional<Integer> appendObjects(int length, Object value) {
+  public boolean setValue(Object value) {
     if (value instanceof Boolean) {
-      setBoolean((Boolean)value);
-      return Optional.of(length);
-    }
-    if (value instanceof Byte) {
+      setBoolean((Boolean) value);
+    } else if (value instanceof Byte) {
       setByte((Byte) value);
-      return Optional.of(length);
-    }
-    if (value instanceof Decimal) {
+    } else if (value instanceof Decimal) {
       Decimal decimal = (Decimal) value;
       long unscaled = decimal.toUnscaledLong();
       if (decimal.precision() < 10) {
@@ -326,33 +321,22 @@ public class ConstantColumnVector extends ColumnVector {
       } else {
         setLong(unscaled);
       }
-      return Optional.of(length);
-    }
-    if (value instanceof Double) {
+    } else if (value instanceof Double) {
       setDouble((Double) value);
-      return Optional.of(length);
-    }
-    if (value instanceof Float) {
+    } else if (value instanceof Float) {
       setFloat((Float) value);
-      return Optional.of(length);
-    }
-    if (value instanceof Integer) {
+    } else if (value instanceof Integer) {
       setInt((Integer) value);
-      return Optional.of(length);
-    }
-    if (value instanceof Long) {
-      setLong( (Long) value);
-      return Optional.of(length);
-    }
-    if (value instanceof Short) {
+    } else if (value instanceof Long) {
+      setLong((Long) value);
+    } else if (value instanceof Short) {
       setShort((Short) value);
-      return Optional.of(length);
-    }
-    if (value instanceof UTF8String) {
+    } else if (value instanceof UTF8String) {
       UTF8String utf8 = (UTF8String) value;
       setUtf8String(utf8);
-      return Optional.of(length);
+    } else {
+      return false;
     }
-    return Optional.empty();
+    return true;
   }
 }
