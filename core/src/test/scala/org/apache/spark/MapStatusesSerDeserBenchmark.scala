@@ -19,7 +19,7 @@ package org.apache.spark
 
 import org.apache.spark.benchmark.Benchmark
 import org.apache.spark.benchmark.BenchmarkBase
-import org.apache.spark.scheduler.{CompressedMapStatus, MergeStatus}
+import org.apache.spark.scheduler.{HighlyCompressedMapStatus, MergeStatus}
 import org.apache.spark.storage.BlockManagerId
 
 /**
@@ -54,7 +54,7 @@ object MapStatusesSerDeserBenchmark extends BenchmarkBase {
     val r = new scala.util.Random(912)
     (0 until numMaps).foreach { i =>
       tracker.registerMapOutput(shuffleId, i,
-        new CompressedMapStatus(BlockManagerId(s"node$i", s"node$i.spark.apache.org", 1000),
+        HighlyCompressedMapStatus(BlockManagerId(s"node$i", s"node$i.spark.apache.org", 1000),
           Array.fill(blockSize) {
             // Creating block size ranging from 0byte to 1GB
             (r.nextDouble() * 1024 * 1024 * 1024).toLong
