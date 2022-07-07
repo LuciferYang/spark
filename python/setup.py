@@ -216,6 +216,7 @@ try:
                   'pyspark.sql',
                   'pyspark.sql.avro',
                   'pyspark.sql.pandas',
+                  'pyspark.sql.streaming',
                   'pyspark.streaming',
                   'pyspark.bin',
                   'pyspark.sbin',
@@ -265,6 +266,7 @@ try:
             'sql': [
                 'pandas>=%s' % _minimum_pandas_version,
                 'pyarrow>=%s' % _minimum_pyarrow_version,
+                'numpy>=1.15',
             ],
             'pandas_on_spark': [
                 'pandas>=%s' % _minimum_pandas_version,

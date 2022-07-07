@@ -24,6 +24,7 @@ import java.util.Locale
 import com.univocity.parsers.csv.{CsvParserSettings, CsvWriterSettings, UnescapedQuoteHandling}
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.FileSourceOptions
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.internal.SQLConf
@@ -34,7 +35,7 @@ class CSVOptions(
     val columnPruning: Boolean,
     defaultTimeZoneId: String,
     defaultColumnNameOfCorruptRecord: String)
-  extends Logging with Serializable {
+  extends FileSourceOptions(parameters) with Logging {
 
   def this(
     parameters: Map[String, String],
@@ -214,7 +215,11 @@ class CSVOptions(
    */
   val lineSeparator: Option[String] = parameters.get("lineSep").map { sep =>
     require(sep.nonEmpty, "'lineSep' cannot be an empty string.")
-    require(sep.length == 1, "'lineSep' can contain only 1 character.")
+    // Intentionally allow it up to 2 for Window's CRLF although multiple
+    // characters have an issue with quotes. This is intentionally undocumented.
+    require(sep.length <= 2, "'lineSep' can contain only 1 character.")
+    if (sep.length == 2) logWarning("It is not recommended to set 'lineSep' " +
+      "with 2 characters due to the limitation of supporting multi-char 'lineSep' within quotes.")
     sep
   }
 

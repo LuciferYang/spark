@@ -34,6 +34,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.commons.lang3.time.FastDateFormat
 import org.apache.hadoop.io.SequenceFile.CompressionType
 import org.apache.hadoop.io.compress.GzipCodec
+import org.apache.logging.log4j.Level
 
 import org.apache.spark.{SparkConf, SparkException, TestUtils}
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Encoders, QueryTest, Row}
@@ -807,12 +808,20 @@ abstract class CSVSuite
 
   test("SPARK-37575: null values should be saved as nothing rather than " +
     "quoted empty Strings \"\" with default settings") {
-    withTempPath { path =>
-      Seq(("Tesla", null: String, ""))
-        .toDF("make", "comment", "blank")
-        .write
-        .csv(path.getCanonicalPath)
-      checkAnswer(spark.read.text(path.getCanonicalPath), Row("Tesla,,\"\""))
+    Seq("true", "false").foreach { confVal =>
+      withSQLConf(SQLConf.LEGACY_NULL_VALUE_WRITTEN_AS_QUOTED_EMPTY_STRING_CSV.key -> confVal) {
+        withTempPath { path =>
+          Seq(("Tesla", null: String, ""))
+            .toDF("make", "comment", "blank")
+            .write
+            .csv(path.getCanonicalPath)
+          if (confVal == "false") {
+            checkAnswer(spark.read.text(path.getCanonicalPath), Row("Tesla,,\"\""))
+          } else {
+            checkAnswer(spark.read.text(path.getCanonicalPath), Row("Tesla,\"\",\"\""))
+          }
+        }
+      }
     }
   }
 
@@ -1828,7 +1837,7 @@ abstract class CSVSuite
       val idf = spark.read
         .schema(schema)
         .csv(path.getCanonicalPath)
-        .select(Symbol("f15"), Symbol("f10"), Symbol("f5"))
+        .select($"f15", $"f10", $"f5")
 
       assert(idf.count() == 2)
       checkAnswer(idf, List(Row(15, 10, 5), Row(-15, -10, -5)))
@@ -2288,6 +2297,40 @@ abstract class CSVSuite
     assert(errMsg2.contains("'lineSep' can contain only 1 character"))
   }
 
+  Seq(true, false).foreach { multiLine =>
+    test(s"""lineSep with 2 chars when multiLine set to $multiLine""") {
+      Seq("\r\n", "||", "|").foreach { newLine =>
+        val logAppender = new LogAppender("lineSep WARN logger")
+        withTempDir { dir =>
+          val inputData = if (multiLine) {
+            s"""name,"i am the${newLine} column1"${newLine}jack,30${newLine}tom,18"""
+          } else {
+            s"name,age${newLine}jack,30${newLine}tom,18"
+          }
+          Files.write(new File(dir, "/data.csv").toPath, inputData.getBytes())
+          withLogAppender(logAppender) {
+            val df = spark.read
+              .options(
+                Map("header" -> "true", "multiLine" -> multiLine.toString, "lineSep" -> newLine))
+              .csv(dir.getCanonicalPath)
+            // Due to the limitation of Univocity parser:
+            // multiple chars of newlines cannot be properly handled when they exist within quotes.
+            // Leave 2-char lineSep as an undocumented features and logWarn user
+            if (newLine != "||" || !multiLine) {
+              checkAnswer(df, Seq(Row("jack", "30"), Row("tom", "18")))
+            }
+            if (newLine.length == 2) {
+              val message = "It is not recommended to set 'lineSep' with 2 characters due to"
+              assert(logAppender.loggingEvents.exists(
+                e => e.getLevel == Level.WARN && e.getMessage.getFormattedMessage.contains(message)
+              ))
+            }
+          }
+        }
+      }
+    }
+  }
+
   test("SPARK-26208: write and read empty data to csv file with headers") {
     withTempPath { path =>
       val df1 = spark.range(10).repartition(2).filter(_ < 0).map(_.toString).toDF
@@ -2611,8 +2654,8 @@ abstract class CSVSuite
             val ex = intercept[AnalysisException] {
               readback.filter($"AAA" === 2 && $"bbb" === 3).collect()
             }
-            assert(ex.getErrorClass == "MISSING_COLUMN")
-            assert(ex.messageParameters.head == "AAA")
+            assert(ex.getErrorClass == "UNRESOLVED_COLUMN")
+            assert(ex.messageParameters.head == "`AAA`")
           }
         }
       }
@@ -2684,6 +2727,16 @@ abstract class CSVSuite
         .csv(csv)
       assert(df.schema == expected)
       checkAnswer(df, Row(1, null) :: Nil)
+    }
+
+    withSQLConf(SQLConf.LEGACY_RESPECT_NULLABILITY_IN_TEXT_DATASET_CONVERSION.key -> "true") {
+      checkAnswer(
+        spark.read.schema(
+          StructType(
+            StructField("f1", StringType, nullable = false) ::
+            StructField("f2", StringType, nullable = false) :: Nil)
+        ).option("mode", "DROPMALFORMED").csv(Seq("a,", "a,b").toDS),
+        Row("a", "b"))
     }
   }
 

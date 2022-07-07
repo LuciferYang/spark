@@ -19,20 +19,19 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, AliasHelper, And, Attribute, AttributeReference, Cast, Divide, DivideDTInterval, DivideYMInterval, EqualTo, Expression, If, IntegerLiteral, Literal, NamedExpression, PredicateHelper, ProjectionOverSchema, SortOrder, SubqueryExpression}
-import org.apache.spark.sql.catalyst.expressions.aggregate
+import org.apache.spark.sql.catalyst.expressions.{aggregate, Alias, AliasHelper, And, Attribute, AttributeReference, AttributeSet, Cast, Expression, IntegerLiteral, Literal, NamedExpression, PredicateHelper, ProjectionOverSchema, SortOrder, SubqueryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.optimizer.CollapseProject
 import org.apache.spark.sql.catalyst.planning.ScanOperation
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, LeafNode, Limit, LocalLimit, LogicalPlan, Project, Sample, Sort}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, LeafNode, Limit, LimitAndOffset, LocalLimit, LogicalPlan, Offset, OffsetAndLimit, Project, Sample, Sort}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.expressions.{SortOrder => V2SortOrder}
-import org.apache.spark.sql.connector.expressions.aggregate.{Aggregation, Avg, Count, GeneralAggregateFunc, Sum}
+import org.apache.spark.sql.connector.expressions.aggregate.{Aggregation, Avg, Count, GeneralAggregateFunc, Sum, UserDefinedAggregateFunc}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownAggregates, SupportsPushDownFilters, V1Scan}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
 import org.apache.spark.sql.sources
-import org.apache.spark.sql.types.{DataType, DayTimeIntervalType, LongType, StructType, YearMonthIntervalType}
+import org.apache.spark.sql.types.{DataType, IntegerType, LongType, StructType}
 import org.apache.spark.sql.util.SchemaUtils._
 
 object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper with AliasHelper {
@@ -44,7 +43,7 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
       pushDownSample,
       pushDownFilters,
       pushDownAggregates,
-      pushDownLimits,
+      pushDownLimitAndOffset,
       pruneColumns)
 
     pushdownRules.foldLeft(plan) { (newPlan, pushDownRule) =>
@@ -138,18 +137,11 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
                       case AggregateExpression(avg: aggregate.Average, _, isDistinct, _, _) =>
                         val sum = aggregate.Sum(avg.child).toAggregateExpression(isDistinct)
                         val count = aggregate.Count(avg.child).toAggregateExpression(isDistinct)
-                        // Closely follow `Average.evaluateExpression`
-                        avg.dataType match {
-                          case _: YearMonthIntervalType =>
-                            If(EqualTo(count, Literal(0L)),
-                              Literal(null, YearMonthIntervalType()), DivideYMInterval(sum, count))
-                          case _: DayTimeIntervalType =>
-                            If(EqualTo(count, Literal(0L)),
-                              Literal(null, DayTimeIntervalType()), DivideDTInterval(sum, count))
-                          case _ =>
-                            // TODO deal with the overflow issue
-                            Divide(addCastIfNeeded(sum, avg.dataType),
-                              addCastIfNeeded(count, avg.dataType), false)
+                        avg.evaluateExpression transform {
+                          case a: Attribute if a.semanticEquals(avg.sum) =>
+                            addCastIfNeeded(sum, avg.sum.dataType)
+                          case a: Attribute if a.semanticEquals(avg.count) =>
+                            addCastIfNeeded(count, avg.count.dataType)
                         }
                     }
                   }.asInstanceOf[Seq[NamedExpression]]
@@ -191,9 +183,14 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
                   // scalastyle:on
                   val newOutput = scan.readSchema().toAttributes
                   assert(newOutput.length == groupingExpressions.length + finalAggregates.length)
-                  val groupAttrs = normalizedGroupingExpressions.zip(newOutput).map {
-                    case (a: Attribute, b: Attribute) => b.withExprId(a.exprId)
-                    case (_, b) => b
+                  val groupByExprToOutputOrdinal = mutable.HashMap.empty[Expression, Int]
+                  val groupAttrs = normalizedGroupingExpressions.zip(newOutput).zipWithIndex.map {
+                    case ((a: Attribute, b: Attribute), _) => b.withExprId(a.exprId)
+                    case ((expr, attr), ordinal) =>
+                      if (!groupByExprToOutputOrdinal.contains(expr.canonicalized)) {
+                        groupByExprToOutputOrdinal(expr.canonicalized) = ordinal
+                      }
+                      attr
                   }
                   val aggOutput = newOutput.drop(groupAttrs.length)
                   val output = groupAttrs ++ aggOutput
@@ -204,7 +201,7 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
                        |Pushed Aggregate Functions:
                        | ${pushedAggregates.get.aggregateExpressions.mkString(", ")}
                        |Pushed Group by:
-                       | ${pushedAggregates.get.groupByColumns.mkString(", ")}
+                       | ${pushedAggregates.get.groupByExpressions.mkString(", ")}
                        |Output: ${output.mkString(", ")}
                       """.stripMargin)
 
@@ -213,14 +210,15 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
                     DataSourceV2ScanRelation(sHolder.relation, wrappedScan, output)
                   if (r.supportCompletePushDown(pushedAggregates.get)) {
                     val projectExpressions = finalResultExpressions.map { expr =>
-                      // TODO At present, only push down group by attribute is supported.
-                      // In future, more attribute conversion is extended here. e.g. GetStructField
-                      expr.transform {
+                      expr.transformDown {
                         case agg: AggregateExpression =>
                           val ordinal = aggExprToOutputOrdinal(agg.canonicalized)
                           val child =
                             addCastIfNeeded(aggOutput(ordinal), agg.resultAttribute.dataType)
                           Alias(child, agg.resultAttribute.name)(agg.resultAttribute.exprId)
+                        case expr if groupByExprToOutputOrdinal.contains(expr.canonicalized) =>
+                          val ordinal = groupByExprToOutputOrdinal(expr.canonicalized)
+                          addCastIfNeeded(groupAttrs(ordinal), expr.dataType)
                       }
                     }.asInstanceOf[Seq[NamedExpression]]
                     Project(projectExpressions, scanRelation)
@@ -263,6 +261,9 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
                             case other => other
                           }
                         agg.copy(aggregateFunction = aggFunction)
+                      case expr if groupByExprToOutputOrdinal.contains(expr.canonicalized) =>
+                        val ordinal = groupByExprToOutputOrdinal(expr.canonicalized)
+                        addCastIfNeeded(groupAttrs(ordinal), expr.dataType)
                     }
                   }
                 }
@@ -293,11 +294,12 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
   private def supportPartialAggPushDown(agg: Aggregation): Boolean = {
     // We don't know the agg buffer of `GeneralAggregateFunc`, so can't do partial agg push down.
     // If `Sum`, `Count`, `Avg` with distinct, can't do partial agg push down.
-    agg.aggregateExpressions().exists {
+    agg.aggregateExpressions().isEmpty || agg.aggregateExpressions().exists {
       case sum: Sum => !sum.isDistinct
       case count: Count => !count.isDistinct
       case avg: Avg => !avg.isDistinct
       case _: GeneralAggregateFunc => false
+      case _: UserDefinedAggregateFunc => false
       case _ => true
     }
   }
@@ -327,7 +329,8 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
 
       val scanRelation = DataSourceV2ScanRelation(sHolder.relation, wrappedScan, output)
 
-      val projectionOverSchema = ProjectionOverSchema(output.toStructType)
+      val projectionOverSchema =
+        ProjectionOverSchema(output.toStructType, AttributeSet(output))
       val projectionFunc = (expr: Expression) => expr transformDown {
         case projectionOverSchema(newExpr) => newExpr
       }
@@ -367,19 +370,21 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
     }
   }
 
-  private def pushDownLimit(plan: LogicalPlan, limit: Int): LogicalPlan = plan match {
+  private def pushDownLimit(plan: LogicalPlan, limit: Int): (LogicalPlan, Boolean) = plan match {
     case operation @ ScanOperation(_, filter, sHolder: ScanBuilderHolder) if filter.isEmpty =>
-      val limitPushed = PushDownUtils.pushLimit(sHolder.builder, limit)
-      if (limitPushed) {
+      val (isPushed, isPartiallyPushed) = PushDownUtils.pushLimit(sHolder.builder, limit)
+      if (isPushed) {
         sHolder.pushedLimit = Some(limit)
       }
-      operation
+      (operation, isPushed && !isPartiallyPushed)
     case s @ Sort(order, _, operation @ ScanOperation(project, filter, sHolder: ScanBuilderHolder))
         if filter.isEmpty && CollapseProject.canCollapseExpressions(
           order, project, alwaysInline = true) =>
       val aliasMap = getAliasMap(project)
       val newOrder = order.map(replaceAlias(_, aliasMap)).asInstanceOf[Seq[SortOrder]]
-      val orders = DataSourceStrategy.translateSortOrders(newOrder)
+      val normalizedOrders = DataSourceStrategy.normalizeExprs(
+        newOrder, sHolder.relation.output).asInstanceOf[Seq[SortOrder]]
+      val orders = DataSourceStrategy.translateSortOrders(normalizedOrders)
       if (orders.length == order.length) {
         val (isPushed, isPartiallyPushed) =
           PushDownUtils.pushTopN(sHolder.builder, orders.toArray, limit)
@@ -387,27 +392,92 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
           sHolder.pushedLimit = Some(limit)
           sHolder.sortOrders = orders
           if (isPartiallyPushed) {
-            s
+            (s, false)
           } else {
-            operation
+            (operation, true)
           }
         } else {
-          s
+          (s, false)
         }
       } else {
-        s
+        (s, false)
       }
     case p: Project =>
-      val newChild = pushDownLimit(p.child, limit)
-      p.withNewChildren(Seq(newChild))
-    case other => other
+      val (newChild, isPartiallyPushed) = pushDownLimit(p.child, limit)
+      (p.withNewChildren(Seq(newChild)), isPartiallyPushed)
+    case other => (other, false)
   }
 
-  def pushDownLimits(plan: LogicalPlan): LogicalPlan = plan.transform {
+  private def pushDownOffset(
+      plan: LogicalPlan,
+      offset: Int): Boolean = plan match {
+    case sHolder: ScanBuilderHolder =>
+      val isPushed = PushDownUtils.pushOffset(sHolder.builder, offset)
+      if (isPushed) {
+        sHolder.pushedOffset = Some(offset)
+      }
+      isPushed
+    case Project(projectList, child) if projectList.forall(_.deterministic) =>
+      pushDownOffset(child, offset)
+    case _ => false
+  }
+
+  def pushDownLimitAndOffset(plan: LogicalPlan): LogicalPlan = plan.transform {
+    case offset @ LimitAndOffset(limit, offsetValue, child) =>
+      val (newChild, canRemoveLimit) = pushDownLimit(child, limit)
+      if (canRemoveLimit) {
+        // Try to push down OFFSET only if the LIMIT operator has been pushed and can be removed.
+        val isPushed = pushDownOffset(newChild, offsetValue)
+        if (isPushed) {
+          newChild
+        } else {
+          // Keep the OFFSET operator if we failed to push down OFFSET to the data source.
+          offset.withNewChildren(Seq(newChild))
+        }
+      } else {
+        // Keep the OFFSET operator if we can't remove LIMIT operator.
+        offset
+      }
+    case globalLimit @ OffsetAndLimit(offset, limit, child) =>
+      // For `df.offset(n).limit(m)`, we can push down `limit(m + n)` first.
+      val (newChild, canRemoveLimit) = pushDownLimit(child, limit + offset)
+      if (canRemoveLimit) {
+        // Try to push down OFFSET only if the LIMIT operator has been pushed and can be removed.
+        val isPushed = pushDownOffset(newChild, offset)
+        if (isPushed) {
+          newChild
+        } else {
+          // Still keep the OFFSET operator if we can't push it down.
+          Offset(Literal(offset), newChild)
+        }
+      } else {
+        // For `df.offset(n).limit(m)`, since we can't push down `limit(m + n)`,
+        // try to push down `offset(n)` here.
+        val isPushed = pushDownOffset(child, offset)
+        if (isPushed) {
+          // Keep the LIMIT operator if we can't push it down.
+          Limit(Literal(limit, IntegerType), child)
+        } else {
+          // Keep the origin plan if we can't push OFFSET operator and LIMIT operator.
+          globalLimit
+        }
+      }
     case globalLimit @ Limit(IntegerLiteral(limitValue), child) =>
-      val newChild = pushDownLimit(child, limitValue)
-      val newLocalLimit = globalLimit.child.asInstanceOf[LocalLimit].withNewChildren(Seq(newChild))
-      globalLimit.withNewChildren(Seq(newLocalLimit))
+      val (newChild, canRemoveLimit) = pushDownLimit(child, limitValue)
+      if (canRemoveLimit) {
+        newChild
+      } else {
+        val newLocalLimit =
+          globalLimit.child.asInstanceOf[LocalLimit].withNewChildren(Seq(newChild))
+        globalLimit.withNewChildren(Seq(newLocalLimit))
+      }
+    case offset @ Offset(IntegerLiteral(n), child) =>
+      val isPushed = pushDownOffset(child, n)
+      if (isPushed) {
+        child
+      } else {
+        offset
+      }
   }
 
   private def getWrappedScan(
@@ -422,7 +492,7 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper wit
           case _ => Array.empty[sources.Filter]
         }
         val pushedDownOperators = PushedDownOperators(aggregation, sHolder.pushedSample,
-          sHolder.pushedLimit, sHolder.sortOrders, sHolder.pushedPredicates)
+          sHolder.pushedLimit, sHolder.pushedOffset, sHolder.sortOrders, sHolder.pushedPredicates)
         V1ScanWrapper(v1, pushedFilters, pushedDownOperators)
       case _ => scan
     }
@@ -435,13 +505,14 @@ case class ScanBuilderHolder(
     builder: ScanBuilder) extends LeafNode {
   var pushedLimit: Option[Int] = None
 
+  var pushedOffset: Option[Int] = None
+
   var sortOrders: Seq[V2SortOrder] = Seq.empty[V2SortOrder]
 
   var pushedSample: Option[TableSampleInfo] = None
 
   var pushedPredicates: Seq[Predicate] = Seq.empty[Predicate]
 }
-
 
 // A wrapper for v1 scan to carry the translated filters and the handled ones, along with
 // other pushed down operators. This is required by the physical v1 scan node.
