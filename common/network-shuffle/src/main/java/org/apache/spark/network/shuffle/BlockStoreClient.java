@@ -42,7 +42,7 @@ import org.apache.spark.network.util.TransportConf;
  * or external service.
  */
 public abstract class BlockStoreClient implements Closeable {
-  protected static final Logger logger = LoggerFactory.getLogger(BlockStoreClient.class);
+  // protected static final Logger logger = LoggerFactory.getLogger(BlockStoreClient.class);
 
   protected volatile TransportClientFactory clientFactory;
   protected String appId;
@@ -83,7 +83,7 @@ public abstract class BlockStoreClient implements Closeable {
         (CorruptionCause) BlockTransferMessage.Decoder.fromByteBuffer(response);
       return cause.cause;
     } catch (Exception e) {
-      logger.warn("Failed to get the corruption cause.");
+      getLogger().warn("Failed to get the corruption cause.");
       return Cause.UNKNOWN_ISSUE;
     }
   }
@@ -170,7 +170,7 @@ public abstract class BlockStoreClient implements Closeable {
             hostLocalDirsCompletable.complete(
               ((LocalDirsForExecutors) msgObj).getLocalDirsByExec());
           } catch (Throwable t) {
-            logger.warn("Error while trying to get the host local dirs for " +
+            getLogger().warn("Error while trying to get the host local dirs for " +
               Arrays.toString(getLocalDirsMessage.execIds), t.getCause());
             hostLocalDirsCompletable.completeExceptionally(t);
           }
@@ -178,7 +178,7 @@ public abstract class BlockStoreClient implements Closeable {
 
         @Override
         public void onFailure(Throwable t) {
-          logger.warn("Error while trying to get the host local dirs for " +
+          getLogger().warn("Error while trying to get the host local dirs for " +
             Arrays.toString(getLocalDirsMessage.execIds), t.getCause());
           hostLocalDirsCompletable.completeExceptionally(t);
         }
@@ -255,4 +255,7 @@ public abstract class BlockStoreClient implements Closeable {
       MergedBlocksMetaListener listener) {
     throw new UnsupportedOperationException();
   }
+
+  protected abstract Logger getLogger();
+
 }

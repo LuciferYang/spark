@@ -40,6 +40,8 @@ import org.apache.spark.network.sasl.SecretKeyHolder;
 import org.apache.spark.network.server.NoOpRpcHandler;
 import org.apache.spark.network.shuffle.protocol.*;
 import org.apache.spark.network.util.TransportConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Client for reading both RDD blocks and shuffle blocks which points to an external
@@ -47,6 +49,9 @@ import org.apache.spark.network.util.TransportConf;
  * (via BlockTransferService), which has the downside of losing the data if we lose the executors.
  */
 public class ExternalBlockStoreClient extends BlockStoreClient {
+
+  protected static final Logger logger = LoggerFactory.getLogger(BlockStoreClient.class);
+
   private static final ErrorHandler PUSH_ERROR_HANDLER = new ErrorHandler.BlockPushErrorHandler();
 
   private final boolean authEnabled;
@@ -322,5 +327,10 @@ public class ExternalBlockStoreClient extends BlockStoreClient {
       clientFactory.close();
       clientFactory = null;
     }
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return ExternalBlockStoreClient.logger;
   }
 }
