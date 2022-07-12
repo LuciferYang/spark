@@ -46,7 +46,7 @@ object URLCodecBenchmark extends BenchmarkBase {
     val codec = new URLCodec()
     benchmark.addCase("Use org.apache.commons.codec.net.URLCodec") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        codec.encode(url, "UTF-8")
+        codec.encode(url)
       }
     }
     benchmark.run()
@@ -66,7 +66,7 @@ object URLCodecBenchmark extends BenchmarkBase {
     val codec = new URLCodec()
     benchmark.addCase("Use org.apache.commons.codec.net.URLCodec") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        codec.decode(value, "UTF-8")
+        codec.decode(value)
       }
     }
     benchmark.run()
