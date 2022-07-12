@@ -55,7 +55,7 @@ object URLCodecBenchmark extends BenchmarkBase {
   def testDecode(value: String, valuesPerIteration: Int): Unit = {
     import org.apache.commons.codec.net.URLCodec
 
-    val benchmark = new Benchmark("Test encode", valuesPerIteration, output = output)
+    val benchmark = new Benchmark("Test decode", valuesPerIteration, output = output)
 
     benchmark.addCase("Use java.net.URLEncoder") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
@@ -76,8 +76,8 @@ object URLCodecBenchmark extends BenchmarkBase {
 
     val valuesPerIteration = 100000
 
-    // Test Contains
+    // Test encode & decode
     testEncode("https://spark.apache.org", valuesPerIteration)
-    testEncode("https%3A%2F%2Fspark.apache.org", valuesPerIteration)
+    testDecode("https%3A%2F%2Fspark.apache.org", valuesPerIteration)
   }
 }
