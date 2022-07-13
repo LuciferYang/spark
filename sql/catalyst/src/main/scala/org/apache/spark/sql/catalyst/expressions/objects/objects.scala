@@ -46,6 +46,8 @@ import org.apache.spark.util.Utils
  */
 trait InvokeLike extends Expression with NonSQLExpression with ImplicitCastInputTypes {
 
+  import java.lang.invoke.MethodHandle
+
   def arguments: Seq[Expression]
 
   def propagateNull: Boolean
@@ -130,7 +132,7 @@ trait InvokeLike extends Expression with NonSQLExpression with ImplicitCastInput
    * @param input the row used for evaluating arguments
    * @return the return object of a method call
    */
-  def invoke(obj: Any, method: Method, input: InternalRow): Any = {
+  def invoke(obj: Any, method: MethodHandle, input: InternalRow): Any = {
     var i = 0
     val len = arguments.length
     var resultNull = false
@@ -155,12 +157,13 @@ trait InvokeLike extends Expression with NonSQLExpression with ImplicitCastInput
     }
   }
 
-  final def findMethod(cls: Class[_], functionName: String, argClasses: Seq[Class[_]]): Method = {
+  final def findMethod(
+      cls: Class[_], functionName: String, argClasses: Seq[Class[_]]): MethodHandle = {
     val method = MethodUtils.getMatchingAccessibleMethod(cls, functionName, argClasses: _*)
     if (method == null) {
       throw QueryExecutionErrors.methodNotDeclaredError(functionName)
     } else {
-      method
+      java.lang.invoke.MethodHandles.publicLookup().unreflect(method)
     }
   }
 }
@@ -286,7 +289,7 @@ case class StaticInvoke(
       ""
     }
 
-    val evaluate = if (returnNullable && !method.getReturnType.isPrimitive) {
+    val evaluate = if (returnNullable && !method.`type`().returnType().isPrimitive) {
       if (CodeGenerator.defaultValue(dataType) == "null") {
         s"""
           ${ev.value} = $callFunc;
@@ -389,7 +392,9 @@ case class Invoke(
       val invokeMethod = if (method.isDefined) {
         method.get
       } else {
-        obj.getClass.getMethod(functionName, argClasses: _*)
+        import java.lang.invoke.MethodHandles
+        MethodHandles.publicLookup().unreflect(
+          obj.getClass.getMethod(functionName, argClasses: _*))
       }
       invoke(obj, invokeMethod, input)
     }
@@ -401,15 +406,15 @@ case class Invoke(
 
     val (argCode, argString, resultIsNull) = prepareArguments(ctx)
 
-    val returnPrimitive = method.isDefined && method.get.getReturnType.isPrimitive
-    val needTryCatch = method.isDefined && method.get.getExceptionTypes.nonEmpty
+    val returnPrimitive = method.isDefined && method.get.`type`().returnType().isPrimitive
+    val needTryCatch = method.isDefined
 
     def getFuncResult(resultVal: String, funcCall: String): String = if (needTryCatch) {
       s"""
         try {
           $resultVal = $funcCall;
-        } catch (Exception e) {
-          org.apache.spark.unsafe.Platform.throwException(e);
+        } catch (Throwable t) {
+          org.apache.spark.unsafe.Platform.throwException(t);
         }
       """
     } else {
