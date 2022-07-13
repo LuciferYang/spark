@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.expressions.objects
 
-import java.lang.reflect.{Method, Modifier}
+import java.lang.reflect.Modifier
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{Builder, WrappedArray}
