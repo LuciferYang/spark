@@ -28,9 +28,10 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.CannotReplaceMissingTableException
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, GlobalLimit, LocalLimit, Offset, Sort}
 import org.apache.spark.sql.connector.{IntegralAverage, StrLen}
+import org.apache.spark.sql.connector.catalog.{Catalogs, Identifier, TableCatalog}
 import org.apache.spark.sql.connector.catalog.functions.{ScalarFunction, UnboundFunction}
+import org.apache.spark.sql.connector.catalog.index.SupportsIndex
 import org.apache.spark.sql.connector.expressions.Expression
-import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, UserDefinedAggregateFunc}
 import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2ScanRelation, V1ScanWrapper}
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog
 import org.apache.spark.sql.functions.{abs, acos, asin, atan, atan2, avg, ceil, coalesce, cos, cosh, cot, count, count_distinct, degrees, exp, floor, lit, log => logarithm, log10, not, pow, radians, round, signum, sin, sinh, sqrt, sum, tan, tanh, udf, when}
@@ -66,9 +67,9 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
         canonicalName match {
           case "h2.iavg" =>
             if (isDistinct) {
-              s"$funcName(DISTINCT ${inputs.mkString(", ")})"
+              s"AVG(DISTINCT ${inputs.mkString(", ")})"
             } else {
-              s"$funcName(${inputs.mkString(", ")})"
+              s"AVG(${inputs.mkString(", ")})"
             }
           case _ =>
             super.visitUserDefinedAggregateFunction(funcName, canonicalName, isDistinct, inputs)
@@ -85,18 +86,6 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
           logWarning("Error occurs while compiling V2 expression", e)
           None
       }
-    }
-
-    override def compileAggregate(aggFunction: AggregateFunc): Option[String] = {
-      super.compileAggregate(aggFunction).orElse(
-        aggFunction match {
-          case f: UserDefinedAggregateFunc if f.name() == "iavg" =>
-            assert(f.children().length == 1)
-            val distinct = if (f.isDistinct) "DISTINCT " else ""
-            compileExpression(f.children().head).map(v => s"AVG($distinct$v)")
-          case _ => None
-        }
-      )
     }
 
     override def functions: Seq[(String, UnboundFunction)] = H2Dialect.functions
@@ -1815,7 +1804,7 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
     checkPushedInfo(df1,
       """
         |PushedAggregates: [REGR_INTERCEPT(BONUS, BONUS), REGR_R2(BONUS, BONUS),
-        |REGR_SLOPE(BONUS, BONUS), REGR_SXY(BONUS, B...,
+        |REGR_SLOPE(BONUS, BONUS), REGR_SXY(BONUS, BONUS)],
         |PushedFilters: [DEPT IS NOT NULL, DEPT > 0],
         |PushedGroupByExpressions: [DEPT],
         |""".stripMargin.replaceAll("\n", " "))
@@ -1835,6 +1824,38 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
     checkPushedInfo(df2, "PushedFilters: [DEPT IS NOT NULL, DEPT > 0], ReadSchema:")
     checkAnswer(df2,
       Seq(Row(0.0, 1.0, 1.0, 20000.0), Row(0.0, 1.0, 1.0, 5000.0), Row(null, null, null, 0.0)))
+
+    val df3 = sql(
+      """
+        |SELECT
+        |  REGR_AVGX(bonus, bonus),
+        |  REGR_AVGY(bonus, bonus)
+        |FROM h2.test.employee WHERE dept > 0 GROUP BY DePt""".stripMargin)
+    checkFiltersRemoved(df3)
+    checkAggregateRemoved(df3)
+    checkPushedInfo(df3,
+      """
+        |PushedAggregates: [AVG(CASE WHEN BONUS IS NOT NULL THEN BONUS ELSE null END)],
+        |PushedFilters: [DEPT IS NOT NULL, DEPT > 0],
+        |PushedGroupByExpressions: [DEPT],
+        |""".stripMargin.replaceAll("\n", " "))
+    checkAnswer(df3, Seq(Row(1100.0, 1100.0), Row(1200.0, 1200.0), Row(1250.0, 1250.0)))
+
+    val df4 = sql(
+      """
+        |SELECT
+        |  REGR_AVGX(DISTINCT bonus, bonus),
+        |  REGR_AVGY(DISTINCT bonus, bonus)
+        |FROM h2.test.employee WHERE dept > 0 GROUP BY DePt""".stripMargin)
+    checkFiltersRemoved(df4)
+    checkAggregateRemoved(df4)
+    checkPushedInfo(df4,
+      """
+        |PushedAggregates: [AVG(DISTINCT CASE WHEN BONUS IS NOT NULL THEN BONUS ELSE null END)],
+        |PushedFilters: [DEPT IS NOT NULL, DEPT > 0],
+        |PushedGroupByExpressions: [DEPT],
+        |""".stripMargin.replaceAll("\n", " "))
+    checkAnswer(df4, Seq(Row(1100.0, 1100.0), Row(1200.0, 1200.0), Row(1250.0, 1250.0)))
   }
 
   test("scan with aggregate push-down: aggregate over alias push down") {
@@ -2229,5 +2250,20 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
       JdbcDialects.unregisterDialect(testH2Dialect)
       JdbcDialects.registerDialect(H2Dialect)
     }
+  }
+
+  test("Test INDEX Using SQL") {
+    val loaded = Catalogs.load("h2", conf)
+    val jdbcTable = loaded.asInstanceOf[TableCatalog]
+      .loadTable(Identifier.of(Array("test"), "people"))
+      .asInstanceOf[SupportsIndex]
+    assert(jdbcTable != null)
+    assert(jdbcTable.indexExists("people_index") == false)
+
+    sql(s"CREATE INDEX people_index ON TABLE h2.test.people (id)")
+    assert(jdbcTable.indexExists("people_index"))
+
+    sql(s"DROP INDEX people_index ON TABLE h2.test.people")
+    assert(jdbcTable.indexExists("people_index") == false)
   }
 }
