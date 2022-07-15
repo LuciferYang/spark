@@ -308,6 +308,11 @@ public class ConstantColumnVector extends ColumnVector {
     this.childData[2].setLong(value.microseconds);
   }
 
+  /**
+   * Set value to the vector using the corresponding set* method above.
+   * @param value value to set to the vector
+   * @return true if the value maps to one of the set* methods above, or false otherwise.
+   */
   public boolean setValue(Object value) {
     if (value instanceof Boolean) {
       setBoolean((Boolean) value);
