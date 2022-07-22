@@ -100,6 +100,9 @@ class FileScanRDD(
       private[this] var currentIterator: Iterator[Object] = null
 
       private def resetCurrentIterator(): Unit = {
+        if (currentIterator != null) {
+          logWarning(s"fuck ${currentIterator.getClass}")
+        }
         currentIterator match {
           case iter: NextIterator[_] =>
             iter.closeIfNeeded()
