@@ -105,7 +105,10 @@ class FileScanRDD(
             iter.closeIfNeeded()
           case iter: Closeable =>
             iter.close()
-          case _ => // do nothing
+          case other =>
+            if (other != null) {
+              logWarning(s"fuck ${other.getClass}")
+            }
         }
         currentIterator = null
       }
