@@ -155,6 +155,7 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
             outputString
           }
         }
+        Thread.sleep(60 * 1000L)
       } catch {
         case e: Throwable =>
           val configs = conf.map {
@@ -205,7 +206,6 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
         joinConfs.foreach { conf =>
           System.gc()  // Workaround for GitHub Actions memory limitation, see also SPARK-37368
           runQuery(queryString, goldenFile, conf)
-          Thread.sleep(6 * 1000L)
         }
       }
     }
