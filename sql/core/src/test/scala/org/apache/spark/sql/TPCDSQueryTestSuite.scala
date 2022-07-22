@@ -155,7 +155,6 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
             outputString
           }
         }
-        Thread.sleep(60 * 1000L)
       } catch {
         case e: Throwable =>
           val configs = conf.map {
