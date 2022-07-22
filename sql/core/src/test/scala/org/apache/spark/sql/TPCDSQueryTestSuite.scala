@@ -188,7 +188,7 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
       val p = new java.util.Properties()
       p.load(new java.io.StringReader(s))
       Seq(p.asScala.toMap)
-    }.getOrElse(allJoinConfCombinations)
+    }.getOrElse(sortMergeJoinConf)
   }
 
   assert(joinConfs.nonEmpty)
