@@ -292,6 +292,7 @@ class FileScanRDD(
           currentFile = null
           updateMetadataRow()
           InputFileBlockHolder.unset()
+          resetCurrentIterator()
           false
         }
       }
