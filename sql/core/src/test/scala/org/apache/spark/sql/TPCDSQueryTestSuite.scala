@@ -63,6 +63,8 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
   // To make output results deterministic
   override protected def sparkConf: SparkConf = super.sparkConf
     .set(SQLConf.SHUFFLE_PARTITIONS.key, "1")
+    .set("spark.sql.autoBroadcastJoinThreshold", "-1")
+    .set("spark.sql.join.preferSortMergeJoin", "true")
 
   protected override def createSparkSession: TestSparkSession = {
     new TestSparkSession(new SparkContext("local[1]", this.getClass.getSimpleName, sparkConf))
