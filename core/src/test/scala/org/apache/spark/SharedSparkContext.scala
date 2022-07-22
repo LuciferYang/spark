@@ -17,11 +17,15 @@
 
 package org.apache.spark
 
+import scala.concurrent.duration._
+
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.Suite
+import org.scalatest.concurrent.Eventually
 
 /** Shares a local `SparkContext` between all tests in a suite and closes it at the end */
-trait SharedSparkContext extends BeforeAndAfterAll with BeforeAndAfterEach { self: Suite =>
+trait SharedSparkContext extends BeforeAndAfterAll with BeforeAndAfterEach
+  with Eventually { self: Suite =>
 
   @transient private var _sc: SparkContext = _
 
@@ -64,6 +68,8 @@ trait SharedSparkContext extends BeforeAndAfterAll with BeforeAndAfterEach { sel
 
   protected override def afterEach(): Unit = {
     super.afterEach()
-    DebugFilesystem.assertNoOpenStreams()
+    eventually(timeout(10.seconds), interval(2.seconds)) {
+      DebugFilesystem.assertNoOpenStreams()
+    }
   }
 }
