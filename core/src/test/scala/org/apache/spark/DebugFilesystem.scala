@@ -31,8 +31,8 @@ object DebugFilesystem extends Logging {
   // Stores the set of active streams and their creation sites.
   private val openStreams = mutable.Map.empty[FSDataInputStream, Throwable]
 
-  def addOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
-    openStreams.put(stream, new Throwable())
+  def addOpenStream(stream: FSDataInputStream, path: String): Unit = openStreams.synchronized {
+    openStreams.put(stream, new Throwable(path))
   }
 
   def clearOpenStreams(): Unit = openStreams.synchronized {
@@ -49,9 +49,6 @@ object DebugFilesystem extends Logging {
       for (exc <- openStreams.values) {
         logWarning("Leaked filesystem connection created at:")
         exc.printStackTrace()
-      }
-      for (input <- openStreams.keys) {
-        logWarning(s"Leaked InputStream: ${input.getFileDescriptor}")
       }
       throw new IllegalStateException(s"There are $numOpen possibly leaked file streams.",
         openStreams.values.head)
@@ -75,7 +72,7 @@ class DebugFilesystem extends LocalFileSystem {
 
   override def open(f: Path, bufferSize: Int): FSDataInputStream = {
     val wrapped: FSDataInputStream = super.open(f, bufferSize)
-    addOpenStream(wrapped)
+    addOpenStream(wrapped, f.toUri.toString)
     new FSDataInputStream(wrapped.getWrappedStream) {
       override def setDropBehind(dropBehind: lang.Boolean): Unit = wrapped.setDropBehind(dropBehind)
 
