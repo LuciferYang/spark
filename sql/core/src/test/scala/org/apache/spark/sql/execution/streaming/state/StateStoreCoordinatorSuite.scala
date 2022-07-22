@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.streaming.state
 
 import java.util.UUID
 
-import org.scalatest.concurrent.Eventually._
 import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.{SharedSparkContext, SparkContext, SparkFunSuite}
