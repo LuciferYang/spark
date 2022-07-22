@@ -223,4 +223,6 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
   } else {
     ignore("skipped because env `SPARK_TPCDS_DATA` is not set") {}
   }
+
+  Thread.sleep(60 * 1000L)
 }
