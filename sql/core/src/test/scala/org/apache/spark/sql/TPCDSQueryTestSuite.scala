@@ -155,6 +155,8 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
             outputString
           }
         }
+        logWarning("fuck begin sleep")
+        Thread.sleep(60 * 1000L)
       } catch {
         case e: Throwable =>
           val configs = conf.map {
@@ -223,7 +225,4 @@ class TPCDSQueryTestSuite extends QueryTest with TPCDSBase with SQLQueryTestHelp
   } else {
     ignore("skipped because env `SPARK_TPCDS_DATA` is not set") {}
   }
-
-  logWarning("fuck begin sleep")
-  Thread.sleep(60 * 1000L)
 }
