@@ -50,6 +50,9 @@ object DebugFilesystem extends Logging {
         logWarning("Leaked filesystem connection created at:")
         exc.printStackTrace()
       }
+      for (input <- openStreams.keys) {
+        logWarning(s"Leaked InputStream: ${input.getFileDescriptor}")
+      }
       throw new IllegalStateException(s"There are $numOpen possibly leaked file streams.",
         openStreams.values.head)
     }
