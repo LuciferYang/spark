@@ -21,7 +21,6 @@ import org.apache.spark.sql.catalyst.optimizer.PropagateEmptyRelationBase
 import org.apache.spark.sql.catalyst.planning.ExtractSingleColumnNullAwareAntiJoin
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.TreePattern.{LOCAL_RELATION, LOGICAL_QUERY_STAGE, TRUE_OR_FALSE_LITERAL}
-import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
 import org.apache.spark.sql.execution.joins.HashedRelationWithAllNullKeys
 
 /**
@@ -33,28 +32,14 @@ import org.apache.spark.sql.execution.joins.HashedRelationWithAllNullKeys
  */
 object AQEPropagateEmptyRelation extends PropagateEmptyRelationBase {
   override protected def isEmpty(plan: LogicalPlan): Boolean =
-    super.isEmpty(plan) || getEstimatedRowCount(plan).contains(0)
+    super.isEmpty(plan) || getRowCount(plan).contains(0)
 
   override protected def nonEmpty(plan: LogicalPlan): Boolean =
-    super.nonEmpty(plan) || getEstimatedRowCount(plan).exists(_ > 0)
+    super.nonEmpty(plan) || getRowCount(plan).exists(_ > 0)
 
-  // The returned value follows:
-  //   - 0 means the plan must produce 0 row
-  //   - positive value means an estimated row count which can be over-estimated
-  //   - none means the plan has not materialized or the plan can not be estimated
-  private def getEstimatedRowCount(plan: LogicalPlan): Option[BigInt] = plan match {
+  private def getRowCount(plan: LogicalPlan): Option[BigInt] = plan match {
     case LogicalQueryStage(_, stage: QueryStageExec) if stage.isMaterialized =>
       stage.getRuntimeStatistics.rowCount
-
-    case LogicalQueryStage(_, agg: BaseAggregateExec) if agg.groupingExpressions.nonEmpty &&
-      agg.child.isInstanceOf[QueryStageExec] =>
-      val stage = agg.child.asInstanceOf[QueryStageExec]
-      if (stage.isMaterialized) {
-        stage.getRuntimeStatistics.rowCount
-      } else {
-        None
-      }
-
     case _ => None
   }
 
