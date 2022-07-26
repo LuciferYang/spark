@@ -73,7 +73,7 @@ class HiveSparkSubmitSuite
     val args = Seq(
       "--class", TemporaryHiveUDFTest.getClass.getName.stripSuffix("$"),
       "--name", "TemporaryHiveUDFTest",
-      "--master", "local-cluster[2,1,1024]",
+      "--master", "local-cluster[2,1,512]",
       "--conf", "spark.ui.enabled=false",
       "--conf", "spark.master.rest.enabled=false",
       "--driver-java-options", "-Dderby.system.durability=test",
