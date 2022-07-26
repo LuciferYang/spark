@@ -1191,12 +1191,12 @@ object TestSettings {
         "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED",
         "--add-opens=java.base/sun.security.action=ALL-UNNAMED",
         "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED").mkString(" ")
-      s"-Xmx3200m -Xss4m -XX:MaxMetaspaceSize=$metaspaceSize -XX:ReservedCodeCacheSize=128m -XX:+UseG1GC -Dfile.encoding=UTF-8 $extraTestJavaArgs"
+      s"-Xmx3g -Xss4m -XX:MaxMetaspaceSize=$metaspaceSize -XX:ReservedCodeCacheSize=128m -XX:+UseG1GC -Dfile.encoding=UTF-8 $extraTestJavaArgs"
         .split(" ").toSeq
     },
     javaOptions ++= {
       val metaspaceSize = sys.env.get("METASPACE_SIZE").getOrElse("1300m")
-      s"-Xmx3200m -XX:MaxMetaspaceSize=$metaspaceSize -XX:+UseG1GC".split(" ").toSeq
+      s"-Xmx3g -XX:MaxMetaspaceSize=$metaspaceSize -XX:+UseG1GC".split(" ").toSeq
     },
     (Test / javaOptions) ++= {
       val jdwpEnabled = sys.props.getOrElse("test.jdwp.enabled", "false").toBoolean
