@@ -32,21 +32,21 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  */
 object IterSizeBenchmark extends BenchmarkBase {
 
-  def testIteratorSize(valuesPerIteration: Int, iterator: Iterator[Int]): Unit = {
+  def testIteratorSize(valuesPerIteration: Int, seq: Seq[Int]): Unit = {
 
-    val benchmark = new Benchmark(s"Test iterator size ${iterator.size}",
+    val benchmark = new Benchmark(s"Test iterator size ${seq.size}",
       valuesPerIteration,
       output = output)
 
     benchmark.addCase("Use iter size") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        iterator.size
+        seq.iterator.size
       }
     }
 
     benchmark.addCase("Use Utils getIteratorSize") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        Utils.getIteratorSize(iterator)
+        Utils.getIteratorSize(seq.iterator)
       }
     }
 
@@ -58,11 +58,11 @@ object IterSizeBenchmark extends BenchmarkBase {
     val valuesPerIteration = 100000
 
     // Test Contains
-    testIteratorSize(valuesPerIteration, Range(0, 100).toIterator)
-    testIteratorSize(valuesPerIteration, Range(0, 1000).toIterator)
-    testIteratorSize(valuesPerIteration, Range(0, 10000).toIterator)
-    testIteratorSize(valuesPerIteration, Range(0, 100000).toIterator)
-    testIteratorSize(valuesPerIteration, Range(0, 1000000).toIterator)
-    testIteratorSize(valuesPerIteration, Range(0, 10000000).toIterator)
+    testIteratorSize(valuesPerIteration, Range(0, 100))
+    testIteratorSize(valuesPerIteration, Range(0, 1000))
+    testIteratorSize(valuesPerIteration, Range(0, 10000))
+    testIteratorSize(valuesPerIteration, Range(0, 100000))
+    testIteratorSize(valuesPerIteration, Range(0, 1000000))
+    testIteratorSize(valuesPerIteration, Range(0, 10000000))
   }
 }
