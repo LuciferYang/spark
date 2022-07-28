@@ -298,10 +298,19 @@ public class VectorizedDeltaBinaryPackedReader extends VectorizedReaderBase {
     Arrays.fill(this.unpackedValuesBuffer, 0);
     BytePackerForLong packer = Packer.LITTLE_ENDIAN.newBytePackerForLong(
         bitWidths[currentMiniBlock]);
-    for (int j = 0; j < miniBlockSizeInValues; j += 8) {
-      ByteBuffer buffer = in.slice(packer.getBitWidth());
-      packer.unpack8Values(buffer.array(),
-        buffer.arrayOffset() + buffer.position(), unpackedValuesBuffer, j);
+    int bitWidth = packer.getBitWidth();
+    int times = miniBlockSizeInValues / 8;
+    int total = times * bitWidth;
+    ByteBuffer buffer = in.slice(total);
+    byte[] array = buffer.array();
+    int i = 0;
+    int srcOffset = buffer.arrayOffset() + buffer.position();
+    int targetOffSet = 0;
+    while (i < times) {
+      packer.unpack8Values(array, srcOffset, unpackedValuesBuffer, targetOffSet);
+      i++;
+      srcOffset += bitWidth;
+      targetOffSet += 8;
     }
     remainingInMiniBlock = miniBlockSizeInValues;
     currentMiniBlock++;
