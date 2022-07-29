@@ -21,7 +21,7 @@ object Iterators {
 
   /**
    * Counts the number of elements of an iterator.
-   * For Scala 2.13, call `iterator.size` method directly to get better performance.
+   * For Scala 2.13, call `iterator.size` method directly may obtain better performance.
    */
-  @inline def size(iterator: Iterator[_]): Long = iterator.size
+  def size(iterator: Iterator[_]): Long = iterator.size
 }

@@ -32,9 +32,30 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  */
 object IteratorSizeBenchmark extends BenchmarkBase {
 
-  def testIteratorSize(valuesPerIteration: Int, seq: Seq[Int]): Unit = {
+  private def testRangeIteratorSize(valuesPerIteration: Int, range: Range): Unit = {
 
-    val benchmark = new Benchmark(s"Test iterator size ${seq.size}",
+    val benchmark = new Benchmark(s"Test Range iterator size ${range.size}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Iterator.size") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        range.iterator.size
+      }
+    }
+
+    benchmark.addCase("Use Utils.getIteratorSize") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        Utils.getIteratorSize(range.iterator)
+      }
+    }
+
+    benchmark.run()
+  }
+
+  private def testSeqIteratorSize(valuesPerIteration: Int, seq: Seq[Int]): Unit = {
+
+    val benchmark = new Benchmark(s"Test Seq iterator size ${seq.size}",
       valuesPerIteration,
       output = output)
 
@@ -53,14 +74,50 @@ object IteratorSizeBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  private def testArrayIteratorSize(valuesPerIteration: Int, array: Array[Int]): Unit = {
+
+    val benchmark = new Benchmark(s"Test Array iterator size ${array.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Iterator.size") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        array.iterator.size
+      }
+    }
+
+    benchmark.addCase("Use Utils.getIteratorSize") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        Utils.getIteratorSize(array.iterator)
+      }
+    }
+
+    benchmark.run()
+  }
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
 
     val valuesPerIteration = 100000
 
-    testIteratorSize(valuesPerIteration, Range(0, 10))
-    testIteratorSize(valuesPerIteration, Range(0, 100))
-    testIteratorSize(valuesPerIteration, Range(0, 1000))
-    testIteratorSize(valuesPerIteration, Range(0, 10000))
-    testIteratorSize(valuesPerIteration, Range(0, 30000))
+    // Test Range
+    testRangeIteratorSize(valuesPerIteration, Range(0, 10))
+    testRangeIteratorSize(valuesPerIteration, Range(0, 100))
+    testRangeIteratorSize(valuesPerIteration, Range(0, 1000))
+    testRangeIteratorSize(valuesPerIteration, Range(0, 10000))
+    testRangeIteratorSize(valuesPerIteration, Range(0, 30000))
+
+    // Test Seq
+    testSeqIteratorSize(valuesPerIteration, Seq.range(0, 10))
+    testSeqIteratorSize(valuesPerIteration, Seq.range(0, 100))
+    testSeqIteratorSize(valuesPerIteration, Seq.range(0, 1000))
+    testSeqIteratorSize(valuesPerIteration, Seq.range(0, 10000))
+    testSeqIteratorSize(valuesPerIteration, Seq.range(0, 30000))
+
+    // Test Array
+    testArrayIteratorSize(valuesPerIteration, Array.range(0, 10))
+    testArrayIteratorSize(valuesPerIteration, Array.range(0, 100))
+    testArrayIteratorSize(valuesPerIteration, Array.range(0, 1000))
+    testArrayIteratorSize(valuesPerIteration, Array.range(0, 10000))
+    testArrayIteratorSize(valuesPerIteration, Array.range(0, 30000))
   }
 }
