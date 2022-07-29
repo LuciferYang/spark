@@ -58,11 +58,10 @@ object IterSizeBenchmark extends BenchmarkBase {
     val valuesPerIteration = 100000
 
     // Test Contains
+    testIteratorSize(valuesPerIteration, Range(0, 10))
     testIteratorSize(valuesPerIteration, Range(0, 100))
     testIteratorSize(valuesPerIteration, Range(0, 1000))
     testIteratorSize(valuesPerIteration, Range(0, 10000))
-    testIteratorSize(valuesPerIteration, Range(0, 100000))
-    testIteratorSize(valuesPerIteration, Range(0, 1000000))
-    testIteratorSize(valuesPerIteration, Range(0, 10000000))
+    testIteratorSize(valuesPerIteration, Range(0, 30000))
   }
 }
