@@ -19,18 +19,18 @@ package org.apache.spark.util
 import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
 
 /**
- * Benchmark for EnumSet vs HashSet hold enumeration type
+ * Benchmark for Utils.getIteratorSize vs Iterator.size.
  * To run this benchmark:
  * {{{
  *   1. without sbt:
- *      bin/spark-submit --class <this class> --jars <spark core test jar> <spark catalyst test jar>
- *   2. build/sbt "catalyst/Test/runMain <this class>"
+ *      bin/spark-submit --class <this class> <spark core test jar>
+ *   2. build/sbt "core/Test/runMain <this class>"
  *   3. generate result:
- *      SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "catalyst/Test/runMain <this class>"
- *      Results will be written to "benchmarks/EnumTypeSetBenchmark-results.txt".
+ *      SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "core/Test/runMain <this class>"
+ *      Results will be written to "benchmarks/IteratorSizeBenchmark-results.txt".
  * }}}
  */
-object IterSizeBenchmark extends BenchmarkBase {
+object IteratorSizeBenchmark extends BenchmarkBase {
 
   def testIteratorSize(valuesPerIteration: Int, seq: Seq[Int]): Unit = {
 
@@ -38,13 +38,13 @@ object IterSizeBenchmark extends BenchmarkBase {
       valuesPerIteration,
       output = output)
 
-    benchmark.addCase("Use iter size") { _: Int =>
+    benchmark.addCase("Use Iterator.size") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         seq.iterator.size
       }
     }
 
-    benchmark.addCase("Use Utils getIteratorSize") { _: Int =>
+    benchmark.addCase("Use Utils.getIteratorSize") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         Utils.getIteratorSize(seq.iterator)
       }
@@ -57,7 +57,6 @@ object IterSizeBenchmark extends BenchmarkBase {
 
     val valuesPerIteration = 100000
 
-    // Test Contains
     testIteratorSize(valuesPerIteration, Range(0, 10))
     testIteratorSize(valuesPerIteration, Range(0, 100))
     testIteratorSize(valuesPerIteration, Range(0, 1000))
