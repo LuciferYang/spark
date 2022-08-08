@@ -2371,7 +2371,7 @@ case class CheckOverflowInTableInsert(child: Cast, columnName: String) extends U
     child.eval(input)
   } catch {
     case e: SparkArithmeticException =>
-      QueryExecutionErrors.castingCauseOverflowErrorInTableInsert(
+      throw QueryExecutionErrors.castingCauseOverflowErrorInTableInsert(
         child.child.dataType,
         child.dataType,
         columnName)
@@ -2400,4 +2400,8 @@ case class CheckOverflowInTableInsert(child: Cast, columnName: String) extends U
   }
 
   override def dataType: DataType = child.dataType
+
+  override def sql: String = child.sql
+
+  override def toString: String = child.toString
 }
