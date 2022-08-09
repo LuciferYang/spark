@@ -2,7 +2,7 @@ package org.apache.spark.sql;
 
 import java.util.*;
 
-public class TestUtils {
+public class TestApiUtils {
     public static Integer[] streamApi(TestObject[] objects) {
       return Arrays.stream(objects).map(TestObject::getChildren)
         .flatMap(Arrays::stream).distinct().toArray(Integer[]::new);

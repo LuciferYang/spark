@@ -27,7 +27,7 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  *   2. build/sbt "catalyst/Test/runMain <this class>"
  *   3. generate result:
  *      SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "catalyst/Test/runMain <this class>"
- *      Results will be written to "benchmarks/EnumTypeSetBenchmark-results.txt".
+ *      Results will be written to "benchmarks/ArrayStreamBenchmark-results.txt".
  * }}}
  */
 object ArrayStreamBenchmark extends BenchmarkBase {
@@ -44,13 +44,13 @@ object ArrayStreamBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use Stream Api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestUtils.streamApi(input)
+        TestApiUtils.streamApi(input)
       }
     }
 
     benchmark.addCase("Use Loop Api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestUtils.loopApi(input)
+        TestApiUtils.loopApi(input)
       }
     }
     benchmark.run()
