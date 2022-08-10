@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.connector.expressions;
 
-import java.util.Arrays;
+import java.util.*;
 
 import org.apache.spark.annotation.Evolving;
 
@@ -44,7 +44,16 @@ public interface Expression {
    * List of fields or columns that are referenced by this expression.
    */
   default NamedReference[] references() {
-    return Arrays.stream(children()).map(e -> e.references())
-      .flatMap(Arrays::stream).distinct().toArray(NamedReference[]::new);
+    List<NamedReference> result = new ArrayList<>();
+    Set<NamedReference> uniqueValues = new HashSet<>();
+    for (Expression e : children()) {
+      NamedReference[] references = e.references();
+      for (NamedReference namedReference : references) {
+        if (uniqueValues.add(namedReference)) {
+          result.add(namedReference);
+        }
+      }
+    }
+    return result.toArray(new NamedReference[0]);
   }
 }
