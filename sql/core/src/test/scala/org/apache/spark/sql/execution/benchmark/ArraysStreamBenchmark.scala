@@ -39,7 +39,7 @@ object ArraysStreamBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestApis.sumsUseLoop(input)
+        TestApis.sumsUseLoopApi(input)
       }
     }
     benchmark.run()
@@ -60,7 +60,7 @@ object ArraysStreamBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestApis.avgUseLoop(input)
+        TestApis.avgUseLoopApi(input)
       }
     }
     benchmark.run()
@@ -191,8 +191,6 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     }
     benchmark.run()
   }
-
-
 
   private def testJoinString(input: Array[String], valuesPerIteration: Int): Unit = {
 

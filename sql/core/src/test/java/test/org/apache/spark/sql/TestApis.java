@@ -30,7 +30,7 @@ public class TestApis {
     }
 
     // CustomSumMetric
-    public static long sumsUseLoop(long[] input) {
+    public static long sumsUseLoopApi(long[] input) {
         long sum = 0L;
         for (long taskMetric : input) {
             sum += taskMetric;
@@ -48,7 +48,7 @@ public class TestApis {
     }
 
     // CustomAvgMetric
-    public static double avgUseLoop(long[] input) {
+    public static double avgUseLoopApi(long[] input) {
         if (input.length > 0) {
             long sum = 0L;
             for (long taskMetric : input) {
