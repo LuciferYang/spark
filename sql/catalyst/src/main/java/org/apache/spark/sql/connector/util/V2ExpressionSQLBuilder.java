@@ -232,7 +232,7 @@ public class V2ExpressionSQLBuilder {
     if (list.isEmpty()) {
       return "CASE WHEN " + v + " IS NULL THEN NULL ELSE FALSE END";
     }
-    return v + " IN (" + list.stream().collect(Collectors.joining(", ")) + ")";
+    return list.stream().collect(Collectors.joining(", ", v + " IN (", ")"));
   }
 
   protected String visitIsNull(String v) {
@@ -324,16 +324,15 @@ public class V2ExpressionSQLBuilder {
   }
 
   protected String visitSQLFunction(String funcName, String[] inputs) {
-    return funcName + "(" + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+    return Arrays.stream(inputs).collect(Collectors.joining(", ", funcName + "(", ")"));
   }
 
   protected String visitAggregateFunction(
       String funcName, boolean isDistinct, String[] inputs) {
     if (isDistinct) {
-      return funcName +
-        "(DISTINCT " + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+      return Arrays.stream(inputs).collect(Collectors.joining(", ", funcName + "(DISTINCT ", ")"));
     } else {
-      return funcName + "(" + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+      return Arrays.stream(inputs).collect(Collectors.joining(", ", funcName + "(", ")"));
     }
   }
 
