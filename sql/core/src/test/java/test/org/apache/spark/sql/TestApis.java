@@ -17,9 +17,10 @@
 
 package test.org.apache.spark.sql;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import com.google.common.base.Objects;
+import org.apache.commons.lang3.RandomUtils;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class TestApis {
@@ -102,5 +103,101 @@ public class TestApis {
     // V2ExpressionSQLBuilder
     public static String stringJoinApi(String[] input) {
         return "(" + String.join(", ", input) + ")";
+    }
+
+    public static void foreachOrderUseStreamApi(String[] input) {
+        Arrays.stream(input).forEachOrdered(String::length);
+    }
+
+    public static void foreachOrderUseLoopApi(String[] input) {
+        for (String s : input) {
+            s.length();
+        }
+    }
+
+    public static int mapToLengthAndSumUseStreamApi(String[] input) {
+      return Arrays.stream(input).mapToInt(String::length).sum();
+    }
+
+    public static int mapToLengthAndSumUseLoopApi(String[] input) {
+        int sum = 0;
+        for (String s : input) {
+            int length = s.length();
+            sum += length;
+        }
+        return sum;
+    }
+
+    public static boolean anyMatchUseStreamApi(long[] input, long target) {
+      return Arrays.stream(input).allMatch(l  -> l > target);
+    }
+
+    public static boolean anyMatchUseLoopApi(long[] input, long target) {
+        for (long l : input) {
+            if (l <= target) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static TestObj[] objs(int length, int size, int range) {
+        TestObj[] objects = new TestObj[length];
+        for (int i = 0; i < length; i++) {
+            objects[i] = new TestObj(size, range);
+        }
+        return objects;
+    }
+
+    public static TestValue[] distinctUseStreamApi(TestObj[] input) {
+      return Arrays.stream(input).map(s -> s.values)
+        .flatMap(Arrays::stream).distinct().toArray(TestValue[]::new);
+    }
+
+    public static TestValue[] distinctUseLoopApi(TestObj[] input) {
+        List<TestValue> list = new ArrayList<>();
+        Set<TestValue> uniqueValues = new HashSet<>();
+        for (TestObj s : input) {
+            TestValue[] values = s.values;
+            for (TestValue testValue : values) {
+                if (uniqueValues.add(testValue)) {
+                    list.add(testValue);
+                }
+            }
+        }
+        return list.toArray(new TestValue[0]);
+    }
+
+
+    public static class TestObj {
+        TestValue[] values;
+
+        public TestObj(int size, int range) {
+            values = new TestValue[size];
+            for (int i = 0; i < values.length; i++) {
+                values[i] = new TestValue(RandomUtils.nextInt(0, range));
+            }
+        }
+    }
+
+    public static class TestValue {
+        private int value;
+
+        public TestValue(int value) {
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            TestValue testValue = (TestValue) o;
+            return value == testValue.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(value);
+        }
     }
 }

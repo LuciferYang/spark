@@ -102,11 +102,97 @@ object ArraysStreamBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToStringListUseStreamApi(input)
+        TestApis.mapToStringListUseLoopApi(input)
       }
     }
     benchmark.run()
   }
+
+  private def testForeachOrder(input: Array[String], valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for eachOrder with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.foreachOrderUseStreamApi(input)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.foreachOrderUseLoopApi(input)
+      }
+    }
+    benchmark.run()
+  }
+
+  private def testMapToLengthAndSum(input: Array[String], valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for MapToLengthAndSum with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.mapToLengthAndSumUseStreamApi(input)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.mapToLengthAndSumUseLoopApi(input)
+      }
+    }
+    benchmark.run()
+  }
+
+  private def testAnyMatch(input: Array[Long], target: Long, valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for AnyMatch with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.anyMatchUseStreamApi(input, target)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.anyMatchUseLoopApi(input, target)
+      }
+    }
+    benchmark.run()
+  }
+
+  private def testDistinct(input: Array[TestApis.TestObj], valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for distinct with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.distinctUseStreamApi(input)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.distinctUseLoopApi(input)
+      }
+    }
+    benchmark.run()
+  }
+
+
 
   private def testJoinString(input: Array[String], valuesPerIteration: Int): Unit = {
 
@@ -189,5 +275,45 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testMapToList((1L to 500L).toArray, valuesPerIteration)
     testMapToList((1L to 1000L).toArray, valuesPerIteration)
     testMapToList((1L to 10000L).toArray, valuesPerIteration)
+
+    testForeachOrder((1L to 1L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 5L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 10L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 20L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 50L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 100L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 500L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
+    testForeachOrder((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
+
+    testMapToLengthAndSum((1L to 1L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 5L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 10L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 20L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 50L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 100L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 500L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
+    testMapToLengthAndSum((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
+
+    testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
+    testAnyMatch((1L to 5L).toArray, 3L, valuesPerIteration)
+    testAnyMatch((1L to 10L).toArray, 5L, valuesPerIteration)
+    testAnyMatch((1L to 20L).toArray, 10L, valuesPerIteration)
+    testAnyMatch((1L to 50L).toArray, 25L, valuesPerIteration)
+    testAnyMatch((1L to 100L).toArray, 50L, valuesPerIteration)
+    testAnyMatch((1L to 500L).toArray, 250L, valuesPerIteration)
+    testAnyMatch((1L to 1000L).toArray, 500L, valuesPerIteration)
+    testAnyMatch((1L to 10000L).toArray, 5000L, valuesPerIteration)
+
+    testDistinct(TestApis.objs(1, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(5, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(10, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(20, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(50, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(100, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(500, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
   }
 }
