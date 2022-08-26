@@ -105,6 +105,14 @@ public class TestApis {
         return "(" + String.join(", ", input) + ")";
     }
 
+    public static String stringJoinerApi(String[] input) {
+        StringJoiner joiner = new StringJoiner(", ", "(", ")");
+        for (String s : input) {
+            joiner.add(s);
+        }
+        return joiner.toString();
+    }
+
     public static void foreachOrderUseStreamApi(String[] input) {
         Arrays.stream(input).forEachOrdered(String::length);
     }
