@@ -107,12 +107,11 @@ public class TestApis {
     }
 
     public static String stringJoinerApi(String[] input) {
-        return joinToString(joiner -> {
-            for (String s : input) {
-                joiner.add(s);
-            }
-            return joiner;
-        }, ", ", "(", ")");
+        StringJoiner joiner = new StringJoiner(", ", "(", ")");
+        for (String s : input) {
+            joiner.add(s);
+        }
+        return joiner.toString();
     }
 
     // V2ExpressionSQLBuilder
@@ -131,20 +130,11 @@ public class TestApis {
     }
 
     public static String stringJoinerApi(List<String> input) {
-        return joinToString(joiner -> {
-            for (String s : input) {
-                joiner.add(s);
-            }
-            return joiner;
-        }, ", ", "(", ")");
-    }
-
-    private static String joinToString(
-        Function<StringJoiner, StringJoiner> function,
-        CharSequence delimiter,
-        CharSequence prefix,
-        CharSequence suffix) {
-      return function.apply(new StringJoiner(delimiter, prefix, suffix)).toString();
+        StringJoiner joiner = new StringJoiner(", ", "(", ")");
+        for (String s : input) {
+            joiner.add(s);
+        }
+        return joiner.toString();
     }
 
     public static void foreachOrderUseStreamApi(String[] input) {
