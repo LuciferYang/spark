@@ -21,6 +21,7 @@ import com.google.common.base.Objects;
 import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class TestApis {
@@ -106,11 +107,12 @@ public class TestApis {
     }
 
     public static String stringJoinerApi(String[] input) {
-        StringJoiner joiner = new StringJoiner(", ", "(", ")");
-        for (String s : input) {
-            joiner.add(s);
-        }
-        return joiner.toString();
+        return joinToString(joiner -> {
+            for (String s : input) {
+                joiner.add(s);
+            }
+            return joiner;
+        }, ", ", "(", ")");
     }
 
     // V2ExpressionSQLBuilder
@@ -129,11 +131,20 @@ public class TestApis {
     }
 
     public static String stringJoinerApi(List<String> input) {
-        StringJoiner joiner = new StringJoiner(", ", "(", ")");
-        for (String s : input) {
-            joiner.add(s);
-        }
-        return joiner.toString();
+        return joinToString(joiner -> {
+            for (String s : input) {
+                joiner.add(s);
+            }
+            return joiner;
+        }, ", ", "(", ")");
+    }
+
+    private static String joinToString(
+        Function<StringJoiner, StringJoiner> function,
+        CharSequence delimiter,
+        CharSequence prefix,
+        CharSequence suffix) {
+      return function.apply(new StringJoiner(delimiter, prefix, suffix)).toString();
     }
 
     public static void foreachOrderUseStreamApi(String[] input) {
