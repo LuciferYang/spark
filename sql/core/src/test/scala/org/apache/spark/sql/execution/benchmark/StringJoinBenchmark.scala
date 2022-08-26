@@ -42,17 +42,18 @@ object StringJoinBenchmark extends BenchmarkBase {
       }
     }
 
+    benchmark.addCase("Use String joiner api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.stringJoinerApi(input)
+      }
+    }
+
     benchmark.addCase("Use String join api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.stringJoinApi(input)
       }
     }
 
-    benchmark.addCase("Use String joiner api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.stringJoinerApi(input)
-      }
-    }
     benchmark.run()
   }
 
@@ -80,17 +81,18 @@ object StringJoinBenchmark extends BenchmarkBase {
       }
     }
 
+    benchmark.addCase("Use String joiner api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.stringJoinerApi(list)
+      }
+    }
+
     benchmark.addCase("Use String join api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.stringJoinApi(list)
       }
     }
 
-    benchmark.addCase("Use String joiner api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.stringJoinerApi(list)
-      }
-    }
     benchmark.run()
   }
 
