@@ -19,6 +19,7 @@ package org.apache.spark.sql.connector.util;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import org.apache.spark.sql.connector.expressions.Cast;
@@ -232,6 +233,7 @@ public class V2ExpressionSQLBuilder {
     if (list.isEmpty()) {
       return "CASE WHEN " + v + " IS NULL THEN NULL ELSE FALSE END";
     }
+    // return joinToString(list, ", ", v + " IN (", ")");
     return v + " IN (" + list.stream().collect(Collectors.joining(", ")) + ")";
   }
 
@@ -324,16 +326,15 @@ public class V2ExpressionSQLBuilder {
   }
 
   protected String visitSQLFunction(String funcName, String[] inputs) {
-    return funcName + "(" + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+    return joinToString(inputs, ", ", funcName + "(", ")");
   }
 
   protected String visitAggregateFunction(
       String funcName, boolean isDistinct, String[] inputs) {
     if (isDistinct) {
-      return funcName +
-        "(DISTINCT " + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+      return joinToString(inputs, ", ", funcName + "(DISTINCT ", ")");
     } else {
-      return funcName + "(" + Arrays.stream(inputs).collect(Collectors.joining(", ")) + ")";
+      return joinToString(inputs, ", ", funcName + "(", ")");
     }
   }
 
@@ -374,5 +375,17 @@ public class V2ExpressionSQLBuilder {
 
   protected String visitExtract(String field, String source) {
     return "EXTRACT(" + field + " FROM " + source + ")";
+  }
+
+  private String joinToString(
+     String[] inputs,
+     CharSequence delimiter,
+     CharSequence prefix,
+     CharSequence suffix) {
+    StringJoiner joiner = new StringJoiner(delimiter, prefix, suffix);
+    for (String input : inputs) {
+      joiner.add(input);
+    }
+    return joiner.toString();
   }
 }
