@@ -86,7 +86,8 @@ class BlockManagerMasterEndpoint(
   private val maxRetainedMergerLocations = conf.get(config.SHUFFLE_MERGER_MAX_RETAINED_LOCATIONS)
 
   private val askThreadPool =
-    ThreadUtils.newDaemonCachedThreadPool("block-manager-ask-thread-pool", 100)
+    ThreadUtils.newDaemonCachedThreadPool("block-manager-ask-thread-pool",
+      conf.get(config.BLOCK_MANAGER_MASTER_MAX_THREAD_THRESHOLD))
   private implicit val askExecutionContext = ExecutionContext.fromExecutorService(askThreadPool)
 
   private val topologyMapper = {

@@ -755,8 +755,12 @@ case class AdaptiveSparkPlanExec(
 }
 
 object AdaptiveSparkPlanExec {
+
+  import org.apache.spark.sql.internal.StaticSQLConf
+
   private[adaptive] val executionContext = ExecutionContext.fromExecutorService(
-    ThreadUtils.newDaemonCachedThreadPool("QueryStageCreator", 16))
+    ThreadUtils.newDaemonCachedThreadPool("QueryStageCreator",
+      SQLConf.get.getConf(StaticSQLConf.ADAPTIVE_QUERY_STAGE_CREATOR_MAX_THREAD_THRESHOLD)))
 
   /**
    * The temporary [[LogicalPlan]] link for query stages.

@@ -204,7 +204,8 @@ private[spark] class BlockManager(
   private[storage] val blockInfoManager = new BlockInfoManager
 
   private val futureExecutionContext = ExecutionContext.fromExecutorService(
-    ThreadUtils.newDaemonCachedThreadPool("block-manager-future", 128))
+    ThreadUtils.newDaemonCachedThreadPool("block-manager-future",
+      conf.get(config.BLOCK_MANAGER_UPDATER_MAX_THREAD_THRESHOLD)))
 
   // Actual storage of where blocks are kept
   private[spark] val memoryStore =

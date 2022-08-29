@@ -126,6 +126,11 @@ case class SubqueryBroadcastExec(
 }
 
 object SubqueryBroadcastExec {
+
+  import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
+
   private[execution] val executionContext = ExecutionContext.fromExecutorService(
-    ThreadUtils.newDaemonCachedThreadPool("dynamicpruning", 16))
+    ThreadUtils.newDaemonCachedThreadPool("dynamicpruning",
+      SQLConf.get.getConf(
+        StaticSQLConf.DYNAMIC_PARTITION_PRUNING_SUBQUERY_BROADCAST_MAX_THREAD_THRESHOLD)))
 }

@@ -270,4 +270,24 @@ object StaticSQLConf {
       .version("3.1.0")
       .stringConf
       .createWithDefault("")
+
+  val ADAPTIVE_QUERY_STAGE_CREATOR_MAX_THREAD_THRESHOLD =
+    buildStaticConf("spark.sql.adaptive.queryStageCreator.maxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(16)
+
+  val DYNAMIC_PARTITION_PRUNING_SUBQUERY_BROADCAST_MAX_THREAD_THRESHOLD =
+    buildStaticConf(
+      "spark.sql.optimizer.dynamicPartitionPruning.subqueryBroadcast.maxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(16)
+
 }

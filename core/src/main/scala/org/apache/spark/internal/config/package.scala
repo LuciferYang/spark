@@ -559,6 +559,33 @@ package object config {
       .timeConf(TimeUnit.MILLISECONDS)
       .createOptional
 
+  private[spark] val STORAGE_BLOCK_MANAGER_MAX_THREAD_THRESHOLD =
+    ConfigBuilder("spark.storage.blockManagerMaxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(100)
+
+  private[spark] val BLOCK_MANAGER_UPDATER_MAX_THREAD_THRESHOLD =
+    ConfigBuilder("spark.storage.blockStoreUpdaterMaxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(128)
+
+  private[spark] val BLOCK_MANAGER_MASTER_MAX_THREAD_THRESHOLD =
+    ConfigBuilder("spark.storage.blockManagerMasterMaxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(100)
+
   private[spark] val STORAGE_CLEANUP_FILES_AFTER_EXECUTOR_EXIT =
     ConfigBuilder("spark.storage.cleanupFilesAfterExecutorExit")
       .doc("Whether or not cleanup the files not served by the external shuffle service " +

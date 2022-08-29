@@ -21,6 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import org.apache.spark.{MapOutputTracker, SparkEnv}
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config
 import org.apache.spark.rpc.{IsolatedRpcEndpoint, RpcCallContext, RpcEnv}
 import org.apache.spark.storage.BlockManagerMessages._
 import org.apache.spark.util.{ThreadUtils, Utils}
@@ -37,7 +38,8 @@ class BlockManagerStorageEndpoint(
   extends IsolatedRpcEndpoint with Logging {
 
   private val asyncThreadPool =
-    ThreadUtils.newDaemonCachedThreadPool("block-manager-storage-async-thread-pool", 100)
+    ThreadUtils.newDaemonCachedThreadPool("block-manager-storage-async-thread-pool",
+      blockManager.conf.get(config.STORAGE_BLOCK_MANAGER_MAX_THREAD_THRESHOLD))
   private implicit val asyncExecutionContext = ExecutionContext.fromExecutorService(asyncThreadPool)
 
   // Operations that involve removing blocks may be slow and should be done asynchronously

@@ -77,6 +77,15 @@ object StreamingConf {
       .booleanConf
       .createWithDefault(false)
 
+  private[streaming] val RECEIVER_SUPERVISOR_MAX_THREAD_THRESHOLD =
+    ConfigBuilder("spark.streaming.receiver.supervisor.maxThreadThreshold")
+      .internal()
+      .doc("")
+      .version("3.4.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold must greater than zero.")
+      .createWithDefault(128)
+
   private[streaming] val DRIVER_WAL_CLASS_CONF_KEY =
     ConfigBuilder("spark.streaming.driver.writeAheadLog.class")
       .version("1.4.0")

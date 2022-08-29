@@ -45,11 +45,14 @@ private[streaming] abstract class ReceiverSupervisor(
   }
   import ReceiverState._
 
+  import org.apache.spark.streaming.StreamingConf
+
   // Attach the supervisor to the receiver
   receiver.attachSupervisor(this)
 
   private val futureExecutionContext = ExecutionContext.fromExecutorService(
-    ThreadUtils.newDaemonCachedThreadPool("receiver-supervisor-future", 128))
+    ThreadUtils.newDaemonCachedThreadPool("receiver-supervisor-future",
+      conf.get(StreamingConf.RECEIVER_SUPERVISOR_MAX_THREAD_THRESHOLD)))
 
   /** Receiver id */
   protected val streamId = receiver.streamId
