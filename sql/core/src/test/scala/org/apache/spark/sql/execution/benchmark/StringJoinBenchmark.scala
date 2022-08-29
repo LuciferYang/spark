@@ -54,6 +54,12 @@ object StringJoinBenchmark extends BenchmarkBase {
       }
     }
 
+    benchmark.addCase("Use Scala join") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val str = input.mkString("(", ", ", ")")
+      }
+    }
+
     benchmark.run()
   }
 
@@ -69,13 +75,13 @@ object StringJoinBenchmark extends BenchmarkBase {
 
     val list = input.asJava
 
-    benchmark.addCase("Use Arrays.steam api no prefix, suffix") { _: Int =>
+    benchmark.addCase("Use steam api no prefix, suffix") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.joinStreamApiNoPreSuffix(list)
       }
     }
 
-    benchmark.addCase("Use Arrays.steam api with prefix, suffix") { _: Int =>
+    benchmark.addCase("Use steam api with prefix, suffix") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.joinStreamApiWithPreSuffix(list)
       }
@@ -90,6 +96,12 @@ object StringJoinBenchmark extends BenchmarkBase {
     benchmark.addCase("Use String join api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.stringJoinApi(list)
+      }
+    }
+
+    benchmark.addCase("Use Scala join") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val str = input.mkString("(", ", ", ")")
       }
     }
 
