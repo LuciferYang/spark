@@ -18,16 +18,18 @@
 package org.apache.spark.sql.execution.benchmark
 
 import org.apache.spark.benchmark.Benchmark
+import org.apache.spark.internal.config.UI.UI_ENABLED
+import org.apache.spark.internal.config.UI.UI_PORT
 import org.apache.spark.sql.SparkSession
 
 object ExpandBenchmark extends SqlBasedBenchmark {
 
   override def getSparkSession: SparkSession = {
-    import org.apache.spark.sql.internal.SQLConf
     SparkSession.builder()
       .master("local[2]")
       .appName(this.getClass.getCanonicalName)
-      .config(SQLConf.CODEGEN_METHOD_SPLIT_THRESHOLD.key, 512)
+      .config(UI_PORT.key, 8836)
+      .config(UI_ENABLED.key, true)
       .getOrCreate()
   }
 
