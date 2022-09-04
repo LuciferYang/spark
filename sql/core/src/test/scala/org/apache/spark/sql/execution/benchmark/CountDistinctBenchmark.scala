@@ -54,7 +54,7 @@ object CountDistinctBenchmark extends SqlBasedBenchmark {
 
         spark.range(N).selectExpr(columns: _*).write.mode("Overwrite").parquet(dir.getCanonicalPath)
 
-        Seq(1, 2, 5, 10, 15, 25, 30, 40, 50, 60, 100).foreach { cnt =>
+        Seq(1, 2, 5, 10, 15, 25, 30, 40, 50, 60, 70, 80, 90, 100).foreach { cnt =>
           val selectExps = columns.take(cnt).map(_.split(" ").last).map(c => s"count(distinct $c)")
 
           val benchmark = new Benchmark("Benchmark count distinct", N, minNumIters = 1)
