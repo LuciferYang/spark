@@ -35,7 +35,7 @@ import org.apache.spark.sql.internal.SQLConf
 object CountDistinctBenchmark extends SqlBasedBenchmark {
   override def getSparkSession: SparkSession = {
     SparkSession.builder()
-      .master("local[2]")
+      .master("local[1]")
       .appName(this.getClass.getCanonicalName)
       .config(SQLConf.SHUFFLE_PARTITIONS.key, 1)
       .config(UI_PORT.key, 8836)
