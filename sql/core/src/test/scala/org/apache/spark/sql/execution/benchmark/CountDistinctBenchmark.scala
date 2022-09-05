@@ -35,7 +35,7 @@ import org.apache.spark.sql.internal.SQLConf
 object CountDistinctBenchmark extends SqlBasedBenchmark {
   override def getSparkSession: SparkSession = {
     SparkSession.builder()
-      .master("local[4]")
+      .master("local[2]")
       .appName(this.getClass.getCanonicalName)
       .config(SQLConf.SHUFFLE_PARTITIONS.key, 1)
       .config(UI_PORT.key, 8836)
@@ -47,8 +47,8 @@ object CountDistinctBenchmark extends SqlBasedBenchmark {
 
     runBenchmark("Benchmark count distinct") {
       withTempPath { dir =>
-        import org.apache.spark.internal.config.Tests.IS_TESTING
-        System.clearProperty(IS_TESTING.key)
+        // import org.apache.spark.internal.config.Tests.IS_TESTING
+        // System.clearProperty(IS_TESTING.key)
         val N = 2000000
         val columns = Range(0, 100).map(i => s"id % $i AS id$i")
 
