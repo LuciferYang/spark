@@ -51,9 +51,9 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
     val conf = new SparkConf()
       .setAppName("DataSourceReadBenchmark")
       // Since `spark.master` always exists, overrides this value
-      .set("spark.master", "local[1]")
-      .setIfMissing("spark.driver.memory", "3g")
-      .setIfMissing("spark.executor.memory", "3g")
+      .set("spark.master", "local[2]")
+      .setIfMissing("spark.driver.memory", "5g")
+      .setIfMissing("spark.executor.memory", "5g")
 
     val sparkSession = SparkSession.builder.config(conf).getOrCreate()
 
