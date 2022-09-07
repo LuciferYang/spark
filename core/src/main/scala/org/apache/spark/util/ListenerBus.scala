@@ -35,7 +35,7 @@ import org.apache.spark.scheduler.SparkListenerEnvironmentUpdate
  */
 private[spark] trait ListenerBus[L <: AnyRef, E] extends Logging {
 
-  private[this] val listenersPlusTimers = new CopyOnWriteArrayList[(L, Option[Timer])]
+  private[this] lazy val listenersPlusTimers = new CopyOnWriteArrayList[(L, Option[Timer])]
 
   // Marked `private[spark]` for access in tests.
   private[spark] def listeners = listenersPlusTimers.asScala.map(_._1).asJava
