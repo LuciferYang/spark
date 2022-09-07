@@ -21,7 +21,6 @@ import com.google.common.base.Objects;
 import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class TestApis {
@@ -89,52 +88,6 @@ public class TestApis {
             list.add(s);
         }
         return list;
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String joinStreamApiNoPreSuffix(String[] input) {
-        return "(" + Arrays.stream(input).collect(Collectors.joining(", ")) + ")";
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String joinStreamApiWithPreSuffix(String[] input) {
-        return Arrays.stream(input).collect(Collectors.joining(", ", "(", ")"));
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String stringJoinApi(String[] input) {
-        return "(" + String.join(", ", input) + ")";
-    }
-
-    public static String stringJoinerApi(String[] input) {
-        StringJoiner joiner = new StringJoiner(", ", "(", ")");
-        for (String s : input) {
-            joiner.add(s);
-        }
-        return joiner.toString();
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String joinStreamApiNoPreSuffix(List<String> input) {
-        return "(" + input.stream().collect(Collectors.joining(", ")) + ")";
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String joinStreamApiWithPreSuffix(List<String> input) {
-        return input.stream().collect(Collectors.joining(", ", "(", ")"));
-    }
-
-    // V2ExpressionSQLBuilder
-    public static String stringJoinApi(List<String> input) {
-        return "(" + String.join(", ", input) + ")";
-    }
-
-    public static String stringJoinerApi(List<String> input) {
-        StringJoiner joiner = new StringJoiner(", ", "(", ")");
-        for (String s : input) {
-            joiner.add(s);
-        }
-        return joiner.toString();
     }
 
     public static void foreachOrderUseStreamApi(String[] input) {
