@@ -24,90 +24,6 @@ import org.apache.spark.benchmark.BenchmarkBase
 
 object ArraysStreamBenchmark extends BenchmarkBase {
 
-  private def testSum(input: Array[Long], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test sum with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.sumUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.sumsUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testAvg(input: Array[Long], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test avg with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.avgUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.avgUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testMapToArray(input: Array[Long], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test map to String Array with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToStringArrayUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToStringArrayUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testMapToList(input: Array[Long], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test map to String List with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToStringListUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToStringListUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
   private def testForeachOrder(input: Array[String], valuesPerIteration: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -124,27 +40,6 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.foreachOrderUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testMapToLengthAndSum(input: Array[String], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test for MapToLengthAndSum with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToLengthAndSumUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.mapToLengthAndSumUseLoopApi(input)
       }
     }
     benchmark.run()
@@ -195,48 +90,6 @@ object ArraysStreamBenchmark extends BenchmarkBase {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
 
-    testSum((1L to 1L).toArray, valuesPerIteration)
-    testSum((1L to 5L).toArray, valuesPerIteration)
-    testSum((1L to 10L).toArray, valuesPerIteration)
-    testSum((1L to 20L).toArray, valuesPerIteration)
-    testSum((1L to 50L).toArray, valuesPerIteration)
-    testSum((1L to 100L).toArray, valuesPerIteration)
-    testSum((1L to 500L).toArray, valuesPerIteration)
-    testSum((1L to 1000L).toArray, valuesPerIteration)
-    testSum((1L to 10000L).toArray, valuesPerIteration)
-
-
-    testAvg((1L to 1L).toArray, valuesPerIteration)
-    testAvg((1L to 5L).toArray, valuesPerIteration)
-    testAvg((1L to 10L).toArray, valuesPerIteration)
-    testAvg((1L to 20L).toArray, valuesPerIteration)
-    testAvg((1L to 50L).toArray, valuesPerIteration)
-    testAvg((1L to 100L).toArray, valuesPerIteration)
-    testAvg((1L to 500L).toArray, valuesPerIteration)
-    testAvg((1L to 1000L).toArray, valuesPerIteration)
-    testAvg((1L to 10000L).toArray, valuesPerIteration)
-
-
-    testMapToArray((1L to 1L).toArray, valuesPerIteration)
-    testMapToArray((1L to 5L).toArray, valuesPerIteration)
-    testMapToArray((1L to 10L).toArray, valuesPerIteration)
-    testMapToArray((1L to 20L).toArray, valuesPerIteration)
-    testMapToArray((1L to 50L).toArray, valuesPerIteration)
-    testMapToArray((1L to 100L).toArray, valuesPerIteration)
-    testMapToArray((1L to 500L).toArray, valuesPerIteration)
-    testMapToArray((1L to 1000L).toArray, valuesPerIteration)
-    testMapToArray((1L to 10000L).toArray, valuesPerIteration)
-
-    testMapToList((1L to 1L).toArray, valuesPerIteration)
-    testMapToList((1L to 5L).toArray, valuesPerIteration)
-    testMapToList((1L to 10L).toArray, valuesPerIteration)
-    testMapToList((1L to 20L).toArray, valuesPerIteration)
-    testMapToList((1L to 50L).toArray, valuesPerIteration)
-    testMapToList((1L to 100L).toArray, valuesPerIteration)
-    testMapToList((1L to 500L).toArray, valuesPerIteration)
-    testMapToList((1L to 1000L).toArray, valuesPerIteration)
-    testMapToList((1L to 10000L).toArray, valuesPerIteration)
-
     testForeachOrder((1L to 1L).map(_.toString).toArray, valuesPerIteration)
     testForeachOrder((1L to 5L).map(_.toString).toArray, valuesPerIteration)
     testForeachOrder((1L to 10L).map(_.toString).toArray, valuesPerIteration)
@@ -246,16 +99,6 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testForeachOrder((1L to 500L).map(_.toString).toArray, valuesPerIteration)
     testForeachOrder((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
     testForeachOrder((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
-
-    testMapToLengthAndSum((1L to 1L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 5L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 10L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 20L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 50L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 100L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 500L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
 
     testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
     testAnyMatch((1L to 5L).toArray, 3L, valuesPerIteration)
