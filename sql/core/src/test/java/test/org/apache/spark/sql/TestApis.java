@@ -41,7 +41,7 @@ public class TestApis {
     // CustomAvgMetric
     public static double avgUseStreamApi(long[] input) {
         if (input.length > 0) {
-            return ((double)Arrays.stream(input).sum()) / input.length;
+            return Arrays.stream(input).sum() / (double)input.length;
         } else {
             return 0D;
         }
@@ -54,7 +54,7 @@ public class TestApis {
             for (long taskMetric : input) {
                 sum += taskMetric;
             }
-            return ((double) sum) / input.length;
+            return sum / (double) input.length;
         } else {
             return 0D;
         }
