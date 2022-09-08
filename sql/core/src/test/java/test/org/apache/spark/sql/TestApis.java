@@ -67,12 +67,11 @@ public class TestApis {
 
     // V2ExpressionSQLBuilder
     public static String[] mapToStringArrayUseLoopApi(long[] input) {
-        List<String> list = new ArrayList<>();
-        for (long l : input) {
-            String s = String.valueOf(l);
-            list.add(s);
+        String[] ret = new String[input.length];
+        for (int i = 0; i < input.length; i++) {
+            ret[i] = String.valueOf(input[i]);
         }
-        return list.toArray(new String[0]);
+        return ret;
     }
 
     // V2ExpressionSQLBuilder
