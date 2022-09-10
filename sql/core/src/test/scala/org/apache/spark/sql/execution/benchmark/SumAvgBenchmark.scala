@@ -109,14 +109,14 @@ object SumAvgBenchmark extends BenchmarkBase {
     testAvg((1L to 1000L).toArray, valuesPerIteration)
     testAvg((1L to 10000L).toArray, valuesPerIteration)
 
-    testMapToLengthAndSum((1L to 1L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 5L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 10L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 20L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 50L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 100L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 500L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
-    testMapToLengthAndSum((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 1L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 5L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 10L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 20L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 50L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 100L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 500L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
+//    testMapToLengthAndSum((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
   }
 }
