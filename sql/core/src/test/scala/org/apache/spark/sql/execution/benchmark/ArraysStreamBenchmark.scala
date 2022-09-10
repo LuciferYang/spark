@@ -117,9 +117,9 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testAnyMatch((1L to 20L).toArray, 19L, valuesPerIteration)
     testAnyMatch((1L to 50L).toArray, 49L, valuesPerIteration)
     testAnyMatch((1L to 100L).toArray, 99L, valuesPerIteration)
-    testAnyMatch((1L to 500L).toArray, 249L, valuesPerIteration)
-    testAnyMatch((1L to 1000L).toArray, 499L, valuesPerIteration)
-    testAnyMatch((1L to 10000L).toArray, 4999L, valuesPerIteration)
+    testAnyMatch((1L to 500L).toArray, 449L, valuesPerIteration)
+    testAnyMatch((1L to 1000L).toArray, 999L, valuesPerIteration)
+    testAnyMatch((1L to 10000L).toArray, 9999L, valuesPerIteration)
 
     testAllMatch((2L to 2L).toArray, 1L, valuesPerIteration)
     testAllMatch((2L to 5L).toArray, 1L, valuesPerIteration)
