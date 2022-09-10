@@ -48,6 +48,7 @@ abstract class YarnShuffleIntegrationSuite extends BaseYarnClusterSuite {
     yarnConfig.set(YarnConfiguration.NM_AUX_SERVICES, "spark_shuffle")
     yarnConfig.set(YarnConfiguration.NM_AUX_SERVICE_FMT.format("spark_shuffle"),
       classOf[YarnShuffleService].getCanonicalName)
+    yarnConfig.set(YarnConfiguration.NM_RECOVERY_ENABLED, "true")
     yarnConfig.set(SHUFFLE_SERVICE_PORT.key, "0")
     yarnConfig.set(SHUFFLE_SERVICE_DB_BACKEND.key, dbBackend.name())
     yarnConfig
@@ -71,6 +72,7 @@ abstract class YarnShuffleIntegrationSuite extends BaseYarnClusterSuite {
     val shuffleService = YarnTestAccessor.getShuffleServiceInstance
 
     val registeredExecFile = YarnTestAccessor.getRegisteredExecutorFile(shuffleService)
+    println(s"registeredExecFile = $registeredExecFile")
 
     val result = File.createTempFile("result", null, tempDir)
     val finalState = runSpark(
