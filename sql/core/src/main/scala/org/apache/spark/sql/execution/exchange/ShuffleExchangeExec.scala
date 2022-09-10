@@ -22,7 +22,15 @@ import java.util.function.Supplier
 
 import scala.concurrent.Future
 
-import org.apache.spark._
+import org.apache.spark.ConstantPartitioner
+import org.apache.spark.HashPartitioner
+import org.apache.spark.MapOutputStatistics
+import org.apache.spark.Partitioner
+import org.apache.spark.PartitionIdPassthrough
+import org.apache.spark.RangePartitioner
+import org.apache.spark.ShuffleDependency
+import org.apache.spark.SparkEnv
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.config
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.Serializer
@@ -44,6 +52,8 @@ import org.apache.spark.util.collection.unsafe.sort.{PrefixComparators, RecordCo
  * Common trait for all shuffle exchange implementations to facilitate pattern matching.
  */
 trait ShuffleExchangeLike extends Exchange {
+
+  import org.apache.spark.MapOutputStatistics
 
   /**
    * Returns the number of mappers of this shuffle.
@@ -117,6 +127,7 @@ case class ShuffleExchangeExec(
     child: SparkPlan,
     shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
   extends ShuffleExchangeLike {
+
 
   private lazy val writeMetrics =
     SQLShuffleWriteMetricsReporter.createShuffleWriteMetrics(sparkContext)

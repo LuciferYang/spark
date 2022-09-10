@@ -18,7 +18,10 @@
 package test.org.apache.spark.sql;
 
 import com.google.common.base.Objects;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.spark.network.crypto.AuthMessage;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -183,5 +186,31 @@ public class TestApis {
         public int hashCode() {
             return Objects.hashCode(value);
         }
+    }
+
+    public static int authMessagesLengthUseStreamApi(AuthMessage[] encryptedPublicKeys) {
+      return Arrays.stream(encryptedPublicKeys).mapToInt(k -> k.encodedLength()).sum();
+    }
+
+    public static int authMessagesLengthUseLoopApi(AuthMessage[] encryptedPublicKeys) {
+      int initialCapacity = 0;
+      for (AuthMessage k : encryptedPublicKeys) {
+        initialCapacity += k.encodedLength();
+      }
+      return initialCapacity;
+    }
+
+    public static  byte[] encodeAuthMessagesUseStreamApi(int length, AuthMessage[] encryptedPublicKeys) {
+        ByteBuf transcript = Unpooled.buffer(length);
+        Arrays.stream(encryptedPublicKeys).forEachOrdered(k -> k.encode(transcript));
+        return transcript.array();
+    }
+
+    public static byte[] encodeAuthMessagesUseLoopApi(int length, AuthMessage[] encryptedPublicKeys) {
+        ByteBuf transcript = Unpooled.buffer(length);
+        for (AuthMessage k : encryptedPublicKeys) {
+            k.encode(transcript);
+        }
+        return transcript.array();
     }
 }

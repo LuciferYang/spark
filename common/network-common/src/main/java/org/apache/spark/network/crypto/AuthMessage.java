@@ -30,7 +30,7 @@ import org.apache.spark.network.protocol.Encoders;
  *
  * Please see crypto/README.md for more details of implementation.
  */
-class AuthMessage implements Encodable {
+public class AuthMessage implements Encodable {
   /** Serialization tag used to catch incorrect payloads. */
   private static final byte TAG_BYTE = (byte) 0xFB;
 
@@ -38,7 +38,7 @@ class AuthMessage implements Encodable {
   public final byte[] salt;
   public final byte[] ciphertext;
 
-  AuthMessage(String appId, byte[] salt, byte[] ciphertext) {
+  public AuthMessage(String appId, byte[] salt, byte[] ciphertext) {
     this.appId = appId;
     this.salt = salt;
     this.ciphertext = ciphertext;
