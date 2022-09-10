@@ -116,16 +116,29 @@ public class TestApis {
     }
 
     public static boolean anyMatchUseStreamApi(long[] input, long target) {
-      return Arrays.stream(input).allMatch(l  -> l > target);
+      return Arrays.stream(input).anyMatch(l  -> l > target);
     }
 
-    public static boolean anyMatchUseLoopApi(long[] input, long target) {
+    public static boolean allMatchUseStreamApi(long[] input, long target) {
+        return Arrays.stream(input).allMatch(l  -> l > target);
+    }
+
+    public static boolean allMatchUseLoopApi(long[] input, long target) {
         for (long l : input) {
             if (l <= target) {
                 return false;
             }
         }
         return true;
+    }
+
+    public static boolean anyMatchUseLoopApi(long[] input, long target) {
+        for (long l : input) {
+            if (l > target) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static TestObj[] objs(int length, int size, int range) {

@@ -66,6 +66,27 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  private def testAllMatch(input: Array[Long], target: Long, valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for AllMatch with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.allMatchUseStreamApi(input, target)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.allMatchUseLoopApi(input, target)
+      }
+    }
+    benchmark.run()
+  }
+
   private def testDistinct(input: Array[TestApis.TestObj], valuesPerIteration: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -90,34 +111,24 @@ object ArraysStreamBenchmark extends BenchmarkBase {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
 
-    testForeachOrder((1L to 1L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 5L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 10L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 20L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 50L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 100L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 500L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 1000L).map(_.toString).toArray, valuesPerIteration)
-    testForeachOrder((1L to 10000L).map(_.toString).toArray, valuesPerIteration)
-
     testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
-    testAnyMatch((1L to 5L).toArray, 3L, valuesPerIteration)
-    testAnyMatch((1L to 10L).toArray, 5L, valuesPerIteration)
-    testAnyMatch((1L to 20L).toArray, 10L, valuesPerIteration)
-    testAnyMatch((1L to 50L).toArray, 25L, valuesPerIteration)
-    testAnyMatch((1L to 100L).toArray, 50L, valuesPerIteration)
-    testAnyMatch((1L to 500L).toArray, 250L, valuesPerIteration)
-    testAnyMatch((1L to 1000L).toArray, 500L, valuesPerIteration)
-    testAnyMatch((1L to 10000L).toArray, 5000L, valuesPerIteration)
+    testAnyMatch((1L to 5L).toArray, 4L, valuesPerIteration)
+    testAnyMatch((1L to 10L).toArray, 9L, valuesPerIteration)
+    testAnyMatch((1L to 20L).toArray, 19L, valuesPerIteration)
+    testAnyMatch((1L to 50L).toArray, 49L, valuesPerIteration)
+    testAnyMatch((1L to 100L).toArray, 99L, valuesPerIteration)
+    testAnyMatch((1L to 500L).toArray, 249L, valuesPerIteration)
+    testAnyMatch((1L to 1000L).toArray, 499L, valuesPerIteration)
+    testAnyMatch((1L to 10000L).toArray, 4999L, valuesPerIteration)
 
-    testDistinct(TestApis.objs(1, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(5, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(10, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(20, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(50, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(100, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(500, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
-    testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
+    testAllMatch((2L to 2L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 5L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 10L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 20L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 50L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 100L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 500L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 1000L).toArray, 1L, valuesPerIteration)
+    testAllMatch((2L to 10000L).toArray, 1L, valuesPerIteration)
   }
 }
