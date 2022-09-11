@@ -100,15 +100,15 @@ object ArraysStreamBenchmark extends BenchmarkBase {
 //      }
 //    }
 
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.distinctUseLoopApi(input)
-      }
-    }
-
     benchmark.addCase("Use Loop and LinkedHashset") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.distinctUseLinkedHashSet(input)
+      }
+    }
+
+    benchmark.addCase("Use Loop api") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.distinctUseLoopApi(input)
       }
     }
 
