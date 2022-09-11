@@ -168,6 +168,14 @@ public class TestApis {
         return list.toArray(new TestValue[0]);
     }
 
+    public static TestValue[] distinctUseLinkedHashSet(TestObj[] input) {
+        Set<TestValue> set = new LinkedHashSet<>();
+        for (TestObj s : input) {
+            Collections.addAll(set, s.values);
+        }
+        return set.toArray(new TestValue[0]);
+    }
+
 
     public static class TestObj {
         TestValue[] values;

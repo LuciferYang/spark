@@ -100,6 +100,12 @@ object ArraysStreamBenchmark extends BenchmarkBase {
       }
     }
 
+    benchmark.addCase("Use Loop and LinkedHashset") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.distinctUseLinkedHashSet(input)
+      }
+    }
+
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.distinctUseLoopApi(input)
@@ -111,24 +117,34 @@ object ArraysStreamBenchmark extends BenchmarkBase {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
 
-    testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
-    testAnyMatch((1L to 5L).toArray, 4L, valuesPerIteration)
-    testAnyMatch((1L to 10L).toArray, 9L, valuesPerIteration)
-    testAnyMatch((1L to 20L).toArray, 19L, valuesPerIteration)
-    testAnyMatch((1L to 50L).toArray, 49L, valuesPerIteration)
-    testAnyMatch((1L to 100L).toArray, 99L, valuesPerIteration)
-    testAnyMatch((1L to 500L).toArray, 449L, valuesPerIteration)
-    testAnyMatch((1L to 1000L).toArray, 999L, valuesPerIteration)
-    testAnyMatch((1L to 10000L).toArray, 9999L, valuesPerIteration)
+//    testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
+//    testAnyMatch((1L to 5L).toArray, 4L, valuesPerIteration)
+//    testAnyMatch((1L to 10L).toArray, 9L, valuesPerIteration)
+//    testAnyMatch((1L to 20L).toArray, 19L, valuesPerIteration)
+//    testAnyMatch((1L to 50L).toArray, 49L, valuesPerIteration)
+//    testAnyMatch((1L to 100L).toArray, 99L, valuesPerIteration)
+//    testAnyMatch((1L to 500L).toArray, 449L, valuesPerIteration)
+//    testAnyMatch((1L to 1000L).toArray, 999L, valuesPerIteration)
+//    testAnyMatch((1L to 10000L).toArray, 9999L, valuesPerIteration)
+//
+//    testAllMatch((2L to 2L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 5L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 10L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 20L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 50L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 100L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 500L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 1000L).toArray, 1L, valuesPerIteration)
+//    testAllMatch((2L to 10000L).toArray, 1L, valuesPerIteration)
 
-    testAllMatch((2L to 2L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 5L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 10L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 20L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 50L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 100L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 500L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 1000L).toArray, 1L, valuesPerIteration)
-    testAllMatch((2L to 10000L).toArray, 1L, valuesPerIteration)
+    testDistinct(TestApis.objs(1, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(5, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(10, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(20, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(50, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(100, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(500, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
+    testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
   }
 }
