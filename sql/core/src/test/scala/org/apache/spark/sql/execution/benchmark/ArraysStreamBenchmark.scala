@@ -115,6 +115,39 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  private def testToArray(input: Seq[AnyVal], valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test for distinct with input size ${input.length}",
+      valuesPerIteration,
+      output = output)
+
+    //    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+    //      for (_ <- 0L until valuesPerIteration) {
+    //        TestApis.distinctUseStreamApi(input)
+    //      }
+    //    }
+
+    import scala.collection.JavaConverters._
+    val list = TestApis.toArrayList(input.asJava)
+
+    val linkedHashSet = TestApis.toLinkedHashSet(input.asJava)
+    benchmark.addCase("Use LinkedHashSet") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.toArray(linkedHashSet)
+      }
+    }
+
+    benchmark.addCase("Use ArrayList") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        TestApis.toArray(list)
+      }
+    }
+
+
+    benchmark.run()
+  }
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
 
@@ -147,5 +180,15 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testDistinct(TestApis.objs(500, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
+
+    testToArray((1 to 1), valuesPerIteration)
+    testToArray((1 to 5), valuesPerIteration)
+    testToArray((1 to 10), valuesPerIteration)
+    testToArray((1 to 20), valuesPerIteration)
+    testToArray((1 to 50), valuesPerIteration)
+    testToArray((1 to 100), valuesPerIteration)
+    testToArray((1 to 500), valuesPerIteration)
+    testToArray((1 to 1000), valuesPerIteration)
+    testToArray((1 to 10000), valuesPerIteration)
   }
 }

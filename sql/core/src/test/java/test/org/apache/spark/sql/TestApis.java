@@ -18,10 +18,13 @@
 package test.org.apache.spark.sql;
 
 import com.google.common.base.Objects;
+import io.netty.buffer.AbstractByteBuf;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.spark.network.crypto.AuthMessage;
+import scala.AnyVal;
+import scala.Int;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -174,6 +177,31 @@ public class TestApis {
             Collections.addAll(set, s.values);
         }
         return set.toArray(new TestValue[0]);
+    }
+
+    public static List<Integer> toArrayList(List<AnyVal> input) {
+        List<Integer> list = new ArrayList<>();
+        for (Object anInt : input) {
+            list.add(Integer.valueOf(anInt.toString()));
+        }
+        return list;
+    }
+
+    public static Integer[] toArray(Set<Integer> input) {
+       return input.toArray(new Integer[0]);
+    }
+
+    public static Integer[] toArray(List<Integer> input) {
+        return input.toArray(new Integer[0]);
+    }
+
+
+    public static Set<Integer> toLinkedHashSet(List<AnyVal> input) {
+        Set<Integer> set = new LinkedHashSet<>();
+        for (Object anInt : input) {
+            set.add(Integer.valueOf(anInt.toString()));
+        }
+        return set;
     }
 
 
