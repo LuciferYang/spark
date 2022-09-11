@@ -171,7 +171,10 @@ public class TestApis {
     public static TestValue[] distinctUseLinkedHashSet(TestObj[] input) {
         Set<TestValue> set = new LinkedHashSet<>();
         for (TestObj s : input) {
-            Collections.addAll(set, s.values);
+            TestValue[] values = s.values;
+            for (TestValue testValue : values) {
+                set.add(testValue);
+            }
         }
         return set.toArray(new TestValue[0]);
     }
