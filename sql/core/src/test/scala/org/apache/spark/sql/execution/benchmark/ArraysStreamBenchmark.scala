@@ -94,11 +94,11 @@ object ArraysStreamBenchmark extends BenchmarkBase {
       valuesPerIteration,
       output = output)
 
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.distinctUseStreamApi(input)
-      }
-    }
+//    benchmark.addCase("Use Arrays.steam api") { _: Int =>
+//      for (_ <- 0L until valuesPerIteration) {
+//        TestApis.distinctUseStreamApi(input)
+//      }
+//    }
 
     benchmark.addCase("Use Loop api") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
