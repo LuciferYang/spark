@@ -100,13 +100,19 @@ object ArraysStreamBenchmark extends BenchmarkBase {
 //      }
 //    }
 
-    benchmark.addCase("Use Loop and LinkedHashset") { _: Int =>
+//    benchmark.addCase("Use LinkedHashset") { _: Int =>
+//      for (_ <- 0L until valuesPerIteration) {
+//        TestApis.distinctUseLinkedHashSet(input)
+//      }
+//    }
+
+    benchmark.addCase("Use Hashset") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.distinctUseLinkedHashSet(input)
       }
     }
 
-    benchmark.addCase("Use Loop api") { _: Int =>
+    benchmark.addCase("Use ArrayList + HashSet") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.distinctUseLoopApi(input)
       }
@@ -131,8 +137,8 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     import scala.collection.JavaConverters._
     val list = TestApis.toArrayList(input.asJava)
 
-    val linkedHashSet = TestApis.toLinkedHashSet(input.asJava)
-    benchmark.addCase("Use LinkedHashSet") { _: Int =>
+    val linkedHashSet = TestApis.toHashSet(input.asJava)
+    benchmark.addCase("Use HashSet") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         TestApis.toArray(linkedHashSet)
       }

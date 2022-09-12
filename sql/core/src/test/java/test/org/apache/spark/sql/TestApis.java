@@ -179,6 +179,14 @@ public class TestApis {
         return set.toArray(new TestValue[0]);
     }
 
+    public static TestValue[] distinctUseHashSet(TestObj[] input) {
+        Set<TestValue> set = new HashSet<>();
+        for (TestObj s : input) {
+            Collections.addAll(set, s.values);
+        }
+        return set.toArray(new TestValue[0]);
+    }
+
     public static List<Integer> toArrayList(List<AnyVal> input) {
         List<Integer> list = new ArrayList<>();
         for (Object anInt : input) {
@@ -198,6 +206,14 @@ public class TestApis {
 
     public static Set<Integer> toLinkedHashSet(List<AnyVal> input) {
         Set<Integer> set = new LinkedHashSet<>();
+        for (Object anInt : input) {
+            set.add(Integer.valueOf(anInt.toString()));
+        }
+        return set;
+    }
+
+    public static Set<Integer> toHashSet(List<AnyVal> input) {
+        Set<Integer> set = new HashSet<>();
         for (Object anInt : input) {
             set.add(Integer.valueOf(anInt.toString()));
         }
