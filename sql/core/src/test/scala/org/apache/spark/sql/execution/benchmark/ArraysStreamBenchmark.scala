@@ -187,14 +187,14 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
 
-    testToArray((1 to 1), valuesPerIteration)
-    testToArray((1 to 5), valuesPerIteration)
-    testToArray((1 to 10), valuesPerIteration)
-    testToArray((1 to 20), valuesPerIteration)
-    testToArray((1 to 50), valuesPerIteration)
-    testToArray((1 to 100), valuesPerIteration)
-    testToArray((1 to 500), valuesPerIteration)
-    testToArray((1 to 1000), valuesPerIteration)
-    testToArray((1 to 10000), valuesPerIteration)
+//    testToArray((1 to 1), valuesPerIteration)
+//    testToArray((1 to 5), valuesPerIteration)
+//    testToArray((1 to 10), valuesPerIteration)
+//    testToArray((1 to 20), valuesPerIteration)
+//    testToArray((1 to 50), valuesPerIteration)
+//    testToArray((1 to 100), valuesPerIteration)
+//    testToArray((1 to 500), valuesPerIteration)
+//    testToArray((1 to 1000), valuesPerIteration)
+//    testToArray((1 to 10000), valuesPerIteration)
   }
 }
