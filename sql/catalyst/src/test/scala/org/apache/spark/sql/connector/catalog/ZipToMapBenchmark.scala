@@ -50,15 +50,45 @@ object ZipToMapBenchmark extends BenchmarkBase {
       }
     }
 
+    val a = data.toArray
+    benchmark.addCase("Use Manual builder array") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val map = zipToMap4(a, a)
+      }
+    }
+
     benchmark.addCase("Use Manual map") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         val map = zipToMap2(data, data)
+      }
+    }
+
+    benchmark.addCase("Use Manual javamap") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val map = zipToMap3(data, data)
+      }
+    }
+
+    benchmark.addCase("Use Manual to javamap") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val map = zipToJavaMap(data, data)
       }
     }
     benchmark.run()
   }
 
   private def zipToMap1[A, B, K, V](keys: Seq[A], values: Seq[B]): Map[K, V] = {
+    import scala.collection.immutable
+    val builder = immutable.Map.newBuilder[K, V]
+    val keyIter = keys.iterator
+    val valueIter = values.iterator
+    while (keyIter.hasNext && valueIter.hasNext) {
+      builder += (keyIter.next(), valueIter.next()).asInstanceOf[(K, V)]
+    }
+    builder.result()
+  }
+
+  private def zipToMap4[A, B, K, V](keys: Array[A], values: Array[B]): Map[K, V] = {
     import scala.collection.immutable
     val builder = immutable.Map.newBuilder[K, V]
     val keyIter = keys.iterator
@@ -77,6 +107,29 @@ object ZipToMapBenchmark extends BenchmarkBase {
       elems += (keyIter.next().asInstanceOf[K] -> valueIter.next().asInstanceOf[V])
     }
     elems
+  }
+
+  private def zipToMap3[A, B, K, V](
+      keys: Seq[A], values: Seq[B]): Map[K, V] = {
+    import scala.collection.JavaConverters._
+    val map = new java.util.HashMap[K, V]()
+    val keyIter = keys.iterator
+    val valueIter = values.iterator
+    while (keyIter.hasNext && valueIter.hasNext) {
+      map.put(keyIter.next().asInstanceOf[K], valueIter.next().asInstanceOf[V])
+    }
+    map.asScala.toMap
+  }
+
+  private def zipToJavaMap[A, B, K, V](
+      keys: Seq[A], values: Seq[B]): java.util.Map[K, V] = {
+    val map = new java.util.HashMap[K, V]()
+    val keyIter = keys.iterator
+    val valueIter = values.iterator
+    while (keyIter.hasNext && valueIter.hasNext) {
+      map.put(keyIter.next().asInstanceOf[K], valueIter.next().asInstanceOf[V])
+    }
+    map
   }
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
