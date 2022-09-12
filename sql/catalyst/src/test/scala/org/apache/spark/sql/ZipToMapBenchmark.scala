@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.connector.catalog
+package org.apache.spark.sql
 
 import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
 
@@ -23,11 +23,9 @@ object ZipToMapBenchmark extends BenchmarkBase {
 
   def testZipToMap(valuesPerIteration: Int, collectionSize: Int): Unit = {
 
-    val capabilities = TableCapability.values()
-
     val benchmark = new Benchmark(
       s"Test zip to map with collectionSize = $collectionSize",
-      valuesPerIteration * capabilities.length,
+      valuesPerIteration,
       output = output)
 
     val data = 0 until collectionSize
