@@ -46,16 +46,11 @@ public interface Expression {
   default NamedReference[] references() {
     // When Java 17 is default, can consider using `LinkedHashSet` instead of
     // `ArrayList + HashSet`, which will be 5 ~ 10% faster than the current implementation.
-    List<NamedReference> list = new ArrayList<>();
     Set<NamedReference> uniqueValues = new HashSet<>();
     for (Expression e : children()) {
       NamedReference[] references = e.references();
-      for (NamedReference reference : references) {
-        if (uniqueValues.add(reference)) {
-          list.add(reference);
-        }
-      }
+      uniqueValues.addAll(Arrays.asList(references));
     }
-    return list.toArray(new NamedReference[0]);
+    return uniqueValues.toArray(new NamedReference[0]);
   }
 }
