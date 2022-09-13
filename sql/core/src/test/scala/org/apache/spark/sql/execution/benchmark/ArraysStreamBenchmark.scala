@@ -24,69 +24,6 @@ import org.apache.spark.benchmark.BenchmarkBase
 
 object ArraysStreamBenchmark extends BenchmarkBase {
 
-  private def testForeachOrder(input: Array[String], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test for eachOrder with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.foreachOrderUseStreamApi(input)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.foreachOrderUseLoopApi(input)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testAnyMatch(input: Array[Long], target: Long, valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test for AnyMatch with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.anyMatchUseStreamApi(input, target)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.anyMatchUseLoopApi(input, target)
-      }
-    }
-    benchmark.run()
-  }
-
-  private def testAllMatch(input: Array[Long], target: Long, valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test for AllMatch with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.allMatchUseStreamApi(input, target)
-      }
-    }
-
-    benchmark.addCase("Use Loop api") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.allMatchUseLoopApi(input, target)
-      }
-    }
-    benchmark.run()
-  }
-
   private def testDistinct(input: Array[TestApis.TestObj], valuesPerIteration: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -109,61 +46,8 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
-  private def testToArray(input: Seq[AnyVal], valuesPerIteration: Int): Unit = {
-
-    val benchmark = new Benchmark(
-      s"Test for distinct with input size ${input.length}",
-      valuesPerIteration,
-      output = output)
-
-    //    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-    //      for (_ <- 0L until valuesPerIteration) {
-    //        TestApis.distinctUseStreamApi(input)
-    //      }
-    //    }
-
-    import scala.collection.JavaConverters._
-    val list = TestApis.toArrayList(input.asJava)
-
-    val linkedHashSet = TestApis.toHashSet(input.asJava)
-    benchmark.addCase("Use HashSet") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.toArray(linkedHashSet)
-      }
-    }
-
-    benchmark.addCase("Use ArrayList") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        TestApis.toArray(list)
-      }
-    }
-
-
-    benchmark.run()
-  }
-
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     val valuesPerIteration = 100000
-
-//    testAnyMatch((1L to 1L).toArray, 1L, valuesPerIteration)
-//    testAnyMatch((1L to 5L).toArray, 4L, valuesPerIteration)
-//    testAnyMatch((1L to 10L).toArray, 9L, valuesPerIteration)
-//    testAnyMatch((1L to 20L).toArray, 19L, valuesPerIteration)
-//    testAnyMatch((1L to 50L).toArray, 49L, valuesPerIteration)
-//    testAnyMatch((1L to 100L).toArray, 99L, valuesPerIteration)
-//    testAnyMatch((1L to 500L).toArray, 449L, valuesPerIteration)
-//    testAnyMatch((1L to 1000L).toArray, 999L, valuesPerIteration)
-//    testAnyMatch((1L to 10000L).toArray, 9999L, valuesPerIteration)
-//
-//    testAllMatch((2L to 2L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 5L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 10L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 20L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 50L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 100L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 500L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 1000L).toArray, 1L, valuesPerIteration)
-//    testAllMatch((2L to 10000L).toArray, 1L, valuesPerIteration)
 
     testDistinct(TestApis.objs(1, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(5, 5, 100), valuesPerIteration)
@@ -174,15 +58,5 @@ object ArraysStreamBenchmark extends BenchmarkBase {
     testDistinct(TestApis.objs(500, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(1000, 5, 100), valuesPerIteration)
     testDistinct(TestApis.objs(10000, 5, 100), valuesPerIteration)
-
-//    testToArray((1 to 1), valuesPerIteration)
-//    testToArray((1 to 5), valuesPerIteration)
-//    testToArray((1 to 10), valuesPerIteration)
-//    testToArray((1 to 20), valuesPerIteration)
-//    testToArray((1 to 50), valuesPerIteration)
-//    testToArray((1 to 100), valuesPerIteration)
-//    testToArray((1 to 500), valuesPerIteration)
-//    testToArray((1 to 1000), valuesPerIteration)
-//    testToArray((1 to 10000), valuesPerIteration)
   }
 }
