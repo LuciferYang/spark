@@ -94,21 +94,9 @@ object ArraysStreamBenchmark extends BenchmarkBase {
       valuesPerIteration,
       output = output)
 
-//    benchmark.addCase("Use Arrays.steam api") { _: Int =>
-//      for (_ <- 0L until valuesPerIteration) {
-//        TestApis.distinctUseStreamApi(input)
-//      }
-//    }
-
-//    benchmark.addCase("Use LinkedHashset") { _: Int =>
-//      for (_ <- 0L until valuesPerIteration) {
-//        TestApis.distinctUseLinkedHashSet(input)
-//      }
-//    }
-
     benchmark.addCase("Use Hashset") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        TestApis.distinctUseLinkedHashSet(input)
+        TestApis.distinctUseHashSet(input)
       }
     }
 
