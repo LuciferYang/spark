@@ -83,16 +83,21 @@ object ZipToMapBenchmark extends BenchmarkBase {
     val valuesPerIteration = 100000
 
     // Test Contains
-    testZipToMap(valuesPerIteration, 1)
-    testZipToMap(valuesPerIteration, 5)
-    testZipToMap(valuesPerIteration, 10)
-    testZipToMap(valuesPerIteration, 20)
-    testZipToMap(valuesPerIteration, 50)
-    testZipToMap(valuesPerIteration, 100)
-    testZipToMap(valuesPerIteration, 500)
-    testZipToMap(valuesPerIteration, 1000)
-    testZipToMap(valuesPerIteration, 5000)
-    testZipToMap(valuesPerIteration, 10000)
-    testZipToMap(valuesPerIteration, 20000)
+//    testZipToMap(valuesPerIteration, 1)
+//    testZipToMap(valuesPerIteration, 5)
+//    testZipToMap(valuesPerIteration, 10)
+//    testZipToMap(valuesPerIteration, 20)
+//    testZipToMap(valuesPerIteration, 50)
+//    testZipToMap(valuesPerIteration, 100)
+//    testZipToMap(valuesPerIteration, 500)
+//    testZipToMap(valuesPerIteration, 1000)
+//    testZipToMap(valuesPerIteration, 5000)
+//    testZipToMap(valuesPerIteration, 10000)
+//    testZipToMap(valuesPerIteration, 20000)
+
+    testZipToMap(valuesPerIteration, 150)
+    testZipToMap(valuesPerIteration, 200)
+    testZipToMap(valuesPerIteration, 300)
+    testZipToMap(valuesPerIteration, 400)
   }
 }
