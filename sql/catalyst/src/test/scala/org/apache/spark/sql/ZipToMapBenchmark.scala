@@ -32,50 +32,35 @@ object ZipToMapBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use zip + toMap") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val map = data.zip(data).toMap
+        val map: Map[Int, Int] = data.zip(data).toMap
+        // data.foreach { k => map(k) }
       }
     }
 
     benchmark.addCase("Use zip + collection.breakOut") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val tuples = data.zip(data)(collection.breakOut)
+        val tuples: Map[Int, Int] = data.zip(data)(collection.breakOut)
+        // data.foreach { k => tuples(k) }
       }
     }
 
     benchmark.addCase("Use Manual builder") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val map = zipToMap1(data, data)
-      }
-    }
-
-    val a = data.toArray
-    benchmark.addCase("Use Manual builder array") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        val map = zipToMap4(a, a)
+        val map: Map[Int, Int] = zipToMapUseMapBuilder[Int, Int, Int, Int](data, data)
+        // data.foreach { k => map(k) }
       }
     }
 
     benchmark.addCase("Use Manual map") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val map = zipToMap2(data, data)
-      }
-    }
-
-    benchmark.addCase("Use Manual javamap") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        val map = zipToMap3(data, data)
-      }
-    }
-
-    benchmark.addCase("Use Manual to javamap") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        val map = zipToJavaMap(data, data)
+        val map: Map[Int, Int] = zipToMapUseMap[Int, Int, Int, Int](data, data)
+        // data.foreach { k => map(k) }
       }
     }
     benchmark.run()
   }
 
-  private def zipToMap1[A, B, K, V](keys: Seq[A], values: Seq[B]): Map[K, V] = {
+  private def zipToMapUseMapBuilder[A, B, K, V](keys: Seq[A], values: Seq[B]): Map[K, V] = {
     import scala.collection.immutable
     val builder = immutable.Map.newBuilder[K, V]
     val keyIter = keys.iterator
@@ -86,18 +71,7 @@ object ZipToMapBenchmark extends BenchmarkBase {
     builder.result()
   }
 
-  private def zipToMap4[A, B, K, V](keys: Array[A], values: Array[B]): Map[K, V] = {
-    import scala.collection.immutable
-    val builder = immutable.Map.newBuilder[K, V]
-    val keyIter = keys.iterator
-    val valueIter = values.iterator
-    while (keyIter.hasNext && valueIter.hasNext) {
-      builder += (keyIter.next(), valueIter.next()).asInstanceOf[(K, V)]
-    }
-    builder.result()
-  }
-
-  private def zipToMap2[A, B, K, V](keys: Seq[A], values: Seq[B]): Map[K, V] = {
+  private def zipToMapUseMap[A, B, K, V](keys: Seq[A], values: Seq[B]): Map[K, V] = {
     var elems: Map[K, V] = Map.empty[K, V]
     val keyIter = keys.iterator
     val valueIter = values.iterator
@@ -105,29 +79,6 @@ object ZipToMapBenchmark extends BenchmarkBase {
       elems += (keyIter.next().asInstanceOf[K] -> valueIter.next().asInstanceOf[V])
     }
     elems
-  }
-
-  private def zipToMap3[A, B, K, V](
-      keys: Seq[A], values: Seq[B]): Map[K, V] = {
-    import scala.collection.JavaConverters._
-    val map = new java.util.HashMap[K, V]()
-    val keyIter = keys.iterator
-    val valueIter = values.iterator
-    while (keyIter.hasNext && valueIter.hasNext) {
-      map.put(keyIter.next().asInstanceOf[K], valueIter.next().asInstanceOf[V])
-    }
-    map.asScala.toMap
-  }
-
-  private def zipToJavaMap[A, B, K, V](
-      keys: Seq[A], values: Seq[B]): java.util.Map[K, V] = {
-    val map = new java.util.HashMap[K, V]()
-    val keyIter = keys.iterator
-    val valueIter = values.iterator
-    while (keyIter.hasNext && valueIter.hasNext) {
-      map.put(keyIter.next().asInstanceOf[K], valueIter.next().asInstanceOf[V])
-    }
-    map
   }
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
