@@ -27,7 +27,6 @@ import org.apache.spark.tags.{ChromeUITest, ExtendedLevelDBTest}
 /**
  * Tests for HistoryServer with Chrome.
  */
-@ChromeUITest
 abstract class ChromeUIHistoryServerSuite
   extends RealBrowserUIHistoryServerSuite("webdriver.chrome.driver") {
 
@@ -51,11 +50,13 @@ abstract class ChromeUIHistoryServerSuite
   }
 }
 
+@ChromeUITest
 @ExtendedLevelDBTest
 class LevelDBBackendChromeUIHistoryServerSuite extends ChromeUIHistoryServerSuite {
   override protected def diskBackend: HybridStoreDiskBackend.Value = HybridStoreDiskBackend.LEVELDB
 }
 
+@ChromeUITest
 class RocksBackendChromeUIHistoryServerSuite extends ChromeUIHistoryServerSuite {
   override protected def diskBackend: HybridStoreDiskBackend.Value = HybridStoreDiskBackend.ROCKSDB
 }
