@@ -18,6 +18,7 @@
 package org.apache.spark.util.collection
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable
 
 import com.google.common.collect.{Iterators => GuavaIterators, Ordering => GuavaOrdering}
 
@@ -62,4 +63,18 @@ private[spark] object Utils {
    */
   def sequenceToOption[T](input: Seq[Option[T]]): Option[Seq[T]] =
     if (input.forall(_.isDefined)) Some(input.flatten) else None
+
+  /**
+   * Same function as `keys.zipWithIndex.toMap`, but has perf gain.
+   */
+  def toIndexMap[K](keys: Iterable[K]): Map[K, Int] = {
+    val builder = immutable.Map.newBuilder[K, Int]
+    val keyIter = keys.iterator
+    var idx = 0
+    while (keyIter.hasNext) {
+      builder += (keyIter.next(), idx).asInstanceOf[(K, Int)]
+      idx = idx + 1
+    }
+    builder.result()
+  }
 }
