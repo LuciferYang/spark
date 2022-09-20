@@ -37,8 +37,4 @@ object YarnTestAccessor {
   def getShuffleServiceConfOverlayResourceName: String = {
     YarnShuffleService.SHUFFLE_SERVICE_CONF_OVERLAY_RESOURCE_NAME
   }
-
-  def shuffleServiceIntegrationTestingKey: String = {
-    YarnShuffleService.INTEGRATION_TESTING
-  }
 }

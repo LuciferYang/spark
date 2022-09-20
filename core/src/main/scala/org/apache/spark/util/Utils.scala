@@ -1994,11 +1994,7 @@ private[spark] object Utils extends Logging {
   /**
    * Indicates whether Spark is currently running unit tests.
    */
-  def isTesting: Boolean = {
-    // Scala's `sys.env` creates a ton of garbage by constructing Scala immutable maps, so
-    // we directly use the Java APIs instead.
-    System.getenv("SPARK_TESTING") != null || System.getProperty(IS_TESTING.key) != null
-  }
+  def isTesting: Boolean = JavaUtils.isTesting
 
   /**
    * Terminates a process waiting for at most the specified duration.

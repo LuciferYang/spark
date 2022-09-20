@@ -17,6 +17,8 @@
 
 package org.apache.spark.internal.config
 
+import org.apache.spark.network.util.JavaUtils
+
 private[spark] object Tests {
 
   val TEST_USE_COMPRESSED_OOPS_KEY = "spark.test.useCompressedOops"
@@ -32,7 +34,7 @@ private[spark] object Tests {
       .booleanConf
       .createWithDefault(true)
 
-  val IS_TESTING = ConfigBuilder("spark.testing")
+  val IS_TESTING = ConfigBuilder(JavaUtils.IS_TESTING)
     .version("1.0.1")
     .booleanConf
     .createOptional

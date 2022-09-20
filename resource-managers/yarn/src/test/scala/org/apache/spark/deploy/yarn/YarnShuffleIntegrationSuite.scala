@@ -50,7 +50,6 @@ abstract class YarnShuffleIntegrationSuite extends BaseYarnClusterSuite {
       classOf[YarnShuffleService].getCanonicalName)
     yarnConfig.set(SHUFFLE_SERVICE_PORT.key, "0")
     yarnConfig.set(SHUFFLE_SERVICE_DB_BACKEND.key, dbBackend.name())
-    yarnConfig.set(YarnTestAccessor.shuffleServiceIntegrationTestingKey, "true")
     yarnConfig
   }
 

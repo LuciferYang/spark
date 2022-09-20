@@ -435,4 +435,9 @@ public class JavaUtils {
     }
   }
 
+  public static final String IS_TESTING = "spark.testing";
+
+  public static boolean isTesting() {
+    return  System.getenv("SPARK_TESTING") != null || System.getProperty(IS_TESTING) != null;
+  }
 }
