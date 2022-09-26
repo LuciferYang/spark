@@ -50,4 +50,9 @@ public class LevelDB implements DB {
     public DBIterator iterator() {
         return new LevelDBIterator(db.iterator());
     }
+
+    @Override
+    public DBBackend backend() {
+        return DBBackend.LEVELDB;
+    }
 }

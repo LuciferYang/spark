@@ -197,7 +197,7 @@ object ShuffleTestAccessor {
   def reloadAppShuffleInfo(
       mergeMgr: RemoteBlockPushResolver, db: DB): ConcurrentMap[String, AppShuffleInfo] = {
     mergeMgr.appsShuffleInfo.clear()
-    mergeMgr.reloadAndCleanUpAppShuffleInfo(null, null, db)
+    mergeMgr.reloadAndCleanUpAppShuffleInfo(mergeMgr.recoveryFile, db.backend(), db)
     mergeMgr.appsShuffleInfo
   }
 

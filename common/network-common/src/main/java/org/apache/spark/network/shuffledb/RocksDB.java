@@ -65,6 +65,11 @@ public class RocksDB implements DB {
     }
 
     @Override
+    public DBBackend backend() {
+      return DBBackend.ROCKSDB;
+    }
+
+    @Override
     public void close() throws IOException {
       db.close();
     }

@@ -47,4 +47,6 @@ public interface DB extends Closeable {
      * Return an iterator over the contents of the DB.
      */
     DBIterator iterator();
+
+    DBBackend backend();
 }

@@ -170,7 +170,7 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
     if (db != null) {
       logger.info("Use {} as the implementation of {}",
         dbBackend, Constants.SHUFFLE_SERVICE_DB_BACKEND);
-      reloadAndCleanUpAppShuffleInfo(recoveryFile, dbBackend, db);
+      reloadAndCleanUpAppShuffleInfo(this.recoveryFile, dbBackend, db);
     }
   }
 
