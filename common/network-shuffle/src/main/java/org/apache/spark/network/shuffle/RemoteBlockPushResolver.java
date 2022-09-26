@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -40,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -57,6 +57,7 @@ import com.google.common.cache.Weigher;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,7 +170,7 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
     if (db != null) {
       logger.info("Use {} as the implementation of {}",
         dbBackend, Constants.SHUFFLE_SERVICE_DB_BACKEND);
-      reloadAndCleanUpAppShuffleInfo(db);
+      reloadAndCleanUpAppShuffleInfo(recoveryFile, dbBackend, db);
     }
   }
 
@@ -941,19 +942,37 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
    * no relevant application attempts local paths information registered in the DB and the hashmap.
    */
   @VisibleForTesting
-  void reloadAndCleanUpAppShuffleInfo(DB db) throws IOException {
+  void reloadAndCleanUpAppShuffleInfo(
+      File recoveryFile, DBBackend dbBackend, DB db) throws IOException {
     logger.info("Reload applications merged shuffle information from DB");
     List<byte[]> dbKeysToBeRemoved = new ArrayList<>();
-    dbKeysToBeRemoved.addAll(reloadActiveAppAttemptsPathInfo(db));
-    dbKeysToBeRemoved.addAll(reloadFinalizedAppAttemptsShuffleMergeInfo(db));
-    removeOutdatedKeyValuesInDB(dbKeysToBeRemoved);
+    Optional<Pair<DBBackend, File>> useToConversionOpt =
+      DBProvider.useToConversion(recoveryFile, dbBackend);
+
+    if (useToConversionOpt.isPresent()) {
+      Pair<DBBackend, File> pair = useToConversionOpt.get();
+      DBBackend originalBackend = pair.getLeft();
+      File originalFile = pair.getRight();
+      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+        dbKeysToBeRemoved.addAll(reloadActiveAppAttemptsPathInfo(original, db));
+        dbKeysToBeRemoved.addAll(reloadFinalizedAppAttemptsShuffleMergeInfo(original, db));
+        removeOutdatedKeyValuesInDB(dbKeysToBeRemoved);
+      } finally {
+        JavaUtils.deleteRecursively(originalFile);
+      }
+    } else {
+      dbKeysToBeRemoved.addAll(reloadActiveAppAttemptsPathInfo(db, null));
+      dbKeysToBeRemoved.addAll(reloadFinalizedAppAttemptsShuffleMergeInfo(db, null));
+      removeOutdatedKeyValuesInDB(dbKeysToBeRemoved);
+    }
   }
 
   /**
    * Reload application attempts local paths information.
    */
   @VisibleForTesting
-  List<byte[]> reloadActiveAppAttemptsPathInfo(DB db) throws IOException {
+  List<byte[]> reloadActiveAppAttemptsPathInfo(DB db, DB newDb) throws IOException {
+    boolean needConversion = newDb != null && !Objects.equals(db, newDb);
     List<byte[]> dbKeysToBeRemoved = new ArrayList<>();
     if (db != null) {
       try (DBIterator itr = db.iterator()) {
@@ -967,6 +986,9 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
           AppAttemptId appAttemptId = parseDbAppAttemptPathsKey(key);
           AppPathsInfo appPathsInfo = mapper.readValue(entry.getValue(), AppPathsInfo.class);
           logger.debug("Reloading Application paths info for application {}", appAttemptId);
+          if (needConversion) {
+            newDb.put(entry.getKey(), entry.getValue());
+          }
           appsShuffleInfo.compute(appAttemptId.appId,
               (appId, existingAppShuffleInfo) -> {
                 if (existingAppShuffleInfo == null ||
@@ -999,8 +1021,9 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
    * Reload the finalized shuffle merges.
    */
   @VisibleForTesting
-  List<byte[]> reloadFinalizedAppAttemptsShuffleMergeInfo(DB db) throws IOException {
+  List<byte[]> reloadFinalizedAppAttemptsShuffleMergeInfo(DB db, DB newDb) throws IOException {
     List<byte[]> dbKeysToBeRemoved = new ArrayList<>();
+    boolean needConversion = newDb != null && !Objects.equals(db, newDb);
     if (db != null) {
       try (DBIterator itr = db.iterator()) {
         itr.seek(APP_ATTEMPT_SHUFFLE_FINALIZE_STATUS_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
@@ -1012,6 +1035,9 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
           }
           AppAttemptShuffleMergeId partitionId = parseDbAppAttemptShufflePartitionKey(key);
           logger.debug("Reloading finalized shuffle info for partitionId {}", partitionId);
+          if (needConversion) {
+            newDb.put(entry.getKey(), entry.getValue());
+          }
           AppShuffleInfo appShuffleInfo = appsShuffleInfo.get(partitionId.appId);
           if (appShuffleInfo != null && appShuffleInfo.attemptId == partitionId.attemptId) {
             appShuffleInfo.shuffles.compute(partitionId.shuffleId,

@@ -18,10 +18,17 @@ package org.apache.spark.network.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.spark.network.shuffledb.DB;
 import org.apache.spark.network.shuffledb.DBBackend;
 import org.apache.spark.network.shuffledb.LevelDB;
@@ -61,4 +68,22 @@ public class DBProvider {
       }
       return null;
     }
+
+  public static Optional<Pair<DBBackend, File>> useToConversion(File dbFile, DBBackend dbBackend) {
+    EnumSet<DBBackend> others = EnumSet.allOf(DBBackend.class);
+    others.remove(dbBackend);
+    String path = dbFile.getAbsolutePath();
+    String prefix = path.substring(0, path.lastIndexOf('.'));
+    List<DBBackend> backends = others.stream()
+      .filter(backend -> new File(backend.fileName(prefix)).exists())
+      .collect(Collectors.toList());
+    Preconditions.checkArgument(backends.size() <= 1);
+    if (backends.isEmpty()) {
+      return Optional.empty();
+    } else {
+      DBBackend originalBackend = backends.get(0);
+      File originalFile = new File(originalBackend.fileName(prefix));
+      return Optional.of(new ImmutablePair<>(originalBackend, originalFile));
+    }
+  }
 }

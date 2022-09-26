@@ -132,7 +132,7 @@ public class ExternalShuffleBlockResolver {
     if (db != null) {
       logger.info("Use {} as the implementation of {}",
         dbBackend, Constants.SHUFFLE_SERVICE_DB_BACKEND);
-      executors = reloadRegisteredExecutors(db);
+      executors = reloadRegisteredExecutors(registeredExecutorFile, dbBackend, db);
     } else {
       executors = Maps.newConcurrentMap();
     }
@@ -458,10 +458,30 @@ public class ExternalShuffleBlockResolver {
     return parsed;
   }
 
+  static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(
+      File registeredExecutorFile, DBBackend dbBackend, DB db) throws IOException {
+    Optional<Pair<DBBackend, File>> useToConversionOpt =
+      DBProvider.useToConversion(registeredExecutorFile, dbBackend);
+
+    if (useToConversionOpt.isPresent()) {
+      Pair<DBBackend, File> pair = useToConversionOpt.get();
+      DBBackend originalBackend = pair.getLeft();
+      File originalFile = pair.getRight();
+      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+        return reloadRegisteredExecutors(original, db);
+      } finally {
+        JavaUtils.deleteRecursively(originalFile);
+      }
+    } else {
+      return reloadRegisteredExecutors(db, null);
+    }
+  }
+
   @VisibleForTesting
-  static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(DB db)
+  static ConcurrentMap<AppExecId, ExecutorShuffleInfo> reloadRegisteredExecutors(DB db, DB newDb)
       throws IOException {
     ConcurrentMap<AppExecId, ExecutorShuffleInfo> registeredExecutors = Maps.newConcurrentMap();
+    boolean needConversion = newDb != null && !Objects.equals(db, newDb);
     if (db != null) {
       try (DBIterator itr = db.iterator()) {
         itr.seek(APP_KEY_PREFIX.getBytes(StandardCharsets.UTF_8));
@@ -476,6 +496,9 @@ public class ExternalShuffleBlockResolver {
           ExecutorShuffleInfo shuffleInfo =
             mapper.readValue(e.getValue(), ExecutorShuffleInfo.class);
           registeredExecutors.put(id, shuffleInfo);
+          if (needConversion) {
+            newDb.put(e.getKey(), e.getValue());
+          }
         }
       }
     }

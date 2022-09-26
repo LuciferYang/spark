@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -34,6 +35,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -361,6 +363,25 @@ public class YarnShuffleService extends AuxiliaryService {
 
     db = DBProvider.initDB(dbBackend, secretsFile, CURRENT_VERSION, mapper);
     logger.info("Recovery location is: " + secretsFile.getPath());
+
+    Optional<Pair<DBBackend, File>> useToConversionOpt =
+      DBProvider.useToConversion(secretsFile, dbBackend);
+    if (useToConversionOpt.isPresent()) {
+      Pair<DBBackend, File> pair = useToConversionOpt.get();
+      DBBackend originalBackend = pair.getLeft();
+      File originalFile = pair.getRight();
+      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+        loadSecretsFromDb(original, db);
+      } finally {
+        JavaUtils.deleteRecursively(originalFile);
+      }
+    } else {
+      loadSecretsFromDb(db, null);
+    }
+  }
+
+  private void loadSecretsFromDb(DB db, DB newDb) throws IOException {
+    boolean needConversion = newDb != null && !Objects.equals(db, newDb);
     if (db != null) {
       logger.info("Going to reload spark shuffle data");
       try (DBIterator itr = db.iterator()) {
@@ -375,6 +396,9 @@ public class YarnShuffleService extends AuxiliaryService {
           ByteBuffer secret = mapper.readValue(e.getValue(), ByteBuffer.class);
           logger.info("Reloading tokens for app: " + id);
           secretManager.registerApp(id, secret);
+          if (needConversion) {
+            newDb.put(e.getKey(), e.getValue());
+          }
         }
       }
     }

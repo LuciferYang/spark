@@ -197,31 +197,31 @@ object ShuffleTestAccessor {
   def reloadAppShuffleInfo(
       mergeMgr: RemoteBlockPushResolver, db: DB): ConcurrentMap[String, AppShuffleInfo] = {
     mergeMgr.appsShuffleInfo.clear()
-    mergeMgr.reloadAndCleanUpAppShuffleInfo(db)
+    mergeMgr.reloadAndCleanUpAppShuffleInfo(null, null, db)
     mergeMgr.appsShuffleInfo
   }
 
   def getOutdatedAppPathInfoCountDuringDBReload(
       mergeMgr: RemoteBlockPushResolver, db: DB): Int = {
-    mergeMgr.reloadActiveAppAttemptsPathInfo(db).size()
+    mergeMgr.reloadActiveAppAttemptsPathInfo(db, null).size()
   }
 
   def getOutdatedFinalizedShuffleCountDuringDBReload(
     mergeMgr: RemoteBlockPushResolver, db: DB): Int = {
-    mergeMgr.reloadFinalizedAppAttemptsShuffleMergeInfo(db).size()
+    mergeMgr.reloadFinalizedAppAttemptsShuffleMergeInfo(db, null).size()
   }
 
   def reloadRegisteredExecutors(
     dbBackend: DBBackend,
     file: File): ConcurrentMap[ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo] = {
     val db = DBProvider.initDB(dbBackend, file)
-    val result = ExternalShuffleBlockResolver.reloadRegisteredExecutors(db)
+    val result = ExternalShuffleBlockResolver.reloadRegisteredExecutors(db, null)
     db.close()
     result
   }
 
   def reloadRegisteredExecutors(
       db: DB): ConcurrentMap[ExternalShuffleBlockResolver.AppExecId, ExecutorShuffleInfo] = {
-    ExternalShuffleBlockResolver.reloadRegisteredExecutors(db)
+    ExternalShuffleBlockResolver.reloadRegisteredExecutors(db, null)
   }
 }
