@@ -35,14 +35,14 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, SQLConfHelper, TableId
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogStorageFormat}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last, PercentileCont, PercentileDisc}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AnyValue, First, Last, PercentileCont, PercentileDisc}
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.catalyst.util.{CharVarcharUtils, DateTimeUtils, IntervalUtils, ResolveDefaultColumns}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.{convertSpecialDate, convertSpecialTimestamp, convertSpecialTimestampNTZ, getZoneId, stringToDate, stringToTimestamp, stringToTimestampWithoutTimeZone}
-import org.apache.spark.sql.connector.catalog.{SupportsNamespaces, TableCatalog}
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, SupportsNamespaces, TableCatalog}
 import org.apache.spark.sql.connector.catalog.TableChange.ColumnPosition
 import org.apache.spark.sql.connector.expressions.{ApplyTransform, BucketTransform, DaysTransform, Expression => V2Expression, FieldReference, HoursTransform, IdentityTransform, LiteralValue, MonthsTransform, Transform, YearsTransform}
 import org.apache.spark.sql.errors.QueryParsingErrors
@@ -1289,10 +1289,6 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
       throw QueryParsingErrors.invalidTimeTravelSpec(
         "timestamp expression cannot refer to any columns", ctx.timestamp)
     }
-    if (timestamp.exists(e => SubqueryExpression.hasSubquery(e))) {
-      throw QueryParsingErrors.invalidTimeTravelSpec(
-        "timestamp expression cannot contain subqueries", ctx.timestamp)
-    }
     RelationTimeTravel(plan, timestamp, version)
   }
 
@@ -1313,7 +1309,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
     }
 
     val tvf = UnresolvedTableValuedFunction(
-      name.asFunctionIdentifier, func.expression.asScala.map(expression).toSeq, aliases)
+      name, func.expression.asScala.map(expression).toSeq, aliases)
     tvf.optionalMap(func.tableAlias.strictIdentifier)(aliasPlan)
   }
 
@@ -1776,7 +1772,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
           CurrentDate()
         case SqlBaseParser.CURRENT_TIMESTAMP =>
           CurrentTimestamp()
-        case SqlBaseParser.CURRENT_USER =>
+        case SqlBaseParser.CURRENT_USER | SqlBaseParser.USER =>
           CurrentUser()
       }
     } else {
@@ -1792,15 +1788,17 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
   override def visitCast(ctx: CastContext): Expression = withOrigin(ctx) {
     val rawDataType = typedVisit[DataType](ctx.dataType())
     val dataType = CharVarcharUtils.replaceCharVarcharWithStringForCast(rawDataType)
-    val cast = ctx.name.getType match {
+    ctx.name.getType match {
       case SqlBaseParser.CAST =>
-        Cast(expression(ctx.expression), dataType)
+        val cast = Cast(expression(ctx.expression), dataType)
+        cast.setTagValue(Cast.USER_SPECIFIED_CAST, true)
+        cast
 
       case SqlBaseParser.TRY_CAST =>
-        TryCast(expression(ctx.expression), dataType)
+        val cast = Cast(expression(ctx.expression), dataType, evalMode = EvalMode.TRY)
+        cast.setTagValue(Cast.USER_SPECIFIED_CAST, true)
+        cast
     }
-    cast.setTagValue(Cast.USER_SPECIFIED_CAST, true)
-    cast
   }
 
   /**
@@ -1816,6 +1814,14 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
   override def visitFirst(ctx: FirstContext): Expression = withOrigin(ctx) {
     val ignoreNullsExpr = ctx.IGNORE != null
     First(expression(ctx.expression), ignoreNullsExpr).toAggregateExpression()
+  }
+
+  /**
+   * Create an [[AnyValue]] expression.
+   */
+  override def visitAny_value(ctx: Any_valueContext): Expression = withOrigin(ctx) {
+    val ignoreNullsExpr = ctx.IGNORE != null
+    AnyValue(expression(ctx.expression), ignoreNullsExpr).toAggregateExpression()
   }
 
   /**
@@ -1859,7 +1865,8 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
           case Descending => PercentileDisc(sortOrder.child, percentage, true)
         }
     }
-    val aggregateExpression = percentile.toAggregateExpression()
+    val filter = Option(ctx.where).map(expression(_))
+    val aggregateExpression = percentile.toAggregateExpression(false, filter)
     ctx.windowSpec match {
       case spec: WindowRefContext =>
         UnresolvedWindowExpression(aggregateExpression, visitWindowRef(spec))
@@ -2353,7 +2360,10 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
       Literal(converter(rawStrippedQualifier))
     } catch {
       case e: NumberFormatException =>
-        throw new ParseException(e.getMessage, ctx)
+        throw new ParseException(
+          errorClass = "_LEGACY_ERROR_TEMP_0060",
+          messageParameters = Map("msg" -> e.getMessage),
+          ctx)
     }
   }
 
@@ -2411,7 +2421,10 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
       Literal(BigDecimal(raw).underlying())
     } catch {
       case e: AnalysisException =>
-        throw new ParseException(e.message, ctx)
+        throw new ParseException(
+          errorClass = "_LEGACY_ERROR_TEMP_0061",
+          messageParameters = Map("msg" -> e.getMessage),
+          ctx)
     }
   }
 
@@ -2609,7 +2622,10 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
         IntervalUtils.stringToInterval(UTF8String.concat(kvs: _*))
       } catch {
         case i: IllegalArgumentException =>
-          val e = new ParseException(i.getMessage, ctx)
+          val e = new ParseException(
+            errorClass = "_LEGACY_ERROR_TEMP_0062",
+            messageParameters = Map("msg" -> i.getMessage),
+            ctx)
           e.setStackTrace(i.getStackTrace)
           throw e
       }
@@ -2648,7 +2664,10 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
       } catch {
         // Handle Exceptions thrown by CalendarInterval
         case e: IllegalArgumentException =>
-          val pe = new ParseException(e.getMessage, ctx)
+          val pe = new ParseException(
+            errorClass = "_LEGACY_ERROR_TEMP_0063",
+            messageParameters = Map("msg" -> e.getMessage),
+            ctx)
           pe.setStackTrace(e.getStackTrace)
           throw pe
       }
@@ -3186,9 +3205,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
     }
 
     CreateNamespace(
-      UnresolvedDBObjectName(
-        visitMultipartIdentifier(ctx.multipartIdentifier),
-        isNamespace = true),
+      UnresolvedNamespace(visitMultipartIdentifier(ctx.multipartIdentifier)),
       ctx.EXISTS != null,
       properties)
   }
@@ -3288,7 +3305,15 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
         throw QueryParsingErrors.cannotCleanReservedTablePropertyError(
           PROP_EXTERNAL, ctx, "please use CREATE EXTERNAL TABLE")
       case (PROP_EXTERNAL, _) => false
-      case _ => true
+      // It's safe to set whatever table comment, so we don't make it a reserved table property.
+      case (PROP_COMMENT, _) => true
+      case (k, _) =>
+        val isReserved = CatalogV2Util.TABLE_RESERVED_PROPERTIES.contains(k)
+        if (!legacyOn && isReserved) {
+          throw QueryParsingErrors.cannotCleanReservedTablePropertyError(
+            k, ctx, "please remove it from the TBLPROPERTIES list.")
+        }
+        !isReserved
     }
   }
 
@@ -3572,16 +3597,14 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
           ctx)
 
       case Some(query) =>
-        CreateTableAsSelect(
-          UnresolvedDBObjectName(table, isNamespace = false),
+        CreateTableAsSelect(UnresolvedIdentifier(table),
           partitioning, query, tableSpec, Map.empty, ifNotExists)
 
       case _ =>
         // Note: table schema includes both the table columns list and the partition columns
         // with data type.
         val schema = StructType(columns ++ partCols)
-        CreateTable(
-          UnresolvedDBObjectName(table, isNamespace = false),
+        CreateTable(UnresolvedIdentifier(table),
           schema, partitioning, tableSpec, ignoreIfExists = ifNotExists)
     }
   }
@@ -3644,16 +3667,14 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
           ctx)
 
       case Some(query) =>
-        ReplaceTableAsSelect(
-          UnresolvedDBObjectName(table, isNamespace = false),
+        ReplaceTableAsSelect(UnresolvedIdentifier(table),
           partitioning, query, tableSpec, writeOptions = Map.empty, orCreate = orCreate)
 
       case _ =>
         // Note: table schema includes both the table columns list and the partition columns
         // with data type.
         val schema = StructType(columns ++ partCols)
-        ReplaceTable(
-          UnresolvedDBObjectName(table, isNamespace = false),
+        ReplaceTable(UnresolvedIdentifier(table),
           schema, partitioning, tableSpec, orCreate = orCreate)
     }
   }
@@ -3664,7 +3685,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
   override def visitDropTable(ctx: DropTableContext): LogicalPlan = withOrigin(ctx) {
     // DROP TABLE works with either a table or a temporary view.
     DropTable(
-      createUnresolvedTableOrView(ctx.multipartIdentifier(), "DROP TABLE"),
+      UnresolvedIdentifier(visitMultipartIdentifier(ctx.multipartIdentifier()), allowTemp = true),
       ctx.EXISTS != null,
       ctx.PURGE != null)
   }
@@ -3674,11 +3695,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
    */
   override def visitDropView(ctx: DropViewContext): AnyRef = withOrigin(ctx) {
     DropView(
-      createUnresolvedView(
-        ctx.multipartIdentifier(),
-        commandName = "DROP VIEW",
-        allowTemp = true,
-        relationTypeMismatchHint = Some("Please use DROP TABLE instead.")),
+      UnresolvedIdentifier(visitMultipartIdentifier(ctx.multipartIdentifier()), allowTemp = true),
       ctx.EXISTS != null)
   }
 
@@ -3687,7 +3704,7 @@ class AstBuilder extends SqlBaseParserBaseVisitor[AnyRef] with SQLConfHelper wit
    */
   override def visitUse(ctx: UseContext): LogicalPlan = withOrigin(ctx) {
     val nameParts = visitMultipartIdentifier(ctx.multipartIdentifier)
-    SetCatalogAndNamespace(UnresolvedDBObjectName(nameParts, isNamespace = true))
+    SetCatalogAndNamespace(UnresolvedNamespace(nameParts))
   }
 
   /**

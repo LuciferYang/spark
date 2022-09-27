@@ -30,21 +30,43 @@ class GenericFunctionsTest(PandasOnSparkTestCase, TestUtils):
         ):
             psdf.interpolate(method="quadratic")
 
+        with self.assertRaisesRegex(
+            NotImplementedError, "interpolate currently works only for method='linear'"
+        ):
+            psdf.id.interpolate(method="quadratic")
+
         with self.assertRaisesRegex(ValueError, "limit must be > 0"):
             psdf.interpolate(limit=0)
 
+        with self.assertRaisesRegex(ValueError, "limit must be > 0"):
+            psdf.id.interpolate(limit=0)
+
         with self.assertRaisesRegex(ValueError, "invalid limit_direction"):
             psdf.interpolate(limit_direction="jump")
+
+        with self.assertRaisesRegex(ValueError, "invalid limit_direction"):
+            psdf.id.interpolate(limit_direction="jump")
+
+        with self.assertRaisesRegex(ValueError, "invalid limit_area"):
+            psdf.interpolate(limit_area="jump")
+
+        with self.assertRaisesRegex(ValueError, "invalid limit_area"):
+            psdf.id.interpolate(limit_area="jump")
 
     def _test_interpolate(self, pobj):
         psobj = ps.from_pandas(pobj)
         self.assert_eq(psobj.interpolate(), pobj.interpolate())
         for limit in range(1, 5):
             for limit_direction in [None, "forward", "backward", "both"]:
-                self.assert_eq(
-                    psobj.interpolate(limit=limit, limit_direction=limit_direction),
-                    pobj.interpolate(limit=limit, limit_direction=limit_direction),
-                )
+                for limit_area in [None, "inside", "outside"]:
+                    self.assert_eq(
+                        psobj.interpolate(
+                            limit=limit, limit_direction=limit_direction, limit_area=limit_area
+                        ),
+                        pobj.interpolate(
+                            limit=limit, limit_direction=limit_direction, limit_area=limit_area
+                        ),
+                    )
 
     def test_interpolate(self):
         pser = pd.Series(
@@ -111,6 +133,18 @@ class GenericFunctionsTest(PandasOnSparkTestCase, TestUtils):
         )
         self._test_interpolate(pdf)
 
+        pdf = pd.DataFrame(
+            [
+                (0.0, np.nan, -1.0, False, np.nan),
+                (np.nan, 2.0, np.nan, True, np.nan),
+                (2.0, 3.0, np.nan, True, np.nan),
+                (np.nan, 4.0, -4.0, False, np.nan),
+                (np.nan, 1.0, np.nan, True, np.nan),
+            ],
+            columns=list("abcde"),
+        )
+        self._test_interpolate(pdf)
+
     def _test_stat_functions(self, stat_func):
         pdf = pd.DataFrame({"a": [np.nan, np.nan, np.nan], "b": [1, np.nan, 2], "c": [1, 2, 3]})
         psdf = ps.from_pandas(pdf)
@@ -132,6 +166,9 @@ class GenericFunctionsTest(PandasOnSparkTestCase, TestUtils):
         self._test_stat_functions(lambda x: x.max(skipna=False))
         self._test_stat_functions(lambda x: x.std())
         self._test_stat_functions(lambda x: x.std(skipna=False))
+        self._test_stat_functions(lambda x: x.std(ddof=2))
+        self._test_stat_functions(lambda x: x.var())
+        self._test_stat_functions(lambda x: x.var(ddof=2))
         self._test_stat_functions(lambda x: x.sem())
         self._test_stat_functions(lambda x: x.sem(skipna=False))
         # self._test_stat_functions(lambda x: x.skew())
@@ -140,6 +177,16 @@ class GenericFunctionsTest(PandasOnSparkTestCase, TestUtils):
         # Test cases below return differently from pandas (either by design or to be fixed)
         pdf = pd.DataFrame({"a": [np.nan, np.nan, np.nan], "b": [1, np.nan, 2], "c": [1, 2, 3]})
         psdf = ps.from_pandas(pdf)
+
+        with self.assertRaisesRegex(TypeError, "ddof must be integer"):
+            psdf.std(ddof="ddof")
+        with self.assertRaisesRegex(TypeError, "ddof must be integer"):
+            psdf.a.std(ddof="ddof")
+
+        with self.assertRaisesRegex(TypeError, "ddof must be integer"):
+            psdf.var(ddof="ddof")
+        with self.assertRaisesRegex(TypeError, "ddof must be integer"):
+            psdf.a.var(ddof="ddof")
 
         self.assert_eq(pdf.a.median(), psdf.a.median())
         self.assert_eq(pdf.a.median(skipna=False), psdf.a.median(skipna=False))
@@ -150,8 +197,8 @@ class GenericFunctionsTest(PandasOnSparkTestCase, TestUtils):
         self.assert_eq(pdf.a.kurtosis(skipna=False), psdf.a.kurtosis(skipna=False))
         self.assert_eq(pdf.a.kurtosis(), psdf.a.kurtosis())
         self.assert_eq(pdf.b.kurtosis(skipna=False), psdf.b.kurtosis(skipna=False))
-        # self.assert_eq(pdf.b.kurtosis(), psdf.b.kurtosis())  AssertionError: nan != -2.0
-        self.assert_eq(-1.5, psdf.c.kurtosis())
+        self.assert_eq(pdf.b.kurtosis(), psdf.b.kurtosis())
+        self.assert_eq(pdf.c.kurtosis(), psdf.c.kurtosis())
 
 
 if __name__ == "__main__":

@@ -295,7 +295,7 @@ class PandasConversionMixin:
         elif type(dt) == DoubleType:
             return np.float64
         elif type(dt) == BooleanType:
-            return np.bool  # type: ignore[attr-defined]
+            return bool
         elif type(dt) == TimestampType:
             return np.datetime64
         elif type(dt) == TimestampNTZType:
@@ -471,7 +471,7 @@ class SparkConversionMixin:
                             pdf[field.name] = s
             else:
                 should_localize = not is_timestamp_ntz_preferred()
-                for column, series in pdf.iteritems():
+                for column, series in pdf.items():
                     s = series
                     if should_localize and is_datetime64tz_dtype(s.dtype) and s.dt.tz is not None:
                         s = _check_series_convert_timestamps_tz_local(series, timezone)
@@ -483,7 +483,7 @@ class SparkConversionMixin:
                             copied = True
                         pdf[column] = s
 
-            for column, series in pdf.iteritems():
+            for column, series in pdf.items():
                 if is_timedelta64_dtype(series):
                     if not copied:
                         pdf = pdf.copy()
@@ -596,12 +596,12 @@ class SparkConversionMixin:
             ]
 
         # Slice the DataFrame to be batched
-        step = -(-len(pdf) // self.sparkContext.defaultParallelism)  # round int up
+        step = self._jconf.arrowMaxRecordsPerBatch()
         pdf_slices = (pdf.iloc[start : start + step] for start in range(0, len(pdf), step))
 
         # Create list of Arrow (columns, type) for serializer dump_stream
         arrow_data = [
-            [(c, t) for (_, c), t in zip(pdf_slice.iteritems(), arrow_types)]
+            [(c, t) for (_, c), t in zip(pdf_slice.items(), arrow_types)]
             for pdf_slice in pdf_slices
         ]
 
@@ -613,16 +613,16 @@ class SparkConversionMixin:
 
         @no_type_check
         def reader_func(temp_filename):
-            return self._jvm.PythonSQLUtils.readArrowStreamFromFile(jsparkSession, temp_filename)
+            return self._jvm.PythonSQLUtils.readArrowStreamFromFile(temp_filename)
 
         @no_type_check
-        def create_RDD_server():
-            return self._jvm.ArrowRDDServer(jsparkSession)
+        def create_iter_server():
+            return self._jvm.ArrowIteratorServer()
 
         # Create Spark DataFrame from Arrow stream file, using one batch per partition
-        jrdd = self._sc._serialize_to_jvm(arrow_data, ser, reader_func, create_RDD_server)
+        jiter = self._sc._serialize_to_jvm(arrow_data, ser, reader_func, create_iter_server)
         assert self._jvm is not None
-        jdf = self._jvm.PythonSQLUtils.toDataFrame(jrdd, schema.json(), jsparkSession)
+        jdf = self._jvm.PythonSQLUtils.toDataFrame(jiter, schema.json(), jsparkSession)
         df = DataFrame(jdf, self)
         df._schema = schema
         return df

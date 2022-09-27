@@ -832,6 +832,57 @@ abstract class OrcQuerySuite extends OrcQueryTest with SharedSparkSession {
       }
     }
   }
+
+  // SPARK-39519: Ignore this case because it requires more than 4g heap memory to ensure test
+  // stability when use Java 11. Should test it manually when upgrading `hive-storage-api`
+  ignore("SPARK-39387: BytesColumnVector should not throw RuntimeException due to overflow") {
+    withTempPath { dir =>
+      val path = dir.getCanonicalPath
+      val df = spark.range(1, 22, 1, 1).map { _ =>
+        val byteData = Array.fill[Byte](1024 * 1024)('X')
+        val mapData = (1 to 100).map(i => (i, byteData))
+        mapData
+      }.toDF()
+      df.write.format("orc").save(path)
+    }
+  }
+
+  test("SPARK-39381: Make vectorized orc columar writer batch size configurable") {
+    Seq(10, 100).foreach(batchSize => {
+      withSQLConf(SQLConf.ORC_VECTORIZED_WRITER_BATCH_SIZE.key -> batchSize.toString) {
+        withTempPath { dir =>
+          val path = dir.getCanonicalPath
+          val df = spark.range(1, 1024, 1, 1).map { _ =>
+            val byteData = Array.fill[Byte](5 * 1024 * 1024)('X')
+            byteData
+          }.toDF()
+          df.write.format("orc").save(path)
+        }
+      }
+    })
+  }
+
+  test("SPARK-39830: Reading ORC table that requires type promotion may throw AIOOBE") {
+    withSQLConf(SQLConf.ORC_VECTORIZED_WRITER_BATCH_SIZE.key -> "1",
+      "orc.stripe.size" -> "10240",
+      "orc.rows.between.memory.checks" -> "1") {
+      withTempPath { dir =>
+        val path = dir.getCanonicalPath
+        val df = spark.range(1, 1 + 512, 1, 1).map { i =>
+          if (i == 1) {
+            (i, Array.fill[Byte](5 * 1024 * 1024)('X'))
+          } else {
+            (i, Array.fill[Byte](1)('X'))
+          }
+        }.toDF("c1", "c2")
+        df.write.format("orc").save(path)
+        withTable("t1") {
+          spark.sql(s"create table t1 (c1 string,c2 binary) using orc location '$path'")
+          spark.sql("select * from t1").collect()
+        }
+      }
+    }
+  }
 }
 
 class OrcV1QuerySuite extends OrcQuerySuite {

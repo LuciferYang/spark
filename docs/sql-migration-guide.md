@@ -24,7 +24,15 @@ license: |
 
 ## Upgrading from Spark SQL 3.3 to 3.4
   
-  - Since Spark 3.4, Spark disables `hive.stats.autogather` by default, which means Hive tables won't automatically update statistics that can be consumed by Hive (not Spark). To restore the behavior before Spark 3.4, you can set `spark.hadoop.hive.stats.autogather` to `true`.
+  - Since Spark 3.4, Number or Number(\*) from Teradata will be treated as Decimal(38,18). In Spark 3.3 or earlier, Number or Number(\*) from Teradata will be treated as Decimal(38, 0), in which case the fractional part will be removed.
+  - Since Spark 3.4, v1 database, table, permanent view and function identifier will include 'spark_catalog' as the catalog name if database is defined, e.g. a table identifier will be: `spark_catalog.default.t`. To restore the legacy behavior, set `spark.sql.legacy.v1IdentifierNoCatalog` to `true`.
+  - Since Spark 3.4, when ANSI SQL mode(configuration `spark.sql.ansi.enabled`) is on, Spark SQL always returns NULL result on getting a map value with a non-existing key. In Spark 3.3 or earlier, there will be an error.
+  - Since Spark 3.4, the SQL CLI `spark-sql` does not print the prefix `Error in query:` before the error message of `AnalysisException`.
+  - Since Spark 3.4, `split` function ignores trailing empty strings when `regex` parameter is empty.
+  - Since Spark 3.4, the `to_binary` function throws error for a malformed `str` input. Use `try_to_binary` to tolerate malformed input and return NULL instead.
+    - Valid Base64 string should include symbols from in base64 alphabet (A-Za-z0-9+/), optional padding (`=`), and optional whitespaces. Whitespaces are skipped in conversion except when they are preceded by padding symbol(s). If padding is present it should conclude the string and follow rules described in RFC 4648 § 4.
+    - Valid hexadecimal strings should include only allowed symbols (0-9A-Fa-f).
+    - Valid values for `fmt` are case-insensitive `hex`, `base64`, `utf-8`, `utf8`.
 
 ## Upgrading from Spark SQL 3.2 to 3.3
 
@@ -69,6 +77,8 @@ license: |
   - Since Spark 3.3, when reading values from a JSON attribute defined as `FloatType` or `DoubleType`, the strings `"+Infinity"`, `"+INF"`, and `"-INF"` are now parsed to the appropriate values, in addition to the already supported `"Infinity"` and `"-Infinity"` variations. This change was made to improve consistency with Jackson's parsing of the unquoted versions of these values. Also, the `allowNonNumericNumbers` option is now respected so these strings will now be considered invalid if this option is disabled.
 
   - Since Spark 3.3, Spark will try to use built-in data source writer instead of Hive serde in `INSERT OVERWRITE DIRECTORY`. This behavior is effective only if `spark.sql.hive.convertMetastoreParquet` or `spark.sql.hive.convertMetastoreOrc` is enabled respectively for Parquet and ORC formats. To restore the behavior before Spark 3.3, you can set `spark.sql.hive.convertMetastoreInsertDir` to `false`.
+  
+  - Since Spark 3.3, the precision of the return type of round-like functions has been fixed. This may cause Spark throw `AnalysisException` of the `CANNOT_UP_CAST_DATATYPE` error class when using views created by prior versions. In such cases, you need to recreate the views using ALTER VIEW AS or CREATE OR REPLACE VIEW AS with newer Spark versions.
 
 ## Upgrading from Spark SQL 3.1 to 3.2
 
@@ -822,11 +832,11 @@ and deprecated the old APIs (e.g., `SQLContext.parquetFile`, `SQLContext.jsonFil
 See the API docs for `SQLContext.read` (
   <a href="api/scala/org/apache/spark/sql/SQLContext.html#read:DataFrameReader">Scala</a>,
   <a href="api/java/org/apache/spark/sql/SQLContext.html#read()">Java</a>,
-  <a href="api/python/reference/api/pyspark.sql.SparkSession.read.html#pyspark.sql.SparkSession.read">Python</a>
+  <a href="api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.read.html#pyspark.sql.SparkSession.read">Python</a>
 ) and `DataFrame.write` (
   <a href="api/scala/org/apache/spark/sql/DataFrame.html#write:DataFrameWriter">Scala</a>,
   <a href="api/java/org/apache/spark/sql/Dataset.html#write()">Java</a>,
-  <a href="api/python/reference/api/pyspark.sql.DataFrame.write.html#pyspark.sql.DataFrame.write">Python</a>
+  <a href="api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.write.html#pyspark.sql.DataFrame.write">Python</a>
 ) more information.
 
 
@@ -1098,12 +1108,6 @@ Spark SQL supports the vast majority of Hive features, such as:
 
 Below is a list of Hive features that we don't support yet. Most of these features are rarely used
 in Hive deployments.
-
-**Major Hive Features**
-
-* Tables with buckets: bucket is the hash partitioning within a Hive table partition. Spark SQL
-  doesn't support buckets yet.
-
 
 **Esoteric Hive Features**
 

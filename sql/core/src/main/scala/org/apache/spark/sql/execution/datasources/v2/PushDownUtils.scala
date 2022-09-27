@@ -19,17 +19,18 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, Expression, NamedExpression, PredicateHelper, SchemaPruning}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, Expression, NamedExpression, SchemaPruning}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils
 import org.apache.spark.sql.connector.expressions.SortOrder
 import org.apache.spark.sql.connector.expressions.filter.Predicate
-import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownFilters, SupportsPushDownLimit, SupportsPushDownRequiredColumns, SupportsPushDownTableSample, SupportsPushDownTopN, SupportsPushDownV2Filters}
+import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownFilters, SupportsPushDownLimit, SupportsPushDownOffset, SupportsPushDownRequiredColumns, SupportsPushDownTableSample, SupportsPushDownTopN, SupportsPushDownV2Filters}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.collection.Utils
 
-object PushDownUtils extends PredicateHelper {
+object PushDownUtils {
   /**
    * Pushes down filters to the data source reader
    *
@@ -80,7 +81,7 @@ object PushDownUtils extends PredicateHelper {
         for (filterExpr <- filters) {
           val translated =
             DataSourceV2Strategy.translateFilterV2WithMapping(
-              filterExpr, Some(translatedFilterToExpr), nestedPredicatePushdownEnabled = true)
+              filterExpr, Some(translatedFilterToExpr))
           if (translated.isEmpty) {
             untranslatableExprs += filterExpr
           } else {
@@ -127,6 +128,19 @@ object PushDownUtils extends PredicateHelper {
       case s: SupportsPushDownLimit if s.pushLimit(limit) =>
         (true, s.isPartiallyPushed)
       case _ => (false, false)
+    }
+  }
+
+  /**
+   * Pushes down OFFSET to the data source Scan.
+   *
+   * @return the Boolean value represents whether to push down.
+   */
+  def pushOffset(scanBuilder: ScanBuilder, offset: Int): Boolean = {
+    scanBuilder match {
+      case s: SupportsPushDownOffset =>
+        s.pushOffset(offset)
+      case _ => false
     }
   }
 
@@ -190,7 +204,7 @@ object PushDownUtils extends PredicateHelper {
   def toOutputAttrs(
       schema: StructType,
       relation: DataSourceV2Relation): Seq[AttributeReference] = {
-    val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
+    val nameToAttr = Utils.toMap(relation.output.map(_.name), relation.output)
     val cleaned = CharVarcharUtils.replaceCharVarcharWithStringInSchema(schema)
     cleaned.toAttributes.map {
       // we have to keep the attribute id during transformation

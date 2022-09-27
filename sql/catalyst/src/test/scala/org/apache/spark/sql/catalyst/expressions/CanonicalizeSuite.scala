@@ -171,13 +171,6 @@ class CanonicalizeSuite extends SparkFunSuite {
     }
   }
 
-  test("SPARK-35742: Expression.semanticEquals should be symmetrical") {
-    val attr = AttributeReference("col", IntegerType)()
-    val expr = PromotePrecision(attr)
-    assert(expr.semanticEquals(attr))
-    assert(attr.semanticEquals(expr))
-  }
-
   test("SPARK-38030: Canonicalization should not remove nullability of AttributeReference" +
     " dataType") {
     val structType = StructType(Seq(StructField("name", StringType, nullable = false)))
@@ -189,5 +182,12 @@ class CanonicalizeSuite extends SparkFunSuite {
     assert(cast.resolved)
     // canonicalization should not converted resolved cast to unresolved
     assert(cast.canonicalized.resolved)
+  }
+
+  test("SPARK-40362: Commutative operator under BinaryComparison") {
+    Seq(EqualTo, EqualNullSafe, GreaterThan, LessThan, GreaterThanOrEqual, LessThanOrEqual)
+      .foreach { bc =>
+        assert(bc(Add($"a", $"b"), Literal(10)).semanticEquals(bc(Add($"b", $"a"), Literal(10))))
+      }
   }
 }

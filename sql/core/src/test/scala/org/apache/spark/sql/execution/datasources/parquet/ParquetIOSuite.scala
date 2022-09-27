@@ -1164,9 +1164,9 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
           classOf[JobCommitFailureParquetOutputCommitter].getCanonicalName
       )
       withTempPath { dir =>
-        val message = intercept[SparkException] {
+        val message = intercept[RuntimeException] {
           spark.range(0, 1).write.options(extraOptions).parquet(dir.getCanonicalPath)
-        }.getCause.getMessage
+        }.getMessage
         assert(message === "Intentional exception for testing purposes")
       }
     }
@@ -1181,7 +1181,8 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
     val errorMessage = intercept[Throwable] {
       spark.read.parquet("hdfs://nonexistent")
     }.toString
-    assert(errorMessage.contains("UnknownHostException"))
+    assert(errorMessage.contains("UnknownHostException") ||
+        errorMessage.contains("is not a valid DFS filename"))
   }
 
   test("SPARK-7837 Do not close output writer twice when commitTask() fails") {
@@ -1200,7 +1201,7 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
       withTempPath { dir =>
         val m1 = intercept[SparkException] {
           spark.range(1).coalesce(1).write.options(extraOptions).parquet(dir.getCanonicalPath)
-        }.getCause.getMessage
+        }.getMessage
         assert(m1.contains("Intentional exception for testing purposes"))
       }
 
@@ -1209,7 +1210,7 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
           val df = spark.range(1).select($"id" as Symbol("a"), $"id" as Symbol("b"))
             .coalesce(1)
           df.write.partitionBy("a").options(extraOptions).parquet(dir.getCanonicalPath)
-        }.getCause.getMessage
+        }.getMessage
         assert(m2.contains("Intentional exception for testing purposes"))
       }
     }
@@ -1303,6 +1304,16 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
         // and dictionary encodings.
         readResourceParquetFile("test-data/timemillis-in-i64.parquet"),
         (1 to 3).map(i => Row(new java.sql.Timestamp(10))))
+    }
+  }
+
+  test("SPARK-40128 read DELTA_LENGTH_BYTE_ARRAY encoded strings") {
+    withAllParquetReaders {
+      checkAnswer(
+        // "fruit" column in this file is encoded using DELTA_LENGTH_BYTE_ARRAY.
+        // The file comes from https://github.com/apache/parquet-testing
+        readResourceParquetFile("test-data/delta_length_byte_array.parquet"),
+        (0 to 999).map(i => Row("apple_banana_mango" + Integer.toString(i * i))))
     }
   }
 

@@ -23,8 +23,7 @@ import org.apache.spark.sql.connector.{DatasourceV2SQLBase, FakeV2Provider, Inse
 class QueryCompilationErrorsDSv2Suite
   extends QueryTest
   with DatasourceV2SQLBase
-  with InsertIntoSQLOnlyTests
-  with QueryErrorsSuiteBase {
+  with InsertIntoSQLOnlyTests {
 
   private val v2Source = classOf[FakeV2Provider].getName
   override protected val v2Format = v2Source
@@ -50,13 +49,12 @@ class QueryCompilationErrorsDSv2Suite
         }
 
         checkAnswer(spark.table(tbl), spark.emptyDataFrame)
-        checkErrorClass(
+        checkError(
           exception = e,
           errorClass = "UNSUPPORTED_FEATURE",
-          errorSubClass = Some("INSERT_PARTITION_SPEC_IF_NOT_EXISTS"),
-          msg = "The feature is not supported: " +
-            s"""INSERT INTO `testcat`.`ns1`.`ns2`.`tbl` IF NOT EXISTS in the PARTITION spec.""",
-          sqlState = Some("0A000"))
+          errorSubClass = "INSERT_PARTITION_SPEC_IF_NOT_EXISTS",
+          parameters = Map("tableName" -> "`testcat`.`ns1`.`ns2`.`tbl`"),
+          sqlState = "0A000")
       }
     }
   }
@@ -71,10 +69,10 @@ class QueryCompilationErrorsDSv2Suite
       }
 
       verifyTable(t1, spark.emptyDataFrame)
-      checkErrorClass(
+      checkError(
         exception = e,
         errorClass = "NON_PARTITION_COLUMN",
-        msg = "PARTITION clause cannot contain a non-partition column name: `id`")
+        parameters = Map("columnName" -> "`id`"))
     }
   }
 
@@ -88,10 +86,10 @@ class QueryCompilationErrorsDSv2Suite
       }
 
       verifyTable(t1, spark.emptyDataFrame)
-      checkErrorClass(
+      checkError(
         exception = e,
         errorClass = "NON_PARTITION_COLUMN",
-        msg = "PARTITION clause cannot contain a non-partition column name: `data`")
+        parameters = Map("columnName" -> "`data`"))
     }
   }
 }

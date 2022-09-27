@@ -37,8 +37,8 @@ def _unsupported_property(property_name, deprecated=False, reason=""):
 
 
 class MissingPandasLikeDataFrameGroupBy:
-    # NOTE: Please update the document "Supported pandas APIs" when implementing the new API.
-    # Documentation path: `python/docs/source/user_guide/pandas_on_spark/supported_pandas_api.rst`.
+    # NOTE: Please update the pandas-on-Spark reference document when implementing the new API.
+    # Documentation path: `python/docs/source/reference/pyspark.pandas/`.
 
     # Properties
     corr = _unsupported_property("corr")
@@ -48,11 +48,8 @@ class MissingPandasLikeDataFrameGroupBy:
     groups = _unsupported_property("groups")
     hist = _unsupported_property("hist")
     indices = _unsupported_property("indices")
-    mad = _unsupported_property("mad")
     ngroups = _unsupported_property("ngroups")
     plot = _unsupported_property("plot")
-    quantile = _unsupported_property("quantile")
-    skew = _unsupported_property("skew")
     tshift = _unsupported_property("tshift")
 
     # Deprecated properties
@@ -61,18 +58,15 @@ class MissingPandasLikeDataFrameGroupBy:
     # Functions
     boxplot = _unsupported_function("boxplot")
     ngroup = _unsupported_function("ngroup")
-    nth = _unsupported_function("nth")
     ohlc = _unsupported_function("ohlc")
     pct_change = _unsupported_function("pct_change")
     pipe = _unsupported_function("pipe")
-    prod = _unsupported_function("prod")
     resample = _unsupported_function("resample")
-    sem = _unsupported_function("sem")
 
 
 class MissingPandasLikeSeriesGroupBy:
-    # NOTE: Please update the document "Supported pandas APIs" when implementing the new API.
-    # Documentation path: `python/docs/source/user_guide/pandas_on_spark/supported_pandas_api.rst`.
+    # NOTE: Please update the pandas-on-Spark reference document when implementing the new API.
+    # Documentation path: `python/docs/source/reference/pyspark.pandas/`.
 
     # Properties
     corr = _unsupported_property("corr")
@@ -83,11 +77,8 @@ class MissingPandasLikeSeriesGroupBy:
     indices = _unsupported_property("indices")
     is_monotonic_decreasing = _unsupported_property("is_monotonic_decreasing")
     is_monotonic_increasing = _unsupported_property("is_monotonic_increasing")
-    mad = _unsupported_property("mad")
     ngroups = _unsupported_property("ngroups")
     plot = _unsupported_property("plot")
-    quantile = _unsupported_property("quantile")
-    skew = _unsupported_property("skew")
     tshift = _unsupported_property("tshift")
 
     # Deprecated properties
@@ -98,10 +89,7 @@ class MissingPandasLikeSeriesGroupBy:
     aggregate = _unsupported_function("aggregate")
     describe = _unsupported_function("describe")
     ngroup = _unsupported_function("ngroup")
-    nth = _unsupported_function("nth")
     ohlc = _unsupported_function("ohlc")
     pct_change = _unsupported_function("pct_change")
     pipe = _unsupported_function("pipe")
-    prod = _unsupported_function("prod")
     resample = _unsupported_function("resample")
-    sem = _unsupported_function("sem")

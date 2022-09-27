@@ -19,7 +19,8 @@ package org.apache.spark.scheduler
 
 import java.io.NotSerializableException
 import java.util.Properties
-import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture, TimeoutException, TimeUnit }
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, ScheduledFuture, TimeoutException, TimeUnit}
+import java.util.concurrent.{Future => JFutrue}
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.annotation.tailrec
@@ -273,6 +274,8 @@ private[spark] class DAGScheduler(
   private val shuffleMergeFinalizeNumThreads =
     sc.getConf.get(config.PUSH_BASED_SHUFFLE_MERGE_FINALIZE_THREADS)
 
+  private val shuffleFinalizeRpcThreads = sc.getConf.get(config.PUSH_SHUFFLE_FINALIZE_RPC_THREADS)
+
   // Since SparkEnv gets initialized after DAGScheduler, externalShuffleClient needs to be
   // initialized lazily
   private lazy val externalShuffleClient: Option[BlockStoreClient] =
@@ -282,12 +285,16 @@ private[spark] class DAGScheduler(
       None
     }
 
-  // Use multi-threaded scheduled executor. The merge finalization task could take some time,
-  // depending on the time to establish connections to mergers, and the time to get MergeStatuses
-  // from all the mergers.
+  // When push-based shuffle is enabled, spark driver will submit a finalize task which will send
+  // a finalize rpc to each merger ESS after the shuffle map stage is complete. The merge
+  // finalization takes up to PUSH_BASED_SHUFFLE_MERGE_RESULTS_TIMEOUT.
   private val shuffleMergeFinalizeScheduler =
     ThreadUtils.newDaemonThreadPoolScheduledExecutor("shuffle-merge-finalizer",
       shuffleMergeFinalizeNumThreads)
+
+  // Send finalize RPC tasks to merger ESS
+  private val shuffleSendFinalizeRpcExecutor: ExecutorService =
+    ThreadUtils.newDaemonFixedThreadPool(shuffleFinalizeRpcThreads, "shuffle-merge-finalize-rpc")
 
   /**
    * Called by the TaskSetManager to report task's starting.
@@ -1175,6 +1182,13 @@ private[spark] class DAGScheduler(
     listenerBus.post(SparkListenerUnschedulableTaskSetRemoved(stageId, stageAttemptId))
   }
 
+  private[scheduler] def handleStageFailed(
+      stageId: Int,
+      reason: String,
+      exception: Option[Throwable]): Unit = {
+    stageIdToStage.get(stageId).foreach { abortStage(_, reason, exception) }
+  }
+
   private[scheduler] def handleTaskSetFailed(
       taskSet: TaskSet,
       reason: String,
@@ -1885,6 +1899,16 @@ private[spark] class DAGScheduler(
               mapOutputTracker.
                 unregisterMergeResult(shuffleId, reduceId, bmAddress, Option(mapIndex))
             }
+          } else {
+            // Unregister the merge result of <shuffleId, reduceId> if there is a FetchFailed event
+            // and is not a  MetaDataFetchException which is signified by bmAddress being null
+            if (bmAddress != null &&
+              bmAddress.executorId.equals(BlockManagerId.SHUFFLE_MERGER_IDENTIFIER)) {
+              assert(pushBasedShuffleEnabled, "Push based shuffle expected to " +
+                "be enabled when handling merge block fetch failure.")
+              mapOutputTracker.
+                unregisterMergeResult(shuffleId, reduceId, bmAddress, None)
+            }
           }
 
           if (failedStage.rdd.isBarrier()) {
@@ -2225,67 +2249,95 @@ private[spark] class DAGScheduler(
     val numMergers = stage.shuffleDep.getMergerLocs.length
     val results = (0 until numMergers).map(_ => SettableFuture.create[Boolean]())
     externalShuffleClient.foreach { shuffleClient =>
-      if (!registerMergeResults) {
-        results.foreach(_.set(true))
-        // Finalize in separate thread as shuffle merge is a no-op in this case
-        shuffleMergeFinalizeScheduler.schedule(new Runnable {
-          override def run(): Unit = {
-            stage.shuffleDep.getMergerLocs.foreach {
-              case shuffleServiceLoc =>
-                // Sends async request to shuffle service to finalize shuffle merge on that host.
-                // Since merge statuses will not be registered in this case,
-                // we pass a no-op listener.
-                shuffleClient.finalizeShuffleMerge(shuffleServiceLoc.host,
-                  shuffleServiceLoc.port, shuffleId, shuffleMergeId,
-                  new MergeFinalizerListener {
-                    override def onShuffleMergeSuccess(statuses: MergeStatuses): Unit = {
-                    }
+      val scheduledFutures =
+        if (!registerMergeResults) {
+          results.foreach(_.set(true))
+          // Finalize in separate thread as shuffle merge is a no-op in this case
+          stage.shuffleDep.getMergerLocs.map {
+            case shuffleServiceLoc =>
+              // Sends async request to shuffle service to finalize shuffle merge on that host.
+              // Since merge statuses will not be registered in this case,
+              // we pass a no-op listener.
+              shuffleSendFinalizeRpcExecutor.submit(new Runnable() {
+                override def run(): Unit = {
+                  shuffleClient.finalizeShuffleMerge(shuffleServiceLoc.host,
+                    shuffleServiceLoc.port, shuffleId, shuffleMergeId,
+                    new MergeFinalizerListener {
+                      override def onShuffleMergeSuccess(statuses: MergeStatuses): Unit = {
+                      }
 
-                    override def onShuffleMergeFailure(e: Throwable): Unit = {
-                    }
-                  })
-            }
-          }
-        }, 0, TimeUnit.SECONDS)
-      } else {
-        stage.shuffleDep.getMergerLocs.zipWithIndex.foreach {
-          case (shuffleServiceLoc, index) =>
-            // Sends async request to shuffle service to finalize shuffle merge on that host
-            // TODO: SPARK-35536: Cancel finalizeShuffleMerge if the stage is cancelled
-            // TODO: during shuffleMergeFinalizeWaitSec
-            shuffleClient.finalizeShuffleMerge(shuffleServiceLoc.host,
-              shuffleServiceLoc.port, shuffleId, shuffleMergeId,
-              new MergeFinalizerListener {
-                override def onShuffleMergeSuccess(statuses: MergeStatuses): Unit = {
-                  assert(shuffleId == statuses.shuffleId)
-                  eventProcessLoop.post(RegisterMergeStatuses(stage, MergeStatus.
-                    convertMergeStatusesToMergeStatusArr(statuses, shuffleServiceLoc)))
-                  results(index).set(true)
-                }
-
-                override def onShuffleMergeFailure(e: Throwable): Unit = {
-                  logWarning(s"Exception encountered when trying to finalize shuffle " +
-                    s"merge on ${shuffleServiceLoc.host} for shuffle $shuffleId", e)
-                  // Do not fail the future as this would cause dag scheduler to prematurely
-                  // give up on waiting for merge results from the remaining shuffle services
-                  // if one fails
-                  results(index).set(false)
+                      override def onShuffleMergeFailure(e: Throwable): Unit = {
+                      }
+                    })
                 }
               })
+          }
+        } else {
+          stage.shuffleDep.getMergerLocs.zipWithIndex.map {
+            case (shuffleServiceLoc, index) =>
+              // Sends async request to shuffle service to finalize shuffle merge on that host
+              // TODO: SPARK-35536: Cancel finalizeShuffleMerge if the stage is cancelled
+              // TODO: during shuffleMergeFinalizeWaitSec
+              shuffleSendFinalizeRpcExecutor.submit(new Runnable() {
+                override def run(): Unit = {
+                  shuffleClient.finalizeShuffleMerge(shuffleServiceLoc.host,
+                    shuffleServiceLoc.port, shuffleId, shuffleMergeId,
+                    new MergeFinalizerListener {
+                      override def onShuffleMergeSuccess(statuses: MergeStatuses): Unit = {
+                        assert(shuffleId == statuses.shuffleId)
+                        eventProcessLoop.post(RegisterMergeStatuses(stage, MergeStatus.
+                          convertMergeStatusesToMergeStatusArr(statuses, shuffleServiceLoc)))
+                        results(index).set(true)
+                      }
+
+                      override def onShuffleMergeFailure(e: Throwable): Unit = {
+                        logWarning(s"Exception encountered when trying to finalize shuffle " +
+                          s"merge on ${shuffleServiceLoc.host} for shuffle $shuffleId", e)
+                        // Do not fail the future as this would cause dag scheduler to prematurely
+                        // give up on waiting for merge results from the remaining shuffle services
+                        // if one fails
+                        results(index).set(false)
+                      }
+                    })
+                }
+              })
+          }
         }
-      }
       // DAGScheduler only waits for a limited amount of time for the merge results.
       // It will attempt to submit the next stage(s) irrespective of whether merge results
       // from all shuffle services are received or not.
+      var timedOut = false
       try {
         Futures.allAsList(results: _*).get(shuffleMergeResultsTimeoutSec, TimeUnit.SECONDS)
       } catch {
         case _: TimeoutException =>
+          timedOut = true
           logInfo(s"Timed out on waiting for merge results from all " +
             s"$numMergers mergers for shuffle $shuffleId")
       } finally {
+        if (timedOut || !registerMergeResults) {
+          cancelFinalizeShuffleMergeFutures(scheduledFutures,
+            if (timedOut) 0L else shuffleMergeResultsTimeoutSec)
+        }
         eventProcessLoop.post(ShuffleMergeFinalized(stage))
       }
+    }
+  }
+
+  private def cancelFinalizeShuffleMergeFutures(
+      futures: Seq[JFutrue[_]],
+      delayInSecs: Long): Unit = {
+
+    def cancelFutures(): Unit = futures.foreach(_.cancel(true))
+
+    if (delayInSecs > 0) {
+      shuffleMergeFinalizeScheduler.schedule(new Runnable {
+        override def run(): Unit = {
+          cancelFutures()
+        }
+      }, delayInSecs, TimeUnit.SECONDS)
+    } else {
+      cancelFutures()
     }
   }
 
@@ -2449,7 +2501,15 @@ private[spark] class DAGScheduler(
     val currentEpoch = maybeEpoch.getOrElse(mapOutputTracker.getEpoch)
     logDebug(s"Considering removal of executor $execId; " +
       s"fileLost: $fileLost, currentEpoch: $currentEpoch")
-    if (!executorFailureEpoch.contains(execId) || executorFailureEpoch(execId) < currentEpoch) {
+    // Check if the execId is a shuffle push merger. We do not remove the executor if it is,
+    // and only remove the outputs on the host.
+    val isShuffleMerger = execId.equals(BlockManagerId.SHUFFLE_MERGER_IDENTIFIER)
+    if (isShuffleMerger && pushBasedShuffleEnabled) {
+      hostToUnregisterOutputs.foreach(
+        host => blockManagerMaster.removeShufflePushMergerLocation(host))
+    }
+    if (!isShuffleMerger &&
+      (!executorFailureEpoch.contains(execId) || executorFailureEpoch(execId) < currentEpoch)) {
       executorFailureEpoch(execId) = currentEpoch
       logInfo(s"Executor lost: $execId (epoch $currentEpoch)")
       if (pushBasedShuffleEnabled) {
@@ -2461,6 +2521,8 @@ private[spark] class DAGScheduler(
       clearCacheLocs()
     }
     if (fileLost) {
+      // When the fetch failure is for a merged shuffle chunk, ignoreShuffleFileLostEpoch is true
+      // and so all the files will be removed.
       val remove = if (ignoreShuffleFileLostEpoch) {
         true
       } else if (!shuffleFileLostEpoch.contains(execId) ||
@@ -2586,6 +2648,13 @@ private[spark] class DAGScheduler(
     }
     listenerBus.post(SparkListenerStageCompleted(stage.latestInfo))
     runningStages -= stage
+  }
+
+  /**
+   * Called by the OutputCommitCoordinator to cancel stage due to data duplication may happen.
+   */
+  private[scheduler] def stageFailed(stageId: Int, reason: String): Unit = {
+    eventProcessLoop.post(StageFailed(stageId, reason, None))
   }
 
   /**
@@ -2855,6 +2924,9 @@ private[scheduler] class DAGSchedulerEventProcessLoop(dagScheduler: DAGScheduler
 
     case completion: CompletionEvent =>
       dagScheduler.handleTaskCompletion(completion)
+
+    case StageFailed(stageId, reason, exception) =>
+      dagScheduler.handleStageFailed(stageId, reason, exception)
 
     case TaskSetFailed(taskSet, reason, exception) =>
       dagScheduler.handleTaskSetFailed(taskSet, reason, exception)
