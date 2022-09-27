@@ -953,7 +953,8 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
       Pair<DBBackend, File> pair = useToConversionOpt.get();
       DBBackend originalBackend = pair.getLeft();
       File originalFile = pair.getRight();
-      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+      try (DB original =
+        DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
         dbKeysToBeRemoved.addAll(reloadActiveAppAttemptsPathInfo(original, db));
         dbKeysToBeRemoved.addAll(reloadFinalizedAppAttemptsShuffleMergeInfo(original, db));
         removeOutdatedKeyValuesInDB(dbKeysToBeRemoved);

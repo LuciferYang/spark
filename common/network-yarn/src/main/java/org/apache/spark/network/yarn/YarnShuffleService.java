@@ -370,7 +370,8 @@ public class YarnShuffleService extends AuxiliaryService {
       Pair<DBBackend, File> pair = useToConversionOpt.get();
       DBBackend originalBackend = pair.getLeft();
       File originalFile = pair.getRight();
-      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+      try (DB original =
+        DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
         loadSecretsFromDb(original, db);
       } finally {
         JavaUtils.deleteRecursively(originalFile);

@@ -467,7 +467,8 @@ public class ExternalShuffleBlockResolver {
       Pair<DBBackend, File> pair = useToConversionOpt.get();
       DBBackend originalBackend = pair.getLeft();
       File originalFile = pair.getRight();
-      try (DB original = DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
+      try (DB original =
+        DBProvider.initDB(originalBackend, originalFile, CURRENT_VERSION, mapper)) {
         return reloadRegisteredExecutors(original, db);
       } finally {
         JavaUtils.deleteRecursively(originalFile);
