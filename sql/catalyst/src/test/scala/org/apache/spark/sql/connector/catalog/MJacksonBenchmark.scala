@@ -31,9 +31,12 @@ object MJacksonBenchmark extends BenchmarkBase {
 
   def testWriteMapToJson(valuesPerIteration: Int, threads: Int): Unit = {
 
-    val map: mutable.HashMap[String, String] = new mutable.HashMap[String, String]()
-    map.put("mergeDir", "/a/b/c/mergeDirName")
-    map.put("attemptId", "yarn_appattempt_1648454518011_994053_000001")
+    val map = Map("intValue" -> 1,
+      "longValue" -> 2L,
+      "doubleValue" -> 3.0D,
+      "stringValue" -> "4",
+      "floatValue" -> 5.0F,
+      "booleanValue" -> true)
 
 
     val benchmark = new Benchmark(s"Test $threads threads write map to json",
@@ -84,10 +87,18 @@ object MJacksonBenchmark extends BenchmarkBase {
   }
 
   def testReadJsonToMap(valuesPerIteration: Int, threads: Int): Unit = {
-    val input =
-      """
-        |{"mergeDir":"/a/b/c/mergeDirName","attemptId":"appattempt_1648454518011_994053_000001"}
-      """.stripMargin
+
+    val input = {
+      val map = Map("intValue" -> 1,
+        "longValue" -> 2L,
+        "doubleValue" -> 3.0D,
+        "stringValue" -> "4",
+        "floatValue" -> 5.0F,
+        "booleanValue" -> true)
+      val mapper = new ObjectMapper()
+      mapper.registerModule(DefaultScalaModule)
+      mapper.writeValueAsString(map)
+    }
 
     val benchmark = new Benchmark(s"Test $threads threads read json to map",
       valuesPerIteration, output = output)
@@ -138,7 +149,7 @@ object MJacksonBenchmark extends BenchmarkBase {
   }
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
-    val valuesPerIteration = 10000000
+    val valuesPerIteration = 1000000
 
     testReadJsonToMap(valuesPerIteration, 5)
     testReadJsonToMap(valuesPerIteration, 10)
