@@ -19,8 +19,6 @@ package org.apache.spark.sql.connector.catalog
 
 import java.util.concurrent.CountDownLatch
 
-import scala.collection.mutable
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
@@ -116,7 +114,7 @@ object MJacksonBenchmark extends BenchmarkBase {
         executor.submit(new Runnable {
           override def run(): Unit = {
             val idx = i % threads
-            multi(idx).readValue(input, classOf[mutable.HashMap[String, String]])
+            multi(idx).readValue(input, classOf[Map[String, Any]])
             latch.countDown()
           }
         })
@@ -136,7 +134,7 @@ object MJacksonBenchmark extends BenchmarkBase {
         executor.submit(new Runnable {
           override def run(): Unit = {
             val idx = i % threads
-            singleton(idx).readValue(input, classOf[mutable.HashMap[String, String]])
+            singleton(idx).readValue(input, classOf[Map[String, Any]])
             latch.countDown()
           }
         })
@@ -154,13 +152,13 @@ object MJacksonBenchmark extends BenchmarkBase {
     testReadJsonToMap(valuesPerIteration, 5)
     testReadJsonToMap(valuesPerIteration, 10)
     testReadJsonToMap(valuesPerIteration, 20)
-//    testReadJsonToMap(valuesPerIteration, 50)
-//    testReadJsonToMap(valuesPerIteration, 100)
+    testReadJsonToMap(valuesPerIteration, 50)
+    testReadJsonToMap(valuesPerIteration, 75)
 
     testWriteMapToJson(valuesPerIteration, 5)
     testWriteMapToJson(valuesPerIteration, 10)
     testWriteMapToJson(valuesPerIteration, 20)
-//    testWriteMapToJson(valuesPerIteration, 50)
-//    testWriteMapToJson(valuesPerIteration, 100)
+    testWriteMapToJson(valuesPerIteration, 50)
+    testWriteMapToJson(valuesPerIteration, 75)
   }
 }
