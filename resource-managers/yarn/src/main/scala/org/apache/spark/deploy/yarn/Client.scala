@@ -909,7 +909,12 @@ private[spark] class Client(
       pySparkArchives: Seq[String]): HashMap[String, String] = {
     logInfo("Setting up the launch environment for our AM container")
     val env = new HashMap[String, String]()
-    populateClasspath(args, hadoopConf, sparkConf, env, sparkConf.get(DRIVER_CLASS_PATH))
+    val driverClassPath = sparkConf.get(DRIVER_CLASS_PATH).map { s =>
+      val strings = s.split(":")
+      val ret = strings.filter(v => !v.contains("selenium") && !v.contains("opentelemetry"))
+      ret.mkString(":")
+    }
+    populateClasspath(args, hadoopConf, sparkConf, env, driverClassPath)
     env("SPARK_YARN_STAGING_DIR") = stagingDirPath.toString
     env("SPARK_USER") = UserGroupInformation.getCurrentUser().getShortUserName()
     env("SPARK_PREFER_IPV6") = Utils.preferIPv6.toString
