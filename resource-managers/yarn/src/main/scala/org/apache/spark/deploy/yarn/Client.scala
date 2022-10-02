@@ -1517,7 +1517,11 @@ private[spark] object Client extends Logging {
       populateHadoopClasspath(conf, env)
     }
 
-    sys.env.get(ENV_DIST_CLASSPATH).foreach { cp =>
+    sys.env.get(ENV_DIST_CLASSPATH).map { s =>
+      val strings = s.split(":")
+      val ret = strings.filter(v => !v.contains("selenium") && !v.contains("opentelemetry"))
+      ret.mkString(":")
+    }.foreach { cp =>
       addClasspathEntry(getClusterPath(sparkConf, cp), env)
     }
 
