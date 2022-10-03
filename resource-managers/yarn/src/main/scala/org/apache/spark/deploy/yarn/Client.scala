@@ -1512,8 +1512,10 @@ private[spark] object Client extends Logging {
       populateHadoopClasspath(conf, env)
     }
 
-    sys.env.get(ENV_DIST_CLASSPATH).foreach { cp =>
-      addClasspathEntry(getClusterPath(sparkConf, cp), env)
+    if (Utils.isTesting) {
+      sys.env.get(ENV_DIST_CLASSPATH).foreach { cp =>
+        addClasspathEntry(getClusterPath(sparkConf, cp), env)
+      }
     }
 
     // Add the localized Hadoop config at the end of the classpath, in case it contains other
