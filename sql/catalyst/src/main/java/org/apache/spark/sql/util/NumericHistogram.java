@@ -53,13 +53,13 @@ public class NumericHistogram {
    *
    * @since 3.3.0
    */
-  public static class Coord implements Comparable {
+  public static class Coord implements Comparable<Coord> {
     public double x;
     public double y;
 
     @Override
-    public int compareTo(Object other) {
-      return Double.compare(x, ((Coord) other).x);
+    public int compareTo(Coord other) {
+      return Double.compare(x, other.x);
     }
   }
 

@@ -55,7 +55,7 @@ public interface SparkThrowable {
   }
 
   default Map<String, String> getMessageParameters() {
-    return new HashMap();
+    return new HashMap<>();
   }
 
   default QueryContext[] getQueryContext() { return new QueryContext[0]; }

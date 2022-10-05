@@ -124,7 +124,7 @@ class YarnShuffleServiceMetrics implements MetricsSource {
         .addGauge(new ShuffleServiceMetricsInfo(name + "_rateMean", "Mean rate of meter " + name),
           m.getMeanRate());
     } else if (metric instanceof Gauge) {
-      final Object gaugeValue = ((Gauge) metric).getValue();
+      final Object gaugeValue = ((Gauge<?>) metric).getValue();
       if (gaugeValue instanceof Integer) {
         metricsRecordBuilder.addGauge(
           getShuffleServiceMetricsInfoForGauge(name), (Integer) gaugeValue);
