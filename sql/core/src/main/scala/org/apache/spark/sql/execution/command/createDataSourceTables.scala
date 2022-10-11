@@ -218,7 +218,7 @@ case class CreateDataSourceTableAsSelectCommand(
       }
     }
 
-    CommandUtils.updateTableStats(sparkSession, table)
+    CommandUtils.updateTableStats(sparkSession, table, mode, metrics)
 
     Seq.empty[Row]
   }

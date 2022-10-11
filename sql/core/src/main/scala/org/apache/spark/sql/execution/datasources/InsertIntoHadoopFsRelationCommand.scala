@@ -208,7 +208,7 @@ case class InsertIntoHadoopFsRelationCommand(
       sparkSession.sharedState.cacheManager.recacheByPath(sparkSession, outputPath, fs)
 
       if (catalogTable.nonEmpty) {
-        CommandUtils.updateTableStats(sparkSession, catalogTable.get)
+        CommandUtils.updateTableStats(sparkSession, catalogTable.get, mode, metrics)
       }
 
     } else {

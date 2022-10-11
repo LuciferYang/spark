@@ -25,6 +25,7 @@ import scala.util.control.NonFatal
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog.{CatalogStatistics, CatalogTable, CatalogTablePartition, CatalogTableType}
@@ -35,9 +36,9 @@ import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.{DataSourceUtils, InMemoryFileIndex}
+import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.{SessionState, SQLConf}
 import org.apache.spark.sql.types._
-
 /**
  * For the purpose of calculating total directory sizes, use this filter to
  * ignore some irrelevant files.
@@ -51,6 +52,30 @@ class PathFilterIgnoreNonData(stagingDir: String) extends PathFilter with Serial
 }
 
 object CommandUtils extends Logging {
+
+  def updateTableStats(
+      sparkSession: SparkSession,
+      table: CatalogTable,
+      mode: SaveMode,
+      metrics: Map[String, SQLMetric]): Unit = {
+    val catalog = sparkSession.sessionState.catalog
+    mode match {
+      case SaveMode.Overwrite | SaveMode.ErrorIfExists =>
+        val numBytes = metrics.get("numOutputBytes").map(_.value).map(BigInt(_))
+        val numRows = metrics.get("numOutputRows").map(_.value).map(BigInt(_))
+        if (numBytes.isDefined) {
+          catalog.alterTableStats(table.identifier,
+            Some(CatalogStatistics(numBytes.get, numRows)))
+          if (table.partitionColumnNames.nonEmpty) {
+            val partitions = catalog.listPartitions(table.identifier)
+            catalog.alterPartitions(table.identifier, partitions)
+          }
+        }
+      case _ if table.stats.nonEmpty => // SaveMode.Append
+        catalog.alterTableStats(table.identifier, None)
+      case _ => // SaveMode.Ignore Do nothing
+    }
+  }
 
   /** Change statistics after changing data by commands. */
   def updateTableStats(sparkSession: SparkSession, table: CatalogTable): Unit = {
