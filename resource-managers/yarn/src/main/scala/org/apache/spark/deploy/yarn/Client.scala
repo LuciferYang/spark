@@ -59,7 +59,7 @@ import org.apache.spark.deploy.yarn.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.internal.config.Python._
-import org.apache.spark.launcher.{JavaModuleOptions, LauncherBackend, SparkAppHandle, YarnCommandBuilderUtils}
+import org.apache.spark.launcher.{JavaExtraOptions, LauncherBackend, SparkAppHandle, YarnCommandBuilderUtils}
 import org.apache.spark.resource.ResourceProfile
 import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.util.{CallerContext, Utils, VersionUtils, YarnContainerInfoHelper}
@@ -990,10 +990,10 @@ private[spark] class Client(
 
     javaOpts += s"-Djava.net.preferIPv6Addresses=${Utils.preferIPv6}"
 
-    // SPARK-37106: To start AM with Java 17, `JavaModuleOptions.defaultModuleOptions`
+    // SPARK-37106: To start AM with Java 17, `JavaModuleOptions.defaultExtraOptions`
     // is added by default. It will not affect Java 8 and Java 11 due to existence of
     // `-XX:+IgnoreUnrecognizedVMOptions`.
-    javaOpts += JavaModuleOptions.defaultModuleOptions()
+    javaOpts += JavaExtraOptions.defaultExtraOptions()
 
     // Set the environment variable through a command prefix
     // to append to the existing value of the variable

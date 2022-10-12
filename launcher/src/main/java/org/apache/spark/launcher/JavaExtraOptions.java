@@ -18,14 +18,14 @@
 package org.apache.spark.launcher;
 
 /**
- * This helper class is used to place the all `--add-opens` options
- * required by Spark when using Java 17. `DEFAULT_MODULE_OPTIONS` has added
+ * This helper class is used to place the all Java options
+ * required by Spark when using Java 17+. `DEFAULT_EXTRA_OPTIONS` has added
  * `-XX:+IgnoreUnrecognizedVMOptions` to be compatible with Java 8 and Java 11.
  *
  * @since 3.3.0
  */
-public class JavaModuleOptions {
-    private static final String[] DEFAULT_MODULE_OPTIONS = {
+public class JavaExtraOptions {
+    private static final String[] DEFAULT_EXTRA_OPTIONS = {
       "-XX:+IgnoreUnrecognizedVMOptions",
       "--add-opens=java.base/java.lang=ALL-UNNAMED",
       "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
@@ -44,10 +44,10 @@ public class JavaModuleOptions {
       "-Djdk.reflect.useDirectMethodHandle=false"};
 
     /**
-     * Returns the default Java options related to `--add-opens' and
+     * Returns the default Java options related to Java 17+ and
      * `-XX:+IgnoreUnrecognizedVMOptions` used by Spark.
      */
-    public static String defaultModuleOptions() {
-      return String.join(" ", DEFAULT_MODULE_OPTIONS);
+    public static String defaultExtraOptions() {
+      return String.join(" ", DEFAULT_EXTRA_OPTIONS);
     }
 }

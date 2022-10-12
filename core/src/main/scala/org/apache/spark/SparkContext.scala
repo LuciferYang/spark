@@ -52,7 +52,7 @@ import org.apache.spark.internal.config.Tests._
 import org.apache.spark.internal.config.UI._
 import org.apache.spark.internal.plugin.PluginContainer
 import org.apache.spark.io.CompressionCodec
-import org.apache.spark.launcher.JavaModuleOptions
+import org.apache.spark.launcher.JavaExtraOptions
 import org.apache.spark.metrics.source.JVMCPUSource
 import org.apache.spark.partial.{ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd._
@@ -400,7 +400,7 @@ class SparkContext(config: SparkConf) extends Logging {
     // This should be set as early as possible.
     SparkContext.fillMissingMagicCommitterConfsIfNeeded(_conf)
 
-    SparkContext.supplementJavaModuleOptions(_conf)
+    SparkContext.supplementJavaExtraOptions(_conf)
     SparkContext.supplementJavaIPv6Options(_conf)
 
     _driverLogger = DriverLogger(_conf)
@@ -3060,11 +3060,11 @@ object SparkContext extends Logging {
    * SPARK-36796: This is a helper function to supplement `--add-opens` options to
    * `spark.driver.extraJavaOptions` and `spark.executor.extraJavaOptions`.
    */
-  private def supplementJavaModuleOptions(conf: SparkConf): Unit = {
+  private def supplementJavaExtraOptions(conf: SparkConf): Unit = {
     def supplement(key: OptionalConfigEntry[String]): Unit = {
       val v = conf.get(key) match {
-        case Some(opts) => s"${JavaModuleOptions.defaultModuleOptions()} $opts"
-        case None => JavaModuleOptions.defaultModuleOptions()
+        case Some(opts) => s"${JavaExtraOptions.defaultExtraOptions()} $opts"
+        case None => JavaExtraOptions.defaultExtraOptions()
       }
       conf.set(key.key, v)
     }
