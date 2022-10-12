@@ -173,8 +173,8 @@
     <!-- for now, not running scalafmt as part of default verify pipeline -->
     <scalafmt.skip>true</scalafmt.skip>
     <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-    <fasterxml.jackson.version>2.14.0-rc1</fasterxml.jackson.version>
-    <fasterxml.jackson.databind.version>2.14.0-rc1</fasterxml.jackson.databind.version>
+    <fasterxml.jackson.version>2.14.0-rc2</fasterxml.jackson.version>
+    <fasterxml.jackson.databind.version>2.14.0-rc2</fasterxml.jackson.databind.version>
     <snappy.version>1.1.8.4</snappy.version>
     <netlib.ludovic.dev.version>3.0.2</netlib.ludovic.dev.version>
     <commons-codec.version>1.15</commons-codec.version>
