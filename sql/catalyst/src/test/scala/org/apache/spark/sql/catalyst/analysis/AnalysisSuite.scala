@@ -717,8 +717,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
       "UNRESOLVED_COLUMN.WITH_SUGGESTION",
       Map("objectName" -> "`y`", "proposal" -> "`t`.`x`"),
       caseSensitive = true,
-      line = -1,
-      pos = -1)
+      line = 1,
+      pos = 46)
   }
 
   test("CTE with non-matching column alias") {
@@ -729,7 +729,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
 
   test("SPARK-28251: Insert into non-existing table error message is user friendly") {
     assertAnalysisErrorClass(parsePlan("INSERT INTO test VALUES (1)"),
-      "TABLE_OR_VIEW_NOT_FOUND", Map("relationName" -> "`test`"))
+      "TABLE_OR_VIEW_NOT_FOUND", Map("relationName" -> "`test`"),
+      line = 1, pos = 12)
   }
 
   test("check CollectMetrics resolved") {
@@ -1158,8 +1159,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
       "UNRESOLVED_COLUMN.WITH_SUGGESTION",
       Map("objectName" -> "`c`.`y`", "proposal" -> "`x`"),
       caseSensitive = true,
-      line = -1,
-      pos = -1)
+      line = 5,
+      pos = 15)
   }
 
   test("SPARK-38118: Func(wrong_type) in the HAVING clause should throw data mismatch error") {
@@ -1178,7 +1179,9 @@ class AnalysisSuite extends AnalysisTest with Matchers {
         "inputSql" -> "\"c\"",
         "inputType" -> "\"BOOLEAN\"",
         "requiredType" -> "\"NUMERIC\" or \"ANSI INTERVAL\""),
-      caseSensitive = false)
+      caseSensitive = false,
+      line = 6,
+      pos = 7)
 
     assertAnalysisErrorClass(
       inputPlan = parsePlan(
@@ -1195,7 +1198,9 @@ class AnalysisSuite extends AnalysisTest with Matchers {
         "inputSql" -> "\"c\"",
         "inputType" -> "\"BOOLEAN\"",
         "requiredType" -> "\"NUMERIC\" or \"ANSI INTERVAL\""),
-      caseSensitive = false)
+      caseSensitive = false,
+      line = 6,
+      pos = 7)
 
     assertAnalysisErrorClass(
       inputPlan = parsePlan(
@@ -1214,8 +1219,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
         "requiredType" ->
           "(\"NUMERIC\" or \"INTERVAL DAY TO SECOND\" or \"INTERVAL YEAR TO MONTH\")"),
       caseSensitive = false,
-      line = -1,
-      pos = -1)
+      line = 6,
+      pos = 7)
 
     assertAnalysisErrorClass(
       inputPlan = parsePlan(
@@ -1234,8 +1239,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
         "requiredType" ->
           "(\"NUMERIC\" or \"INTERVAL DAY TO SECOND\" or \"INTERVAL YEAR TO MONTH\")"),
       caseSensitive = false,
-      line = -1,
-      pos = -1)
+      line = 6,
+      pos = 7)
   }
 
   test("SPARK-39354: should be [TABLE_OR_VIEW_NOT_FOUND]") {
@@ -1246,7 +1251,9 @@ class AnalysisSuite extends AnalysisTest with Matchers {
          |FROM t1
          |JOIN t2 ON t1.user_id = t2.user_id
          |WHERE t1.dt >= DATE_SUB('2020-12-27', 90)""".stripMargin),
-      "TABLE_OR_VIEW_NOT_FOUND", Map("relationName" -> "`t2`"))
+      "TABLE_OR_VIEW_NOT_FOUND", Map("relationName" -> "`t2`"),
+      line = 5,
+      pos = 5)
   }
 
   test("SPARK-39144: nested subquery expressions deduplicate relations should be done bottom up") {
