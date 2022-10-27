@@ -198,7 +198,8 @@ trait AnalysisTest extends PlanTest {
              |Actual message parameters: ${e.messageParameters.mkString("\n  ")}
              """.stripMargin)
       }
-      if (e.line.getOrElse(-1) != line || e.startPosition.getOrElse(-1) != pos) {
+      if ((line >= 0 && e.line.getOrElse(-1) != line) ||
+          (pos >= 0 && e.startPosition.getOrElse(-1) != pos)) {
         failMsgBuilder.append(
           s"""Line/position should be: $line, $pos
              |Actual line/position: ${e.line.getOrElse(-1)}, ${e.startPosition.getOrElse(-1)}
