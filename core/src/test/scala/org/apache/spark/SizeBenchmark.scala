@@ -28,7 +28,8 @@ object SizeBenchmark extends BenchmarkBase {
     val valuesPerIteration = 100000
     val buffer = new ArrayBuffer[Int]()
     buffer.appendAll((0 until dataSize))
-    val benchmark = new Benchmark(s"Test size of Seq with buffer size $dataSize",
+    val benchmark = new Benchmark(
+      s"Test size of Seq with buffer size $dataSize and toSize $callSizeTimes time(s)",
       valuesPerIteration, output = output)
     benchmark.addCase("toSeq + Size") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
