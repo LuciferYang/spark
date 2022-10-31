@@ -723,9 +723,9 @@ object SQLConf {
         "multiplying the median partition size and also larger than " +
         "'spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes'")
       .version("3.0.0")
-      .intConf
+      .doubleConf
       .checkValue(_ >= 0, "The skew factor cannot be negative.")
-      .createWithDefault(5)
+      .createWithDefault(5.0)
 
   val SKEW_JOIN_SKEWED_PARTITION_THRESHOLD =
     buildConf("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes")
@@ -1830,6 +1830,14 @@ object SQLConf {
       .stringConf
       .createWithDefault("lz4")
 
+  val CHECKPOINT_RENAMEDFILE_CHECK_ENABLED =
+    buildConf("spark.sql.streaming.checkpoint.renamedFileCheck.enabled")
+      .doc("When true, Spark will validate if renamed checkpoint file exists.")
+      .internal()
+      .version("3.4.0")
+      .booleanConf
+      .createWithDefault(false)
+
   /**
    * Note: this is defined in `RocksDBConf.FORMAT_VERSION`. These two places should be updated
    * together.
@@ -1916,7 +1924,7 @@ object SQLConf {
         "Integration Guide.")
       .version("3.1.0")
       .booleanConf
-      .createWithDefault(true)
+      .createWithDefault(false)
 
   val STATEFUL_OPERATOR_CHECK_CORRECTNESS_ENABLED =
     buildConf("spark.sql.streaming.statefulOperator.checkCorrectness.enabled")
@@ -1930,6 +1938,22 @@ object SQLConf {
         "When this config is disabled, Spark will just print warning message for users. " +
         "Prior to Spark 3.1.0, the behavior is disabling this config.")
       .version("3.1.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val STATEFUL_OPERATOR_ALLOW_MULTIPLE =
+    buildConf("spark.sql.streaming.statefulOperator.allowMultiple")
+      .internal()
+      .doc("When true, multiple stateful operators are allowed to be present in a streaming " +
+        "pipeline. The support for multiple stateful operators introduces a minor (semantically " +
+        "correct) change in respect to late record filtering - late records are detected and " +
+        "filtered in respect to the watermark from the previous microbatch instead of the " +
+        "current one. This is a behavior change for Spark streaming pipelines and we allow " +
+        "users to revert to the previous behavior of late record filtering (late records are " +
+        "detected and filtered by comparing with the current microbatch watermark) by setting " +
+        "the flag value to false. In this mode, only a single stateful operator will be allowed " +
+        "in a streaming pipeline.")
+      .version("3.4.0")
       .booleanConf
       .createWithDefault(true)
 
@@ -1973,6 +1997,15 @@ object SQLConf {
     .version("3.3.0")
     .booleanConf
     .createWithDefault(false)
+
+  val ASYNC_LOG_PURGE =
+    buildConf("spark.sql.streaming.asyncLogPurge.enabled")
+      .internal()
+      .doc("When true, purging the offset log and " +
+        "commit log of old entries will be done asynchronously.")
+      .version("3.4.0")
+      .booleanConf
+      .createWithDefault(true)
 
   val VARIABLE_SUBSTITUTE_ENABLED =
     buildConf("spark.sql.variable.substitute")
@@ -2983,6 +3016,16 @@ object SQLConf {
         "explicit default values to behave as if they had specified DEFAULT NULL instead. " +
         "For example, this allows most INSERT INTO statements to specify only a prefix of the " +
         "columns in the target table, and the remaining columns will receive NULL values.")
+      .version("3.4.0")
+      .booleanConf
+      .createWithDefault(false)
+
+  val SKIP_TYPE_VALIDATION_ON_ALTER_PARTITION =
+    buildConf("spark.sql.legacy.skipTypeValidationOnAlterPartition")
+      .internal()
+      .doc("When true, skip validation for partition spec in ALTER PARTITION. E.g., " +
+        "`ALTER TABLE .. ADD PARTITION(p='a')` would work even the partition type is int. " +
+        s"When false, the behavior follows ${STORE_ASSIGNMENT_POLICY.key}")
       .version("3.4.0")
       .booleanConf
       .createWithDefault(false)
@@ -4233,6 +4276,8 @@ class SQLConf extends Serializable with Logging {
   def streamingMaintenanceInterval: Long = getConf(STREAMING_MAINTENANCE_INTERVAL)
 
   def stateStoreCompressionCodec: String = getConf(STATE_STORE_COMPRESSION_CODEC)
+
+  def checkpointRenamedFileCheck: Boolean = getConf(CHECKPOINT_RENAMEDFILE_CHECK_ENABLED)
 
   def parquetFilterPushDown: Boolean = getConf(PARQUET_FILTER_PUSHDOWN_ENABLED)
 

@@ -119,7 +119,7 @@ class AnalysisErrorSuite extends AnalysisTest {
       messageParameters: Map[String, String],
       caseSensitive: Boolean = true): Unit = {
     test(name) {
-      assertAnalysisErrorClass(plan, errorClass, messageParameters, caseSensitive)
+      assertAnalysisErrorClass(plan, errorClass, messageParameters, caseSensitive = caseSensitive)
     }
   }
 
@@ -327,10 +327,14 @@ class AnalysisErrorSuite extends AnalysisTest {
     testRelation2.groupBy($"a")(sum(UnresolvedStar(None))),
     "Invalid usage of '*' in expression 'sum'." :: Nil)
 
-  errorTest(
+  errorClassTest(
     "sorting by unsupported column types",
     mapRelation.orderBy($"map".asc),
-    "sort" :: "type" :: "map<int,int>" :: Nil)
+    errorClass = "DATATYPE_MISMATCH.INVALID_ORDERING_TYPE",
+    messageParameters = Map(
+      "sqlExpr" -> "\"map ASC NULLS FIRST\"",
+      "functionName" -> "`sortorder`",
+      "dataType" -> "\"MAP<INT, INT>\""))
 
   errorClassTest(
     "sorting by attributes are not from grouping expressions",
@@ -366,10 +370,11 @@ class AnalysisErrorSuite extends AnalysisTest {
     "Ambiguous reference to fields" :: "differentCase" :: "differentcase" :: Nil,
     caseSensitive = false)
 
-  errorTest(
+  errorClassTest(
     "missing field",
     nestedRelation2.select($"top.c"),
-    "No such struct field" :: "aField" :: "bField" :: "cField" :: Nil,
+    "FIELD_NOT_FOUND",
+    Map("fieldName" -> "`c`", "fields" -> "`aField`, `bField`, `cField`"),
     caseSensitive = false)
 
   errorTest(
@@ -432,67 +437,131 @@ class AnalysisErrorSuite extends AnalysisTest {
     "UNRESOLVED_COLUMN.WITH_SUGGESTION",
     Map("objectName" -> "`bad_column`", "proposal" -> "`a`, `b`, `c`, `d`, `e`"))
 
-  errorTest(
+  errorClassTest(
     "slide duration greater than window in time window",
     testRelation2.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "2 second", "0 second").as("window")),
-      s"The slide duration " :: " must be less than or equal to the windowDuration " :: Nil
+    "DATATYPE_MISMATCH.PARAMETER_CONSTRAINT_VIOLATION",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 2000000, 0)\"",
+      "leftExprName" -> "`slide_duration`",
+      "leftExprValue" -> "2000000L",
+      "constraint" -> "<=",
+      "rightExprName" -> "`window_duration`",
+      "rightExprValue" -> "1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "start time greater than slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "1 second", "1 minute").as("window")),
-      "The absolute value of start time " :: " must be less than the slideDuration " :: Nil
+    "DATATYPE_MISMATCH.PARAMETER_CONSTRAINT_VIOLATION",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 1000000, 60000000)\"",
+      "leftExprName" -> "`abs(start_time)`",
+      "leftExprValue" -> "60000000L",
+      "constraint" -> "<",
+      "rightExprName" -> "`slide_duration`",
+      "rightExprValue" -> "1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "start time equal to slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "1 second", "1 second").as("window")),
-      "The absolute value of start time " :: " must be less than the slideDuration " :: Nil
+    "DATATYPE_MISMATCH.PARAMETER_CONSTRAINT_VIOLATION",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 1000000, 1000000)\"",
+      "leftExprName" -> "`abs(start_time)`",
+      "leftExprValue" -> "1000000L",
+      "constraint" -> "<",
+      "rightExprName" -> "`slide_duration`",
+      "rightExprValue" -> "1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "SPARK-21590: absolute value of start time greater than slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "1 second", "-1 minute").as("window")),
-    "The absolute value of start time " :: " must be less than the slideDuration " :: Nil
+    "DATATYPE_MISMATCH.PARAMETER_CONSTRAINT_VIOLATION",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 1000000, -60000000)\"",
+      "leftExprName" -> "`abs(start_time)`",
+      "leftExprValue" -> "60000000L",
+      "constraint" -> "<",
+      "rightExprName" -> "`slide_duration`",
+      "rightExprValue" -> "1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "SPARK-21590: absolute value of start time equal to slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "1 second", "-1 second").as("window")),
-    "The absolute value of start time " :: " must be less than the slideDuration " :: Nil
+    "DATATYPE_MISMATCH.PARAMETER_CONSTRAINT_VIOLATION",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 1000000, -1000000)\"",
+      "leftExprName" -> "`abs(start_time)`",
+      "leftExprValue" -> "1000000L",
+      "constraint" -> "<",
+      "rightExprName" -> "`slide_duration`",
+      "rightExprValue" -> "1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "negative window duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "-1 second", "1 second", "0 second").as("window")),
-      "The window duration " :: " must be greater than 0." :: Nil
+      "DATATYPE_MISMATCH.VALUE_OUT_OF_RANGE",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, -1000000, 1000000, 0)\"",
+      "exprName" -> "`window_duration`",
+      "valueRange" -> s"(0, 9223372036854775807]",
+      "currentValue" -> "-1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "zero window duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "0 second", "1 second", "0 second").as("window")),
-      "The window duration " :: " must be greater than 0." :: Nil
+    "DATATYPE_MISMATCH.VALUE_OUT_OF_RANGE",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 0, 1000000, 0)\"",
+      "exprName" -> "`window_duration`",
+      "valueRange" -> "(0, 9223372036854775807]",
+      "currentValue" -> "0L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "negative slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "-1 second", "0 second").as("window")),
-      "The slide duration " :: " must be greater than 0." :: Nil
+    "DATATYPE_MISMATCH.VALUE_OUT_OF_RANGE",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, -1000000, 0)\"",
+      "exprName" -> "`slide_duration`",
+      "valueRange" -> "(0, 9223372036854775807]",
+      "currentValue" -> "-1000000L"
+    )
   )
 
-  errorTest(
+  errorClassTest(
     "zero slide duration in time window",
     testRelation.select(
       TimeWindow(Literal("2016-01-01 01:01:01"), "1 second", "0 second", "0 second").as("window")),
-      "The slide duration" :: " must be greater than 0." :: Nil
+    "DATATYPE_MISMATCH.VALUE_OUT_OF_RANGE",
+    Map(
+      "sqlExpr" -> "\"window(2016-01-01 01:01:01, 1000000, 0, 0)\"",
+      "exprName" -> "`slide_duration`",
+      "valueRange" -> "(0, 9223372036854775807]",
+      "currentValue" -> "0L"
+    )
   )
 
   errorTest(
@@ -724,7 +793,7 @@ class AnalysisErrorSuite extends AnalysisTest {
       inputPlan = plan2,
       expectedErrorClass = "DATATYPE_MISMATCH.INVALID_ORDERING_TYPE",
       expectedMessageParameters = Map(
-        "functionName" -> "EqualTo",
+        "functionName" -> "`=`",
         "dataType" -> "\"MAP<STRING, STRING>\"",
         "sqlExpr" -> "\"(b = d)\""
       ),
@@ -809,10 +878,12 @@ class AnalysisErrorSuite extends AnalysisTest {
         Project(
           Alias(Literal(1), "x")() :: Nil,
           UnresolvedRelation(TableIdentifier("t", Option("nonexist")))))))
-    assertAnalysisError(plan, "Table or view not found:" :: Nil)
+    assertAnalysisErrorClass(plan,
+      expectedErrorClass = "TABLE_OR_VIEW_NOT_FOUND",
+      Map("relationName" -> "`nonexist`.`t`"))
   }
 
-  test("SPARK-33909: Check rand functions seed is legal at analyer side") {
+  test("SPARK-33909: Check rand functions seed is legal at analyzer side") {
     Seq(Rand("a".attr), Randn("a".attr)).foreach { r =>
       val plan = Project(Seq(r.as("r")), testRelation)
       assertAnalysisError(plan,
@@ -832,7 +903,8 @@ class AnalysisErrorSuite extends AnalysisTest {
           "inputSql" -> inputSql,
           "inputType" -> inputType,
           "requiredType" -> "(\"INT\" or \"BIGINT\")"),
-        caseSensitive = false)
+        caseSensitive = false
+      )
     }
   }
 
@@ -876,6 +948,26 @@ class AnalysisErrorSuite extends AnalysisTest {
       "[`a`, `b`, `c`, `d`, `e`]"
       :: Nil)
 
+  errorClassTest(
+    "SPARK-39783: backticks in error message for candidate column with dots",
+    // This selects a column that does not exist,
+    // the error message suggest the existing column with correct backticks
+    testRelation6.select($"`the`.`id`"),
+    errorClass = "UNRESOLVED_COLUMN.WITH_SUGGESTION",
+    messageParameters = Map(
+      "objectName" -> "`the`.`id`",
+      "proposal" -> "`the.id`"))
+
+  errorClassTest(
+    "SPARK-39783: backticks in error message for candidate struct column",
+    // This selects a column that does not exist,
+    // the error message suggest the existing column with correct backticks
+    nestedRelation2.select($"`top.aField`"),
+    errorClass = "UNRESOLVED_COLUMN.WITH_SUGGESTION",
+    messageParameters = Map(
+      "objectName" -> "`top.aField`",
+      "proposal" -> "`top`"))
+
   test("SPARK-35080: Unsupported correlated equality predicates in subquery") {
     val a = AttributeReference("a", IntegerType)()
     val b = AttributeReference("b", IntegerType)()
@@ -892,7 +984,7 @@ class AnalysisErrorSuite extends AnalysisTest {
       (And($"a" === $"c", Cast($"d", IntegerType) === $"c"), "CAST(d#x AS INT) = outer(c#x)"))
     conditions.foreach { case (cond, msg) =>
       val plan = Project(
-        ScalarSubquery(
+        Exists(
           Aggregate(Nil, count(Literal(1)).as("cnt") :: Nil,
             Filter(cond, t1))
         ).as("sub") :: Nil,
