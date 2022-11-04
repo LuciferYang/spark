@@ -1274,7 +1274,8 @@ private[spark] class AppStatusListener(
       attemptId: Int,
       completionTime: Long)
 
-  private def cleanupStagesWithInMemoryStore(countToDelete: Long): Seq[Array[Int]] = {
+  private def cleanupStagesWithInMemoryStore(
+      countToDelete: Long): scala.collection.Seq[Array[Int]] = {
     val stageArray = new ArrayBuffer[StageCompletionTime]()
     val stageDataCount = new mutable.HashMap[Int, Int]()
     KVUtils.foreach(kvstore.view(classOf[StageDataWrapper])) { s =>
@@ -1306,7 +1307,7 @@ private[spark] class AppStatusListener(
       }
       cleanupCachedQuantiles(key)
       key
-    }.toSeq
+    }
   }
 
   private def cleanupStagesInKVStore(countToDelete: Long): Seq[Array[Int]] = {

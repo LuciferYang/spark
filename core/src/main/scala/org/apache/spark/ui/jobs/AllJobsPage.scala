@@ -124,7 +124,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
   }
 
   private def makeExecutorEvent(executors: Seq[v1.ExecutorSummary]):
-      Seq[String] = {
+      scala.collection.Seq[String] = {
     val events = ListBuffer[String]()
     executors.sortBy { e =>
       e.removeTime.map(_.getTime).getOrElse(e.addTime.getTime)
@@ -167,11 +167,11 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
         events += removedEvent
       }
     }
-    events.toSeq
+    events
   }
 
   private def makeTimeline(
-      jobs: Seq[v1.JobData],
+      jobs: scala.collection.Seq[v1.JobData],
       executors: Seq[v1.ExecutorSummary],
       startTime: Long): Seq[Node] = {
 
@@ -246,7 +246,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
       tableHeaderId: String,
       jobTag: String,
       jobs: Seq[v1.JobData],
-      killEnabled: Boolean): Seq[Node] = {
+      killEnabled: Boolean): scala.collection.Seq[Node] = {
 
     val someJobHasJobGroup = jobs.exists(_.jobGroup.isDefined)
     val jobIdTitle = if (someJobHasJobGroup) "Job Id (Job Group)" else "Job Id"
@@ -296,11 +296,11 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
     }
 
     val activeJobsTable =
-      jobsTable(request, "active", "activeJob", activeJobs.toSeq, killEnabled = parent.killEnabled)
+      jobsTable(request, "active", "activeJob", activeJobs, killEnabled = parent.killEnabled)
     val completedJobsTable =
-      jobsTable(request, "completed", "completedJob", completedJobs.toSeq, killEnabled = false)
+      jobsTable(request, "completed", "completedJob", completedJobs, killEnabled = false)
     val failedJobsTable =
-      jobsTable(request, "failed", "failedJob", failedJobs.toSeq, killEnabled = false)
+      jobsTable(request, "failed", "failedJob", failedJobs, killEnabled = false)
 
     val shouldShowActiveJobs = activeJobs.nonEmpty
     val shouldShowCompletedJobs = completedJobs.nonEmpty
@@ -369,7 +369,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
       </div>
 
     var content = summary
-    content ++= makeTimeline((activeJobs ++ completedJobs ++ failedJobs).toSeq,
+    content ++= makeTimeline((activeJobs ++ completedJobs ++ failedJobs),
       store.executorList(false), startTime)
 
     if (shouldShowActiveJobs) {

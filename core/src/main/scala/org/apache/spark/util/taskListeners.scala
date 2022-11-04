@@ -50,7 +50,7 @@ trait TaskFailureListener extends EventListener {
  */
 private[spark]
 class TaskCompletionListenerException(
-    errorMessages: Seq[String],
+    errorMessages: scala.collection.Seq[String],
     val previousError: Option[Throwable] = None)
   extends RuntimeException {
 

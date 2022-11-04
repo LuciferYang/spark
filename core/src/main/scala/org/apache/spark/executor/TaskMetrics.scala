@@ -199,7 +199,7 @@ class TaskMetrics private[spark] () extends Serializable {
    */
   private[spark] def mergeShuffleReadMetrics(): Unit = synchronized {
     if (tempShuffleReadMetrics.nonEmpty) {
-      shuffleReadMetrics.setMergeValues(tempShuffleReadMetrics.toSeq)
+      shuffleReadMetrics.setMergeValues(tempShuffleReadMetrics)
     }
   }
 

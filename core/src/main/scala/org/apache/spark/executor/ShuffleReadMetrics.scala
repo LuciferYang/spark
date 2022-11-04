@@ -104,7 +104,8 @@ class ShuffleReadMetrics private[spark] () extends Serializable {
    * Resets the value of the current metrics (`this`) and merges all the independent
    * [[TempShuffleReadMetrics]] into `this`.
    */
-  private[spark] def setMergeValues(metrics: Seq[TempShuffleReadMetrics]): Unit = {
+  private[spark] def setMergeValues(
+      metrics: scala.collection.Seq[TempShuffleReadMetrics]): Unit = {
     _remoteBlocksFetched.setValue(0)
     _localBlocksFetched.setValue(0)
     _remoteBytesRead.setValue(0)

@@ -433,7 +433,7 @@ private[spark] object UIUtils extends Logging {
       }
     }
 
-    val headerRow: Seq[Node] = {
+    val headerRow: scala.collection.Seq[Node] = {
       headers.view.zipWithIndex.map { x =>
         getTooltip(x._2) match {
           case Some(tooltip) =>
@@ -444,7 +444,7 @@ private[spark] object UIUtils extends Logging {
             </th>
           case None => <th width={colWidthAttr} class={getClass(x._2)}>{getHeaderContent(x._1)}</th>
         }
-      }.toSeq
+      }
     }
     <table class={listingTableClass} id={id.map(Text.apply)}>
       <thead>{headerRow}</thead>

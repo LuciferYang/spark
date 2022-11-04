@@ -220,7 +220,7 @@ private[spark] class SparkSubmit extends Logging {
   private[deploy] def prepareSubmitEnvironment(
       args: SparkSubmitArguments,
       conf: Option[HadoopConfiguration] = None)
-      : (Seq[String], Seq[String], SparkConf, String) = {
+      : (scala.collection.Seq[String], scala.collection.Seq[String], SparkConf, String) = {
     // Return values
     val childArgs = new ArrayBuffer[String]()
     val childClasspath = new ArrayBuffer[String]()
@@ -859,7 +859,7 @@ private[spark] class SparkSubmit extends Logging {
 
     sparkConf.set("spark.app.submitTime", System.currentTimeMillis().toString)
 
-    (childArgs.toSeq, childClasspath.toSeq, sparkConf, childMainClass)
+    (childArgs, childClasspath, sparkConf, childMainClass)
   }
 
   // [SPARK-20328]. HadoopRDD calls into a Hadoop library that fetches delegation tokens with

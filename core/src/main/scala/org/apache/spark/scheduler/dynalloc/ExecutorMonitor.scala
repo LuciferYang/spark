@@ -154,7 +154,7 @@ private[spark] class ExecutorMonitor(
     nextTimeout.set(Long.MinValue)
   }
 
-  private[spark] def executorsDecommissioned(ids: Seq[String]): Unit = {
+  private[spark] def executorsDecommissioned(ids: collection.Seq[String]): Unit = {
     ids.foreach { id =>
       val tracker = executors.get(id)
       if (tracker != null) {

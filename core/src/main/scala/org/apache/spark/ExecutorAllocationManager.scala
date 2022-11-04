@@ -524,7 +524,8 @@ private[spark] class ExecutorAllocationManager(
    * Request the cluster manager to remove the given executors.
    * Returns the list of executors which are removed.
    */
-  private def removeExecutors(executors: Seq[(String, Int)]): Seq[String] = synchronized {
+  private def removeExecutors(
+      executors: Seq[(String, Int)]): collection.Seq[String] = synchronized {
     val executorIdsToBeRemoved = new ArrayBuffer[String]
     logDebug(s"Request to remove executorIds: ${executors.mkString(", ")}")
     val numExecutorsTotalPerRpId = mutable.Map[Int, Int]()
@@ -568,14 +569,14 @@ private[spark] class ExecutorAllocationManager(
       // We don't want to change our target number of executors, because we already did that
       // when the task backlog decreased.
       if (decommissionEnabled) {
-        val executorIdsWithoutHostLoss = executorIdsToBeRemoved.toSeq.map(
+        val executorIdsWithoutHostLoss = executorIdsToBeRemoved.map(
           id => (id, ExecutorDecommissionInfo("spark scale down"))).toArray
         client.decommissionExecutors(
           executorIdsWithoutHostLoss,
           adjustTargetNumExecutors = false,
           triggeredByExecutor = false)
       } else {
-        client.killExecutors(executorIdsToBeRemoved.toSeq, adjustTargetNumExecutors = false,
+        client.killExecutors(executorIdsToBeRemoved, adjustTargetNumExecutors = false,
           countFailures = false, force = false)
       }
     }
@@ -590,12 +591,12 @@ private[spark] class ExecutorAllocationManager(
     // reset the newExecutorTotal to the existing number of executors
     if (testing || executorsRemoved.nonEmpty) {
       if (decommissionEnabled) {
-        executorMonitor.executorsDecommissioned(executorsRemoved.toSeq)
+        executorMonitor.executorsDecommissioned(executorsRemoved)
       } else {
-        executorMonitor.executorsKilled(executorsRemoved.toSeq)
+        executorMonitor.executorsKilled(executorsRemoved)
       }
       logInfo(s"Executors ${executorsRemoved.mkString(",")} removed due to idle timeout.")
-      executorsRemoved.toSeq
+      executorsRemoved
     } else {
       logWarning(s"Unable to reach the cluster manager to kill executor/s " +
         s"${executorIdsToBeRemoved.mkString(",")} or no executor eligible to kill!")

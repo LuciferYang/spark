@@ -396,7 +396,7 @@ private[spark] class ShuffleBlockPusher(conf: SparkConf) extends Logging {
       dataFile: File,
       partitionLengths: Array[Long],
       mergerLocs: Seq[BlockManagerId],
-      transportConf: TransportConf): Seq[PushRequest] = {
+      transportConf: TransportConf): scala.collection.Seq[PushRequest] = {
     var offset = 0L
     var currentReqSize = 0
     var currentReqOffset = 0L
@@ -427,7 +427,7 @@ private[spark] class ShuffleBlockPusher(conf: SparkConf) extends Logging {
         } else {
           if (blocks.nonEmpty) {
             // Convert the previous batch into a PushRequest
-            requests += PushRequest(mergerLocs(currentMergerId), blocks.toSeq,
+            requests += PushRequest(mergerLocs(currentMergerId), blocks,
               createRequestBuffer(transportConf, dataFile, currentReqOffset, currentReqSize))
             blocks = new ArrayBuffer[(BlockId, Int)]
           }
@@ -456,10 +456,10 @@ private[spark] class ShuffleBlockPusher(conf: SparkConf) extends Logging {
     }
     // Add in the final request
     if (blocks.nonEmpty) {
-      requests += PushRequest(mergerLocs(currentMergerId), blocks.toSeq,
+      requests += PushRequest(mergerLocs(currentMergerId), blocks,
         createRequestBuffer(transportConf, dataFile, currentReqOffset, currentReqSize))
     }
-    requests.toSeq
+    requests
   }
 
   // Visible for testing
@@ -483,7 +483,7 @@ private[spark] object ShuffleBlockPusher {
    */
   private[spark] case class PushRequest(
     address: BlockManagerId,
-    blocks: Seq[(BlockId, Int)],
+    blocks: scala.collection.Seq[(BlockId, Int)],
     reqBuffer: ManagedBuffer) {
     val size = blocks.map(_._2).sum
   }

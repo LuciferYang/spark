@@ -147,9 +147,10 @@ private[spark] trait ListenerBus[L <: AnyRef, E] extends Logging {
   /** Allows bus implementations to prevent error logging for certain exceptions. */
   protected def isIgnorableException(e: Throwable): Boolean = false
 
-  private[spark] def findListenersByClass[T <: L : ClassTag](): Seq[T] = {
+  private[spark]
+  def findListenersByClass[T <: L : ClassTag](): scala.collection.Seq[T] = {
     val c = implicitly[ClassTag[T]].runtimeClass
-    listeners.asScala.filter(_.getClass == c).map(_.asInstanceOf[T]).toSeq
+    listeners.asScala.filter(_.getClass == c).map(_.asInstanceOf[T])
   }
 
   private def redactEvent(e: E): E = {

@@ -34,7 +34,7 @@ import org.apache.spark.util.Utils
 private[ui] class StageTableBase(
     store: AppStatusStore,
     request: HttpServletRequest,
-    stages: Seq[v1.StageData],
+    stages: scala.collection.Seq[v1.StageData],
     tableHeaderID: String,
     stageTag: String,
     basePath: String,

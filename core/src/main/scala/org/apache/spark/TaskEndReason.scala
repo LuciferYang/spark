@@ -157,7 +157,8 @@ case class ExceptionFailure(
     this
   }
 
-  private[spark] def withMetricPeaks(metricPeaks: Seq[Long]): ExceptionFailure = {
+  private[spark] def withMetricPeaks(
+      metricPeaks: scala.collection.Seq[Long]): ExceptionFailure = {
     this.metricPeaks = metricPeaks
     this
   }
@@ -225,7 +226,7 @@ case class TaskKilled(
     reason: String,
     accumUpdates: Seq[AccumulableInfo] = Seq.empty,
     private[spark] val accums: Seq[AccumulatorV2[_, _]] = Nil,
-    metricPeaks: Seq[Long] = Seq.empty)
+    metricPeaks: scala.collection.Seq[Long] = Seq.empty)
   extends TaskFailedReason {
 
   override def toErrorString: String = s"TaskKilled ($reason)"

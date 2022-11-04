@@ -78,7 +78,7 @@ private[spark] trait ExecutorAllocationClient {
    * @return the ids of the executors acknowledged by the cluster manager to be removed.
    */
   def killExecutors(
-    executorIds: Seq[String],
+    executorIds: collection.Seq[String],
     adjustTargetNumExecutors: Boolean,
     countFailures: Boolean,
     force: Boolean = false): Seq[String]
