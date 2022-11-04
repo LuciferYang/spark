@@ -50,7 +50,7 @@ object TypeUtils extends QueryErrorsBase {
         errorSubClass = "DATA_DIFF_TYPES",
         messageParameters = Map(
           "functionName" -> toSQLId(caller),
-          "dataType" -> types.map(toSQLType).mkString("(", " or ", ")")
+          "dataType" -> types.distinct.map(toSQLType).mkString("(", " or ", ")")
         )
       )
     }

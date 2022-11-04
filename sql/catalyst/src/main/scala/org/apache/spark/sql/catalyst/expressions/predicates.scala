@@ -452,7 +452,8 @@ case class In(value: Expression, list: Seq[Expression]) extends Predicate {
         errorSubClass = "DATA_DIFF_TYPES",
         messageParameters = Map(
           "functionName" -> toSQLId(prettyName),
-          "dataType" -> children.map(child => toSQLType(child.dataType)).mkString("[", ", ", "]")
+          "dataType" -> children.map(child => toSQLType(child.dataType)).distinct
+            .mkString("[", ", ", "]")
         )
       )
     } else {

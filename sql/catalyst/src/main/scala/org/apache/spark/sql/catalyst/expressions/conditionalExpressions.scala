@@ -201,7 +201,7 @@ case class CaseWhen(
         errorSubClass = "DATA_DIFF_TYPES",
         messageParameters = Map(
           "functionName" -> toSQLId(prettyName),
-          "dataType" -> inputTypesForMerging.map(toSQLType).mkString("[", ", ", "]")
+          "dataType" -> inputTypesForMerging.distinct.map(toSQLType).mkString("[", ", ", "]")
         )
       )
     }

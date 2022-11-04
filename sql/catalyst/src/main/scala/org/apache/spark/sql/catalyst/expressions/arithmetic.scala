@@ -1219,7 +1219,7 @@ case class Least(children: Seq[Expression]) extends ComplexTypeMergingExpression
         errorSubClass = "DATA_DIFF_TYPES",
         messageParameters = Map(
           "functionName" -> toSQLId(prettyName),
-          "dataType" -> children.map(_.dataType).map(toSQLType).mkString("[", ", ", "]")
+          "dataType" -> children.map(_.dataType).distinct.map(toSQLType).mkString("[", ", ", "]")
         )
       )
     } else {
@@ -1310,7 +1310,7 @@ case class Greatest(children: Seq[Expression]) extends ComplexTypeMergingExpress
         errorSubClass = "DATA_DIFF_TYPES",
         messageParameters = Map(
           "functionName" -> toSQLId(prettyName),
-          "dataType" -> children.map(_.dataType).map(toSQLType).mkString("[", ", ", "]")
+          "dataType" -> children.map(_.dataType).distinct.map(toSQLType).mkString("[", ", ", "]")
         )
       )
     } else {

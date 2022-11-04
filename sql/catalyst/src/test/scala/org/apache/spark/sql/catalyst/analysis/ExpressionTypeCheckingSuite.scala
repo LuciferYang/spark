@@ -717,6 +717,16 @@ class ExpressionTypeCheckingSuite extends SparkFunSuite with SQLHelper with Quer
           "dataType" -> "\"MAP<STRING, BIGINT>\""
         )
       )
+
+      val expr4 = operator(Seq($"intField", $"stringField", $"stringField"))
+      assertErrorForDataDifferingTypes(
+        expr = expr4,
+        messageParameters = Map(
+          "sqlExpr" -> toSQLExpr(expr4),
+          "functionName" -> toSQLId(expr4.prettyName),
+          "dataType" -> "[\"INT\", \"STRING\"]"
+        )
+      )
     }
   }
 
