@@ -71,6 +71,5 @@ object GenericArrayDataConstructorBenchmark extends BenchmarkBase {
     constructorBenchmark(10)
     constructorBenchmark(100)
     constructorBenchmark(1000)
-    constructorBenchmark(10000)
   }
 }
