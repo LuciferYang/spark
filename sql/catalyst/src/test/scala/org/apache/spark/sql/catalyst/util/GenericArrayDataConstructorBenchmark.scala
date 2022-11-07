@@ -44,11 +44,7 @@ object GenericArrayDataConstructorBenchmark extends BenchmarkBase {
     val buffer = if (bufferSize == 0) {
       ArrayBuffer.empty[Any]
     } else {
-      val ret = new ArrayBuffer[Any](bufferSize)
-      (0 until bufferSize).foreach { i =>
-        ret(i) = i
-      }
-      ret
+      ArrayBuffer.fill[Any](bufferSize)(() => 1)
     }
 
     benchmark.addCase("toSeq and construct") { _ =>
