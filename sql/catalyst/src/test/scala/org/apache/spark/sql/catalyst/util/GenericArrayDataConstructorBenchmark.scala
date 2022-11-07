@@ -46,7 +46,7 @@ object GenericArrayDataConstructorBenchmark extends BenchmarkBase {
     } else {
       val ret = new ArrayBuffer[Any](bufferSize)
       (0 until bufferSize).foreach { i =>
-        buffer(i) = i
+        ret(i) = i
       }
       ret
     }
