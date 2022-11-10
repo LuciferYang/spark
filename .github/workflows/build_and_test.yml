@@ -73,6 +73,7 @@ jobs:
       run: |
         echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     - name: Check all modules
@@ -205,6 +206,7 @@ jobs:
       run: |
         echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     # Cache local repositories. Note that GitHub Actions cache has a 2G limit.
@@ -364,6 +366,7 @@ jobs:
       run: |
         echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     # Cache local repositories. Note that GitHub Actions cache has a 2G limit.
@@ -454,6 +457,7 @@ jobs:
       run: |
         echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     # Cache local repositories. Note that GitHub Actions cache has a 2G limit.
@@ -523,6 +527,7 @@ jobs:
       if: github.repository != 'apache/spark'
       run: |
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     # Cache local repositories. Note that GitHub Actions cache has a 2G limit.
@@ -648,6 +653,7 @@ jobs:
       if: github.repository != 'apache/spark'
       run: |
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     - name: Cache Scala, SBT and Maven
@@ -698,6 +704,7 @@ jobs:
       if: github.repository != 'apache/spark'
       run: |
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     - name: Cache Scala, SBT and Maven
@@ -747,6 +754,7 @@ jobs:
       if: github.repository != 'apache/spark'
       run: |
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     - name: Cache Scala, SBT and Maven
@@ -851,6 +859,7 @@ jobs:
       run: |
         echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
         git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git clean -fxd
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
         git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
     - name: Cache Scala, SBT and Maven
