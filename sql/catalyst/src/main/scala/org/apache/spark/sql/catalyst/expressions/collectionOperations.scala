@@ -2877,37 +2877,93 @@ case class Sequence(
   override def dataType: ArrayType = ArrayType(start.dataType, containsNull = false)
 
   override def checkInputDataTypes(): TypeCheckResult = {
-    val startType = start.dataType
-    def stepType = stepOpt.get.dataType
-    val typesCorrect =
-      startType.sameType(stop.dataType) &&
-        (startType match {
-          case TimestampType | TimestampNTZType =>
-            stepOpt.isEmpty || CalendarIntervalType.acceptsType(stepType) ||
-              YearMonthIntervalType.acceptsType(stepType) ||
-              DayTimeIntervalType.acceptsType(stepType)
-          case DateType =>
-            stepOpt.isEmpty || CalendarIntervalType.acceptsType(stepType) ||
-              YearMonthIntervalType.acceptsType(stepType) ||
-              DayTimeIntervalType.acceptsType(stepType)
-          case _: IntegralType =>
-            stepOpt.isEmpty || stepType.sameType(startType)
-          case _ => false
-        })
+    def expectedTimeType(dataType: DataType): Boolean = {
+      CalendarIntervalType.acceptsType(dataType) ||
+        YearMonthIntervalType.acceptsType(dataType) ||
+        DayTimeIntervalType.acceptsType(dataType)
+    }
 
-    if (typesCorrect) {
-      TypeCheckResult.TypeCheckSuccess
-    } else {
-      DataTypeMismatch(
-        errorSubClass = "SEQUENCE_WRONG_INPUT_TYPES",
-        messageParameters = Map(
-          "functionName" -> toSQLId(prettyName),
-          "startType" -> toSQLType(TypeCollection(TimestampType, TimestampNTZType, DateType)),
-          "stepType" -> toSQLType(
-            TypeCollection(CalendarIntervalType, YearMonthIntervalType, DayTimeIntervalType)),
-          "otherStartType" -> toSQLType(IntegralType)
+    def checkStartAndStep(startType: DataType, stepType: DataType): TypeCheckResult = {
+      startType match {
+        case TimestampType | TimestampNTZType | DateType =>
+          if (expectedTimeType(stepType)) {
+            TypeCheckResult.TypeCheckSuccess
+          } else {
+            DataTypeMismatch(
+              errorSubClass = "PARAMETER_TYPE_VIOLATION",
+              messageParameters = Map(
+                "refExprName" -> toSQLId("start"),
+                "refExprType" -> toSQLType(
+                  TypeCollection(TimestampType, TimestampType, DateType)),
+                "targetExprName" -> toSQLId("step"),
+                "targetType" -> toSQLType(stepType)
+              )
+            )
+          }
+        case _: IntegralType =>
+          if (stepType.sameType(startType)) {
+            TypeCheckResult.TypeCheckSuccess
+          } else {
+            DataTypeMismatch(
+              errorSubClass = "PARAMETER_TYPE_VIOLATION",
+              messageParameters = Map(
+                "refExprName" -> toSQLId("start"),
+                "refExprType" -> toSQLType(IntegralType),
+                "targetExprName" -> toSQLId("step"),
+                "targetType" -> toSQLType(stepType)
+              )
+            )
+          }
+        case _ =>
+          DataTypeMismatch(
+            errorSubClass = "UNEXPECTED_INPUT_TYPE",
+            messageParameters = Map(
+              "paramIndex" -> "1",
+              "requiredType" -> toSQLType(
+                TypeCollection(TimestampType, TimestampType, DateType, IntegralType)),
+              "inputSql" -> toSQLExpr(start),
+              "inputType" -> toSQLType(startType)
+            )
+          )
+      }
+    }
+
+    (start.dataType, stop.dataType) match {
+      case (NullType, _) | (_, NullType) =>
+        DataTypeMismatch(
+          errorSubClass = "NULL_TYPE",
+          messageParameters = Map("functionName" -> toSQLId(prettyName))
         )
-      )
+      case (startType, stopType) if !startType.sameType(stopType) =>
+        DataTypeMismatch(
+          errorSubClass = "PARAMETER_TYPE_VIOLATION",
+          messageParameters = Map(
+            "refExprName" -> toSQLId("start"),
+            "refExprType" -> toSQLType(startType),
+            "targetExprName" -> toSQLId("stop"),
+            "targetType" -> toSQLType(stopType)
+          )
+        )
+      case (startType, _) =>
+        if (stepOpt.isDefined) {
+          checkStartAndStep(startType, stepOpt.get.dataType)
+        } else {
+          startType match {
+            case TimestampType | TimestampNTZType | DateType | _: IntegralType =>
+              TypeCheckResult.TypeCheckSuccess
+            case _ =>
+              DataTypeMismatch(
+                errorSubClass = "UNEXPECTED_INPUT_TYPE",
+                messageParameters = Map(
+                  "paramIndex" -> "1",
+                  "requiredType" -> toSQLType(
+                    TypeCollection(TimestampType, TimestampType, DateType, IntegralType)),
+                  "inputSql" -> toSQLExpr(start),
+                  "inputType" -> toSQLType(startType)
+                )
+              )
+          }
+        }
     }
   }
 

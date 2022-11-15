@@ -1542,10 +1542,13 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
     checkAnswer(df.select(array_max(df("a"))), answer)
     checkAnswer(df.selectExpr("array_max(a)"), answer)
   }
-
   test("sequence") {
     checkAnswer(Seq((-2, 2)).toDF().select(sequence($"_1", $"_2")),
       Seq(Row(Array(-2, -1, 0, 1, 2))))
+    checkAnswer(Seq((null, 2)).toDF().select(sequence($"_1", $"_2")),
+      Seq(Row(null)))
+    checkAnswer(Seq((2, null)).toDF().select(sequence($"_1", $"_2")),
+      Seq(Row(null)))
     checkAnswer(Seq((7, 2, -2)).toDF().select(sequence($"_1", $"_2", $"_3")),
       Seq(Row(Array(7, 5, 3))))
 
@@ -1591,13 +1594,13 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
       exception = intercept[AnalysisException] {
         Seq((true, false)).toDF().selectExpr("sequence(_1, _2)")
       },
-      errorClass = "DATATYPE_MISMATCH.SEQUENCE_WRONG_INPUT_TYPES",
+      errorClass = "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE",
       parameters = Map(
         "sqlExpr" -> "\"sequence(_1, _2)\"",
-        "functionName" -> "`sequence`",
-        "startType" -> "(\"TIMESTAMP\" or \"TIMESTAMP_NTZ\" or \"DATE\")",
-        "stepType" -> "(\"INTERVAL\" or \"INTERVAL YEAR TO MONTH\" or \"INTERVAL DAY TO SECOND\")",
-        "otherStartType" -> "\"INTEGRAL\""
+        "paramIndex" -> "1",
+        "inputSql" -> "\"_1\"",
+        "inputType" -> "\"BOOLEAN\"",
+        "requiredType" -> "(\"TIMESTAMP\" or \"TIMESTAMP\" or \"DATE\" or \"INTEGRAL\")"
       ),
       queryContext = Array(ExpectedContext("", "", 0, 15, "sequence(_1, _2)"))
     )
@@ -1605,13 +1608,13 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
       exception = intercept[AnalysisException] {
         Seq((true, false, 42)).toDF().selectExpr("sequence(_1, _2, _3)")
       },
-      errorClass = "DATATYPE_MISMATCH.SEQUENCE_WRONG_INPUT_TYPES",
+      errorClass = "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE",
       parameters = Map(
         "sqlExpr" -> "\"sequence(_1, _2, _3)\"",
-        "functionName" -> "`sequence`",
-        "startType" -> "(\"TIMESTAMP\" or \"TIMESTAMP_NTZ\" or \"DATE\")",
-        "stepType" -> "(\"INTERVAL\" or \"INTERVAL YEAR TO MONTH\" or \"INTERVAL DAY TO SECOND\")",
-        "otherStartType" -> "\"INTEGRAL\""
+        "paramIndex" -> "1",
+        "inputSql" -> "\"_1\"",
+        "inputType" -> "\"BOOLEAN\"",
+        "requiredType" -> "(\"TIMESTAMP\" or \"TIMESTAMP\" or \"DATE\" or \"INTEGRAL\")"
       ),
       queryContext = Array(ExpectedContext("", "", 0, 19, "sequence(_1, _2, _3)"))
     )
@@ -1619,13 +1622,13 @@ class DataFrameFunctionsSuite extends QueryTest with SharedSparkSession {
       exception = intercept[AnalysisException] {
         Seq((1, 2, 0.5)).toDF().selectExpr("sequence(_1, _2, _3)")
       },
-      errorClass = "DATATYPE_MISMATCH.SEQUENCE_WRONG_INPUT_TYPES",
+      errorClass = "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE",
       parameters = Map(
         "sqlExpr" -> "\"sequence(_1, _2, _3)\"",
-        "functionName" -> "`sequence`",
-        "startType" -> "(\"TIMESTAMP\" or \"TIMESTAMP_NTZ\" or \"DATE\")",
-        "stepType" -> "(\"INTERVAL\" or \"INTERVAL YEAR TO MONTH\" or \"INTERVAL DAY TO SECOND\")",
-        "otherStartType" -> "\"INTEGRAL\""
+        "paramIndex" -> "1",
+        "inputSql" -> "\"_1\"",
+        "inputType" -> "\"DOUBLE\"",
+        "requiredType" -> "(\"TIMESTAMP\" or \"TIMESTAMP\" or \"DATE\" or \"INTEGRAL\")"
       ),
       queryContext = Array(ExpectedContext("", "", 0, 19, "sequence(_1, _2, _3)"))
     )
