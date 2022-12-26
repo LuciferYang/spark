@@ -312,7 +312,7 @@ public abstract class ColumnVector implements AutoCloseable {
    */
   protected ColumnVector(DataType type) {
     if (type instanceof UserDefinedType) {
-      this.type = ((UserDefinedType) type).sqlType();
+      this.type = ((UserDefinedType<?>) type).sqlType();
     } else {
       this.type = type;
     }

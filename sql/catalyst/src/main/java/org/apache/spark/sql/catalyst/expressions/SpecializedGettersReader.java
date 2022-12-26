@@ -77,7 +77,7 @@ public final class SpecializedGettersReader {
       return obj.getMap(ordinal);
     }
     if (handleUserDefinedType && dataType instanceof UserDefinedType) {
-      return obj.get(ordinal, ((UserDefinedType)dataType).sqlType());
+      return obj.get(ordinal, ((UserDefinedType<?>)dataType).sqlType());
     }
 
     throw new UnsupportedOperationException("Unsupported data type " + dataType.simpleString());
