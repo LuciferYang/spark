@@ -50,8 +50,8 @@ object ToSeqBenchmark extends BenchmarkBase {
     benchmark.addCase("Use WrappedArray") { _: Int =>
       val strings = Array.empty[String]
       for (_ <- 0L until valuesPerIteration) {
-        import scala.collection.mutable
-        mutable.WrappedArray.make(info.getExecutorsList.toArray(strings))
+        import scala.collection.immutable
+        immutable.ArraySeq.unsafeWrapArray(info.getExecutorsList.toArray(strings))
       }
     }
     benchmark.run()
