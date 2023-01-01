@@ -41,12 +41,6 @@ object SerializerBenchmark extends BenchmarkBase {
 
     val testValues = DeterministicLevel.values
 
-    benchmark.addCase("Use map") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        testValues.foreach(scalaToPb)
-      }
-    }
-
     benchmark.addCase("Use case match") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         testValues.foreach {
@@ -57,6 +51,12 @@ object SerializerBenchmark extends BenchmarkBase {
           case DeterministicLevel.INDETERMINATE =>
             GDeterministicLevel.DETERMINISTIC_LEVEL_INDETERMINATE
         }
+      }
+    }
+
+    benchmark.addCase("Use map") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        testValues.foreach(scalaToPb)
       }
     }
     benchmark.run()
