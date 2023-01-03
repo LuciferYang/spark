@@ -1679,8 +1679,7 @@ class InsertSuite extends DataSourceTest with SharedSparkSession {
           Config(
             None),
           Config(
-            Some(SQLConf.ORC_VECTORIZED_READER_ENABLED.key -> "false"),
-            insertNullsToStorage = false))),
+            Some(SQLConf.ORC_VECTORIZED_READER_ENABLED.key -> "false")))),
       TestCase(
         dataSource = "parquet",
         Seq(
@@ -1944,11 +1943,7 @@ class InsertSuite extends DataSourceTest with SharedSparkSession {
               Row(Seq(Row(1, 2)), Seq(Map(false -> "def", true -> "jkl"))),
               Seq(Map(true -> "xyz"))),
             Row(2,
-              if (config.dataSource != "orc") {
-                null
-              } else {
-                Row(Seq(Row(1, 2)), Seq(Map(false -> "def", true -> "jkl")))
-              },
+              null,
               Seq(Map(true -> "xyz"))),
             Row(3,
               Row(Seq(Row(3, 4)), Seq(Map(false -> "mno", true -> "pqr"))),
