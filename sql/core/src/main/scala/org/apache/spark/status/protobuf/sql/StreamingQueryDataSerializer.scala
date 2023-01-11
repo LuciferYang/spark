@@ -33,7 +33,12 @@ class StreamingQueryDataSerializer extends ProtobufSerDe {
       .setId(data.id.toString)
       .setRunId(data.runId)
       .setIsActive(data.isActive)
-    Option(data.name).foreach(builder.setName)
+    if (data.name == null) {
+      builder.setNameIsNull(true)
+    } else {
+      builder.setNameIsNull(false)
+      builder.setName(data.name)
+    }
     data.exception.foreach(builder.setException)
     builder.setStartTimestamp(data.startTimestamp)
     data.endTimestamp.foreach(builder.setEndTimestamp)
@@ -47,7 +52,7 @@ class StreamingQueryDataSerializer extends ProtobufSerDe {
     val endTimestamp =
       getOptional(data.hasEndTimestamp, () => data.getEndTimestamp)
     new StreamingQueryData(
-      name = data.getName,
+      name = if (data.getNameIsNull) null else data.getName,
       id = UUID.fromString(data.getId),
       runId = data.getRunId,
       isActive = data.getIsActive,

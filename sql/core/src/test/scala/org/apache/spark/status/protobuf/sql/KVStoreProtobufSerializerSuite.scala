@@ -213,4 +213,20 @@ class KVStoreProtobufSerializerSuite extends SparkFunSuite {
     assert(result.startTimestamp == input.startTimestamp)
     assert(result.endTimestamp == input.endTimestamp)
   }
+
+  test("StreamingQueryData with null name") {
+    val id = UUID.randomUUID()
+    val input = new StreamingQueryData(
+      name = null,
+      id = id,
+      runId = s"run-id-$id",
+      isActive = false,
+      exception = Some("Some Exception"),
+      startTimestamp = 1L,
+      endTimestamp = Some(2L)
+    )
+    val bytes = serializer.serialize(input)
+    val result = serializer.deserialize(bytes, classOf[StreamingQueryData])
+    assert(result.name == null)
+  }
 }

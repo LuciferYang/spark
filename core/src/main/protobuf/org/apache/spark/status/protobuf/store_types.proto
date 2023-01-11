@@ -490,13 +490,14 @@ message RDDOperationGraphWrapper {
 }
 
 message StreamingQueryData {
-  string name = 1;
-  string id = 2;
-  string run_id = 3;
-  bool is_active = 4;
-  optional string exception = 5;
-  int64 start_timestamp = 6;
-  optional int64 end_timestamp = 7;
+  bool name_is_null = 1;
+  string name = 2;
+  string id = 3;
+  string run_id = 4;
+  bool is_active = 5;
+  optional string exception = 6;
+  int64 start_timestamp = 7;
+  optional int64 end_timestamp = 8;
 }
 
 message StageDataWrapper {
