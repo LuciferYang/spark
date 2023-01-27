@@ -279,6 +279,16 @@ connect = Module(
     ],
     sbt_test_goals=[
         "connect/test",
+    ],
+)
+
+connect_client_jvm = Module(
+    name="connect-client-jvm",
+    dependencies=[catalyst],
+    source_file_regexes=[
+        "connector/connect",
+    ],
+    sbt_test_goals=[
         "connect-client-jvm/test",
     ],
 )
