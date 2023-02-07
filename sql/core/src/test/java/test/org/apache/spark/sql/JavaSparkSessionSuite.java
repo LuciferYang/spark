@@ -18,9 +18,10 @@
 package test.org.apache.spark.sql;
 
 import org.apache.spark.sql.*;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Test;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,7 +29,7 @@ import java.util.Map;
 public class JavaSparkSessionSuite {
   private SparkSession spark;
 
-  @After
+  @AfterEach
   public void tearDown() {
     spark.stop();
     spark = null;
@@ -51,7 +52,7 @@ public class JavaSparkSessionSuite {
       .getOrCreate();
 
     for (Map.Entry<String, Object> e : map.entrySet()) {
-      Assert.assertEquals(spark.conf().get(e.getKey()), e.getValue().toString());
+      Assertions.assertEquals(spark.conf().get(e.getKey()), e.getValue().toString());
     }
   }
 }
