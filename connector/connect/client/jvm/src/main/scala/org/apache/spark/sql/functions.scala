@@ -4637,7 +4637,7 @@ object functions {
    */
   // scalastyle:on line.size.limit
   def from_csv(e: Column, schema: StructType, options: Map[String, String]): Column =
-    Column.fn("from_csv", e, lit(schema.json), createOptionsMap(options))
+    Column.fn("from_csv", e, lit(schema.catalogString), createOptionsMap(options))
 
   // scalastyle:off line.size.limit
 

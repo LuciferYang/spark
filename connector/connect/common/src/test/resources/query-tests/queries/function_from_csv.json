@@ -1,0 +1,36 @@
+{
+  "project": {
+    "input": {
+      "localRelation": {
+        "schema": "struct\u003cid:bigint,a:int,b:double,d:struct\u003cid:bigint,a:int,b:double\u003e,e:array\u003cint\u003e,f:map\u003cstring,struct\u003cid:bigint,a:int,b:double\u003e\u003e,g:string\u003e"
+      }
+    },
+    "expressions": [{
+      "unresolvedFunction": {
+        "functionName": "from_csv",
+        "arguments": [{
+          "literal": {
+            "string": "2021-08-12T15:16:23.000+11:00"
+          }
+        }, {
+          "literal": {
+            "string": "struct\u003ca:timestamp_ntz\u003e"
+          }
+        }, {
+          "unresolvedFunction": {
+            "functionName": "map",
+            "arguments": [{
+              "literal": {
+                "string": "timestampFormat"
+              }
+            }, {
+              "literal": {
+                "string": "dd/MM/yyyy HH:mm"
+              }
+            }]
+          }
+        }]
+      }
+    }]
+  }
+}

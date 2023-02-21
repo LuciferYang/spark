@@ -1,0 +1,8 @@
+”
+ŽZ‹ˆstruct<id:bigint,a:int,b:double,d:struct<id:bigint,a:int,b:double>,e:array<int>,f:map<string,struct<id:bigint,a:int,b:double>>,g:string>€~
+from_csv!
+j2021-08-12T15:16:23.000+11:00
+jstruct<a:timestamp_ntz>20
+map
+jtimestampFormat
+jdd/MM/yyyy HH:mm
