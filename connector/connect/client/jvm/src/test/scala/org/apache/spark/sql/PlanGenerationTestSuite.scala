@@ -1538,7 +1538,7 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
   }
 
   functionTest("to_json") {
-    fn.to_json(lit("""[{"a":1}]"""), Map("mode" -> "FAILFAST"))
+    fn.to_json(Column("e"), Map("mode" -> "FAILFAST"))
   }
 
   functionTest("size") {
