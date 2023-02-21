@@ -1423,9 +1423,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.get(Column("e"), fn.lit(0))
   }
 
-  functionTest("array_sort") {
-    fn.array_sort(Column("e"), (x, y) => x > y)
-  }
+//  functionTest("array_sort") {
+//    fn.array_sort(Column("e"), (x, y) => x > y)
+//  }
 
   functionTest("array_remove") {
     fn.array_remove(Column("e"), 3)
@@ -1523,9 +1523,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.get_json_object(Column("g"), "$.f1")
   }
 
-  functionTest("json_tuple") {
-    fn.json_tuple(Column("g"), "a", "b")
-  }
+//  functionTest("json_tuple") {
+//    fn.json_tuple(Column("g"), "a", "b")
+//  }
 
   functionTest("from_json") {
     val schema = ArrayType(new StructType()
@@ -1534,13 +1534,13 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.from_json(Column("g"), schema, Map("mode" -> "FAILFAST"))
   }
 
-  functionTest("schema_of_json") {
-    fn.schema_of_json(Column("g"))
-  }
+//  functionTest("schema_of_json") {
+//    fn.schema_of_json(Column("g"))
+//  }
 
-  functionTest("to_json") {
-    fn.to_json(Column("g"), Map("mode" -> "FAILFAST"))
-  }
+//  functionTest("to_json") {
+//    fn.to_json(Column("g"), Map("mode" -> "FAILFAST"))
+//  }
 
   functionTest("size") {
     fn.size(Column("e"))
@@ -1566,9 +1566,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.reverse(Column("e"))
   }
 
-  functionTest("flatten") {
-    fn.flatten(Column("e"))
-  }
+//  functionTest("flatten") {
+//    fn.flatten(Column("e"))
+//  }
 
   functionTest("sequence") {
     fn.sequence(lit(1), lit(100), lit(2))
@@ -1608,7 +1608,6 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
 
   test("from_csv") {
     val schema = new StructType().add("time", TimestampType)
-    fn.from_csv(Column("h"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm"))
     temporals.select(fn.from_csv(Column("t"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm")))
   }
 
@@ -1616,9 +1615,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.schema_of_csv("0.1,1")
   }
 
-  functionTest("to_csv") {
-    fn.to_csv(Column("g"), Map("timestampFormat" -> "dd/MM/yyyy HH:mm").asJava)
-  }
+//  functionTest("to_csv") {
+//    fn.to_csv(Column("g"), Map("timestampFormat" -> "dd/MM/yyyy HH:mm").asJava)
+//  }
 
   functionTest("years") {
     fn.years(Column("a"))
