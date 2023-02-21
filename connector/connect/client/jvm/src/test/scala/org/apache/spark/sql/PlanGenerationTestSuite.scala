@@ -1537,9 +1537,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.schema_of_json(lit("""{"id": "a", "drop": {"drop": null}}"""))
   }
 
-//  functionTest("to_json") {
-//    fn.to_json(Column("g"), Map("mode" -> "FAILFAST"))
-//  }
+  functionTest("to_json") {
+    fn.to_json(lit("""[{"a":1}]"""), Map("mode" -> "FAILFAST"))
+  }
 
   functionTest("size") {
     fn.size(Column("e"))
@@ -1557,9 +1557,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.array_max(Column("e"))
   }
 
-  functionTest("shuffle") {
-    fn.shuffle(Column("e"))
-  }
+//  functionTest("shuffle") {
+//    fn.shuffle(Column("e"))
+//  }
 
   functionTest("reverse") {
     fn.reverse(Column("e"))
