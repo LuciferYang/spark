@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import java.nio.file.{Files, Path}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
@@ -1185,6 +1186,258 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
 
   functionTest("radians") {
     fn.radians("b")
+  }
+
+  functionTest("array_contains") {
+    fn.array_contains(Column("e"), 3)
+  }
+
+  functionTest("array_append") {
+    fn.array_append(Column("e"), 4)
+  }
+
+  functionTest("arrays_overlap") {
+    fn.arrays_overlap(Column("e"), Column("e"))
+  }
+
+  functionTest("slice") {
+    fn.slice(Column("e"), 1, 2)
+  }
+
+  functionTest("array_join") {
+    fn.array_join(Column("e"), ",", "0")
+  }
+
+  functionTest("concat") {
+    fn.concat(Column("e"), Column("e"))
+  }
+
+  functionTest("array_position") {
+    fn.array_position(Column("e"), 2)
+  }
+
+  functionTest("element_at") {
+    fn.element_at(Column("e"), 1)
+  }
+
+  functionTest("get") {
+    fn.get(Column("e"), fn.lit(0))
+  }
+
+  functionTest("array_sort") {
+    fn.array_sort(Column("e"), (x, y) => x > y)
+  }
+
+  functionTest("array_remove") {
+    fn.array_remove(Column("e"), 3)
+  }
+
+  functionTest("array_compact") {
+    fn.array_compact(Column("e"))
+  }
+
+  functionTest("array_distinct") {
+    fn.array_distinct(Column("e"))
+  }
+
+  functionTest("array_intersect") {
+    fn.array_intersect(Column("e"), Column("e"))
+  }
+
+  functionTest("array_insert") {
+    fn.array_insert(Column("e"), lit(3), lit(2))
+  }
+
+  functionTest("array_union") {
+    fn.array_union(Column("e"), Column("e"))
+  }
+
+  functionTest("array_except") {
+    fn.array_except(Column("e"), Column("e"))
+  }
+
+//  functionTest("transform") {
+//    fn.transform(Column("e"), x => x + 1)
+//  }
+
+//  functionTest("exists") {
+//    fn.exists(Column("e"), _ % 2 === 0)
+//  }
+
+//  functionTest("forall") {
+//    fn.forall(Column("e"), x => x % 2 === 0)
+//  }
+
+//  functionTest("filter") {
+//    fn.filter(Column("e"), (x, i) => i % 2 === 0)
+//  }
+
+//  functionTest("aggregate") {
+//    fn.aggregate(Column("e"), lit(0), (acc, x) => acc + x, _ * 10)
+//  }
+
+//  functionTest("zip_with") {
+//    fn.zip_with(Column("e"), Column("e"), (x, y) => x + y)
+//  }
+
+//  functionTest("transform_keys") {
+//    fn.transform_keys(Column("f"), (k, v) => k + v)
+//  }
+
+//  functionTest("transform_values") {
+//    fn.transform_values(Column("f"), (k, v) => k - v)
+//  }
+
+//  functionTest("map_filter") {
+//    fn.transform_values(Column("f"), (k, v) => k * 10 === v)
+//  }
+
+//  functionTest("map_zip_with") {
+//    fn.map_zip_with(Column("f"), Column("f"), (k, v1, v2) => k === v1 + v2)
+//  }
+
+  functionTest("explode") {
+    fn.explode(Column("f"))
+  }
+
+  functionTest("explode_outer") {
+    fn.explode_outer(Column("e"))
+  }
+
+  functionTest("posexplode") {
+    fn.posexplode(Column("e"))
+  }
+
+  functionTest("posexplode_outer") {
+    fn.posexplode_outer(Column("e"))
+  }
+
+  functionTest("inline") {
+    fn.inline(fn.array(fn.struct("a", "b"), fn.struct("a", "b")))
+  }
+
+  functionTest("inline_outer") {
+    fn.inline_outer(fn.array(fn.struct("a", "b"), fn.struct("a", "b")))
+  }
+
+  functionTest("get_json_object") {
+    fn.get_json_object(Column("g"), "$.f1")
+  }
+
+  functionTest("json_tuple") {
+    fn.json_tuple(Column("g"), "a", "b")
+  }
+
+  functionTest("from_json") {
+    val schema = ArrayType(new StructType()
+      .add("a", IntegerType)
+      .add("b", IntegerType))
+    fn.from_json(Column("g"), schema, Map("mode" -> "FAILFAST"))
+  }
+
+  functionTest("schema_of_json") {
+    fn.schema_of_json(Column("g"))
+  }
+
+  functionTest("to_json") {
+    fn.to_json(Column("g"), Map("mode" -> "FAILFAST"))
+  }
+
+  functionTest("size") {
+    fn.size(Column("e"))
+  }
+
+  functionTest("sort_array") {
+    fn.sort_array(Column("e"), asc = true)
+  }
+
+  functionTest("array_min") {
+    fn.array_min(Column("e"))
+  }
+
+  functionTest("array_max") {
+    fn.array_max(Column("e"))
+  }
+
+  functionTest("shuffle") {
+    fn.shuffle(Column("e"))
+  }
+
+  functionTest("reverse") {
+    fn.reverse(Column("e"))
+  }
+
+  functionTest("flatten") {
+    fn.flatten(Column("e"))
+  }
+
+  functionTest("sequence") {
+    fn.sequence(lit(1), lit(100), lit(2))
+  }
+
+  functionTest("array_repeat") {
+    fn.array_repeat(Column("e"), 3)
+  }
+
+  functionTest("map_contains_key") {
+    fn.array_repeat(Column("f"), 3)
+  }
+
+  functionTest("map_keys") {
+    fn.map_keys(Column("f"))
+  }
+
+  functionTest("map_values") {
+    fn.map_values(Column("f"))
+  }
+
+  functionTest("map_entries") {
+    fn.map_entries(Column("f"))
+  }
+
+  functionTest("map_from_entries") {
+    fn.map_entries(Column("f"))
+  }
+
+  functionTest("arrays_zip") {
+    fn.arrays_zip(Column("e"), Column("e"))
+  }
+
+  functionTest("map_concat") {
+    fn.map_concat(Column("f"), Column("f"))
+  }
+
+  functionTest("from_csv") {
+    val schema = new StructType().add("time", TimestampType)
+    fn.from_csv(Column("g"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm"))
+  }
+
+  functionTest("schema_of_csv") {
+    fn.schema_of_csv("0.1,1")
+  }
+
+  functionTest("to_csv") {
+    fn.to_csv(Column("g"), Map("timestampFormat" -> "dd/MM/yyyy HH:mm").asJava)
+  }
+
+  functionTest("years") {
+    fn.years(Column("a"))
+  }
+
+  functionTest("months") {
+    fn.months(Column("a"))
+  }
+
+  functionTest("days") {
+    fn.days(Column("a"))
+  }
+
+  functionTest("hours") {
+    fn.hours(Column("a"))
+  }
+
+  functionTest("bucket") {
+    fn.bucket(3, Column("a"))
   }
 
   test("groupby agg") {
