@@ -1,0 +1,9 @@
+ö
+éZãàstruct<id:bigint,a:int,b:double,d:struct<id:bigint,a:int,b:double>,e:array<int>,f:map<string,struct<id:bigint,a:int,b:double>>,g:string>ÜÉ
+	from_json
+gÕ
+ j«{"type":"array","elementType":{"type":"struct","fields":[{"name":"a","type":"integer","nullable":true,"metadata":{}},{"name":"b","type":"integer","nullable":true,"metadata":{}}]},"containsNull":true}
+map
+jmode
+
+jFAILFAST

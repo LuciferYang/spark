@@ -1,0 +1,10 @@
+Ü
+Z‹ˆstruct<id:bigint,a:int,b:double,d:struct<id:bigint,a:int,b:double>,e:array<int>,f:map<string,struct<id:bigint,a:int,b:double>>,g:string>IG
+inline=;
+array
+struct
+a
+b
+struct
+a
+b
