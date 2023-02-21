@@ -1,0 +1,4 @@
+Î
+ŽZ‹ˆstruct<id:bigint,a:int,b:double,d:struct<id:bigint,a:int,b:double>,e:array<int>,f:map<string,struct<id:bigint,a:int,b:double>>,g:string>;9
+schema_of_json'
+%j#{"id": "a", "drop": {"drop": null}}
