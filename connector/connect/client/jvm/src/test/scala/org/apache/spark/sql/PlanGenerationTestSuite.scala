@@ -18,7 +18,6 @@ package org.apache.spark.sql
 
 import java.nio.file.{Files, Path}
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
