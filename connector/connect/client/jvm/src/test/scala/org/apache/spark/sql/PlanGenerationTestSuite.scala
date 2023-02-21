@@ -182,6 +182,7 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     .add("e", "array<int>")
     .add("f", MapType(StringType, simpleSchema))
     .add("g", "string")
+    .add("h", TimestampType)
 
   private val complexSchemaString = complexSchema.catalogString
 
@@ -1409,7 +1410,7 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
 
   functionTest("from_csv") {
     val schema = new StructType().add("time", TimestampType)
-    fn.from_csv(Column("g"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm"))
+    fn.from_csv(Column("h"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm"))
   }
 
   functionTest("schema_of_csv") {
