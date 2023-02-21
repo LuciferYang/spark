@@ -4760,7 +4760,7 @@ object functions {
    * A transform for timestamps to partition data into hours.
    *
    * @group partition_transforms
-   * @since 3.0.0
+   * @since 3.4.0
    */
   def hours(e: Column): Column =
     Column.fn("hours", e)

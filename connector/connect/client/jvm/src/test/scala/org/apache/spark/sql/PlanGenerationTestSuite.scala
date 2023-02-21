@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import java.nio.file.{Files, Path}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
@@ -1616,9 +1617,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.schema_of_csv("0.1,1")
   }
 
-//  functionTest("to_csv") {
-//    fn.to_csv(Column("g"), Map("timestampFormat" -> "dd/MM/yyyy HH:mm").asJava)
-//  }
+  functionTest("to_csv") {
+    fn.to_csv(Column("g"), Map("timestampFormat" -> "dd/MM/yyyy HH:mm").asJava)
+  }
 
   functionTest("years") {
     fn.years(Column("a"))
