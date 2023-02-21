@@ -1607,7 +1607,8 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
 
 //  test("from_csv") {
 //    val schema = new StructType().add("time", TimestampType)
-//    temporals.select(fn.from_csv(Column("t"), schema, Map("timestampFormat" -> "dd/MM/yyyy HH:mm")))
+//    temporals.select(fn.from_csv(Column("t"), schema,
+  //    Map("timestampFormat" -> "dd/MM/yyyy HH:mm")))
 //  }
 
   functionTest("schema_of_csv") {
