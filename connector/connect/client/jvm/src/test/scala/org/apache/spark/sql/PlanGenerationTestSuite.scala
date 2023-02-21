@@ -1533,9 +1533,9 @@ class PlanGenerationTestSuite extends ConnectFunSuite with BeforeAndAfterAll wit
     fn.from_json(Column("g"), schema, Map("mode" -> "FAILFAST"))
   }
 
-//  functionTest("schema_of_json") {
-//    fn.schema_of_json(Column("g"))
-//  }
+  functionTest("schema_of_json") {
+    fn.schema_of_json(lit("""{"id": "a", "drop": {"drop": null}}"""))
+  }
 
 //  functionTest("to_json") {
 //    fn.to_json(Column("g"), Map("mode" -> "FAILFAST"))
