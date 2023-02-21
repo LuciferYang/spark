@@ -4158,7 +4158,7 @@ object functions {
         cols.append(lit(k))
         cols.append(lit(v))
     }
-    Column.fn("map", cols: _*)
+    Column.fn("map", cols.toSeq: _*)
   }
 
   // scalastyle:off line.size.limit
