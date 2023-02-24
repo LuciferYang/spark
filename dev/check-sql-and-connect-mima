@@ -21,8 +21,10 @@ set -o pipefail
 set -e
 
 # Go to the Spark project root directory
-SPARK_HOME="$(cd "`dirname "$0"`"/..; pwd)"
-cd "$SPARK_HOME"
+FWDIR="$(cd "`dirname "$0"`"/..; pwd)"
+cd "$FWDIR"
+export SPARK_HOME=$FWDIR
+echo $SPARK_HOME
 
 TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
 SQL_BUILD_RESULT="$(build/sbt clean sql/package | tail -n1 | awk '{print $1}')"
