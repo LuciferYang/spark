@@ -118,7 +118,10 @@ object SqlAndConnectCompatibilityCheck {
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
 
     val newMethods = clientClass.getMethods
+    // scalastyle:off
+    println(s"newMethods = ${newMethods.mkString(",")}")
     val oldMethods = sqlClass.getMethods
+    println(s"oldMethods = ${oldMethods.mkString(",")}")
 
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
