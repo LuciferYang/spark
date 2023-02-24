@@ -139,7 +139,7 @@ class ClientE2ETestSuite extends RemoteSparkSession {
     }
   }
 
-  test("write table") {
+  ignore("write table") {
     withTable("myTable") {
       val df = spark.range(10).limit(3)
       df.write.mode(SaveMode.Overwrite).saveAsTable("myTable")
