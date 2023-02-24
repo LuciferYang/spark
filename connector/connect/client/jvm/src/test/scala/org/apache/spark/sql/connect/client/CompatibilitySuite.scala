@@ -117,7 +117,10 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
 
     val newMethods = clientClass.getMethods
+    // scalastyle:off
+    println(s"newMethods size = ${newMethods.size}")
     val oldMethods = sqlClass.getMethods
+    println(s"oldMethods size = ${oldMethods.size}")
 
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
