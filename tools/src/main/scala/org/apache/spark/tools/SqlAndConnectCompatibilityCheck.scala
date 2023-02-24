@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.connect.client
+package org.apache.spark.tools
 
 import java.io.File
 import java.net.URLClassLoader
@@ -22,8 +22,6 @@ import java.util.regex.Pattern
 
 import com.typesafe.tools.mima.core._
 import com.typesafe.tools.mima.lib.MiMaLib
-import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
-import org.apache.spark.sql.connect.client.util.IntegrationTestUtils._
 
 /**
  * This test checks the binary compatibility of the connect client API against the spark SQL API
