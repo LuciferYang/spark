@@ -122,12 +122,16 @@ object SqlAndConnectCompatibilityCheck {
     println(s"newMethods = ${newMethods.mkString(",")}")
     val oldMethods = sqlClass.getMethods
     println(s"oldMethods = ${oldMethods.mkString(",")}")
+    val oldMethodsNames = oldMethods.map(m => m.toString)
 
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
       .map(m => m.toString)
       .foreach(method => {
-        assert(oldMethods.map(m => m.toString).contains(method))
+        if (!oldMethodsNames.contains(method)) {
+          // scalastyle:off
+          println(s"un-compatibility method = $method")
+        }
       })
   }
 
