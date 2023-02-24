@@ -24,7 +24,7 @@ set -e
 SPARK_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 cd "$SPARK_HOME"
 
-#TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
+TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
 #SQL_BUILD_RESULT="$(build/sbt clean sql/package | tail -n1 | awk '{print $1}')"
 #if [ "$SQL_BUILD_RESULT" != "[success]" ]; then
 #  echo "ERROR: sql module package failed."
