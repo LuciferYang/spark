@@ -28,6 +28,7 @@ echo $SPARK_HOME
 
 TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
 CORE_CLASSPATH="$(build/sbt -DcopyDependencies=false "export core/fullClasspath" | grep jar | tail -n1)"
+CATALYST_CLASSPATH="$(build/sbt -DcopyDependencies=false "export catalyst/fullClasspath" | grep jar | tail -n1)"
 SQL_BUILD_RESULT="$(build/sbt sql/package | tail -n1 | awk '{print $1}')"
 if [ "$SQL_BUILD_RESULT" != "[success]" ]; then
   echo "ERROR: sql module package failed."
@@ -51,7 +52,7 @@ fi
 $JAVA_CMD \
   -Xmx2g \
   -XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.util.jar=ALL-UNNAMED \
-  -cp "$TOOLS_CLASSPATH:$CORE_CLASSPATH" \
+  -cp "$TOOLS_CLASSPATH:$CORE_CLASSPATH:$CATALYST_CLASSPATH" \
   org.apache.spark.tools.SqlAndConnectCompatibilityCheck
 
 #ERRORS=$($JAVA_CMD -Xmx2g -XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.util.jar=ALL-UNNAMED -cp "$TOOLS_CLASSPATH" org.apache.spark.tools.SqlAndConnectCompatibilityCheck | grep ERROR)
