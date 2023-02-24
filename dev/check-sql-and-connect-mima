@@ -27,13 +27,13 @@ export SPARK_HOME=$FWDIR
 echo $SPARK_HOME
 
 TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
-SQL_BUILD_RESULT="$(build/sbt clean sql/package | tail -n1 | awk '{print $1}')"
+SQL_BUILD_RESULT="$(build/sbt sql/package | tail -n1 | awk '{print $1}')"
 if [ "$SQL_BUILD_RESULT" != "[success]" ]; then
   echo "ERROR: sql module package failed."
   # shellcheck disable=SC2242
   exit 1
 fi
-CONNECT_BUILD_RESULT="$(build/sbt clean connect-client-jvm/assembly | tail -n1 | awk '{print $1}')"
+CONNECT_BUILD_RESULT="$(build/sbt connect-client-jvm/assembly | tail -n1 | awk '{print $1}')"
 if [ "$CONNECT_BUILD_RESULT" != "[success]" ]; then
   echo "ERROR: connect-client-jvm module assembly failed."
   # shellcheck disable=SC2242
