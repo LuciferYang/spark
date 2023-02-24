@@ -21,13 +21,22 @@ set -o pipefail
 set -e
 
 # Go to the Spark project root directory
-FWDIR="$(cd "`dirname "$0"`"/..; pwd)"
-cd "$FWDIR"
-echo $FWDIR
+SPARK_HOME="$(cd "`dirname "$0"`"/..; pwd)"
+cd "$SPARK_HOME"
 
 TOOLS_CLASSPATH="$(build/sbt -DcopyDependencies=false "export tools/fullClasspath" | grep jar | tail -n1)"
-
-rm -f .generated-mima*
+SQL_BUILD_RESULT="$(build/sbt clean sql/package | tail -n1 | awk '{print $1}')"
+if [ "$SQL_BUILD_RESULT" != "[success]" ]; then
+  echo "ERROR: sql module package failed."
+  # shellcheck disable=SC2242
+  exit 1
+fi
+CONNECT_BUILD_RESULT="$(build/sbt clean connect-client-jvm/assembly | tail -n1 | awk '{print $1}')"
+if [ "$CONNECT_BUILD_RESULT" != "[success]" ]; then
+  echo "ERROR: connect-client-jvm module assembly failed."
+  # shellcheck disable=SC2242
+  exit 1
+fi
 
 if [[ -x "$JAVA_HOME/bin/java" ]]; then
   JAVA_CMD="$JAVA_HOME/bin/java"
@@ -35,8 +44,11 @@ else
   JAVA_CMD=java
 fi
 
-$JAVA_CMD \
-  -Xmx2g \
-  -XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.util.jar=ALL-UNNAMED \
-  -cp "$TOOLS_CLASSPATH" \
-  org.apache.spark.tools.SqlAndConnectCompatibilityCheck
+ERRORS=$($JAVA_CMD -Xmx2g -XX:+IgnoreUnrecognizedVMOptions --add-opens=java.base/java.util.jar=ALL-UNNAMED -cp "$TOOLS_CLASSPATH" org.apache.spark.tools.SqlAndConnectCompatibilityCheck | grep ERROR)
+
+if test ! -z "$ERRORS"; then
+    echo -e "sql and connect-client-jvm module check mima failed at following occurrences:\n$ERRORS"
+    exit 1
+else
+    echo -e "sql and connect-client-jvm module check mima passed."
+fi
