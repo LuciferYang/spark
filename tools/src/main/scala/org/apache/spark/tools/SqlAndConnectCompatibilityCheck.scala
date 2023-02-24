@@ -153,7 +153,7 @@ object SqlAndConnectCompatibilityCheck {
       }
   }
 
-  private[sql] lazy val sparkHome: String = {
+  private lazy val sparkHome: String = {
     if (!sys.env.contains("SPARK_HOME")) {
       throw new IllegalStateException("SPARK_HOME is not set.")
     }
@@ -166,7 +166,7 @@ object SqlAndConnectCompatibilityCheck {
    *
    * @return the jar
    */
-  private[sql] def findJar(path: String, sbtName: String, mvnName: String): File = {
+  private def findJar(path: String, sbtName: String, mvnName: String): File = {
     val targetDir = new File(new File(sparkHome, path), "target")
     assert(
       targetDir.exists(),
