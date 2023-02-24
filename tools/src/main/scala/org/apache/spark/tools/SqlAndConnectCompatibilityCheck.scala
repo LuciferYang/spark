@@ -121,7 +121,7 @@ object SqlAndConnectCompatibilityCheck {
     // scalastyle:off
     println(s"newMethods size = ${newMethods.size}")
     val oldMethods = sqlClass.getMethods
-    println(s"oldMethods size = ${newMethods.size}")
+    println(s"oldMethods size = ${oldMethods.size}")
     val oldMethodsNames = oldMethods.map(m => m.toString)
 
     // For now we simply check the new methods is a subset of the old methods.
