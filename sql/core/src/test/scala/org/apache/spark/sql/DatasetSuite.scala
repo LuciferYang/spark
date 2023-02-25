@@ -60,7 +60,7 @@ object TestForTypeAlias {
   def aliasedArrayInTuple: (Int, IntArray) = (1, Array(1))
 }
 
-class DatasetSuite extends QueryTest
+  class DatasetSuite extends QueryTest
   with SharedSparkSession
   with AdaptiveSparkPlanHelper {
   import testImplicits._
@@ -69,7 +69,7 @@ class DatasetSuite extends QueryTest
 
   test("data set methods") {
     // scalastyle:off
-    val methods = Dataset.getClass.getMethods
+    val methods = classOf[Dataset[_]].getClass.getMethods
     println(s"Methods size = ${methods.size}")
     methods.zipWithIndex.foreach(m => println(s"Method-${m._2} name = ${m._1.toString}"))
   }
