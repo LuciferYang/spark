@@ -114,8 +114,28 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     println(clientJar.toURI)
     println(sqlJar.toURI)
 
-    val clientClassLoader: URLClassLoader = new URLClassLoader(Seq(clientJar.toURI.toURL).toArray)
-    val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray)
+    val clientClassLoader: URLClassLoader = new URLClassLoader(Seq(clientJar.toURI.toURL).toArray) {
+      override def loadClass(name: String, resolve: Boolean): Class[_] = {
+        val loaded = findLoadedClass(name)
+        if (loaded == null) {
+          super.loadClass(name, resolve)
+        } else {
+          println(s"already load = $loaded")
+          loaded
+        }
+      }
+    }
+    val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray) {
+      override def loadClass(name: String, resolve: Boolean): Class[_] = {
+        val loaded = findLoadedClass(name)
+        if (loaded == null) {
+          super.loadClass(name, resolve)
+        } else {
+          println(s"already load = $loaded")
+          loaded
+        }
+      }
+    }
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
