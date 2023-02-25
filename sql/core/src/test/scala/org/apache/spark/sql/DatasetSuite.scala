@@ -69,7 +69,7 @@ object TestForTypeAlias {
 
   test("data set methods") {
     // scalastyle:off
-    val methods = classOf[Dataset[_]].getClass.getMethods
+    val methods = classOf[Dataset[_]].getMethods
     println(s"Methods size = ${methods.size}")
     methods.zipWithIndex.foreach(m => println(s"Method-${m._2} name = ${m._1.toString}"))
   }
