@@ -110,13 +110,17 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
   }
 
   test("compatibility API tests: Dataset") {
+    // scalastyle:off
+    println(clientJar.toURI)
+    println(sqlJar.toURI)
+
     val clientClassLoader: URLClassLoader = new URLClassLoader(Seq(clientJar.toURI.toURL).toArray)
     val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray)
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
 
-    // scalastyle:off
+
     val newMethods = clientClass.getMethods
     println(s"newMethods size = ${newMethods.size}")
     newMethods.zipWithIndex.foreach(m => println(s"newMethod-${m._2} name = ${m._1.toString}"))
