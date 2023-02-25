@@ -119,10 +119,10 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     // scalastyle:off
     val newMethods = clientClass.getMethods
     println(s"newMethods size = ${newMethods.size}")
-    newMethods.zipWithIndex.foreach(m => println(s"newMethod-${m._1} name = ${m._2.toString}"))
+    newMethods.zipWithIndex.foreach(m => println(s"newMethod-${m._2} name = ${m._1.toString}"))
     val oldMethods = sqlClass.getMethods
     println(s"oldMethods size = ${oldMethods.size}")
-    oldMethods.zipWithIndex.foreach(m => println(s"oldMethod-${m._1} name = ${m._2.toString}"))
+    oldMethods.zipWithIndex.foreach(m => println(s"oldMethod-${m._2} name = ${m._1.toString}"))
 
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
