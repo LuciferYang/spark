@@ -67,6 +67,13 @@ class DatasetSuite extends QueryTest
 
   private implicit val ordering = Ordering.by((c: ClassData) => c.a -> c.b)
 
+  test("data set methods") {
+    // scalastyle:off
+    val methods = Dataset.getClass.getMethods
+    println(s"Methods size = ${methods.size}")
+    methods.zipWithIndex.foreach(m => println(s"Method-${m._2} name = ${m._1.toString}"))
+  }
+
   test("checkAnswer should compare map correctly") {
     val data = Seq((1, "2", Map(1 -> 2, 2 -> 1)))
     checkAnswer(
