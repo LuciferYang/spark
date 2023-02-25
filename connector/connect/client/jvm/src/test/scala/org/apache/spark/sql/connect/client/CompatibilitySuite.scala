@@ -118,6 +118,7 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
       override def loadClass(name: String, resolve: Boolean): Class[_] = {
         val loaded = findLoadedClass(name)
         if (loaded == null) {
+          println(s"will load new")
           super.loadClass(name, resolve)
         } else {
           println(s"already load = $loaded")
@@ -129,6 +130,7 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
       override def loadClass(name: String, resolve: Boolean): Class[_] = {
         val loaded = findLoadedClass(name)
         if (loaded == null) {
+          println(s"will load new")
           super.loadClass(name, resolve)
         } else {
           println(s"already load = $loaded")
