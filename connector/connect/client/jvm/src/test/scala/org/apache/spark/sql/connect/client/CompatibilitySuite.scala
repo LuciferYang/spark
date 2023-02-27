@@ -229,6 +229,10 @@ class CompatibilitySuite extends ConnectFunSuite {
     val oldMethods = sqlClass.getMethods
     println(s"oldMethods length = ${oldMethods.length}")
 
+    if (newMethods.map(_.toString).sorted sameElements oldMethods.map(_.toString).sorted) {
+      println(s"The contents of newMethods and boldMethods are the same")
+    }
+
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
       .map(m => m.toString)
