@@ -214,15 +214,20 @@ class CompatibilitySuite extends ConnectFunSuite {
     }
   }
 
+  // scalastyle:off
   test("compatibility API tests: Dataset") {
     val clientClassLoader: URLClassLoader = new URLClassLoader(Seq(clientJar.toURI.toURL).toArray)
     val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray)
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
+    println(s"clientClass load from ${clientClass.getProtectionDomain.getCodeSource.getLocation}")
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
+    println(s"sqlClass load from ${sqlClass.getProtectionDomain.getCodeSource.getLocation}")
 
     val newMethods = clientClass.getMethods
+    println(s"newMethods length = ${newMethods.length}")
     val oldMethods = sqlClass.getMethods
+    println(s"oldMethods length = ${oldMethods.length}")
 
     // For now we simply check the new methods is a subset of the old methods.
     newMethods
