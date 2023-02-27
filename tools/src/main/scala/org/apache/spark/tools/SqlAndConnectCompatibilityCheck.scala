@@ -220,9 +220,9 @@ object SqlAndConnectCompatibilityCheck {
     val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray)
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
-    println(clientClass.getClassLoader.getResource("/"))
+    println(clientClass.getProtectionDomain.getCodeSource.getLocation)
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
-    println(sqlClass.getClassLoader.getResource("/"))
+    println(sqlClass.getProtectionDomain.getCodeSource.getLocation)
 
     val newMethods = clientClass.getMethods
     println(s"newMethods size = ${newMethods.size}")
