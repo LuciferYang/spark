@@ -140,7 +140,9 @@ class CompatibilitySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     }
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
+    println(clientClass.getClassLoader.getResource("/"))
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
+    println(sqlClass.getClassLoader.getResource("/"))
 
 
     val newMethods = clientClass.getMethods
