@@ -17,7 +17,6 @@
 # limitations under the License.
 #
 
-set -o pipefail
 set -e
 
 # Go to the Spark project root directory
@@ -56,7 +55,7 @@ $JAVA_CMD \
 
 echo "finish connect-client-jvm module mima check ..."
 
-ERRORS=$(grep ERROR .connect-mima-check-result | tail -n1)
+ERRORS=$(cat grep ERROR .connect-mima-check-result | tail -n1)
 
 if test ! -z "$ERRORS"; then
   cat .connect-mima-check-result
