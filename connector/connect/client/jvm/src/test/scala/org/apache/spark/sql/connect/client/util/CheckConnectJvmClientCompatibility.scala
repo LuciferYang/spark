@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.tools
+package org.apache.spark.sql.connect.client.util
 
 import java.io.{File, Writer}
 import java.net.URLClassLoader
@@ -25,8 +25,10 @@ import java.util.regex.Pattern
 
 import scala.reflect.runtime.universe.runtimeMirror
 
-import com.typesafe.tools.mima.core._
+import com.typesafe.tools.mima.core.{Problem, ProblemFilter, ProblemFilters}
 import com.typesafe.tools.mima.lib.MiMaLib
+
+import org.apache.spark.sql.connect.client.util.IntegrationTestUtils._
 
 /**
  * A tool for checking the binary compatibility of the connect client API against the spark SQL API
@@ -55,8 +57,11 @@ object CheckConnectJvmClientCompatibility {
         Files.newBufferedWriter(Paths.get(
           s"$sparkHome/.connect-mima-check-result"), StandardCharsets.UTF_8)
       val clientJar: File =
-        findJar("connector/connect/client/jvm", "spark-connect-client-jvm-assembly")
-      val sqlJar: File = findJar("sql/core", "spark-sql")
+        findJar(
+          "connector/connect/client/jvm",
+          "spark-connect-client-jvm-assembly",
+          "spark-connect-client-jvm")
+      val sqlJar: File = findJar("sql/core", "spark-sql", "spark-sql")
       val problems = checkMiMaCompatibility(clientJar, sqlJar)
       if (problems.nonEmpty) {
         resultWriter.write(s"ERROR: Comparing client jar: $clientJar and and sql jar: $sqlJar \n")
@@ -71,7 +76,7 @@ object CheckConnectJvmClientCompatibility {
         resultWriter.write("\n")
       }
     } catch {
-      case e: Exception =>
+      case e: Throwable =>
         resultWriter.write(s"ERROR: ${e.getMessage}")
     } finally {
       if (resultWriter != null) {
@@ -203,13 +208,14 @@ object CheckConnectJvmClientCompatibility {
 
       // TypedColumn
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.TypedColumn.this"))
-    allProblems
+    val problems = allProblems
       .filter { p =>
         includedRules.exists(rule => rule(p))
       }
       .filter { p =>
         excludeRules.forall(rule => rule(p))
       }
+    problems
   }
 
   private def checkDatasetApiCompatibility(clientJar: File, sqlJar: File): Seq[String] = {
@@ -235,40 +241,6 @@ object CheckConnectJvmClientCompatibility {
 
     // For now we simply check the new methods is a subset of the old methods.
     clientMethods.diff(sqlMethods)
-  }
-
-  /**
-   * Find a jar in the Spark project artifacts. It requires a build first (e.g. sbt package)
-   * so that this method can find the jar in the target folders.
-   *
-   * @return the jar
-   */
-  private def findJar(path: String, sbtName: String): File = {
-    val targetDir = new File(new File(sparkHome, path), "target")
-    if (!targetDir.exists()) {
-      throw new IllegalStateException("Fail to locate the target folder: " +
-        s"'${targetDir.getCanonicalPath}'. " +
-        s"SPARK_HOME='${new File(sparkHome).getCanonicalPath}'. " +
-        "Make sure the spark project jars has been built (e.g. using sbt package)" +
-        "and the env variable `SPARK_HOME` is set correctly.")
-    }
-    val jars = recursiveListFiles(targetDir).filter { f =>
-      // SBT jar
-      f.getParentFile.getName.startsWith("scala-") &&
-        f.getName.startsWith(sbtName) && f.getName.endsWith(".jar")
-    }
-    // It is possible we found more than one: one built by maven, and another by SBT
-    if (jars.isEmpty) {
-      throw new IllegalStateException(
-        s"Failed to find the jar inside folder: ${targetDir.getCanonicalPath}")
-    }
-    println("Using jar: " + jars(0).getCanonicalPath)
-    jars(0) // return the first jar found
-  }
-
-  private def recursiveListFiles(f: File): Array[File] = {
-    val these = f.listFiles
-    these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
   }
 
   private case class IncludeByName(name: String) extends ProblemFilter {
