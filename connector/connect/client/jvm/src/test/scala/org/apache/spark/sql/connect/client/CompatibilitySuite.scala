@@ -25,6 +25,7 @@ import com.typesafe.tools.mima.lib.MiMaLib
 
 import org.apache.spark.sql.connect.client.util.ConnectFunSuite
 import org.apache.spark.sql.connect.client.util.IntegrationTestUtils._
+import org.apache.spark.util.ChildFirstURLClassLoader
 
 /**
  * This test checks the binary compatibility of the connect client API against the spark SQL API
@@ -193,8 +194,10 @@ class CompatibilitySuite extends ConnectFunSuite {
   }
 
   test("compatibility API tests: Dataset") {
-    val clientClassLoader: URLClassLoader = new URLClassLoader(Seq(clientJar.toURI.toURL).toArray)
-    val sqlClassLoader: URLClassLoader = new URLClassLoader(Seq(sqlJar.toURI.toURL).toArray)
+    val clientClassLoader: URLClassLoader =
+      new ChildFirstURLClassLoader(Seq(clientJar.toURI.toURL).toArray, this.getClass.getClassLoader)
+    val sqlClassLoader: URLClassLoader =
+      new ChildFirstURLClassLoader(Seq(sqlJar.toURI.toURL).toArray, this.getClass.getClassLoader)
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
