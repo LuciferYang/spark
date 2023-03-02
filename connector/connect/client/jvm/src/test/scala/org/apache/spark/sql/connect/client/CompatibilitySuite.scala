@@ -201,6 +201,9 @@ class CompatibilitySuite extends ConnectFunSuite {
 
     val clientClass = clientClassLoader.loadClass("org.apache.spark.sql.Dataset")
     val sqlClass = sqlClassLoader.loadClass("org.apache.spark.sql.Dataset")
+    val clientClassLocation = clientClass.getProtectionDomain.getCodeSource.getLocation
+    val sqlClassLocation = sqlClass.getProtectionDomain.getCodeSource.getLocation
+    assert(clientClassLocation != sqlClassLocation)
 
     val newMethods = clientClass.getMethods
     val oldMethods = sqlClass.getMethods
