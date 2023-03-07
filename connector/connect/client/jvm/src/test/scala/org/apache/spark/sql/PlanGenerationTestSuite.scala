@@ -2049,6 +2049,76 @@ class PlanGenerationTestSuite
       fn.lit(Array(new CalendarInterval(2, 20, 100L), new CalendarInterval(2, 21, 200L))))
   }
 
+  test("function typedlit") {
+    simple.select(
+      fn.typedlit(fn.col("id")),
+      fn.typedlit('id),
+      fn.typedlit(true),
+      fn.typedlit(68.toByte),
+      fn.typedlit(9872.toShort),
+      fn.typedlit(-8726532),
+      fn.typedlit(7834609328726532L),
+      fn.typedlit(Math.E),
+      fn.typedlit(-0.8f),
+      fn.typedlit(BigDecimal(8997620, 5)),
+      fn.typedlit(BigDecimal(898897667231L, 7).bigDecimal),
+      fn.typedlit("connect!"),
+      fn.typedlit('T'),
+      fn.typedlit(Array.tabulate(10)(i => ('A' + i).toChar)),
+      fn.typedlit(Array.tabulate(23)(i => (i + 120).toByte)),
+      fn.typedlit(mutable.WrappedArray.make(Array[Byte](8.toByte, 6.toByte))),
+      fn.typedlit(null),
+      fn.typedlit(java.time.LocalDate.of(2020, 10, 10)),
+      fn.typedlit(Decimal.apply(BigDecimal(8997620, 6))),
+      fn.typedlit(java.time.Instant.ofEpochMilli(1677155519808L)),
+      fn.typedlit(new java.sql.Timestamp(12345L)),
+      fn.typedlit(java.time.LocalDateTime.of(2023, 2, 23, 20, 36)),
+      fn.typedlit(java.sql.Date.valueOf("2023-02-23")),
+      fn.typedlit(java.time.Duration.ofSeconds(200L)),
+      fn.typedlit(java.time.Period.ofDays(100)),
+      fn.typedlit(new CalendarInterval(2, 20, 100L)))
+  }
+
+  test("function typedlit array") {
+    simple.select(
+      fn.typedlit(Array.emptyDoubleArray),
+      fn.typedlit(Array(Array(1), Array(2), Array(3))),
+      fn.typedlit(Array(Array(Array(1)), Array(Array(2)), Array(Array(3)))),
+      fn.typedlit(Array(true, false)),
+      fn.typedlit(Array(67.toByte, 68.toByte, 69.toByte)),
+      fn.typedlit(Array(9872.toShort, 9873.toShort, 9874.toShort)),
+      fn.typedlit(Array(-8726532, 8726532, -8726533)),
+      fn.typedlit(Array(7834609328726531L, 7834609328726532L, 7834609328726533L)),
+      fn.typedlit(Array(Math.E, 1.toDouble, 2.toDouble)),
+      fn.typedlit(Array(-0.8f, -0.7f, -0.9f)),
+      fn.typedlit(Array(BigDecimal(8997620, 5), BigDecimal(8997621, 5))),
+      fn.typedlit(
+        Array(BigDecimal(898897667231L, 7).bigDecimal, BigDecimal(898897667231L, 7).bigDecimal)),
+      fn.typedlit(Array("connect!", "disconnect!")),
+      fn.typedlit(Array('T', 'F')),
+      fn.typedlit(
+        Array(
+          Array.tabulate(10)(i => ('A' + i).toChar),
+          Array.tabulate(10)(i => ('B' + i).toChar))),
+      fn.typedlit(
+        Array(java.time.LocalDate.of(2020, 10, 10), java.time.LocalDate.of(2020, 10, 11))),
+      fn.typedlit(
+        Array(
+          java.time.Instant.ofEpochMilli(1677155519808L),
+          java.time.Instant.ofEpochMilli(1677155519809L))),
+      fn.typedlit(Array(new java.sql.Timestamp(12345L), new java.sql.Timestamp(23456L))),
+      fn.typedlit(
+        Array(
+          java.time.LocalDateTime.of(2023, 2, 23, 20, 36),
+          java.time.LocalDateTime.of(2023, 2, 23, 21, 36))),
+      fn.typedlit(
+        Array(java.sql.Date.valueOf("2023-02-23"), java.sql.Date.valueOf("2023-03-01"))),
+      fn.typedlit(Array(java.time.Duration.ofSeconds(100L), java.time.Duration.ofSeconds(200L))),
+      fn.typedlit(Array(java.time.Period.ofDays(100), java.time.Period.ofDays(200))),
+      fn.typedlit(Array(new CalendarInterval(2, 20, 100L), new CalendarInterval(2, 21, 200L)))
+    )
+  }
+
   /* Window API */
   test("window") {
     simple.select(
