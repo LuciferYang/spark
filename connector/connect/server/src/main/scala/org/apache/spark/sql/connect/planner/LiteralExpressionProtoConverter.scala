@@ -17,11 +17,12 @@
 
 package org.apache.spark.sql.connect.planner
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import org.apache.spark.connect.proto
-import org.apache.spark.sql.catalyst.expressions
+import org.apache.spark.sql.catalyst.{expressions, CatalystTypeConverters}
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, IntervalUtils}
 import org.apache.spark.sql.connect.common.{DataTypeProtoConverter, InvalidPlanInput}
 import org.apache.spark.sql.types._
@@ -106,6 +107,19 @@ object LiteralExpressionProtoConverter {
           toArrayData(lit.getArray),
           ArrayType(DataTypeProtoConverter.toCatalystType(lit.getArray.getElementType)))
 
+      case proto.Expression.Literal.LiteralTypeCase.MAP =>
+        expressions.Literal.create(
+          toMapData(lit.getMap),
+          MapType(
+            DataTypeProtoConverter.toCatalystType(lit.getMap.getKeyType),
+            DataTypeProtoConverter.toCatalystType(lit.getMap.getValueType)))
+
+      case proto.Expression.Literal.LiteralTypeCase.STRUCT =>
+        val dataType = DataTypeProtoConverter.toCatalystType(lit.getStruct.getStructType)
+        val structData = toStructData(lit.getStruct)
+        val convert = CatalystTypeConverters.createToCatalystConverter(dataType)
+        expressions.Literal.create(convert(structData), dataType)
+
       case _ =>
         throw InvalidPlanInput(
           s"Unsupported Literal Type: ${lit.getLiteralTypeCase.getNumber}" +
@@ -118,6 +132,53 @@ object LiteralExpressionProtoConverter {
       case proto.Expression.Literal.LiteralTypeCase.STRING => lit.getString
 
       case _ => toCatalystExpression(lit).value
+    }
+  }
+
+  private def getConverter(dataType: proto.DataType): proto.Expression.Literal => Any = {
+    if (dataType.hasShort) { v =>
+      v.getShort.toShort
+    } else if (dataType.hasInteger) { v =>
+      v.getInteger
+    } else if (dataType.hasLong) { v =>
+      v.getLong
+    } else if (dataType.hasDouble) { v =>
+      v.getDouble
+    } else if (dataType.hasByte) { v =>
+      v.getByte.toByte
+    } else if (dataType.hasFloat) { v =>
+      v.getFloat
+    } else if (dataType.hasBoolean) { v =>
+      v.getBoolean
+    } else if (dataType.hasString) { v =>
+      v.getString
+    } else if (dataType.hasBinary) { v =>
+      v.getBinary.toByteArray
+    } else if (dataType.hasDate) { v =>
+      DateTimeUtils.toJavaDate(v.getDate)
+    } else if (dataType.hasTimestamp) { v =>
+      DateTimeUtils.toJavaTimestamp(v.getTimestamp)
+    } else if (dataType.hasTimestampNtz) { v =>
+      DateTimeUtils.microsToLocalDateTime(v.getTimestampNtz)
+    } else if (dataType.hasDayTimeInterval) { v =>
+      IntervalUtils.microsToDuration(v.getDayTimeInterval)
+    } else if (dataType.hasYearMonthInterval) { v =>
+      IntervalUtils.monthsToPeriod(v.getYearMonthInterval)
+    } else if (dataType.hasDecimal) { v =>
+      Decimal(v.getDecimal.getValue)
+    } else if (dataType.hasCalendarInterval) { v =>
+    {
+      val interval = v.getCalendarInterval
+      new CalendarInterval(interval.getMonths, interval.getDays, interval.getMicroseconds)
+    }
+    } else if (dataType.hasArray) { v =>
+      toArrayData(v.getArray)
+    } else if (dataType.hasMap) { v =>
+      toMapData(v.getMap)
+    } else if (dataType.hasStruct) { v =>
+      toStructData(v.getStruct)
+    } else {
+      throw InvalidPlanInput(s"Unsupported Literal Type: $dataType)")
     }
   }
 
@@ -135,45 +196,42 @@ object LiteralExpressionProtoConverter {
     }
 
     val elementType = array.getElementType
-    if (elementType.hasShort) {
-      makeArrayData(v => v.getShort.toShort)
-    } else if (elementType.hasInteger) {
-      makeArrayData(v => v.getInteger)
-    } else if (elementType.hasLong) {
-      makeArrayData(v => v.getLong)
-    } else if (elementType.hasDouble) {
-      makeArrayData(v => v.getDouble)
-    } else if (elementType.hasByte) {
-      makeArrayData(v => v.getByte.toByte)
-    } else if (elementType.hasFloat) {
-      makeArrayData(v => v.getFloat)
-    } else if (elementType.hasBoolean) {
-      makeArrayData(v => v.getBoolean)
-    } else if (elementType.hasString) {
-      makeArrayData(v => v.getString)
-    } else if (elementType.hasBinary) {
-      makeArrayData(v => v.getBinary.toByteArray)
-    } else if (elementType.hasDate) {
-      makeArrayData(v => DateTimeUtils.toJavaDate(v.getDate))
-    } else if (elementType.hasTimestamp) {
-      makeArrayData(v => DateTimeUtils.toJavaTimestamp(v.getTimestamp))
-    } else if (elementType.hasTimestampNtz) {
-      makeArrayData(v => DateTimeUtils.microsToLocalDateTime(v.getTimestampNtz))
-    } else if (elementType.hasDayTimeInterval) {
-      makeArrayData(v => IntervalUtils.microsToDuration(v.getDayTimeInterval))
-    } else if (elementType.hasYearMonthInterval) {
-      makeArrayData(v => IntervalUtils.monthsToPeriod(v.getYearMonthInterval))
-    } else if (elementType.hasDecimal) {
-      makeArrayData(v => Decimal(v.getDecimal.getValue))
-    } else if (elementType.hasCalendarInterval) {
-      makeArrayData(v => {
-        val interval = v.getCalendarInterval
-        new CalendarInterval(interval.getMonths, interval.getDays, interval.getMicroseconds)
-      })
-    } else if (elementType.hasArray) {
-      makeArrayData(v => toArrayData(v.getArray))
-    } else {
-      throw InvalidPlanInput(s"Unsupported Literal Type: $elementType)")
+    makeArrayData(getConverter(elementType))
+  }
+
+  private def toMapData(map: proto.Expression.Literal.Map): Any = {
+    def makeMapData[T](converter: proto.Expression.Literal => T)(implicit
+        tag: ClassTag[T]): mutable.Map[String, T] = {
+      val builder = mutable.HashMap.empty[String, T]
+      val mapDataMap = map.getMapDataMap
+      builder.sizeHint(mapDataMap.size())
+      val iter = mapDataMap.entrySet().iterator()
+      while (iter.hasNext) {
+        val entry = iter.next()
+        val key = entry.getKey
+        val value = entry.getValue
+        builder += ((key, converter(value)))
+      }
+      builder
+    }
+
+    val valueType = map.getValueType
+    makeMapData(getConverter(valueType))
+  }
+
+  private def toStructData(struct: proto.Expression.Literal.Struct): Any = {
+    val elements = struct.getElementList.asScala
+    val dataTypes = struct.getStructType.getStruct.getFieldsList.asScala.map(_.getDataType)
+    val structData = elements.zip(dataTypes).map { case (element, dataType) =>
+      getConverter(dataType)(element)
+    }
+
+    structData.toList match {
+      case List(a) => (a)
+      case List(a, b) => (a, b)
+      case List(a, b, c) => (a, b, c)
+      case List(a, b, c, d) => (a, b, c, d)
+      case List(a, b, c, d, e) => (a, b, c, d, e)
     }
   }
 }

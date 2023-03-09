@@ -22,9 +22,13 @@ import java.math.{BigDecimal => JBigDecimal}
 import java.sql.{Date, Timestamp}
 import java.time._
 
+import scala.reflect.runtime.universe.TypeTag
+import scala.util.Try
+
 import com.google.protobuf.ByteString
 
 import org.apache.spark.connect.proto
+import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, IntervalUtils}
 import org.apache.spark.sql.connect.common.DataTypeProtoConverter._
 import org.apache.spark.sql.types._
@@ -95,6 +99,49 @@ object LiteralValueProtoConverter {
       case null => builder.setNull(nullType)
       case _ => throw new UnsupportedOperationException(s"literal $literal not supported (yet).")
     }
+  }
+
+  def toLiteralProtoBuilder(
+      literal: Any,
+      dataType: DataType): proto.Expression.Literal.Builder = {
+    val builder = proto.Expression.Literal.newBuilder()
+
+    def arrayBuilder(list: List[_], elementType: DataType) = {
+      val ab = builder.getArrayBuilder.setElementType(toConnectProtoType(elementType))
+      list.foreach(x => ab.addElement(toLiteralProto(x)))
+      ab
+    }
+
+    def mapBuilder(map: Map[_, _], keyType: DataType, valueType: DataType) = {
+      val mb = builder.getMapBuilder
+        .setKeyType(toConnectProtoType(keyType))
+        .setValueType(toConnectProtoType(valueType))
+      map.foreach(kv => mb.putMapData(kv._1.toString, toLiteralProto(kv._2)))
+      mb
+    }
+
+    def structBuilder(values: Seq[Any], structType: StructType) = {
+      val sb = builder.getStructBuilder.setStructType(toConnectProtoType(structType))
+      values.foreach(v => sb.addElement(toLiteralProto(v)))
+      sb
+    }
+
+    (literal, dataType) match {
+      case (v: List[_], ArrayType(elementType, _)) =>
+        builder.setArray(arrayBuilder(v, elementType))
+      case (v: Map[_, _], MapType(keyType, valueType, _)) =>
+        builder.setMap(mapBuilder(v, keyType, valueType))
+      case (v: Product, structType: StructType) =>
+        builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
+      case _ => unsupported(s"literal $literal not supported (yet).")
+    }
+  }
+
+  def create[T: TypeTag](v: T): proto.Expression.Literal.Builder = Try {
+    val ScalaReflection.Schema(dataType, _) = ScalaReflection.schemaFor[T]
+    toLiteralProtoBuilder(v, dataType)
+  }.getOrElse {
+    toLiteralProtoBuilder(v)
   }
 
   /**

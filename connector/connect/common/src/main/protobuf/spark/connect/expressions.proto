@@ -173,6 +173,8 @@ message Expression {
       int32 year_month_interval = 20;
       int64 day_time_interval = 21;
       Array array = 22;
+      Map map = 23;
+      Struct struct = 24;
     }
 
     message Decimal {
@@ -194,6 +196,17 @@ message Expression {
     message Array {
       DataType element_type = 1;
       repeated Literal elements = 2;
+    }
+
+    message Map {
+      DataType keyType = 1;
+      DataType valueType = 2;
+      map<string, Literal> map_data = 3;
+    }
+
+    message Struct {
+      DataType structType = 1;
+      repeated Literal element = 2;
     }
   }
 
