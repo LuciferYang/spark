@@ -194,9 +194,8 @@ object LiteralExpressionProtoConverter {
       }
       builder.result()
     }
-
-    val elementType = array.getElementType
-    makeArrayData(getConverter(elementType))
+    
+    makeArrayData(getConverter(array.getElementType))
   }
 
   private def toMapData(map: proto.Expression.Literal.Map): Any = {
