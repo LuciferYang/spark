@@ -206,8 +206,8 @@ object LiteralExpressionProtoConverter {
         tagK: ClassTag[K],
         tagV: ClassTag[V]): mutable.Map[K, V] = {
       val builder = mutable.HashMap.empty[K, V]
-      val keys = map.getKeyList.asScala
-      val values = map.getValueList.asScala
+      val keys = map.getKeysList.asScala
+      val values = map.getValuesList.asScala
       builder.sizeHint(keys.size)
       keys.zip(values).foreach { case (key, value) =>
         builder += ((keyConverter(key), valueConverter(value)))
@@ -219,7 +219,7 @@ object LiteralExpressionProtoConverter {
   }
 
   private def toStructData(struct: proto.Expression.Literal.Struct): Any = {
-    val elements = struct.getElementList.asScala
+    val elements = struct.getElementsList.asScala
     val dataTypes = struct.getStructType.getStruct.getFieldsList.asScala.map(_.getDataType)
     val structData = elements
       .zip(dataTypes)
@@ -234,6 +234,7 @@ object LiteralExpressionProtoConverter {
       case List(a, b, c) => (a, b, c)
       case List(a, b, c, d) => (a, b, c, d)
       case List(a, b, c, d, e) => (a, b, c, d, e)
+      case List(a, b, c, d, e, f) => (a, b, c, d, e, f)
       case _ => throw InvalidPlanInput(s"Unsupported Literal: $structData)")
     }
   }

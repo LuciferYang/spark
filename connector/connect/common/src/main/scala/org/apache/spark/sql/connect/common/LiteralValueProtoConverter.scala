@@ -108,7 +108,7 @@ object LiteralValueProtoConverter {
 
     def arrayBuilder(list: List[_], elementType: DataType) = {
       val ab = builder.getArrayBuilder.setElementType(toConnectProtoType(elementType))
-      list.foreach(x => ab.addElement(toLiteralProto(x)))
+      list.foreach(x => ab.addElements(toLiteralProto(x)))
       ab
     }
 
@@ -117,15 +117,15 @@ object LiteralValueProtoConverter {
         .setKeyType(toConnectProtoType(keyType))
         .setValueType(toConnectProtoType(valueType))
       map.foreach { case (k, v) =>
-        mb.addKey(toLiteralProto(k))
-        mb.addValue(toLiteralProto(v))
+        mb.addKeys(toLiteralProto(k))
+        mb.addValues(toLiteralProto(v))
       }
       mb
     }
 
     def structBuilder(values: Seq[Any], structType: StructType) = {
       val sb = builder.getStructBuilder.setStructType(toConnectProtoType(structType))
-      values.foreach(v => sb.addElement(toLiteralProto(v)))
+      values.foreach(v => sb.addElements(toLiteralProto(v)))
       sb
     }
 
@@ -136,7 +136,7 @@ object LiteralValueProtoConverter {
         builder.setMap(mapBuilder(v, keyType, valueType))
       case (v: Product, structType: StructType) =>
         builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
-      case (v: Option[_], dataType: DataType) =>
+      case (v: Option[_], _: DataType) =>
         toLiteralProtoBuilder(v.get)
       case _ => unsupported(s"literal $literal not supported (yet).")
     }

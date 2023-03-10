@@ -201,13 +201,13 @@ message Expression {
     message Map {
       DataType keyType = 1;
       DataType valueType = 2;
-      repeated Literal key = 3;
-      repeated Literal value = 4;
+      repeated Literal keys = 3;
+      repeated Literal values = 4;
     }
 
     message Struct {
       DataType structType = 1;
-      repeated Literal element = 2;
+      repeated Literal elements = 2;
     }
   }
 

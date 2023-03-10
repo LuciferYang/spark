@@ -472,47 +472,33 @@ class Expression(google.protobuf.message.Message):
         class Map(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            class MapDataEntry(google.protobuf.message.Message):
-                DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-                KEY_FIELD_NUMBER: builtins.int
-                VALUE_FIELD_NUMBER: builtins.int
-                key: builtins.str
-                @property
-                def value(self) -> global___Expression.Literal: ...
-                def __init__(
-                    self,
-                    *,
-                    key: builtins.str = ...,
-                    value: global___Expression.Literal | None = ...,
-                ) -> None: ...
-                def HasField(
-                    self, field_name: typing_extensions.Literal["value", b"value"]
-                ) -> builtins.bool: ...
-                def ClearField(
-                    self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]
-                ) -> None: ...
-
             KEYTYPE_FIELD_NUMBER: builtins.int
             VALUETYPE_FIELD_NUMBER: builtins.int
-            MAP_DATA_FIELD_NUMBER: builtins.int
+            KEYS_FIELD_NUMBER: builtins.int
+            VALUES_FIELD_NUMBER: builtins.int
             @property
             def keyType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
             def valueType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
-            def map_data(
+            def keys(
                 self,
-            ) -> google.protobuf.internal.containers.MessageMap[
-                builtins.str, global___Expression.Literal
+            ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+                global___Expression.Literal
+            ]: ...
+            @property
+            def values(
+                self,
+            ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+                global___Expression.Literal
             ]: ...
             def __init__(
                 self,
                 *,
                 keyType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
                 valueType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
-                map_data: collections.abc.Mapping[builtins.str, global___Expression.Literal]
-                | None = ...,
+                keys: collections.abc.Iterable[global___Expression.Literal] | None = ...,
+                values: collections.abc.Iterable[global___Expression.Literal] | None = ...,
             ) -> None: ...
             def HasField(
                 self,
@@ -523,7 +509,14 @@ class Expression(google.protobuf.message.Message):
             def ClearField(
                 self,
                 field_name: typing_extensions.Literal[
-                    "keyType", b"keyType", "map_data", b"map_data", "valueType", b"valueType"
+                    "keyType",
+                    b"keyType",
+                    "keys",
+                    b"keys",
+                    "valueType",
+                    b"valueType",
+                    "values",
+                    b"values",
                 ],
             ) -> None: ...
 
@@ -531,11 +524,11 @@ class Expression(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
             STRUCTTYPE_FIELD_NUMBER: builtins.int
-            ELEMENT_FIELD_NUMBER: builtins.int
+            ELEMENTS_FIELD_NUMBER: builtins.int
             @property
             def structType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
-            def element(
+            def elements(
                 self,
             ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
                 global___Expression.Literal
@@ -544,7 +537,7 @@ class Expression(google.protobuf.message.Message):
                 self,
                 *,
                 structType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
-                element: collections.abc.Iterable[global___Expression.Literal] | None = ...,
+                elements: collections.abc.Iterable[global___Expression.Literal] | None = ...,
             ) -> None: ...
             def HasField(
                 self, field_name: typing_extensions.Literal["structType", b"structType"]
@@ -552,7 +545,7 @@ class Expression(google.protobuf.message.Message):
             def ClearField(
                 self,
                 field_name: typing_extensions.Literal[
-                    "element", b"element", "structType", b"structType"
+                    "elements", b"elements", "structType", b"structType"
                 ],
             ) -> None: ...
 
