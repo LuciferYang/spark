@@ -147,6 +147,10 @@
       }
     }, {
       "literal": {
+        "integer": 1
+      }
+    }, {
+      "literal": {
         "array": {
           "elementType": {
             "integer": {
@@ -172,14 +176,16 @@
             "integer": {
             }
           },
-          "mapData": {
-            "a": {
-              "integer": 1
-            },
-            "b": {
-              "integer": 2
-            }
-          }
+          "key": [{
+            "string": "a"
+          }, {
+            "string": "b"
+          }],
+          "value": [{
+            "integer": 1
+          }, {
+            "integer": 2
+          }]
         }
       }
     }, {

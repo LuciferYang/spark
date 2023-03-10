@@ -959,6 +959,7 @@ class ColumnExpressionSuite extends QueryTest with SharedSparkSession {
   }
 
   test("typedLit") {
+    assert(typedLit(Some(1)) == Column(Literal(1)))
     assert(typedLit($"foo") == $"foo")
     assert(typedLit($"foo") == $"foo")
     assert(typedLit(1) == Column(Literal(1)))

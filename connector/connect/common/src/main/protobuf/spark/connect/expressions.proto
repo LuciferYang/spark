@@ -201,7 +201,8 @@ message Expression {
     message Map {
       DataType keyType = 1;
       DataType valueType = 2;
-      map<string, Literal> map_data = 3;
+      repeated Literal key = 3;
+      repeated Literal value = 4;
     }
 
     message Struct {

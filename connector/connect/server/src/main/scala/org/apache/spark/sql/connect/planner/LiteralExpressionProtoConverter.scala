@@ -200,38 +200,41 @@ object LiteralExpressionProtoConverter {
   }
 
   private def toMapData(map: proto.Expression.Literal.Map): Any = {
-    def makeMapData[T](converter: proto.Expression.Literal => T)(implicit
-        tag: ClassTag[T]): mutable.Map[String, T] = {
-      val builder = mutable.HashMap.empty[String, T]
-      val mapDataMap = map.getMapDataMap
-      builder.sizeHint(mapDataMap.size())
-      val iter = mapDataMap.entrySet().iterator()
-      while (iter.hasNext) {
-        val entry = iter.next()
-        val key = entry.getKey
-        val value = entry.getValue
-        builder += ((key, converter(value)))
+    def makeMapData[K, V](
+        keyConverter: proto.Expression.Literal => K,
+        valueConverter: proto.Expression.Literal => V)(implicit
+        tagK: ClassTag[K],
+        tagV: ClassTag[V]): mutable.Map[K, V] = {
+      val builder = mutable.HashMap.empty[K, V]
+      val keys = map.getKeyList.asScala
+      val values = map.getValueList.asScala
+      builder.sizeHint(keys.size)
+      keys.zip(values).foreach { case (key, value) =>
+        builder += ((keyConverter(key), valueConverter(value)))
       }
       builder
     }
 
-    val valueType = map.getValueType
-    makeMapData(getConverter(valueType))
+    makeMapData(getConverter(map.getKeyType), getConverter(map.getValueType))
   }
 
   private def toStructData(struct: proto.Expression.Literal.Struct): Any = {
     val elements = struct.getElementList.asScala
     val dataTypes = struct.getStructType.getStruct.getFieldsList.asScala.map(_.getDataType)
-    val structData = elements.zip(dataTypes).map { case (element, dataType) =>
-      getConverter(dataType)(element)
-    }
+    val structData = elements
+      .zip(dataTypes)
+      .map { case (element, dataType) =>
+        getConverter(dataType)(element)
+      }
+      .toList
 
-    structData.toList match {
+    structData match {
       case List(a) => (a)
       case List(a, b) => (a, b)
       case List(a, b, c) => (a, b, c)
       case List(a, b, c, d) => (a, b, c, d)
       case List(a, b, c, d, e) => (a, b, c, d, e)
+      case _ => throw InvalidPlanInput(s"Unsupported Literal: $structData)")
     }
   }
 }

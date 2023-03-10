@@ -2097,6 +2097,7 @@ class PlanGenerationTestSuite
       fn.typedLit(new CalendarInterval(2, 20, 100L)),
 
       // Handle parameterized scala types e.g.: List, Seq and Map.
+      fn.typedLit(Some(1)),
       fn.typedLit(Seq(1, 2, 3)),
       fn.typedLit(Map("a" -> 1, "b" -> 2)),
       fn.typedLit(("a", 2, 1.0)))

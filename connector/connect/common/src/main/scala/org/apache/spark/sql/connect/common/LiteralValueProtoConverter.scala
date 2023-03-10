@@ -116,7 +116,10 @@ object LiteralValueProtoConverter {
       val mb = builder.getMapBuilder
         .setKeyType(toConnectProtoType(keyType))
         .setValueType(toConnectProtoType(valueType))
-      map.foreach(kv => mb.putMapData(kv._1.toString, toLiteralProto(kv._2)))
+      map.foreach { case (k, v) =>
+        mb.addKey(toLiteralProto(k))
+        mb.addValue(toLiteralProto(v))
+      }
       mb
     }
 
@@ -133,6 +136,8 @@ object LiteralValueProtoConverter {
         builder.setMap(mapBuilder(v, keyType, valueType))
       case (v: Product, structType: StructType) =>
         builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
+      case (v: Option[_], dataType: DataType) =>
+        toLiteralProtoBuilder(v.get)
       case _ => unsupported(s"literal $literal not supported (yet).")
     }
   }
