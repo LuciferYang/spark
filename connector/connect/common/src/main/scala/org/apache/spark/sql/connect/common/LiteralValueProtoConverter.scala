@@ -138,7 +138,7 @@ object LiteralValueProtoConverter {
         builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
       case (v: Option[_], _: DataType) =>
         toLiteralProtoBuilder(v.get)
-      case _ => unsupported(s"literal $literal not supported (yet).")
+      case _ => throw new UnsupportedOperationException(s"literal $literal not supported (yet).")
     }
   }
 

@@ -167,10 +167,10 @@ object LiteralExpressionProtoConverter {
     } else if (dataType.hasDecimal) { v =>
       Decimal(v.getDecimal.getValue)
     } else if (dataType.hasCalendarInterval) { v =>
-    {
-      val interval = v.getCalendarInterval
-      new CalendarInterval(interval.getMonths, interval.getDays, interval.getMicroseconds)
-    }
+      {
+        val interval = v.getCalendarInterval
+        new CalendarInterval(interval.getMonths, interval.getDays, interval.getMicroseconds)
+      }
     } else if (dataType.hasArray) { v =>
       toArrayData(v.getArray)
     } else if (dataType.hasMap) { v =>
@@ -194,7 +194,7 @@ object LiteralExpressionProtoConverter {
       }
       builder.result()
     }
-    
+
     makeArrayData(getConverter(array.getElementType))
   }
 
