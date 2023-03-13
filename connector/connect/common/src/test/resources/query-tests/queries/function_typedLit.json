@@ -156,7 +156,7 @@
             "integer": {
             }
           },
-          "element": [{
+          "elements": [{
             "integer": 1
           }, {
             "integer": 2
@@ -176,12 +176,12 @@
             "integer": {
             }
           },
-          "key": [{
+          "keys": [{
             "string": "a"
           }, {
             "string": "b"
           }],
-          "value": [{
+          "values": [{
             "integer": 1
           }, {
             "integer": 2
@@ -215,12 +215,376 @@
               }]
             }
           },
-          "element": [{
+          "elements": [{
             "string": "a"
           }, {
             "integer": 2
           }, {
             "double": 1.0
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "array": {
+          "elementType": {
+            "array": {
+              "elementType": {
+                "integer": {
+                }
+              }
+            }
+          },
+          "elements": [{
+            "array": {
+              "elementType": {
+                "integer": {
+                }
+              },
+              "elements": [{
+                "integer": 1
+              }, {
+                "integer": 2
+              }, {
+                "integer": 3
+              }]
+            }
+          }, {
+            "array": {
+              "elementType": {
+                "integer": {
+                }
+              },
+              "elements": [{
+                "integer": 4
+              }, {
+                "integer": 5
+              }, {
+                "integer": 6
+              }]
+            }
+          }, {
+            "array": {
+              "elementType": {
+                "integer": {
+                }
+              },
+              "elements": [{
+                "integer": 7
+              }, {
+                "integer": 8
+              }, {
+                "integer": 9
+              }]
+            }
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "array": {
+          "elementType": {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              }
+            }
+          },
+          "elements": [{
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 1
+              }, {
+                "integer": 2
+              }]
+            }
+          }, {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 3
+              }, {
+                "integer": 4
+              }]
+            }
+          }, {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 5
+              }, {
+                "integer": 6
+              }]
+            }
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "map": {
+          "keyType": {
+            "integer": {
+            }
+          },
+          "valueType": {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              }
+            }
+          },
+          "keys": [{
+            "integer": 1
+          }, {
+            "integer": 2
+          }],
+          "values": [{
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 1
+              }, {
+                "integer": 2
+              }]
+            }
+          }, {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 3
+              }, {
+                "integer": 4
+              }]
+            }
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "struct": {
+          "structType": {
+            "struct": {
+              "fields": [{
+                "name": "_1",
+                "dataType": {
+                  "array": {
+                    "elementType": {
+                      "integer": {
+                      }
+                    }
+                  }
+                },
+                "nullable": true
+              }, {
+                "name": "_2",
+                "dataType": {
+                  "map": {
+                    "keyType": {
+                      "string": {
+                      }
+                    },
+                    "valueType": {
+                      "integer": {
+                      }
+                    }
+                  }
+                },
+                "nullable": true
+              }, {
+                "name": "_3",
+                "dataType": {
+                  "struct": {
+                    "fields": [{
+                      "name": "_1",
+                      "dataType": {
+                        "string": {
+                        }
+                      },
+                      "nullable": true
+                    }, {
+                      "name": "_2",
+                      "dataType": {
+                        "map": {
+                          "keyType": {
+                            "integer": {
+                            }
+                          },
+                          "valueType": {
+                            "string": {
+                            }
+                          },
+                          "valueContainsNull": true
+                        }
+                      },
+                      "nullable": true
+                    }]
+                  }
+                },
+                "nullable": true
+              }]
+            }
+          },
+          "elements": [{
+            "array": {
+              "elementType": {
+                "integer": {
+                }
+              },
+              "elements": [{
+                "integer": 1
+              }, {
+                "integer": 2
+              }, {
+                "integer": 3
+              }]
+            }
+          }, {
+            "map": {
+              "keyType": {
+                "string": {
+                }
+              },
+              "valueType": {
+                "integer": {
+                }
+              },
+              "keys": [{
+                "string": "a"
+              }, {
+                "string": "b"
+              }],
+              "values": [{
+                "integer": 1
+              }, {
+                "integer": 2
+              }]
+            }
+          }, {
+            "struct": {
+              "structType": {
+                "struct": {
+                  "fields": [{
+                    "name": "_1",
+                    "dataType": {
+                      "string": {
+                      }
+                    },
+                    "nullable": true
+                  }, {
+                    "name": "_2",
+                    "dataType": {
+                      "map": {
+                        "keyType": {
+                          "integer": {
+                          }
+                        },
+                        "valueType": {
+                          "string": {
+                          }
+                        },
+                        "valueContainsNull": true
+                      }
+                    },
+                    "nullable": true
+                  }]
+                }
+              },
+              "elements": [{
+                "string": "a"
+              }, {
+                "map": {
+                  "keyType": {
+                    "integer": {
+                    }
+                  },
+                  "valueType": {
+                    "string": {
+                    }
+                  },
+                  "keys": [{
+                    "integer": 1
+                  }, {
+                    "integer": 2
+                  }],
+                  "values": [{
+                    "string": "a"
+                  }, {
+                    "string": "b"
+                  }]
+                }
+              }]
+            }
           }]
         }
       }

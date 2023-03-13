@@ -472,14 +472,14 @@ class Expression(google.protobuf.message.Message):
         class Map(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            KEYTYPE_FIELD_NUMBER: builtins.int
-            VALUETYPE_FIELD_NUMBER: builtins.int
+            KEY_TYPE_FIELD_NUMBER: builtins.int
+            VALUE_TYPE_FIELD_NUMBER: builtins.int
             KEYS_FIELD_NUMBER: builtins.int
             VALUES_FIELD_NUMBER: builtins.int
             @property
-            def keyType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
+            def key_type(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
-            def valueType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
+            def value_type(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
             def keys(
                 self,
@@ -495,26 +495,26 @@ class Expression(google.protobuf.message.Message):
             def __init__(
                 self,
                 *,
-                keyType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
-                valueType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
+                key_type: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
+                value_type: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
                 keys: collections.abc.Iterable[global___Expression.Literal] | None = ...,
                 values: collections.abc.Iterable[global___Expression.Literal] | None = ...,
             ) -> None: ...
             def HasField(
                 self,
                 field_name: typing_extensions.Literal[
-                    "keyType", b"keyType", "valueType", b"valueType"
+                    "key_type", b"key_type", "value_type", b"value_type"
                 ],
             ) -> builtins.bool: ...
             def ClearField(
                 self,
                 field_name: typing_extensions.Literal[
-                    "keyType",
-                    b"keyType",
+                    "key_type",
+                    b"key_type",
                     "keys",
                     b"keys",
-                    "valueType",
-                    b"valueType",
+                    "value_type",
+                    b"value_type",
                     "values",
                     b"values",
                 ],
@@ -523,10 +523,10 @@ class Expression(google.protobuf.message.Message):
         class Struct(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            STRUCTTYPE_FIELD_NUMBER: builtins.int
+            STRUCT_TYPE_FIELD_NUMBER: builtins.int
             ELEMENTS_FIELD_NUMBER: builtins.int
             @property
-            def structType(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
+            def struct_type(self) -> pyspark.sql.connect.proto.types_pb2.DataType: ...
             @property
             def elements(
                 self,
@@ -536,16 +536,16 @@ class Expression(google.protobuf.message.Message):
             def __init__(
                 self,
                 *,
-                structType: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
+                struct_type: pyspark.sql.connect.proto.types_pb2.DataType | None = ...,
                 elements: collections.abc.Iterable[global___Expression.Literal] | None = ...,
             ) -> None: ...
             def HasField(
-                self, field_name: typing_extensions.Literal["structType", b"structType"]
+                self, field_name: typing_extensions.Literal["struct_type", b"struct_type"]
             ) -> builtins.bool: ...
             def ClearField(
                 self,
                 field_name: typing_extensions.Literal[
-                    "elements", b"elements", "structType", b"structType"
+                    "elements", b"elements", "struct_type", b"struct_type"
                 ],
             ) -> None: ...
 

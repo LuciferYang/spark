@@ -108,7 +108,7 @@ object LiteralValueProtoConverter {
 
     def arrayBuilder(list: List[_], elementType: DataType) = {
       val ab = builder.getArrayBuilder.setElementType(toConnectProtoType(elementType))
-      list.foreach(x => ab.addElements(toLiteralProto(x)))
+      list.foreach(x => ab.addElements(toLiteralProto(x, elementType)))
       ab
     }
 
@@ -117,15 +117,17 @@ object LiteralValueProtoConverter {
         .setKeyType(toConnectProtoType(keyType))
         .setValueType(toConnectProtoType(valueType))
       map.foreach { case (k, v) =>
-        mb.addKeys(toLiteralProto(k))
-        mb.addValues(toLiteralProto(v))
+        mb.addKeys(toLiteralProto(k, keyType))
+        mb.addValues(toLiteralProto(v, valueType))
       }
       mb
     }
 
     def structBuilder(values: Seq[Any], structType: StructType) = {
       val sb = builder.getStructBuilder.setStructType(toConnectProtoType(structType))
-      values.foreach(v => sb.addElements(toLiteralProto(v)))
+      values.zip(structType.fields.map(_.dataType)).foreach { case (v, dataType) =>
+        sb.addElements(toLiteralProto(v, dataType))
+      }
       sb
     }
 
@@ -138,7 +140,7 @@ object LiteralValueProtoConverter {
         builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
       case (v: Option[_], _: DataType) =>
         toLiteralProtoBuilder(v.get)
-      case _ => throw new UnsupportedOperationException(s"literal $literal not supported (yet).")
+      case _ => toLiteralProtoBuilder(literal)
     }
   }
 
@@ -157,6 +159,9 @@ object LiteralValueProtoConverter {
    */
   def toLiteralProto(literal: Any): proto.Expression.Literal =
     toLiteralProtoBuilder(literal).build()
+
+  def toLiteralProto(literal: Any, dataType: DataType): proto.Expression.Literal =
+    toLiteralProtoBuilder(literal, dataType).build()
 
   private def toDataType(clz: Class[_]): DataType = clz match {
     // primitive types

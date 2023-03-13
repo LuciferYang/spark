@@ -2100,7 +2100,11 @@ class PlanGenerationTestSuite
       fn.typedLit(Some(1)),
       fn.typedLit(Seq(1, 2, 3)),
       fn.typedLit(Map("a" -> 1, "b" -> 2)),
-      fn.typedLit(("a", 2, 1.0)))
+      fn.typedLit(("a", 2, 1.0)),
+      fn.typedLit(Seq(Seq(1, 2, 3), Seq(4, 5, 6), Seq(7, 8, 9))),
+      fn.typedLit(Seq(Map("a" -> 1, "b" -> 2), Map("a" -> 3, "b" -> 4), Map("a" -> 5, "b" -> 6))),
+      fn.typedLit(Map(1 -> Map("a" -> 1, "b" -> 2), 2 -> Map("a" -> 3, "b" -> 4))),
+      fn.typedLit((Seq(1, 2, 3), Map("a" -> 1, "b" -> 2), ("a", Map(1 -> "a", 2 -> "b")))))
   }
 
   /* Window API */
