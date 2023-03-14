@@ -689,6 +689,74 @@
           }]
         }
       }
+    }, {
+      "literal": {
+        "struct": {
+          "structType": {
+            "struct": {
+              "fields": [{
+                "name": "_1",
+                "dataType": {
+                  "string": {
+                  }
+                },
+                "nullable": true
+              }, {
+                "name": "_2",
+                "dataType": {
+                  "integer": {
+                  }
+                }
+              }, {
+                "name": "_3",
+                "dataType": {
+                  "boolean": {
+                  }
+                }
+              }, {
+                "name": "_4",
+                "dataType": {
+                  "double": {
+                  }
+                }
+              }, {
+                "name": "_5",
+                "dataType": {
+                  "float": {
+                  }
+                }
+              }, {
+                "name": "_6",
+                "dataType": {
+                  "byte": {
+                  }
+                }
+              }, {
+                "name": "_7",
+                "dataType": {
+                  "short": {
+                  }
+                }
+              }]
+            }
+          },
+          "elements": [{
+            "string": "1"
+          }, {
+            "integer": 2
+          }, {
+            "boolean": true
+          }, {
+            "double": 3.0
+          }, {
+            "float": 4.0
+          }, {
+            "byte": 5
+          }, {
+            "short": 6
+          }]
+        }
+      }
     }]
   }
 }
