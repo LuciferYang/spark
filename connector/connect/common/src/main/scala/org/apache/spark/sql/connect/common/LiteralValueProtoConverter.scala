@@ -17,20 +17,17 @@
 
 package org.apache.spark.sql.connect.common
 
-import java.lang.{Boolean => JBoolean, Byte => JByte, Character => JChar, Double => JDouble, Float => JFloat, Integer => JInteger, Iterable => JavaIterable, Long => JLong, Short => JShort}
+import java.lang.{Boolean => JBoolean, Byte => JByte, Character => JChar, Double => JDouble, Float => JFloat, Integer => JInteger, Long => JLong, Short => JShort}
 import java.math.{BigDecimal => JBigDecimal}
 import java.sql.{Date, Timestamp}
 import java.time._
-import java.util.{Map => JavaMap}
 
-import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 import com.google.protobuf.ByteString
 
 import org.apache.spark.connect.proto
-import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, IntervalUtils}
 import org.apache.spark.sql.connect.common.DataTypeProtoConverter._
@@ -117,12 +114,6 @@ object LiteralValueProtoConverter {
           a.foreach(item => ab.addElements(toLiteralProto(item, elementType)))
         case s: scala.collection.Seq[_] =>
           s.foreach(item => ab.addElements(toLiteralProto(item, elementType)))
-        case i: JavaIterable[_] =>
-          val iter = i.iterator
-          while (iter.hasNext) {
-            val item = iter.next()
-            ab.addElements(toLiteralProto(item, elementType))
-          }
         case other =>
           throw new IllegalArgumentException(s"literal $other not supported (yet).")
       }
@@ -141,11 +132,6 @@ object LiteralValueProtoConverter {
             mb.addKeys(toLiteralProto(k, keyType))
             mb.addValues(toLiteralProto(v, valueType))
           }
-        case javaMap: JavaMap[_, _] =>
-          javaMap.asScala.foreach { case (k, v) =>
-            mb.addKeys(toLiteralProto(k, keyType))
-            mb.addValues(toLiteralProto(v, valueType))
-          }
         case other =>
           throw new IllegalArgumentException(s"literal $other not supported (yet).")
       }
@@ -158,12 +144,6 @@ object LiteralValueProtoConverter {
       val dataTypes = structType.fields.map(_.dataType)
 
       scalaValue match {
-        case row: Row =>
-          var idx = 0
-          while (idx < row.size) {
-            sb.addElements(toLiteralProto(row(idx), dataTypes(idx)))
-            idx += 1
-          }
         case p: Product =>
           val iter = p.productIterator
           var idx = 0
