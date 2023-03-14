@@ -17,17 +17,20 @@
 
 package org.apache.spark.sql.connect.common
 
-import java.lang.{Boolean => JBoolean, Byte => JByte, Character => JChar, Double => JDouble, Float => JFloat, Integer => JInteger, Long => JLong, Short => JShort}
+import java.lang.{Boolean => JBoolean, Byte => JByte, Character => JChar, Double => JDouble, Float => JFloat, Integer => JInteger, Iterable => JavaIterable, Long => JLong, Short => JShort}
 import java.math.{BigDecimal => JBigDecimal}
 import java.sql.{Date, Timestamp}
 import java.time._
+import java.util.{Map => JavaMap}
 
+import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 import com.google.protobuf.ByteString
 
 import org.apache.spark.connect.proto
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.util.{DateTimeUtils, IntervalUtils}
 import org.apache.spark.sql.connect.common.DataTypeProtoConverter._
@@ -106,40 +109,88 @@ object LiteralValueProtoConverter {
       dataType: DataType): proto.Expression.Literal.Builder = {
     val builder = proto.Expression.Literal.newBuilder()
 
-    def arrayBuilder(list: List[_], elementType: DataType) = {
+    def arrayBuilder(scalaValue: Any, elementType: DataType) = {
       val ab = builder.getArrayBuilder.setElementType(toConnectProtoType(elementType))
-      list.foreach(x => ab.addElements(toLiteralProto(x, elementType)))
+
+      scalaValue match {
+        case a: Array[_] =>
+          a.foreach(item => ab.addElements(toLiteralProto(item, elementType)))
+        case s: scala.collection.Seq[_] =>
+          s.foreach(item => ab.addElements(toLiteralProto(item, elementType)))
+        case i: JavaIterable[_] =>
+          val iter = i.iterator
+          while (iter.hasNext) {
+            val item = iter.next()
+            ab.addElements(toLiteralProto(item, elementType))
+          }
+        case other =>
+          throw new IllegalArgumentException(s"literal $other not supported (yet).")
+      }
+
       ab
     }
 
-    def mapBuilder(map: Map[_, _], keyType: DataType, valueType: DataType) = {
+    def mapBuilder(scalaValue: Any, keyType: DataType, valueType: DataType) = {
       val mb = builder.getMapBuilder
         .setKeyType(toConnectProtoType(keyType))
         .setValueType(toConnectProtoType(valueType))
-      map.foreach { case (k, v) =>
-        mb.addKeys(toLiteralProto(k, keyType))
-        mb.addValues(toLiteralProto(v, valueType))
+
+      scalaValue match {
+        case map: scala.collection.Map[_, _] =>
+          map.foreach { case (k, v) =>
+            mb.addKeys(toLiteralProto(k, keyType))
+            mb.addValues(toLiteralProto(v, valueType))
+          }
+        case javaMap: JavaMap[_, _] =>
+          javaMap.asScala.foreach { case (k, v) =>
+            mb.addKeys(toLiteralProto(k, keyType))
+            mb.addValues(toLiteralProto(v, valueType))
+          }
+        case other =>
+          throw new IllegalArgumentException(s"literal $other not supported (yet).")
       }
+
       mb
     }
 
-    def structBuilder(values: Seq[Any], structType: StructType) = {
+    def structBuilder(scalaValue: Any, structType: StructType) = {
       val sb = builder.getStructBuilder.setStructType(toConnectProtoType(structType))
-      values.zip(structType.fields.map(_.dataType)).foreach { case (v, dataType) =>
-        sb.addElements(toLiteralProto(v, dataType))
+      val dataTypes = structType.fields.map(_.dataType)
+
+      scalaValue match {
+        case row: Row =>
+          var idx = 0
+          while (idx < row.size) {
+            sb.addElements(toLiteralProto(row(idx), dataTypes(idx)))
+            idx += 1
+          }
+        case p: Product =>
+          val iter = p.productIterator
+          var idx = 0
+          while (idx < structType.size) {
+            sb.addElements(toLiteralProto(iter.next(), dataTypes(idx)))
+            idx += 1
+          }
+        case other =>
+          throw new IllegalArgumentException(s"literal $other not supported (yet).")
       }
+
       sb
     }
 
     (literal, dataType) match {
-      case (v: List[_], ArrayType(elementType, _)) =>
+      case (v, ArrayType(elementType, _)) if !elementType.isInstanceOf[NullType] =>
         builder.setArray(arrayBuilder(v, elementType))
-      case (v: Map[_, _], MapType(keyType, valueType, _)) =>
+      case (v, MapType(keyType, valueType, _)) =>
         builder.setMap(mapBuilder(v, keyType, valueType))
-      case (v: Product, structType: StructType) =>
-        builder.setStruct(structBuilder(v.productIterator.toSeq, structType))
+      case (v, structType: StructType) =>
+        builder.setStruct(structBuilder(v, structType))
       case (v: Option[_], _: DataType) =>
-        toLiteralProtoBuilder(v.get)
+        if (v.isDefined) {
+          toLiteralProtoBuilder(v.get)
+        } else {
+          builder.setNull(toConnectProtoType(dataType))
+        }
       case _ => toLiteralProtoBuilder(literal)
     }
   }

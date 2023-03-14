@@ -167,6 +167,22 @@
       }
     }, {
       "literal": {
+        "array": {
+          "elementType": {
+            "integer": {
+            }
+          },
+          "elements": [{
+            "integer": 1
+          }, {
+            "integer": 2
+          }, {
+            "integer": 3
+          }]
+        }
+      }
+    }, {
+      "literal": {
         "map": {
           "keyType": {
             "string": {
@@ -221,6 +237,91 @@
             "integer": 2
           }, {
             "double": 1.0
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "null": {
+          "integer": {
+          }
+        }
+      }
+    }, {
+      "literal": {
+        "array": {
+          "elementType": {
+            "integer": {
+            }
+          },
+          "elements": [{
+            "integer": 1
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "map": {
+          "keyType": {
+            "integer": {
+            }
+          },
+          "valueType": {
+            "integer": {
+            }
+          },
+          "keys": [{
+            "integer": 1
+          }],
+          "values": [{
+            "null": {
+              "integer": {
+              }
+            }
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "map": {
+          "keyType": {
+            "integer": {
+            }
+          },
+          "valueType": {
+            "integer": {
+            }
+          },
+          "keys": [{
+            "integer": 1
+          }],
+          "values": [{
+            "null": {
+              "integer": {
+              }
+            }
+          }]
+        }
+      }
+    }, {
+      "literal": {
+        "map": {
+          "keyType": {
+            "integer": {
+            }
+          },
+          "valueType": {
+            "integer": {
+            }
+          },
+          "keys": [{
+            "integer": 1
+          }],
+          "values": [{
+            "null": {
+              "integer": {
+              }
+            }
           }]
         }
       }
