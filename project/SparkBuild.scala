@@ -282,7 +282,11 @@ object SparkBuild extends PomBuild {
           // 4. `fruitless type test: a value of TypeA cannot also be a TypeB`
           "-Wconf:cat=unchecked&msg=outer reference:s",
           "-Wconf:cat=unchecked&msg=eliminated by erasure:s",
-          "-Wconf:msg=^(?=.*?a value of type)(?=.*?cannot also be).+$:s"
+          "-Wconf:msg=^(?=.*?a value of type)(?=.*?cannot also be).+$:s",
+
+          // For Scala 2.13.11-M1
+          "-Wconf:msg=legacy-binding:s",
+          "-Wconf:msg=Implicit definition should have explicit type:s"
         )
       }
     }
