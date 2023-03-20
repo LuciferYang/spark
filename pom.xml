@@ -2686,6 +2686,12 @@
         <groupId>com.google.crypto.tink</groupId>
         <artifactId>tink</artifactId>
         <version>${tink.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>androidx.annotation</groupId>
+            <artifactId>annotation</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.arrow</groupId>
