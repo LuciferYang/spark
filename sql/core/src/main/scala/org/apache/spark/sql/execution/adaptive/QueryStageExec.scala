@@ -97,6 +97,7 @@ abstract class QueryStageExec extends LeafExecNode {
   override def executeToIterator(): Iterator[InternalRow] = plan.executeToIterator()
 
   protected override def doExecute(): RDD[InternalRow] = plan.execute()
+  override def supportsRowBased: Boolean = plan.supportsRowBased
   override def supportsColumnar: Boolean = plan.supportsColumnar
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = plan.executeColumnar()
   override def doExecuteBroadcast[T](): Broadcast[T] = plan.executeBroadcast()
@@ -178,6 +179,8 @@ case class ShuffleQueryStageExec(
     case _ =>
       throw new IllegalStateException(s"wrong plan for shuffle stage:\n ${plan.treeString}")
   }
+
+  def advisoryPartitionSize: Option[Long] = shuffle.advisoryPartitionSize
 
   @transient private lazy val shuffleFuture = shuffle.submitShuffleJob
 
