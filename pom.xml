@@ -2674,7 +2674,7 @@
       <dependency>
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>
-        <version>${antlr4.version}</version>
+        <version>${antlr4-runtime.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
