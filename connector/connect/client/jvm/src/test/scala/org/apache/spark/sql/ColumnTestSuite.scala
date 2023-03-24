@@ -16,12 +16,11 @@
  */
 package org.apache.spark.sql
 
-import java.io.ByteArrayOutputStream
-
 import scala.collection.JavaConverters._
 
 import org.apache.spark.sql.{functions => fn}
 import org.apache.spark.sql.connect.client.util.ConnectFunSuite
+import org.apache.spark.sql.connect.client.util.TestUtils._
 import org.apache.spark.sql.types._
 
 /**
@@ -158,12 +157,6 @@ class ColumnTestSuite extends ConnectFunSuite {
   test("asc and asc_nulls_first are the same") {
     val a = fn.col("a")
     assert(a.asc == a.asc_nulls_first)
-  }
-
-  private def captureStdOut(block: => Unit): String = {
-    val capturedOut = new ByteArrayOutputStream()
-    Console.withOut(capturedOut)(block)
-    capturedOut.toString()
   }
 
   test("explain") {

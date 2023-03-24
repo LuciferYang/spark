@@ -16,7 +16,6 @@
  */
 package org.apache.spark.sql
 
-import java.io.{ByteArrayOutputStream, PrintStream}
 import java.nio.file.Files
 
 import scala.collection.JavaConverters._
@@ -24,7 +23,6 @@ import scala.collection.JavaConverters._
 import io.grpc.StatusRuntimeException
 import java.util.Properties
 import org.apache.commons.io.FileUtils
-import org.apache.commons.io.output.TeeOutputStream
 import org.apache.commons.lang3.{JavaVersion, SystemUtils}
 import org.scalactic.TolerantNumerics
 
@@ -33,6 +31,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.StringEncoder
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.catalyst.parser.ParseException
 import org.apache.spark.sql.connect.client.util.{IntegrationTestUtils, RemoteSparkSession}
+import org.apache.spark.sql.connect.client.util.TestUtils._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
@@ -269,15 +268,6 @@ class ClientE2ETestSuite extends RemoteSparkSession with SQLHelper {
 
   // TODO test large result when we can create table or view
   // test("test spark large result")
-  private def captureStdOut(block: => Unit): String = {
-    val currentOut = Console.out
-    val capturedOut = new ByteArrayOutputStream()
-    val newOut = new PrintStream(new TeeOutputStream(currentOut, capturedOut))
-    Console.withOut(newOut) {
-      block
-    }
-    capturedOut.toString
-  }
 
   private def checkFragments(result: String, fragmentsToCheck: Seq[String]): Unit = {
     fragmentsToCheck.foreach { fragment =>
@@ -605,10 +595,6 @@ class ClientE2ETestSuite extends RemoteSparkSession with SQLHelper {
     }
   }
 
-  test("version") {
-    assert(spark.version == SPARK_VERSION)
-  }
-
   test("time") {
     val timeFragments = Seq("Time taken: ", " ms")
     testCapturedStdOut(spark.time(spark.sql("select 1").collect()), timeFragments: _*)
@@ -634,7 +620,9 @@ class ClientE2ETestSuite extends RemoteSparkSession with SQLHelper {
   }
 
   test("SparkVersion") {
-    assert(!spark.version.isEmpty)
+    val sparkVersion = spark.version
+    assert(sparkVersion.nonEmpty)
+    assert(sparkVersion == SPARK_VERSION)
   }
 
   private def checkSameResult[E](expected: scala.collection.Seq[E], dataset: Dataset[E]): Unit = {

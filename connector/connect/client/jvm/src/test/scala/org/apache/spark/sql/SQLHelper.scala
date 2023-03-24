@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql
 
+import org.apache.spark.util.Utils
+
 trait SQLHelper {
 
   def spark: SparkSession
@@ -46,6 +48,17 @@ trait SQLHelper {
       keys.zip(currentValues).foreach {
         case (key, Some(value)) => spark.conf.set(key, value)
         case (key, None) => spark.conf.unset(key)
+      }
+    }
+  }
+
+  /**
+   * Drops table `tableName` after calling `f`.
+   */
+  protected def withTable(tableNames: String*)(f: => Unit): Unit = {
+    Utils.tryWithSafeFinally(f) {
+      tableNames.foreach { name =>
+        spark.sql(s"DROP TABLE IF EXISTS $name").collect()
       }
     }
   }
