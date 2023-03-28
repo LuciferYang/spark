@@ -30,6 +30,7 @@ from pyspark.sql.readwriter import (
     DataFrameReader as PySparkDataFrameReader,
     DataFrameWriterV2 as PySparkDataFrameWriterV2,
 )
+from pyspark.errors import PySparkAttributeError
 
 if TYPE_CHECKING:
     from pyspark.sql.connect.dataframe import DataFrame
@@ -130,7 +131,7 @@ class DataFrameReader(OptionUtils):
         return DataFrame.withPlan(plan, self._client)
 
     def table(self, tableName: str) -> "DataFrame":
-        return self._df(Read(tableName))
+        return self._df(Read(tableName, self._options))
 
     table.__doc__ = PySparkDataFrameReader.table.__doc__
 
@@ -416,6 +417,12 @@ class DataFrameReader(OptionUtils):
                 return self.load()
 
     jdbc.__doc__ = PySparkDataFrameReader.jdbc.__doc__
+
+    @property
+    def _jreader(self) -> None:
+        raise PySparkAttributeError(
+            error_class="JVM_ATTRIBUTE_NOT_SUPPORTED", message_parameters={"attr_name": "_jreader"}
+        )
 
 
 DataFrameReader.__doc__ = PySparkDataFrameReader.__doc__

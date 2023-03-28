@@ -1248,6 +1248,13 @@ def array_position(col: "ColumnOrName", value: Any) -> Column:
 array_position.__doc__ = pysparkfuncs.array_position.__doc__
 
 
+def array_prepend(col: "ColumnOrName", value: Any) -> Column:
+    return _invoke_function("array_prepend", _to_col(col), lit(value))
+
+
+array_prepend.__doc__ = pysparkfuncs.array_prepend.__doc__
+
+
 def array_remove(col: "ColumnOrName", element: Any) -> Column:
     return _invoke_function("array_remove", _to_col(col), lit(element))
 
@@ -2481,9 +2488,6 @@ def _test() -> None:
 
     # Spark Connect does not support Spark Context but the test depends on that.
     del pyspark.sql.connect.functions.monotonically_increasing_id.__doc__
-
-    # TODO(SPARK-41843): Implement SparkSession.udf
-    del pyspark.sql.connect.functions.call_udf.__doc__
 
     globs["spark"] = (
         PySparkSession.builder.appName("sql.connect.functions tests")

@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{RepartitionOperation, _}
 import org.apache.spark.sql.catalyst.rules._
 import org.apache.spark.sql.catalyst.trees.AlwaysProcess
 import org.apache.spark.sql.catalyst.trees.TreePattern._
+import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.internal.SQLConf
@@ -87,7 +88,6 @@ abstract class Optimizer(catalogManager: CatalogManager)
         CollapseProject,
         OptimizeWindowFunctions,
         CollapseWindow,
-        CombineFilters,
         EliminateOffsets,
         EliminateLimits,
         CombineUnions,
@@ -1202,16 +1202,26 @@ object CollapseRepartition extends Rule[LogicalPlan] {
     }
     // Case 2: When a RepartitionByExpression has a child of global Sort, Repartition or
     // RepartitionByExpression we can remove the child.
-    case r @ RepartitionByExpression(_, child @ (Sort(_, true, _) | _: RepartitionOperation), _) =>
+    case r @ RepartitionByExpression(
+        _, child @ (Sort(_, true, _) | _: RepartitionOperation), _, _) =>
       r.withNewChildren(child.children)
     // Case 3: When a RebalancePartitions has a child of local or global Sort, Repartition or
     // RepartitionByExpression we can remove the child.
-    case r @ RebalancePartitions(_, child @ (_: Sort | _: RepartitionOperation), _) =>
+    case r @ RebalancePartitions(_, child @ (_: Sort | _: RepartitionOperation), _, _) =>
       r.withNewChildren(child.children)
     // Case 4: When a RebalancePartitions has a child of RebalancePartitions we can remove the
     // child.
-    case r @ RebalancePartitions(_, child: RebalancePartitions, _) =>
+    case r @ RebalancePartitions(_, child: RebalancePartitions, _, _) =>
       r.withNewChildren(child.children)
+    // Case 5: When a LocalLimit has a child of Repartition we can remove the Repartition.
+    // Because its output is determined by the number of partitions and the expressions of the
+    // Repartition. Therefore, it is feasible to remove Repartition except for repartition by
+    // nondeterministic expressions, because users may expect to randomly take data.
+    case l @ LocalLimit(_, r: RepartitionByExpression)
+        if r.partitionExpressions.nonEmpty && r.partitionExpressions.forall(_.deterministic) =>
+      l.copy(child = r.child)
+    case l @ LocalLimit(_, r: RebalancePartitions) =>
+      l.copy(child = r.child)
   }
 }
 
@@ -1222,7 +1232,7 @@ object CollapseRepartition extends Rule[LogicalPlan] {
 object OptimizeRepartition extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan.transformWithPruning(
     _.containsPattern(REPARTITION_OPERATION), ruleId) {
-    case r @ RepartitionByExpression(partitionExpressions, _, numPartitions)
+    case r @ RepartitionByExpression(partitionExpressions, _, numPartitions, _)
       if partitionExpressions.nonEmpty && partitionExpressions.forall(_.foldable) &&
         numPartitions.isEmpty =>
       r.copy(optNumPartitions = Some(1))
@@ -1612,7 +1622,8 @@ object EliminateSorts extends Rule[LogicalPlan] {
       // Arithmetic operations for floating-point values are order-sensitive
       // (they are not associative).
       case _: Sum | _: Average | _: CentralMomentAgg =>
-        !Seq(FloatType, DoubleType).exists(_.sameType(func.children.head.dataType))
+        !Seq(FloatType, DoubleType)
+          .exists(e => DataTypeUtils.sameType(e, func.children.head.dataType))
       case _ => false
     }
 
