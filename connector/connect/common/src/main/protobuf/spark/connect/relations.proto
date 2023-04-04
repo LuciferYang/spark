@@ -80,6 +80,7 @@ message Relation {
     StatApproxQuantile approx_quantile = 105;
     StatFreqItems freq_items = 106;
     StatSampleBy sample_by = 107;
+    StatBloomFilter bloom_filter = 108;
 
     // Catalog API (experimental / unstable)
     Catalog catalog = 200;
@@ -604,6 +605,26 @@ message StatSampleBy {
 
     // (Required) The fraction value. Must be in [0, 1].
     double fraction = 2;
+  }
+}
+
+// Returns a Bloom filter over a specified column.
+// It will invoke 'Dataset.stat.bloomFilter' to compute the results.
+message StatBloomFilter {
+  // (Required) The input relation.
+  Relation input = 1;
+
+  // (Required) The column that defines strata.
+  Expression col = 2;
+
+  // (Required) The expected number of items which will be put into the filter.
+  int64 expected_num_items = 3;
+
+  oneof other_parameter {
+    // The expected number of bits of the filter.
+    int64 numBits = 4;
+    // The expected false positive probability of the filter.
+    double fpp = 5;
   }
 }
 

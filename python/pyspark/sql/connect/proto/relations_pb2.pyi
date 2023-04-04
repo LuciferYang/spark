@@ -105,6 +105,7 @@ class Relation(google.protobuf.message.Message):
     APPROX_QUANTILE_FIELD_NUMBER: builtins.int
     FREQ_ITEMS_FIELD_NUMBER: builtins.int
     SAMPLE_BY_FIELD_NUMBER: builtins.int
+    BLOOM_FILTER_FIELD_NUMBER: builtins.int
     CATALOG_FIELD_NUMBER: builtins.int
     EXTENSION_FIELD_NUMBER: builtins.int
     UNKNOWN_FIELD_NUMBER: builtins.int
@@ -197,6 +198,8 @@ class Relation(google.protobuf.message.Message):
     @property
     def sample_by(self) -> global___StatSampleBy: ...
     @property
+    def bloom_filter(self) -> global___StatBloomFilter: ...
+    @property
     def catalog(self) -> pyspark.sql.connect.proto.catalog_pb2.Catalog:
         """Catalog API (experimental / unstable)"""
     @property
@@ -252,6 +255,7 @@ class Relation(google.protobuf.message.Message):
         approx_quantile: global___StatApproxQuantile | None = ...,
         freq_items: global___StatFreqItems | None = ...,
         sample_by: global___StatSampleBy | None = ...,
+        bloom_filter: global___StatBloomFilter | None = ...,
         catalog: pyspark.sql.connect.proto.catalog_pb2.Catalog | None = ...,
         extension: google.protobuf.any_pb2.Any | None = ...,
         unknown: global___Unknown | None = ...,
@@ -263,6 +267,8 @@ class Relation(google.protobuf.message.Message):
             b"aggregate",
             "approx_quantile",
             b"approx_quantile",
+            "bloom_filter",
+            b"bloom_filter",
             "catalog",
             b"catalog",
             "co_group_map",
@@ -362,6 +368,8 @@ class Relation(google.protobuf.message.Message):
             b"aggregate",
             "approx_quantile",
             b"approx_quantile",
+            "bloom_filter",
+            b"bloom_filter",
             "catalog",
             b"catalog",
             "co_group_map",
@@ -499,6 +507,7 @@ class Relation(google.protobuf.message.Message):
         "approx_quantile",
         "freq_items",
         "sample_by",
+        "bloom_filter",
         "catalog",
         "extension",
         "unknown",
@@ -2190,6 +2199,77 @@ class StatSampleBy(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["seed"] | None: ...
 
 global___StatSampleBy = StatSampleBy
+
+class StatBloomFilter(google.protobuf.message.Message):
+    """Returns a Bloom filter over a specified column.
+    It will invoke 'Dataset.stat.bloomFilter' to compute the results.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INPUT_FIELD_NUMBER: builtins.int
+    COL_FIELD_NUMBER: builtins.int
+    EXPECTED_NUM_ITEMS_FIELD_NUMBER: builtins.int
+    NUMBITS_FIELD_NUMBER: builtins.int
+    FPP_FIELD_NUMBER: builtins.int
+    @property
+    def input(self) -> global___Relation:
+        """(Required) The input relation."""
+    @property
+    def col(self) -> pyspark.sql.connect.proto.expressions_pb2.Expression:
+        """(Required) The column that defines strata."""
+    expected_num_items: builtins.int
+    """(Required) The expected number of items which will be put into the filter."""
+    numBits: builtins.int
+    """The expected number of bits of the filter."""
+    fpp: builtins.float
+    """The expected false positive probability of the filter."""
+    def __init__(
+        self,
+        *,
+        input: global___Relation | None = ...,
+        col: pyspark.sql.connect.proto.expressions_pb2.Expression | None = ...,
+        expected_num_items: builtins.int = ...,
+        numBits: builtins.int = ...,
+        fpp: builtins.float = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "col",
+            b"col",
+            "fpp",
+            b"fpp",
+            "input",
+            b"input",
+            "numBits",
+            b"numBits",
+            "other_parameter",
+            b"other_parameter",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "col",
+            b"col",
+            "expected_num_items",
+            b"expected_num_items",
+            "fpp",
+            b"fpp",
+            "input",
+            b"input",
+            "numBits",
+            b"numBits",
+            "other_parameter",
+            b"other_parameter",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["other_parameter", b"other_parameter"]
+    ) -> typing_extensions.Literal["numBits", "fpp"] | None: ...
+
+global___StatBloomFilter = StatBloomFilter
 
 class NAFill(google.protobuf.message.Message):
     """Replaces null values.

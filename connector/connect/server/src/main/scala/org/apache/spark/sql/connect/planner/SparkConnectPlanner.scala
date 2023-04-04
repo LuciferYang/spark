@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.connect.planner
 
+import java.io.ByteArrayOutputStream
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -107,6 +109,8 @@ class SparkConnectPlanner(val session: SparkSession) {
       case proto.Relation.RelTypeCase.FREQ_ITEMS => transformStatFreqItems(rel.getFreqItems)
       case proto.Relation.RelTypeCase.SAMPLE_BY =>
         transformStatSampleBy(rel.getSampleBy)
+      case proto.Relation.RelTypeCase.BLOOM_FILTER =>
+        transformStatBloomFilter(rel.getBloomFilter)
       case proto.Relation.RelTypeCase.TO_SCHEMA => transformToSchema(rel.getToSchema)
       case proto.Relation.RelTypeCase.TO_DF =>
         transformToDF(rel.getToDf)
@@ -463,6 +467,24 @@ class SparkConnectPlanner(val session: SparkSession) {
         fractions = fractions.toMap,
         seed = if (rel.hasSeed) rel.getSeed else Utils.random.nextLong)
       .logicalPlan
+  }
+
+  private def transformStatBloomFilter(rel: proto.StatBloomFilter): LogicalPlan = {
+    val col = Column(transformExpression(rel.getCol))
+    val expectedNumItems = rel.getExpectedNumItems
+    val stat = Dataset
+      .ofRows(session, transformRelation(rel.getInput))
+      .stat
+    val bloomFilter = if (rel.hasNumBits) {
+      stat.bloomFilter(col, expectedNumItems, rel.getNumBits)
+    } else {
+      stat.bloomFilter(col, expectedNumItems, rel.getFpp)
+    }
+    val out = new ByteArrayOutputStream()
+    bloomFilter.writeTo(out)
+    LocalRelation.fromProduct(
+      output = AttributeReference("bloom_filter_binary", BinaryType, nullable = false)() :: Nil,
+      data = Tuple1.apply(out.toByteArray) :: Nil)
   }
 
   private def transformToSchema(rel: proto.ToSchema): LogicalPlan = {
