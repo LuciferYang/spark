@@ -32,6 +32,7 @@ import org.apache.spark.connect.proto.ExecutePlanResponse.SqlCommandResult
 import org.apache.spark.connect.proto.Parse.ParseFormat
 import org.apache.spark.ml.{functions => MLFunctions}
 import org.apache.spark.sql.{Column, Dataset, Encoders, SparkSession}
+import org.apache.spark.sql.avro.{AvroDataToCatalyst, CatalystDataToAvro}
 import org.apache.spark.sql.catalyst.{expressions, AliasIdentifier, FunctionIdentifier}
 import org.apache.spark.sql.catalyst.analysis.{GlobalTempView, LocalTempView, MultiAlias, ParameterizedQuery, UnresolvedAlias, UnresolvedAttribute, UnresolvedExtractValue, UnresolvedFunction, UnresolvedRegex, UnresolvedRelation, UnresolvedStar}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -42,7 +43,7 @@ import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.{CollectMetrics, CommandResult, Deduplicate, Except, Intersect, LocalRelation, LogicalPlan, Project, Sample, Sort, SubqueryAlias, Union, Unpivot, UnresolvedHint}
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, CharVarcharUtils}
 import org.apache.spark.sql.connect.artifact.SparkConnectArtifactManager
-import org.apache.spark.sql.connect.common.{DataTypeProtoConverter, InvalidPlanInput, LiteralValueProtoConverter, UdfPacket}
+import org.apache.spark.sql.connect.common.{DataTypeProtoConverter, InvalidPlanInput, LiteralValueProtoConverter, StorageLevelProtoConverter, UdfPacket}
 import org.apache.spark.sql.connect.config.Connect.CONNECT_GRPC_ARROW_MAX_BATCH_SIZE
 import org.apache.spark.sql.connect.plugin.SparkConnectPluginRegistry
 import org.apache.spark.sql.connect.service.SparkConnectStreamHandler
@@ -213,11 +214,11 @@ class SparkConnectPlanner(val session: SparkSession) {
   }
 
   private def transformSql(sql: proto.SQL): LogicalPlan = {
-    val args = sql.getArgsMap.asScala.toMap
+    val args = sql.getArgsMap
     val parser = session.sessionState.sqlParser
     val parsedPlan = parser.parsePlan(sql.getQuery)
-    if (args.nonEmpty) {
-      ParameterizedQuery(parsedPlan, args.mapValues(parser.parseExpression).toMap)
+    if (!args.isEmpty) {
+      ParameterizedQuery(parsedPlan, args.asScala.mapValues(transformLiteral).toMap)
     } else {
       parsedPlan
     }
@@ -1256,6 +1257,40 @@ class SparkConnectPlanner(val session: SparkSession) {
           None
         }
 
+      // Avro-specific functions
+      case "from_avro" if Seq(2, 3).contains(fun.getArgumentsCount) =>
+        val children = fun.getArgumentsList.asScala.toSeq.map(transformExpression)
+        val jsonFormatSchema = children(1) match {
+          case Literal(s, StringType) if s != null => s.toString
+          case other =>
+            throw InvalidPlanInput(
+              s"jsonFormatSchema in from_avro should be a literal string, but got $other")
+        }
+        var options = Map.empty[String, String]
+        if (fun.getArgumentsCount == 3) {
+          children(2) match {
+            case UnresolvedFunction(Seq("map"), arguments, _, _, _) =>
+              options = ExprUtils.convertToMapData(CreateMap(arguments))
+            case other =>
+              throw InvalidPlanInput(
+                s"Options in from_json should be created by map, but got $other")
+          }
+        }
+        Some(AvroDataToCatalyst(children.head, jsonFormatSchema, options))
+
+      case "to_avro" if Seq(1, 2).contains(fun.getArgumentsCount) =>
+        val children = fun.getArgumentsList.asScala.toSeq.map(transformExpression)
+        var jsonFormatSchema = Option.empty[String]
+        if (fun.getArgumentsCount == 2) {
+          children(1) match {
+            case Literal(s, StringType) if s != null => jsonFormatSchema = Some(s.toString)
+            case other =>
+              throw InvalidPlanInput(
+                s"jsonFormatSchema in to_avro should be a literal string, but got $other")
+          }
+        }
+        Some(CatalystDataToAvro(children.head, jsonFormatSchema))
+
       // PS(Pandas API on Spark)-specific functions
       case "distributed_sequence_id" if fun.getArgumentsCount == 0 =>
         Some(DistributedSequenceID())
@@ -1655,7 +1690,9 @@ class SparkConnectPlanner(val session: SparkSession) {
       sessionId: String,
       responseObserver: StreamObserver[ExecutePlanResponse]): Unit = {
     // Eagerly execute commands of the provided SQL string.
-    val df = session.sql(getSqlCommand.getSql, getSqlCommand.getArgsMap)
+    val df = session.sql(
+      getSqlCommand.getSql,
+      getSqlCommand.getArgsMap.asScala.mapValues(transformLiteral).toMap)
     // Check if commands have been executed.
     val isCommand = df.queryExecution.commandExecuted.isInstanceOf[CommandResult]
     val rows = df.logicalPlan match {
@@ -2154,7 +2191,13 @@ class SparkConnectPlanner(val session: SparkSession) {
   }
 
   private def transformCacheTable(getCacheTable: proto.CacheTable): LogicalPlan = {
-    session.catalog.cacheTable(getCacheTable.getTableName)
+    if (getCacheTable.hasStorageLevel) {
+      session.catalog.cacheTable(
+        getCacheTable.getTableName,
+        StorageLevelProtoConverter.toStorageLevel(getCacheTable.getStorageLevel))
+    } else {
+      session.catalog.cacheTable(getCacheTable.getTableName)
+    }
     emptyLocalRelation
   }
 

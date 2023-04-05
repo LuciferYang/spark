@@ -947,8 +947,16 @@ class DataFrameTestsMixin:
         self.assertGreaterEqual(row.sum, 0)
 
     def test_sample(self):
-        self.assertRaisesRegex(
-            TypeError, "should be a bool, float and number", lambda: self.spark.range(1).sample()
+        with self.assertRaises(PySparkTypeError) as pe:
+            self.spark.range(1).sample()
+
+        self.check_error(
+            exception=pe.exception,
+            error_class="NOT_BOOL_OR_FLOAT_OR_INT",
+            message_parameters={
+                "arg_name": "withReplacement (optional), fraction (required) and seed (optional)",
+                "arg_type": "NoneType, NoneType, NoneType",
+            },
         )
 
         self.assertRaises(TypeError, lambda: self.spark.range(1).sample("a"))
@@ -1036,7 +1044,7 @@ class DataFrameTestsMixin:
             self.assertEqual(df.storageLevel, StorageLevel.NONE)
 
             df.cache()
-            self.assertEqual(df.storageLevel, StorageLevel.MEMORY_AND_DISK)
+            self.assertEqual(df.storageLevel, StorageLevel.MEMORY_AND_DISK_DESER)
 
             df.unpersist()
             self.assertEqual(df.storageLevel, StorageLevel.NONE)
@@ -1508,20 +1516,23 @@ class DataFrameTestsMixin:
         self.assertEqual(expected, list(it))
 
     def test_to_local_iterator_not_fully_consumed(self):
+        with QuietTest(self.sc):
+            self.check_to_local_iterator_not_fully_consumed()
+
+    def check_to_local_iterator_not_fully_consumed(self):
         # SPARK-23961: toLocalIterator throws exception when not fully consumed
         # Create a DataFrame large enough so that write to socket will eventually block
         df = self.spark.range(1 << 20, numPartitions=2)
         it = df.toLocalIterator()
         self.assertEqual(df.take(1)[0], next(it))
-        with QuietTest(self.sc):
-            it = None  # remove iterator from scope, socket is closed when cleaned up
-            # Make sure normal df operations still work
-            result = []
-            for i, row in enumerate(df.toLocalIterator()):
-                result.append(row)
-                if i == 7:
-                    break
-            self.assertEqual(df.take(8), result)
+        it = None  # remove iterator from scope, socket is closed when cleaned up
+        # Make sure normal df operations still work
+        result = []
+        for i, row in enumerate(df.toLocalIterator()):
+            result.append(row)
+            if i == 7:
+                break
+        self.assertEqual(df.take(8), result)
 
     def test_same_semantics_error(self):
         with QuietTest(self.sc):
