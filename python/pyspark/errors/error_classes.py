@@ -39,6 +39,16 @@ ERROR_CLASSES_JSON = """
       "Function `<func_name>` should return Column, got <return_type>."
     ]
   },
+  "INVALID_ITEM_FOR_CONTAINER": {
+    "message": [
+      "All items in `<arg_name>` should be in <allowed_types>, got <item_type>."
+    ]
+  },
+  "JVM_ATTRIBUTE_NOT_SUPPORTED" : {
+    "message" : [
+      "Attribute `<attr_name>` is not supported in Spark Connect as it depends on the JVM. If you need to use this attribute, do not use Spark Connect when creating your session."
+    ]
+  },
   "NOT_BOOL" : {
     "message" : [
       "Argument `<arg_name>` should be a bool, got <arg_type>."
@@ -52,6 +62,21 @@ ERROR_CLASSES_JSON = """
   "NOT_BOOL_OR_DICT_OR_FLOAT_OR_INT_OR_STR" : {
     "message" : [
       "Argument `<arg_name>` should be a bool, dict, float, int or str, got <arg_type>."
+    ]
+  },
+  "NOT_BOOL_OR_FLOAT_OR_INT" : {
+    "message" : [
+      "Argument `<arg_name>` should be a bool, float or str, got <arg_type>."
+    ]
+  },
+  "NOT_BOOL_OR_FLOAT_OR_INT_OR_LIST_OR_NONE_OR_STR_OR_TUPLE" : {
+    "message" : [
+      "Argument `<arg_name>` should be a bool, float, int, list, None, str or tuple, got <arg_type>."
+    ]
+  },
+  "NOT_BOOL_OR_FLOAT_OR_INT_OR_STR" : {
+    "message" : [
+      "Argument `<arg_name>` should be a bool, float, int or str, got <arg_type>."
     ]
   },
   "NOT_BOOL_OR_LIST" : {
@@ -82,6 +107,11 @@ ERROR_CLASSES_JSON = """
   "NOT_COLUMN_OR_INT" : {
     "message" : [
       "Argument `<arg_name>` should be a Column or int, got <arg_type>."
+    ]
+  },
+  "NOT_COLUMN_OR_INT_OR_LIST_OR_STR_OR_TUPLE" : {
+    "message" : [
+      "Argument `<arg_name>` should be a Column, int, list, str or tuple, got <arg_type>."
     ]
   },
   "NOT_COLUMN_OR_INT_OR_STR" : {
@@ -134,6 +164,11 @@ ERROR_CLASSES_JSON = """
       "<objectName> is not iterable."
     ]
   },
+  "NOT_LIST_OF_STR" : {
+    "message" : [
+      "Argument `<arg_name>` should be a list[str], got <arg_type>."
+    ]
+  },
   "NOT_LIST_OR_STR_OR_TUPLE" : {
     "message" : [
       "Argument `<arg_name>` should be a list, str or tuple, got <arg_type>."
@@ -157,6 +192,11 @@ ERROR_CLASSES_JSON = """
   "NOT_WINDOWSPEC" : {
     "message" : [
       "Argument `<arg_name>` should be a WindowSpec, got <arg_type>."
+    ]
+  },
+  "NO_ACTIVE_SESSION" : {
+    "message" : [
+      "No active Spark session found. Please create a new Spark session before running the code."
     ]
   },
   "UNSUPPORTED_NUMPY_ARRAY_SCALAR" : {

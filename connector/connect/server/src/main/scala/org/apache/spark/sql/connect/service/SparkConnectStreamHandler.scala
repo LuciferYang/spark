@@ -21,6 +21,7 @@ import scala.collection.JavaConverters._
 
 import com.google.protobuf.ByteString
 import io.grpc.stub.StreamObserver
+import org.apache.commons.lang3.StringUtils
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.connect.proto
@@ -28,6 +29,8 @@ import org.apache.spark.connect.proto.{ExecutePlanRequest, ExecutePlanResponse}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.connect.artifact.SparkConnectArtifactManager
+import org.apache.spark.sql.connect.common.DataTypeProtoConverter
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter.toLiteralProto
 import org.apache.spark.sql.connect.config.Connect.CONNECT_GRPC_ARROW_MAX_BATCH_SIZE
 import org.apache.spark.sql.connect.planner.SparkConnectPlanner
@@ -41,12 +44,22 @@ import org.apache.spark.util.ThreadUtils
 class SparkConnectStreamHandler(responseObserver: StreamObserver[ExecutePlanResponse])
     extends Logging {
 
-  def handle(v: ExecutePlanRequest): Unit = {
+  def handle(v: ExecutePlanRequest): Unit = SparkConnectArtifactManager.withArtifactClassLoader {
     val session =
       SparkConnectService
         .getOrCreateIsolatedSession(v.getUserContext.getUserId, v.getSessionId)
         .session
     session.withActive {
+
+      // Add debug information to the query execution so that the jobs are traceable.
+      val debugString = v.toString
+      session.sparkContext.setLocalProperty(
+        "callSite.short",
+        s"Spark Connect - ${StringUtils.abbreviate(debugString, 128)}")
+      session.sparkContext.setLocalProperty(
+        "callSite.long",
+        StringUtils.abbreviate(debugString, 2048))
+
       v.getPlan.getOpTypeCase match {
         case proto.Plan.OpTypeCase.COMMAND => handleCommand(session, v)
         case proto.Plan.OpTypeCase.ROOT => handlePlan(session, v)
@@ -60,6 +73,8 @@ class SparkConnectStreamHandler(responseObserver: StreamObserver[ExecutePlanResp
     // Extract the plan from the request and convert it to a logical plan
     val planner = new SparkConnectPlanner(session)
     val dataframe = Dataset.ofRows(session, planner.transformRelation(request.getPlan.getRoot))
+    responseObserver.onNext(
+      SparkConnectStreamHandler.sendSchemaToResponse(request.getSessionId, dataframe.schema))
     processAsArrowBatches(request.getSessionId, dataframe, responseObserver)
     responseObserver.onNext(
       SparkConnectStreamHandler.sendMetricsToResponse(request.getSessionId, dataframe))
@@ -201,6 +216,15 @@ object SparkConnectStreamHandler {
         responseObserver.onNext(response.build())
       }
     }
+  }
+
+  def sendSchemaToResponse(sessionId: String, schema: StructType): ExecutePlanResponse = {
+    // Send the Spark data type
+    ExecutePlanResponse
+      .newBuilder()
+      .setSessionId(sessionId)
+      .setSchema(DataTypeProtoConverter.toConnectProtoType(schema))
+      .build()
   }
 
   def sendMetricsToResponse(sessionId: String, rows: DataFrame): ExecutePlanResponse = {

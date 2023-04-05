@@ -35,6 +35,12 @@
     ],
     "sqlState" : "22003"
   },
+  "BINARY_ARITHMETIC_OVERFLOW" : {
+    "message" : [
+      "<value1> <symbol> <value2> caused overflow."
+    ],
+    "sqlState" : "22003"
+  },
   "CANNOT_CAST_DATATYPE" : {
     "message" : [
       "Cannot cast <sourceType> to <targetType>."
@@ -128,6 +134,12 @@
       "Cannot recognize hive type string: <fieldType>, column: <fieldName>."
     ],
     "sqlState" : "429BB"
+  },
+  "CANNOT_RENAME_ACROSS_SCHEMA" : {
+    "message" : [
+      "Renaming a <type> across schemas is not allowed."
+    ],
+    "sqlState" : "0AKD0"
   },
   "CANNOT_RESTORE_PERMISSIONS_FOR_PATH" : {
     "message" : [
@@ -530,12 +542,6 @@
     ],
     "sqlState" : "23505"
   },
-  "ELEMENT_AT_BY_INDEX_ZERO" : {
-    "message" : [
-      "The index 0 is invalid. An index shall be either < 0 or > 0 (the first element has index 1)."
-    ],
-    "sqlState" : "22003"
-  },
   "EMPTY_JSON_FIELD_VALUE" : {
     "message" : [
       "Failed to parse an empty string for data type <dataType>."
@@ -909,6 +915,12 @@
     ],
     "sqlState" : "42602"
   },
+  "INVALID_INDEX_OF_ZERO" : {
+    "message" : [
+      "The index 0 is invalid. An index shall be either < 0 or > 0 (the first element has index 1)."
+    ],
+    "sqlState" : "22003"
+  },
   "INVALID_JSON_ROOT_FIELD" : {
     "message" : [
       "Cannot convert JSON root field to target Spark type."
@@ -1062,6 +1074,28 @@
       "Rewrite the query to avoid window functions, aggregate functions, and generator functions in the WHERE clause."
     ],
     "sqlState" : "42903"
+  },
+  "INVALID_WRITE_DISTRIBUTION" : {
+    "message" : [
+      "The requested write distribution is invalid."
+    ],
+    "subClass" : {
+      "PARTITION_NUM_AND_SIZE" : {
+        "message" : [
+          "The partition number and advisory partition size can't be specified at the same time."
+        ]
+      },
+      "PARTITION_NUM_WITH_UNSPECIFIED_DISTRIBUTION" : {
+        "message" : [
+          "The number of partitions can't be specified with unspecified distribution."
+        ]
+      },
+      "PARTITION_SIZE_WITH_UNSPECIFIED_DISTRIBUTION" : {
+        "message" : [
+          "The advisory partition size can't be specified with unspecified distribution."
+        ]
+      }
+    }
   },
   "LOCATION_ALREADY_EXISTS" : {
     "message" : [
@@ -2931,11 +2965,6 @@
       "Unsupported data type <dataType>."
     ]
   },
-  "_LEGACY_ERROR_TEMP_1178" : {
-    "message" : [
-      "The number of partitions can't be specified with unspecified distribution. Invalid writer requirements detected."
-    ]
-  },
   "_LEGACY_ERROR_TEMP_1181" : {
     "message" : [
       "Stream-stream join without equality predicate is not supported."
@@ -3855,11 +3884,6 @@
   "_LEGACY_ERROR_TEMP_2043" : {
     "message" : [
       "- <sqlValue> caused overflow."
-    ]
-  },
-  "_LEGACY_ERROR_TEMP_2044" : {
-    "message" : [
-      "<sqlValue1> <symbol> <sqlValue2> caused overflow."
     ]
   },
   "_LEGACY_ERROR_TEMP_2045" : {

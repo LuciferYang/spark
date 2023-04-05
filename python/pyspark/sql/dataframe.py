@@ -39,7 +39,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from py4j.java_gateway import JavaObject
+from py4j.java_gateway import JavaObject, JVMView
 
 from pyspark import copy_func, _NoValue
 from pyspark._globals import _NoValueType
@@ -61,6 +61,7 @@ from pyspark.sql.types import (
     Row,
     _parse_datatype_json_string,
 )
+from pyspark.sql.utils import get_active_spark_context
 from pyspark.sql.pandas.conversion import PandasConversionMixin
 from pyspark.sql.pandas.map_ops import PandasMapOpsMixin
 
@@ -304,6 +305,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 1.3.0
 
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
         .. deprecated:: 2.0.0
             Use :meth:`DataFrame.createOrReplaceTempView` instead.
 
@@ -382,10 +386,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         name : str
             Name of the view.
 
-        Returns
-        -------
-        None
-
         Examples
         --------
         Create a local temporary view named 'people'.
@@ -423,10 +423,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         name : str
             Name of the view.
 
-        Returns
-        -------
-        None
-
         Examples
         --------
         Create a global temporary view.
@@ -463,10 +459,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ----------
         name : str
             Name of the view.
-
-        Returns
-        -------
-        None
 
         Examples
         --------
@@ -588,10 +580,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionchanged:: 3.4.0
             Supports Spark Connect.
-
-        Returns
-        -------
-        None
 
         Examples
         --------
@@ -853,10 +841,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         vertical : bool, optional
             If set to ``True``, print output rows vertically (one line
             per column value).
-
-        Returns
-        -------
-        None
 
         Examples
         --------
@@ -1241,10 +1225,16 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 2.0.0
 
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
         Parameters
         ----------
         prefetchPartitions : bool, optional
-            If Spark should pre-fetch the next partition  before it is needed.
+            If Spark should pre-fetch the next partition before it is needed.
+
+            .. versionchanged:: 3.4.0
+                This argument does not take effect for Spark Connect.
 
         Returns
         -------
@@ -1418,6 +1408,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 1.3.0
 
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
         Notes
         -----
         The default storage level has changed to `MEMORY_AND_DISK` to match Scala in 2.0.
@@ -1432,6 +1425,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df = spark.range(1)
         >>> df.cache()
         DataFrame[id: bigint]
+
+        >>> df.explain()
+        == Physical Plan ==
+        InMemoryTableScan ...
         """
         self.is_cached = True
         self._jdf.cache()
@@ -1447,6 +1444,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         If no storage level is specified defaults to (`MEMORY_AND_DISK_DESER`)
 
         .. versionadded:: 1.3.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
         Notes
         -----
@@ -1468,6 +1468,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df.persist()
         DataFrame[id: bigint]
 
+        >>> df.explain()
+        == Physical Plan ==
+        InMemoryTableScan ...
+
         Persists the data in the disk by specifying the storage level.
 
         >>> from pyspark.storagelevel import StorageLevel
@@ -1484,6 +1488,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """Get the :class:`DataFrame`'s current storage level.
 
         .. versionadded:: 2.1.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
         Returns
         -------
@@ -1517,6 +1524,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         memory and disk.
 
         .. versionadded:: 1.3.0
+
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
 
         Notes
         -----
@@ -1848,13 +1858,14 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             or is_withReplacement_omitted_kwargs
             or is_withReplacement_omitted_args
         ):
-            argtypes = [
-                str(type(arg)) for arg in [withReplacement, fraction, seed] if arg is not None
-            ]
+            argtypes = [type(arg).__name__ for arg in [withReplacement, fraction, seed]]
             raise PySparkTypeError(
-                "withReplacement (optional), fraction (required) and seed (optional)"
-                " should be a bool, float and number; however, "
-                "got [%s]." % ", ".join(argtypes)
+                error_class="NOT_BOOL_OR_FLOAT_OR_INT",
+                message_parameters={
+                    "arg_name": "withReplacement (optional), "
+                    + "fraction (required) and seed (optional)",
+                    "arg_type": ", ".join(argtypes),
+                },
             )
 
         if is_withReplacement_omitted_args:
@@ -4890,9 +4901,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                 error_class="NOT_DICT",
                 message_parameters={"arg_name": "metadata", "arg_type": type(metadata).__name__},
             )
-        sc = SparkContext._active_spark_context
-        assert sc is not None and sc._jvm is not None
-        jmeta = sc._jvm.org.apache.spark.sql.types.Metadata.fromJson(json.dumps(metadata))
+        sc = get_active_spark_context()
+        jmeta = cast(JVMView, sc._jvm).org.apache.spark.sql.types.Metadata.fromJson(
+            json.dumps(metadata)
+        )
         return DataFrame(self._jdf.withMetadata(columnName, jmeta), self.sparkSession)
 
     @overload
