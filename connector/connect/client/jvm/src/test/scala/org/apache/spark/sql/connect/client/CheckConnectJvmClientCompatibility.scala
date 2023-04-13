@@ -111,6 +111,7 @@ object CheckConnectJvmClientCompatibility {
       IncludeByName("org.apache.spark.sql.catalog.Database.*"),
       IncludeByName("org.apache.spark.sql.catalog.Function.*"),
       IncludeByName("org.apache.spark.sql.catalog.Table.*"),
+      IncludeByName("org.apache.spark.sql.streaming.DataStreamReader.*"),
       IncludeByName("org.apache.spark.sql.Column.*"),
       IncludeByName("org.apache.spark.sql.ColumnName.*"),
       IncludeByName("org.apache.spark.sql.DataFrame.*"),
@@ -197,7 +198,6 @@ object CheckConnectJvmClientCompatibility {
         "org.apache.spark.sql.SparkSession.baseRelationToDataFrame"),
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.SparkSession.createDataset"),
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.SparkSession.executeCommand"),
-      ProblemFilters.exclude[Problem]("org.apache.spark.sql.SparkSession.readStream"),
       ProblemFilters.exclude[Problem]("org.apache.spark.sql.SparkSession.this"),
 
       // RuntimeConfig

@@ -37,6 +37,7 @@ import org.apache.spark.sql.connect.client.{SparkConnectClient, SparkResult}
 import org.apache.spark.sql.connect.client.util.{Cleaner, ConvertToArrow}
 import org.apache.spark.sql.connect.common.LiteralValueProtoConverter.toLiteralProto
 import org.apache.spark.sql.internal.CatalogImpl
+import org.apache.spark.sql.streaming.DataStreamReader
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -288,6 +289,17 @@ class SparkSession private[sql] (
   def read: DataFrameReader = new DataFrameReader(this)
 
   /**
+   * Returns a `DataStreamReader` that can be used to read streaming data in as a `DataFrame`.
+   * {{{
+   *   sparkSession.readStream.parquet("/path/to/directory/of/parquet/files")
+   *   sparkSession.readStream.schema(schema).json("/path/to/directory/of/json/files")
+   * }}}
+   *
+   * @since 3.5.0
+   */
+  def readStream: DataStreamReader = new DataStreamReader(this)
+
+  /**
    * Interface through which the user may create, drop, alter or query underlying databases,
    * tables, functions etc.
    *
@@ -443,6 +455,13 @@ class SparkSession private[sql] (
     val result = new SparkResult(value, allocator, encoder)
     cleaner.register(result)
     result
+  }
+
+  private[sql] def execute[T](
+      command: proto.Command,
+      encoder: AgnosticEncoder[T]): SparkResult[T] = {
+    val plan = proto.Plan.newBuilder().setCommand(command).build()
+    execute(plan, encoder)
   }
 
   private[sql] def execute(f: proto.Relation.Builder => Unit): Unit = {
