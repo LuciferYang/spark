@@ -553,7 +553,7 @@ public class JavaDatasetSuite implements Serializable {
   private void assertEqualsUnorderly(
       List<Tuple2<String, Integer>> expected,
       List<Tuple2<String, Integer>> actual) {
-    Assert.assertEquals(
+    Assertions.assertEquals(
         expected.stream().sorted(comparatorStringAndIntTuple).collect(Collectors.toList()),
         actual.stream().sorted(comparatorStringAndIntTuple).collect(Collectors.toList())
     );
