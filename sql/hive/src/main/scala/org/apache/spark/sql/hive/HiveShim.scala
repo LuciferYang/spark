@@ -20,7 +20,6 @@ package org.apache.spark.sql.hive
 import java.rmi.server.UID
 
 import scala.collection.JavaConverters._
-import scala.language.implicitConversions
 
 import com.google.common.base.Objects
 import org.apache.avro.Schema
