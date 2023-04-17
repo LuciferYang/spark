@@ -597,7 +597,15 @@ jobs:
     - name: Scala linter
       run: ./dev/lint-scala
     - name: Java linter
-      run: ./dev/lint-java
+      uses: nikitasavinov/checkstyle-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: 'github-pr-check'
+        tool_name: 'reviewdog'
+        checkstyle_config: ./dev/checkstyle.xml
+        checkstyle_version: 9.3
+        fail_on_error: true
+        filter_mode: nofilter
     - name: Spark connect jvm client mima check
       if: inputs.branch != 'branch-3.2' && inputs.branch != 'branch-3.3'
       run: ./dev/connect-jvm-client-mima-check
