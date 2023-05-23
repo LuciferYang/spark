@@ -414,8 +414,7 @@ class QueryCompilationErrorsSuite
       errorClass = "UNRESOLVED_MAP_KEY.WITH_SUGGESTION",
       sqlState = None,
       parameters = Map("objectName" -> "`a`",
-        "proposal" ->
-          "`__auto_generated_subquery_name`.`m`, `__auto_generated_subquery_name`.`aa`"),
+        "proposal" -> "`aa`, `m`"),
       context = ExpectedContext(
         fragment = "a",
         start = 9,
@@ -430,8 +429,7 @@ class QueryCompilationErrorsSuite
       errorClass = "UNRESOLVED_MAP_KEY.WITH_SUGGESTION",
       sqlState = None,
       parameters = Map("objectName" -> "`a`",
-        "proposal" ->
-          "`__auto_generated_subquery_name`.`m`, `__auto_generated_subquery_name`.`a.a`"),
+        "proposal" -> "`m`, `a.a`"),
       context = ExpectedContext(
         fragment = "a",
         start = 9,
@@ -494,6 +492,33 @@ class QueryCompilationErrorsSuite
           stop = 9))
 
       checkAnswer(sql("SELECT __auto_generated_subquery_name.i from (SELECT i FROM v)"), Row(1))
+    }
+  }
+
+  test("AMBIGUOUS_ALIAS_IN_NESTED_CTE: Nested CTEs with same name and " +
+    "ctePrecedencePolicy = EXCEPTION") {
+    withTable("t") {
+      withSQLConf(SQLConf.LEGACY_CTE_PRECEDENCE_POLICY.key -> "EXCEPTION") {
+        val query =
+          """
+            |WITH
+            |    t AS (SELECT 1),
+            |    t2 AS (
+            |        WITH t AS (SELECT 2)
+            |        SELECT * FROM t)
+            |SELECT * FROM t2;
+            |""".stripMargin
+
+        checkError(
+          exception = intercept[AnalysisException] {
+            sql(query)
+          },
+          errorClass = "AMBIGUOUS_ALIAS_IN_NESTED_CTE",
+          parameters = Map(
+            "name" -> "`t`",
+            "config" -> toSQLConf(SQLConf.LEGACY_CTE_PRECEDENCE_POLICY.key),
+            "docroot" -> SPARK_DOC_ROOT))
+      }
     }
   }
 
