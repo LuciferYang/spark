@@ -780,22 +780,11 @@ jobs:
         run: |
           # Fix for TTY related issues when launching the Ammonite REPL in tests.
           export TERM=vt100 && script -qfc 'echo exit | amm -s' && rm typescript
-          set -e
-          export MAVEN_OPTS="-Xss64m -Xmx2g -XX:ReservedCodeCacheSize=1g -Dorg.slf4j.simpleLogger.defaultLogLevel=WARN"
-          export MAVEN_CLI_OPTS="--no-transfer-progress"
           export JAVA_VERSION=${{ matrix.java }}
-          # It uses Maven's 'install' intentionally, see https://github.com/apache/spark/pull/26414.
-          # 1. Test with -Phive
-          ./build/mvn $MAVEN_CLI_OPTS -DskipTests -Djava.version=${JAVA_VERSION/-ea} install -Phive
-          ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/client/jvm -Phive
-          # TODO(SPARK-43989): Enable connect server module testing after resolving SPARK-43646
-          # ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/server -Phive
-          # 2. Test without -Phive
-          # ./build/mvn $MAVEN_CLI_OPTS -DskipTests -Djava.version=${JAVA_VERSION/-ea} install -pl assembly
-          # TODO(SPARK-43989): Enable connect server module testing after resolving SPARK-43646
-          # ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/server
-          # ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/client/jvm
-          # rm -rf ~/.m2/repository/org/apache/spark
+          ./dev/run-connect-maven-tests
+          TEST_RETCODE=$?
+          rm -rf ~/.m2/repository/org/apache/spark
+          exit $TEST_RETCODE
       - name: Upload test results to report
         if: always()
         uses: actions/upload-artifact@v3
