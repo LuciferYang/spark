@@ -776,6 +776,7 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
       - name: Build and Test with Maven
+        shell: 'script -q -e -c "bash {0}"'
         run: |
           # Fix for TTY related issues when launching the Ammonite REPL in tests.
           export TERM=vt100 && script -qfc 'echo exit | amm -s' && rm typescript
@@ -785,9 +786,9 @@ jobs:
           # It uses Maven's 'install' intentionally, see https://github.com/apache/spark/pull/26414.
           # 1. Test with -Phive
           ./build/mvn $MAVEN_CLI_OPTS -DskipTests -Djava.version=${JAVA_VERSION/-ea} install -Phive
+          ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/client/jvm -Phive
           # TODO(SPARK-43989): Enable connect server module testing after resolving SPARK-43646
           # ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/server -Phive
-          ./build/mvn $MAVEN_CLI_OPTS -Djava.version=${JAVA_VERSION/-ea} test -pl connector/connect/client/jvm -Phive
           # 2. Test without -Phive
           # ./build/mvn $MAVEN_CLI_OPTS -DskipTests -Djava.version=${JAVA_VERSION/-ea} install -pl assembly
           # TODO(SPARK-43989): Enable connect server module testing after resolving SPARK-43646
