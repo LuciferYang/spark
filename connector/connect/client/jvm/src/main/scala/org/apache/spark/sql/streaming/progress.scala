@@ -192,7 +192,7 @@ class StreamingQueryProgress private[spark] (
       ("sink" -> sink.jsonValue) ~
       ("observedMetrics" -> safeMapToJValue[Row](
         observedMetrics,
-        row => ToJsonUtil.jsonValue(row)))
+        row => fromJsonNode(ToJsonUtil.jsonNode(row))))
   }
 }
 

@@ -174,7 +174,8 @@ class StreamingQueryProgress private[spark](
     ("stateOperators" -> JArray(stateOperators.map(_.jsonValue).toList)) ~
     ("sources" -> JArray(sources.map(_.jsonValue).toList)) ~
     ("sink" -> sink.jsonValue) ~
-    ("observedMetrics" -> safeMapToJValue[Row](observedMetrics, row => ToJsonUtil.jsonValue(row)))
+    ("observedMetrics" ->
+      safeMapToJValue[Row](observedMetrics, row => fromJsonNode(ToJsonUtil.jsonNode(row))))
   }
 }
 
