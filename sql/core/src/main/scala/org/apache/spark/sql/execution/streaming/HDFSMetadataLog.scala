@@ -26,13 +26,12 @@ import scala.reflect.ClassTag
 
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs._
-import org.json4s.NoTypeHints
-import org.json4s.jackson.Serialization
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.util.JacksonUtils
 
 
 /**
@@ -48,8 +47,6 @@ import org.apache.spark.sql.internal.SQLConf
  */
 class HDFSMetadataLog[T <: AnyRef : ClassTag](sparkSession: SparkSession, path: String)
   extends MetadataLog[T] with Logging {
-
-  private implicit val formats = Serialization.formats(NoTypeHints)
 
   /** Needed to serialize type T into JSON when using Jackson */
   private implicit val manifest = Manifest.classType[T](implicitly[ClassTag[T]].runtimeClass)
@@ -108,7 +105,7 @@ class HDFSMetadataLog[T <: AnyRef : ClassTag](sparkSession: SparkSession, path: 
    * in the caller.
    */
   protected def serialize(metadata: T, out: OutputStream): Unit = {
-    Serialization.write(metadata, out)
+    JacksonUtils.writeValue(out, metadata)
   }
 
   /**
@@ -118,7 +115,7 @@ class HDFSMetadataLog[T <: AnyRef : ClassTag](sparkSession: SparkSession, path: 
    */
   protected def deserialize(in: InputStream): T = {
     val reader = new InputStreamReader(in, StandardCharsets.UTF_8)
-    Serialization.read[T](reader)
+    JacksonUtils.readValue[T](reader)
   }
 
   /**

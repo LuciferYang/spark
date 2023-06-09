@@ -36,6 +36,7 @@ import org.scalatest.concurrent.Eventually.{eventually, timeout}
 import org.scalatestplus.mockito.MockitoSugar
 
 import org.apache.spark._
+import org.apache.spark.Json4sUtils.createTempJsonFile
 import org.apache.spark.TestUtils._
 import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
 import org.apache.spark.internal.config.PLUGINS

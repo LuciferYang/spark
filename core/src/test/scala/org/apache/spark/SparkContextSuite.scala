@@ -36,6 +36,7 @@ import org.json4s.{DefaultFormats, Extraction}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.must.Matchers._
 
+import org.apache.spark.Json4sUtils.createTempJsonFile
 import org.apache.spark.TestUtils._
 import org.apache.spark.executor.ExecutorExitCode
 import org.apache.spark.internal.config._

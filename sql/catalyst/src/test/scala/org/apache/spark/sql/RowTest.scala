@@ -102,7 +102,7 @@ class RowTest extends AnyFunSpec with Matchers {
       val values = ArraySeq("1", "2", "3")
       val row = new GenericRowWithSchema(Array(values), schema)
       val expectedList = JArray(JString("1") :: JString("2") :: JString("3") :: Nil)
-      ToJsonUtil.jsonValue(row) shouldBe new JObject(("list", expectedList) :: Nil)
+      ToJsonUtil.jsonNode(row) shouldBe new JObject(("list", expectedList) :: Nil)
     }
   }
 

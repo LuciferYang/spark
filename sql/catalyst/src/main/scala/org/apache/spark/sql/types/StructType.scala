@@ -18,10 +18,11 @@
 package org.apache.spark.sql.types
 
 import scala.collection.{mutable, Map}
+import scala.collection.JavaConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-import org.json4s.JsonDSL._
+import com.fasterxml.jackson.databind.JsonNode
 
 import org.apache.spark.annotation.Stable
 import org.apache.spark.sql.catalyst.analysis.Resolver
@@ -34,6 +35,7 @@ import org.apache.spark.sql.catalyst.util.ResolveDefaultColumns._
 import org.apache.spark.sql.catalyst.util.StringUtils.StringConcat
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.util.JacksonUtils
 import org.apache.spark.util.collection.Utils
 
 /**
@@ -405,9 +407,15 @@ case class StructType(fields: Array[StructField]) extends DataType with Seq[Stru
     fields.foreach(field => field.buildFormattedString(prefix, stringConcat, maxDepth))
   }
 
-  override private[sql] def jsonValue =
-    ("type" -> typeName) ~
-      ("fields" -> map(_.jsonValue))
+  override private[sql] def jsonNode: JsonNode = {
+    val node = JacksonUtils.createObjectNode
+    node.put("type", typeName)
+    val nodes = map(_.jsonNode).asJava
+    val arrayNode = JacksonUtils.createArrayNode(nodes.size())
+    arrayNode.addAll(nodes)
+    node.set[JsonNode]("fields", arrayNode)
+    node
+  }
 
   override def apply(fieldIndex: Int): StructField = fields(fieldIndex)
 
