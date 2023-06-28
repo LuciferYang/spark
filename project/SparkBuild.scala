@@ -327,9 +327,10 @@ object SparkBuild extends PomBuild {
     (MavenCompile / publishMavenStyle) := true,
     (SbtCompile / publishMavenStyle) := false,
     (MavenCompile / publishLocal) :=
-      publishOrSkip(MavenCompile / publishLocalConfiguration, publishLocal / skip).value,
+      publishOrSkip(MavenCompile / publishLocalConfiguration,
+        MavenCompile / publishLocal / skip).value,
     (SbtCompile / publishLocal) :=
-      publishOrSkip(SbtCompile / publishLocalConfiguration, publishLocal / skip).value,
+      publishOrSkip(SbtCompile / publishLocalConfiguration, SbtCompile / publishLocal / skip).value,
     publishLocal := Seq((MavenCompile / publishLocal), (SbtCompile / publishLocal)).dependOn.value,
 
     javaOptions ++= {
