@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class JavaSparkSessionSuite {
@@ -54,5 +55,31 @@ public class JavaSparkSessionSuite {
     for (Map.Entry<String, Object> e : map.entrySet()) {
       Assertions.assertEquals(spark.conf().get(e.getKey()), e.getValue().toString());
     }
+  }
+
+  @Test
+  public void testPositionalParameters() {
+    spark = new TestSparkSession();
+
+    int[] emptyArgs = {};
+    List<Row> collected1 = spark.sql("select 'abc'", emptyArgs).collectAsList();
+    Assert.assertEquals("abc", collected1.get(0).getString(0));
+
+    Object[] singleArg = new String[] { "abc" };
+    List<Row> collected2 = spark.sql("select ?", singleArg).collectAsList();
+    Assert.assertEquals("abc", collected2.get(0).getString(0));
+
+    int[] args = new int[] { 1, 2, 3 };
+    List<Row> collected3 = spark.sql("select ?, ?, ?", args).collectAsList();
+    Row r0 = collected3.get(0);
+    Assert.assertEquals(1, r0.getInt(0));
+    Assert.assertEquals(2, r0.getInt(1));
+    Assert.assertEquals(3, r0.getInt(2));
+
+    Object[] mixedArgs = new Object[] { 1, "abc" };
+    List<Row> collected4 = spark.sql("select ?, ?", mixedArgs).collectAsList();
+    Row r1 = collected4.get(0);
+    Assert.assertEquals(1, r1.getInt(0));
+    Assert.assertEquals("abc", r1.getString(1));
   }
 }

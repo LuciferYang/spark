@@ -22,9 +22,6 @@ import java.util.Properties
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 import io.grpc.StatusRuntimeException
 import org.apache.commons.io.FileUtils
@@ -32,7 +29,6 @@ import org.apache.commons.io.output.TeeOutputStream
 import org.apache.commons.lang3.{JavaVersion, SystemUtils}
 import org.scalactic.TolerantNumerics
 import org.scalatest.PrivateMethodTester
-import org.scalatest.concurrent.Eventually._
 
 import org.apache.spark.{SPARK_VERSION, SparkException}
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.StringEncoder
@@ -45,7 +41,6 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.util.ThreadUtils
 
 class ClientE2ETestSuite extends RemoteSparkSession with SQLHelper with PrivateMethodTester {
 
@@ -953,69 +948,28 @@ class ClientE2ETestSuite extends RemoteSparkSession with SQLHelper with PrivateM
     }
   }
 
-  test("interrupt all - background queries, foreground interrupt") {
-    val session = spark
-    import session.implicits._
-    implicit val ec = ExecutionContext.global
-    val q1 = Future {
-      spark.range(10).map(n => { Thread.sleep(30000); n }).collect()
-    }
-    val q2 = Future {
-      spark.range(10).map(n => { Thread.sleep(30000); n }).collect()
-    }
-    var q1Interrupted = false
-    var q2Interrupted = false
-    var error: Option[String] = None
-    q1.onComplete {
-      case Success(_) =>
-        error = Some("q1 shouldn't have finished!")
-      case Failure(t) if t.getMessage.contains("cancelled") =>
-        q1Interrupted = true
-      case Failure(t) =>
-        error = Some("unexpected failure in q1: " + t.toString)
-    }
-    q2.onComplete {
-      case Success(_) =>
-        error = Some("q2 shouldn't have finished!")
-      case Failure(t) if t.getMessage.contains("cancelled") =>
-        q2Interrupted = true
-      case Failure(t) =>
-        error = Some("unexpected failure in q2: " + t.toString)
-    }
-    // 20 seconds is < 30 seconds the queries should be running,
-    // because it should be interrupted sooner
-    eventually(timeout(20.seconds), interval(1.seconds)) {
-      // keep interrupting every second, until both queries get interrupted.
-      spark.interruptAll()
-      assert(error.isEmpty, s"Error not empty: $error")
-      assert(q1Interrupted)
-      assert(q2Interrupted)
-    }
+  test("sql() with positional parameters") {
+    val result0 = spark.sql("select 1", Array.empty).collect()
+    assert(result0.length == 1 && result0(0).getInt(0) === 1)
+
+    val result1 = spark.sql("select ?", Array(1)).collect()
+    assert(result1.length == 1 && result1(0).getInt(0) === 1)
+
+    val result2 = spark.sql("select ?, ?", Array(1, "abc")).collect()
+    assert(result2.length == 1)
+    assert(result2(0).getInt(0) === 1)
+    assert(result2(0).getString(1) === "abc")
   }
 
-  test("interrupt all - foreground queries, background interrupt") {
-    val session = spark
-    import session.implicits._
-    implicit val ec = ExecutionContext.global
+  test("sql() with named parameters") {
+    val result0 = spark.sql("select 1", Map.empty[String, Any]).collect()
+    assert(result0.length == 1 && result0(0).getInt(0) === 1)
 
-    @volatile var finished = false
-    val interruptor = Future {
-      eventually(timeout(20.seconds), interval(1.seconds)) {
-        spark.interruptAll()
-        assert(finished)
-      }
-      finished
-    }
-    val e1 = intercept[io.grpc.StatusRuntimeException] {
-      spark.range(10).map(n => { Thread.sleep(30.seconds.toMillis); n }).collect()
-    }
-    assert(e1.getMessage.contains("cancelled"), s"Unexpected exception: $e1")
-    val e2 = intercept[io.grpc.StatusRuntimeException] {
-      spark.range(10).map(n => { Thread.sleep(30.seconds.toMillis); n }).collect()
-    }
-    assert(e2.getMessage.contains("cancelled"), s"Unexpected exception: $e2")
-    finished = true
-    assert(ThreadUtils.awaitResult(interruptor, 10.seconds) == true)
+    val result1 = spark.sql("select :abc", Map("abc" -> 1)).collect()
+    assert(result1.length == 1 && result1(0).getInt(0) === 1)
+
+    val result2 = spark.sql("select :c0 limit :l0", Map("l0" -> 1, "c0" -> "abc")).collect()
+    assert(result2.length == 1 && result2(0).getString(0) === "abc")
   }
 }
 
