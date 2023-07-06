@@ -88,11 +88,23 @@ jQuery.extend(jQuery.fn.dataTableExt.oSort, {
   },
 
   "title-numeric-asc": function (a, b) {
-    return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+    if (typeof a === 'string' && typeof b === 'number') {
+      return -1;
+    } else if (typeof a === 'number' && typeof b === 'string') {
+      return 1;
+    } else {
+      return a - b;
+    }
   },
 
   "title-numeric-desc": function (a, b) {
-    return ((a < b) ? 1 : ((a > b) ? -1 : 0));
+    if (typeof a === 'string' && typeof b === 'number') {
+      return 1;
+    } else if (typeof a === 'number' && typeof b === 'string') {
+      return -1;
+    } else {
+      return b - a;
+    }
   }
 });
 
