@@ -41,9 +41,7 @@ import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.TransportConf;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TransportClientFactorySuite {
   private TransportConf conf;
@@ -260,7 +258,7 @@ public class TransportClientFactorySuite {
       TransportServer server = ctx.createServer();
       int unreachablePort = server.getPort();
       JavaUtils.closeQuietly(server);
-      IOException exception = Assert.assertThrows(IOException.class,
+      IOException exception = Assertions.assertThrows(IOException.class,
           () -> factory.createClient(TestUtils.getLocalHost(), unreachablePort, true));
       assertNotEquals(exception.getCause(), null);
     }
