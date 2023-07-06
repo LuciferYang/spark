@@ -26,8 +26,6 @@ import com.google.protobuf.{Any => ProtoAny, ByteString}
 import io.grpc.{Context, Status, StatusRuntimeException}
 import io.grpc.stub.StreamObserver
 import org.apache.commons.lang3.exception.ExceptionUtils
-import org.json4s._
-import org.json4s.jackson.JsonMethods.parse
 
 import org.apache.spark.{Partition, SparkEnv, TaskContext}
 import org.apache.spark.api.python.{PythonEvalType, SimplePythonFunction}
@@ -91,15 +89,6 @@ class SparkConnectPlanner(val sessionHolder: SessionHolder) extends Logging {
   private lazy val pythonExec =
     sys.env.getOrElse("PYSPARK_PYTHON", sys.env.getOrElse("PYSPARK_DRIVER_PYTHON", "python3"))
 
-  // SparkConnectPlanner is used per request.
-  private lazy val pythonIncludes = {
-    implicit val formats = DefaultFormats
-    parse(session.conf.get("spark.connect.pythonUDF.includes", "[]"))
-      .extract[Array[String]]
-      .toList
-      .asJava
-  }
-
   // The root of the query plan is a relation and we apply the transformations to it.
   def transformRelation(rel: proto.Relation): LogicalPlan = {
     val plan = rel.getRelTypeCase match {
@@ -162,6 +151,8 @@ class SparkConnectPlanner(val sessionHolder: SessionHolder) extends Logging {
         transformCoGroupMap(rel.getCoGroupMap)
       case proto.Relation.RelTypeCase.APPLY_IN_PANDAS_WITH_STATE =>
         transformApplyInPandasWithState(rel.getApplyInPandasWithState)
+      case proto.Relation.RelTypeCase.CACHED_REMOTE_RELATION =>
+        transformCachedRemoteRelation(rel.getCachedRemoteRelation)
       case proto.Relation.RelTypeCase.COLLECT_METRICS =>
         transformCollectMetrics(rel.getCollectMetrics)
       case proto.Relation.RelTypeCase.PARSE => transformParse(rel.getParse)
@@ -897,6 +888,12 @@ class SparkConnectPlanner(val sessionHolder: SessionHolder) extends Logging {
       .logicalPlan
   }
 
+  private def transformCachedRemoteRelation(rel: proto.CachedRemoteRelation): LogicalPlan = {
+    sessionHolder
+      .getDataFrameOrThrow(rel.getRelationId)
+      .logicalPlan
+  }
+
   private def transformWithColumnsRenamed(rel: proto.WithColumnsRenamed): LogicalPlan = {
     Dataset
       .ofRows(session, transformRelation(rel.getInput))
@@ -1519,7 +1516,7 @@ class SparkConnectPlanner(val sessionHolder: SessionHolder) extends Logging {
       command = fun.getCommand.toByteArray,
       // Empty environment variables
       envVars = Maps.newHashMap(),
-      pythonIncludes = pythonIncludes,
+      pythonIncludes = sessionHolder.artifactManager.getSparkConnectPythonIncludes.asJava,
       pythonExec = pythonExec,
       pythonVer = fun.getPythonVer,
       // Empty broadcast variables
