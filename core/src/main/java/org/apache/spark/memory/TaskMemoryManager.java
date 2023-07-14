@@ -21,10 +21,10 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Deque;
 import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -168,27 +168,27 @@ public class TaskMemoryManager {
         // Build a map of consumer in order of memory usage to prioritize spilling. Assign current
         // consumer (if present) a nominal memory usage of 0 so that it is always last in priority
         // order. The map will include all consumers that have previously acquired memory.
-        TreeMap<Long, List<MemoryConsumer>> sortedConsumers = new TreeMap<>();
+        TreeMap<Long, Deque<MemoryConsumer>> sortedConsumers = new TreeMap<>();
         for (MemoryConsumer c: consumers) {
           if (c.getUsed() > 0 && c.getMode() == mode) {
             long key = c == requestingConsumer ? 0 : c.getUsed();
-            List<MemoryConsumer> list =
-                sortedConsumers.computeIfAbsent(key, k -> new ArrayList<>(1));
-            list.add(c);
+            Deque<MemoryConsumer> deque =
+                sortedConsumers.computeIfAbsent(key, k -> new LinkedList<>());
+            deque.add(c);
           }
         }
         // Iteratively spill consumers until we've freed enough memory or run out of consumers.
         while (got < required && !sortedConsumers.isEmpty()) {
           // Get the consumer using the least memory more than the remaining required memory.
-          Map.Entry<Long, List<MemoryConsumer>> currentEntry =
+          Map.Entry<Long, Deque<MemoryConsumer>> currentEntry =
             sortedConsumers.ceilingEntry(required - got);
           // No consumer has enough memory on its own, start with spilling the biggest consumer.
           if (currentEntry == null) {
             currentEntry = sortedConsumers.lastEntry();
           }
-          List<MemoryConsumer> cList = currentEntry.getValue();
-          got += trySpillAndAcquire(requestingConsumer, required - got, cList, cList.size() - 1);
-          if (cList.isEmpty()) {
+          Deque<MemoryConsumer> deque = currentEntry.getValue();
+          got += trySpillAndAcquire(requestingConsumer, required - got, deque);
+          if (deque.isEmpty()) {
             sortedConsumers.remove(currentEntry.getKey());
           }
         }
@@ -204,9 +204,9 @@ public class TaskMemoryManager {
   }
 
   /**
-   * Try to acquire as much memory as possible from `cList[idx]`, up to `requested` bytes by
+   * Try to acquire as much memory as possible from `deque.getLast()`, up to `requested` bytes by
    * spilling and then acquiring the freed memory. If no more memory can be spilled from
-   * `cList[idx]`, remove it from the list.
+   * `deque.getLast()`, remove it from the deque.
    *
    * @return number of bytes acquired (<= requested)
    * @throws RuntimeException if task is interrupted
@@ -215,10 +215,9 @@ public class TaskMemoryManager {
   private long trySpillAndAcquire(
       MemoryConsumer requestingConsumer,
       long requested,
-      List<MemoryConsumer> cList,
-      int idx) {
+      Deque<MemoryConsumer> deque) {
     MemoryMode mode = requestingConsumer.getMode();
-    MemoryConsumer consumerToSpill = cList.get(idx);
+    MemoryConsumer consumerToSpill = deque.getLast();
     if (logger.isDebugEnabled()) {
       logger.debug("Task {} try to spill {} from {} for {}", taskAttemptId,
         Utils.bytesToString(requested), consumerToSpill, requestingConsumer);
@@ -239,7 +238,7 @@ public class TaskMemoryManager {
         // try again in the next loop iteration.
         return memoryManager.acquireExecutionMemory(requested, taskAttemptId, mode);
       } else {
-        cList.remove(idx);
+        deque.removeLast();
         return 0;
       }
     } catch (ClosedByInterruptException e) {
