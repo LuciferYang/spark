@@ -740,6 +740,32 @@ setMethod("ceiling",
           })
 
 #' @details
+#' \code{char}: Returns the ASCII character having the binary equivalent to n.
+#' If n is larger than 256 the result is equivalent to char(n % 256)
+#'
+#' @rdname column_string_functions
+#' @aliases char char,Column-method
+#' @note char since 3.5.0
+setMethod("char",
+          signature(x = "Column"),
+          function(x) {
+            jc <- callJStatic("org.apache.spark.sql.functions", "char", x@jc)
+            column(jc)
+          })
+
+#' @details
+#' \code{chr}: Alias for \code{char}.
+#'
+#' @rdname column_string_functions
+#' @aliases chr chr,Column-method
+#' @note char since 3.5.0
+setMethod("chr",
+          signature(x = "Column"),
+          function(x) {
+            char(x)
+          })
+
+#' @details
 #' \code{coalesce}: Returns the first column that is not NA, or NA if all inputs are.
 #'
 #' @rdname column_nonaggregate_functions
