@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.expressions.aggregate.ImperativeAggregate
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.trees.UnaryLike
+import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType, LongType, StructType}
 
@@ -140,9 +141,9 @@ case class BitmapCount(child: Expression)
   // scalastyle:off line.size.limit
   examples = """
     Examples:
-      > SELECT substring(hex(_FUNC_((bitmap_bit_position(col)))), 0, 6) FROM VALUES (1), (2), (3) AS tab(col);
+      > SELECT substring(hex(_FUNC_(bitmap_bit_position(col))), 0, 6) FROM VALUES (1), (2), (3) AS tab(col);
        070000
-      > SELECT substring(hex(_FUNC_((bitmap_bit_position(col)))), 0, 6) FROM VALUES (1), (1), (1) AS tab(col);
+      > SELECT substring(hex(_FUNC_(bitmap_bit_position(col))), 0, 6) FROM VALUES (1), (1), (1) AS tab(col);
        010000
   """,
   // scalastyle:on line.size.limit
@@ -175,18 +176,18 @@ case class BitmapConstructAgg(child: Expression,
 
   override def nullable: Boolean = false
 
-  override def aggBufferSchema: StructType = StructType.fromAttributes(aggBufferAttributes)
+  override def aggBufferSchema: StructType = DataTypeUtils.fromAttributes(aggBufferAttributes)
+
+  // The aggregation buffer is a fixed size binary.
+  private val bitmapAttr = AttributeReference("bitmap", BinaryType, nullable = false)()
 
   override def aggBufferAttributes: Seq[AttributeReference] = bitmapAttr :: Nil
 
   override def defaultResult: Option[Literal] =
     Option(Literal(Array.fill[Byte](BitmapExpressionUtils.NUM_BYTES)(0)))
 
-  override def inputAggBufferAttributes: Seq[AttributeReference] =
+  override val inputAggBufferAttributes: Seq[AttributeReference] =
     aggBufferAttributes.map(_.newInstance())
-
-  // The aggregation buffer is a fixed size binary.
-  private val bitmapAttr = AttributeReference("bitmap", BinaryType, nullable = false)()
 
   override def initialize(buffer: InternalRow): Unit = {
     buffer.update(mutableAggBufferOffset, Array.fill[Byte](BitmapExpressionUtils.NUM_BYTES)(0))
@@ -268,18 +269,18 @@ case class BitmapOrAgg(child: Expression,
 
   override def nullable: Boolean = false
 
-  override def aggBufferSchema: StructType = StructType.fromAttributes(aggBufferAttributes)
+  override def aggBufferSchema: StructType = DataTypeUtils.fromAttributes(aggBufferAttributes)
+
+  // The aggregation buffer is a fixed size binary.
+  private val bitmapAttr = AttributeReference("bitmap", BinaryType, false)()
 
   override def aggBufferAttributes: Seq[AttributeReference] = bitmapAttr :: Nil
 
   override def defaultResult: Option[Literal] =
     Option(Literal(Array.fill[Byte](BitmapExpressionUtils.NUM_BYTES)(0)))
 
-  override def inputAggBufferAttributes: Seq[AttributeReference] =
+  override val inputAggBufferAttributes: Seq[AttributeReference] =
     aggBufferAttributes.map(_.newInstance())
-
-  // The aggregation buffer is a fixed size binary.
-  private val bitmapAttr = AttributeReference("bitmap", BinaryType, false)()
 
   override def initialize(buffer: InternalRow): Unit = {
     buffer.update(mutableAggBufferOffset, Array.fill[Byte](BitmapExpressionUtils.NUM_BYTES)(0))
