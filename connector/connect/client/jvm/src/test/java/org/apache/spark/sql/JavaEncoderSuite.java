@@ -16,8 +16,8 @@
  */
 package org.apache.spark.sql;
 
-import org.junit.*;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import static org.apache.spark.sql.Encoders.*;
 import static org.apache.spark.sql.functions.*;
@@ -33,7 +33,7 @@ import java.util.Arrays;
 public class JavaEncoderSuite {
   private static SparkSession spark;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     SparkConnectServerUtils.start();
     spark = SparkSession
@@ -45,7 +45,7 @@ public class JavaEncoderSuite {
         .create();
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() {
     spark.stop();
     spark = null;
