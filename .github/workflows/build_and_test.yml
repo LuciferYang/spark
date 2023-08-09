@@ -32,12 +32,6 @@ on:
         type: string
         # Change 'master' to 'branch-4.0' in branch-4.0 branch after cutting it.
         default: master
-      branch2:
-        description: Branch2 to run the build against
-        required: false
-        type: string
-        # Change 'master' to 'branch-4.0' in branch-4.0 branch after cutting it.
-        default: 'branch-3.3'
       hadoop:
         description: Hadoop version to run with. HADOOP_PROFILE environment variable should accept it.
         required: false
@@ -127,7 +121,7 @@ jobs:
         IMG_URL="ghcr.io/$REPO_OWNER/$IMG_NAME"
         echo "image_url=$IMG_URL" >> $GITHUB_OUTPUT
 
-  branch-3.3:
+  branch_3.3:
     name: Branch 3.3 Test
     runs-on: ubuntu-22.04
     env:
@@ -138,7 +132,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: apache/spark
-          ref: ${{ inputs.branch2 }}
+          ref: 'branch-3.3'
       - name: Check
         run: |
           find . -name 'build_and_test.yml' 2>/dev/null -exec cat {} \;
