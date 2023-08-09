@@ -126,20 +126,15 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       packages: write
-    env:
-      GITHUB_PREV_SHA: ${{ github.event.before }}
     steps:
-      - name: Checkout Spark repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          repository: apache/spark
-          ref: 'branch-3.3'
       - name: Check
         run: |
-          find . -name 'build_and_test.yml' 2>/dev/null
+          mv ./.github/workflows/build_and_test.yml ./.github/workflows/build_and_test.yml.bak
+          git checkout branch-3.3 -- ./.github/workflows/build_and_test.yml
+          mv ./.github/workflows/build_and_test.yml ./.github/workflows/branch33_build_and_test.yml
+          mv ./.github/workflows/build_and_test.yml.bak ./.github/workflows/build_and_test.yml
       - name: Run
-        uses: ./.github/workflows/build_and_test.yml
+        uses: ./.github/workflows/branch33_build_and_test.yml
         with:
           java: 8
           branch: branch-3.3
