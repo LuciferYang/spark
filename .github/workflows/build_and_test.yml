@@ -136,6 +136,21 @@ jobs:
       - name: Check
         run: |
           find . -name 'build_and_test.yml' 2>/dev/null
+      - name: Run
+        uses: ./.github/workflows/build_and_test.yml
+        with:
+          java: 8
+          branch: branch-3.3
+          hadoop: hadoop3
+          envs: >-
+            {
+              "SCALA_PROFILE": "scala2.13"
+            }
+          jobs: >-
+            {
+              "build": "true",
+              "lint" : "true"
+            }    
 
   # Build: build Spark and run the tests for specified modules.
   build:
