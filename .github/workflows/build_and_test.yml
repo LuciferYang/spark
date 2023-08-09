@@ -121,7 +121,7 @@ jobs:
         IMG_URL="ghcr.io/$REPO_OWNER/$IMG_NAME"
         echo "image_url=$IMG_URL" >> $GITHUB_OUTPUT
 
-  branch_3.3:
+  branch33:
     name: Branch 3.3 Test
     runs-on: ubuntu-22.04
     env:
