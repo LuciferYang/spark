@@ -121,6 +121,22 @@ jobs:
         IMG_URL="ghcr.io/$REPO_OWNER/$IMG_NAME"
         echo "image_url=$IMG_URL" >> $GITHUB_OUTPUT
 
+  branch-3.3:
+    name: Branch 3.3 Test
+    runs-on: ubuntu-22.04
+    env:
+      GITHUB_PREV_SHA: ${{ github.event.before }}
+    steps:
+      - name: Checkout Spark repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: apache/spark
+          ref: branch-3.3
+      - name: Check
+        run: |
+          find . -name 'build_and_test.yml' 2>/dev/null -exec cat {} \;
+
   # Build: build Spark and run the tests for specified modules.
   build:
     name: "Build modules: ${{ matrix.modules }} ${{ matrix.comment }}"
