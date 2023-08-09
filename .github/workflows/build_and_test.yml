@@ -135,7 +135,7 @@ jobs:
           ref: 'branch-3.3'
       - name: Check
         run: |
-          find . -name 'build_and_test.yml' 2>/dev/null -exec cat {} \;
+          find . -name 'build_and_test.yml' 2>/dev/null
 
   # Build: build Spark and run the tests for specified modules.
   build:
