@@ -124,6 +124,8 @@ jobs:
   branch33:
     name: Branch 3.3 Test
     runs-on: ubuntu-22.04
+    permissions:
+      packages: write
     env:
       GITHUB_PREV_SHA: ${{ github.event.before }}
     steps:
