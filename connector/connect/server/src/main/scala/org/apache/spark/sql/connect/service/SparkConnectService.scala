@@ -263,6 +263,7 @@ object SparkConnectService extends Logging {
   private type SessionCacheKey = (String, String)
 
   private[connect] var server: Server = _
+  private[connect] var service: SparkConnectService = _
 
   private[connect] var uiTab: Option[SparkConnectServerTab] = None
   private[connect] var listener: SparkConnectServerListener = _
@@ -384,8 +385,9 @@ object SparkConnectService extends Logging {
         NettyServerBuilder.forAddress(new InetSocketAddress(hostname, port))
       case _ => NettyServerBuilder.forPort(port)
     }
+    service = new SparkConnectService(debugMode)
     sb.maxInboundMessageSize(SparkEnv.get.conf.get(CONNECT_GRPC_MAX_INBOUND_MESSAGE_SIZE).toInt)
-      .addService(new SparkConnectService(debugMode))
+      .addService(service)
 
     // Add all registered interceptors to the server builder.
     SparkConnectInterceptorRegistry.chainInterceptors(sb)
