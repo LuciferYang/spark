@@ -192,15 +192,6 @@ public abstract class BloomFilter {
     return Math.max(1, (int) Math.round((double) m / n * Math.log(2)));
   }
 
-  /**
-   * Computes m (total bits of Bloom filter) which is expected to achieve, for the specified
-   * expected insertions, the required false positive probability.
-   *
-   * See http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives for the formula.
-   *
-   * @param n expected insertions (must be positive)
-   * @param p false positive rate (must be 0 < p < 1)
-   */
   public static long optimalNumOfBits(long n, double p) {
     return (long) (-n * Math.log(p) / (Math.log(2) * Math.log(2)));
   }
