@@ -69,6 +69,7 @@ class SparkConnectService(debug: Boolean) extends AsyncService with BindableServ
   override def executePlan(
       request: proto.ExecutePlanRequest,
       responseObserver: StreamObserver[proto.ExecutePlanResponse]): Unit = {
+    new Exception().printStackTrace() // check that it's real RPC coming in
     try {
       new SparkConnectExecutePlanHandler(responseObserver).handle(request)
     } catch {
