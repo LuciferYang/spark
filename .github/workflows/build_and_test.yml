@@ -129,10 +129,10 @@ jobs:
     steps:
       - name: Check
         run: |
-          mv ./.github/workflows/build_and_test.yml ./.github/workflows/build_and_test.yml.bak
+          # mv ./.github/workflows/build_and_test.yml ./.github/workflows/build_and_test.yml.bak
           git checkout branch-3.3 -- ./.github/workflows/build_and_test.yml
           mv ./.github/workflows/build_and_test.yml ./.github/workflows/branch33_build_and_test.yml
-          mv ./.github/workflows/build_and_test.yml.bak ./.github/workflows/build_and_test.yml
+          # mv ./.github/workflows/build_and_test.yml.bak ./.github/workflows/build_and_test.yml
       - name: Run
         uses: ./.github/workflows/branch33_build_and_test.yml
         with:
