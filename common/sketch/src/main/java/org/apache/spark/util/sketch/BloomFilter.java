@@ -196,8 +196,8 @@ public abstract class BloomFilter {
    * Computes m (total bits of Bloom filter) which is expected to achieve, for the specified
    * expected insertions, the required false positive probability.
    * <p>
-   * See <a href="http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives">
-   *     http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives</a> for the formula.
+   * @see <a href="http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives">
+   *     Probability_of_false_positives</a> for the formula.
    *
    * @param n expected insertions (must be positive)
    * @param p false positive rate (must be 0 < p < 1)
