@@ -197,7 +197,7 @@ public abstract class BloomFilter {
    * expected insertions, the required false positive probability.
    *
    * @param n expected insertions (must be positive)
-   * @param p false positive rate (must be 0 < p < 1)
+   * @param p false positive rate (must be 0 &lt; p &lt; 1)
    * @see <a href="http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives">
    *     Probability_of_false_positives</a> for the formula.
    */
