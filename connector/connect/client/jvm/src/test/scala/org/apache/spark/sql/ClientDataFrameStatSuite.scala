@@ -222,10 +222,7 @@ class ClientDataFrameStatSuite extends RemoteSparkSession {
     checkBloomFilter(data, negativeValues, df)
   }
 
-  private def checkBloomFilter(
-      data: Seq[Any],
-      notContainValues: Seq[Any],
-      df: DataFrame): Unit = {
+  private def checkBloomFilter(data: Seq[Any], notContainValues: Seq[Any], df: DataFrame) = {
     val filter1 = df.stat.bloomFilter("id", 1000, 0.03)
     assert(filter1.expectedFpp() - 0.03 < 1e-3)
     assert(data.forall(filter1.mightContain))
