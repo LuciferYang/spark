@@ -25,6 +25,7 @@ import org.apache.spark.sql.connect.dsl.plans._
 import org.apache.spark.sql.connect.service.SparkConnectService
 import org.apache.spark.sql.test.SharedSparkSession
 
+// scalastyle:off println
 class SparkConnectReattachableExecuteSuite extends SharedSparkSession {
 
   private val sessionId = UUID.randomUUID.toString()
