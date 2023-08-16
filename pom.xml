@@ -1316,12 +1316,6 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-client-minicluster</artifactId>
         <version>${yarn.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-          </exclusion>
-        </exclusions>
         <scope>test</scope>
       </dependency>
       <!-- End of Hadoop 3.x dependencies -->
