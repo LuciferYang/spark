@@ -516,6 +516,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 2.0.0
 
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
         Notes
         -----
         This API is evolving.
@@ -1304,7 +1307,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     def offset(self, num: int) -> "DataFrame":
         """Returns a new :class: `DataFrame` by skipping the first `n` rows.
 
-        .. versionadded:: 3.5.0
+        .. versionadded:: 3.4.0
+
+        .. versionchanged:: 3.5.0
+            Supports vanilla PySpark.
 
         Parameters
         ----------
@@ -3540,6 +3546,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 3.4.0
 
+        .. versionchanged:: 3.4.0
+            Supports Spark Connect.
+
         Parameters
         ----------
         ids : str, Column, tuple, list, optional
@@ -3630,6 +3639,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ``org.apache.spark.sql.util.QueryExecutionListener`` to the spark session.
 
         .. versionadded:: 3.3.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
 
         Parameters
         ----------
@@ -4065,6 +4077,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         Note: too late data older than watermark will be dropped.
 
          .. versionadded:: 3.5.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
 
          Parameters
          ----------
@@ -5276,6 +5291,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     def toDF(self, *cols: str) -> "DataFrame":
         """Returns a new :class:`DataFrame` that with new specified column names
 
+        .. versionadded:: 1.6.0
+
         .. versionchanged:: 3.4.0
             Supports Spark Connect.
 
@@ -5304,6 +5321,12 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 16|  Bob|
         +---+-----+
         """
+        for col in cols:
+            if not isinstance(col, str):
+                raise PySparkTypeError(
+                    error_class="NOT_LIST_OF_STR",
+                    message_parameters={"arg_name": "cols", "arg_type": type(col).__name__},
+                )
         jdf = self._jdf.toDF(self._jseq(cols))
         return DataFrame(jdf, self.sparkSession)
 
@@ -5375,6 +5398,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         .. versionadded:: 3.1.0
 
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
+
         Notes
         -----
         The equality comparison here is simplified by tolerating the cosmetic differences
@@ -5419,6 +5445,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         Returns a hash code of the logical query plan against this :class:`DataFrame`.
 
         .. versionadded:: 3.1.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
 
         Notes
         -----
@@ -5542,6 +5571,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
     ) -> "PandasOnSparkDataFrame":
         """
         Converts the existing DataFrame into a pandas-on-Spark DataFrame.
+
+        .. versionadded:: 3.2.0
+
+        .. versionchanged:: 3.5.0
+            Supports Spark Connect.
 
         If a pandas-on-Spark DataFrame is converted to a Spark DataFrame and then back
         to pandas-on-Spark, it will lose the index information and the original index
