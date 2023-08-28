@@ -300,7 +300,7 @@ object ShuffleExchangeExec {
           rddForSampling,
           ascending = true,
           samplePointsPerPartitionHint = SQLConf.get.rangeExchangeSampleSizePerPartition)
-      case SinglePartition => new ConstantPartitioner
+      case SinglePartition => ConstantPartitioner
       case k @ KeyGroupedPartitioning(expressions, n, _) =>
         val valueMap = k.uniquePartitionValues.zipWithIndex.map {
           case (partition, index) => (partition.toSeq(expressions.map(_.dataType)), index)

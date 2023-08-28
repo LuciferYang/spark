@@ -1279,7 +1279,7 @@ abstract class RDD[T: ClassTag](
         // get the new RDD[U]
         partiallyAggregated = partiallyAggregated
           .map(v => (0.toByte, v))
-          .foldByKey(zeroValue, new ConstantPartitioner)(cleanCombOp)
+          .foldByKey(zeroValue, ConstantPartitioner)(cleanCombOp)
           .values
       }
       val copiedZeroValue = Utils.clone(zeroValue, sc.env.closureSerializer.newInstance())

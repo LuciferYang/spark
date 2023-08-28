@@ -156,7 +156,7 @@ private[spark] class KeyGroupedPartitioner(
 /**
  * A [[org.apache.spark.Partitioner]] that partitions all records into a single partition.
  */
-private[spark] class ConstantPartitioner extends Partitioner {
+private[spark] object ConstantPartitioner extends Partitioner {
   override def numPartitions: Int = 1
   override def getPartition(key: Any): Int = 0
 }
