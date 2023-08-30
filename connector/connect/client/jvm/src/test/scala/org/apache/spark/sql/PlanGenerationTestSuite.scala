@@ -3235,6 +3235,18 @@ class PlanGenerationTestSuite
   private val testDescFilePath: String = s"${IntegrationTestUtils.sparkHome}/connector/" +
     "connect/common/src/test/resources/protobuf-tests/common.desc"
 
+  ignore("from_protobuf messageClassName") {
+    binary.select(pbFn.from_protobuf(fn.col("bytes"), classOf[StorageLevel].getName))
+  }
+
+  ignore("from_protobuf messageClassName options") {
+    binary.select(
+      pbFn.from_protobuf(
+        fn.col("bytes"),
+        classOf[StorageLevel].getName,
+        Map("recursive.fields.max.depth" -> "2").asJava))
+  }
+
   test("from_protobuf messageClassName descFilePath options") {
     binary.select(
       pbFn.from_protobuf(
