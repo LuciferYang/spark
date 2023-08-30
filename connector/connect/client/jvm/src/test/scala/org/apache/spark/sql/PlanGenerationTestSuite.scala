@@ -3235,19 +3235,6 @@ class PlanGenerationTestSuite
   private val testDescFilePath: String = s"${IntegrationTestUtils.sparkHome}/connector/" +
     "connect/common/src/test/resources/protobuf-tests/common.desc"
 
-  test("from_protobuf messageClassName") {
-    binary.select(
-      pbFn.from_protobuf(fn.col("bytes"), "org.apache.spark.sql.protobuf.protos.TestProtoObj"))
-  }
-
-  test("from_protobuf messageClassName options") {
-    binary.select(
-      pbFn.from_protobuf(
-        fn.col("bytes"),
-        "org.apache.spark.sql.protobuf.protos.TestProtoObj",
-        Map("recursive.fields.max.depth" -> "2").asJava))
-  }
-
   test("from_protobuf messageClassName descFilePath options") {
     binary.select(
       pbFn.from_protobuf(
