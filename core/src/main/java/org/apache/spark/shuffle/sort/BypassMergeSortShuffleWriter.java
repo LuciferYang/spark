@@ -36,6 +36,7 @@ import com.google.common.io.Closeables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.spark.ConstantPartitioner;
 import org.apache.spark.Partitioner;
 import org.apache.spark.ShuffleDependency;
 import org.apache.spark.SparkConf;
@@ -123,7 +124,7 @@ final class BypassMergeSortShuffleWriter<K, V>
     final ShuffleDependency<K, V, V> dep = handle.dependency();
     this.mapId = mapId;
     this.shuffleId = dep.shuffleId();
-    this.partitioner = dep.partitioner();
+    this.partitioner = dep.partitioner().numPartitions() > 1 ? dep.partitioner() : new ConstantPartitioner();
     this.numPartitions = partitioner.numPartitions();
     this.writeMetrics = writeMetrics;
     this.serializer = dep.serializer();
