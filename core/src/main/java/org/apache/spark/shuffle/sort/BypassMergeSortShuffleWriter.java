@@ -124,7 +124,8 @@ final class BypassMergeSortShuffleWriter<K, V>
     final ShuffleDependency<K, V, V> dep = handle.dependency();
     this.mapId = mapId;
     this.shuffleId = dep.shuffleId();
-    this.partitioner = dep.partitioner().numPartitions() > 1 ? dep.partitioner() : new ConstantPartitioner();
+    this.partitioner =
+      dep.partitioner().numPartitions() > 1 ? dep.partitioner() : new ConstantPartitioner();
     this.numPartitions = partitioner.numPartitions();
     this.writeMetrics = writeMetrics;
     this.serializer = dep.serializer();
