@@ -23,8 +23,6 @@ import java.util.concurrent.TimeUnit.{MICROSECONDS, NANOSECONDS}
 
 import scala.util.control.NonFatal
 
-import sun.util.calendar.ZoneInfo
-
 import org.apache.spark.sql.catalyst.trees.SQLQueryContext
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.{rebaseGregorianToJulianDays, rebaseGregorianToJulianMicros, rebaseJulianToGregorianDays, rebaseJulianToGregorianMicros}
