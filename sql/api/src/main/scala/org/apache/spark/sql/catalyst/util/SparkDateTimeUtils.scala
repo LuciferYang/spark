@@ -16,7 +16,6 @@
  */
 package org.apache.spark.sql.catalyst.util
 
-import java.lang.invoke.{MethodHandles, MethodType}
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, ZonedDateTime, ZoneId, ZoneOffset}
 import java.util.TimeZone
@@ -30,7 +29,6 @@ import org.apache.spark.sql.catalyst.util.RebaseDateTime.{rebaseGregorianToJulia
 import org.apache.spark.sql.errors.ExecutionErrors
 import org.apache.spark.sql.types.{DateType, TimestampType}
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.util.SparkClassUtils
 
 trait SparkDateTimeUtils {
 
@@ -194,15 +192,6 @@ trait SparkDateTimeUtils {
     rebaseJulianToGregorianDays(julianDays)
   }
 
-  private val zoneInfoGetOffsetsByWallMethod = {
-    val lookup = MethodHandles.publicLookup()
-    lookup.findVirtual(
-      SparkClassUtils.classForName("sun.util.calendar.ZoneInfo"),
-      "getOffsetsByWall",
-      MethodType.methodType(
-        classOf[Int], classOf[Long], classOf[Array[Int]]))
-  }
-
   /**
    * Converts days since the epoch 1970-01-01 in Proleptic Gregorian calendar to a local date
    * at the default JVM time zone in the hybrid calendar (Julian + Gregorian). It rebases the given
@@ -220,12 +209,7 @@ trait SparkDateTimeUtils {
   def toJavaDate(days: Int): Date = {
     val rebasedDays = rebaseGregorianToJulianDays(days)
     val localMillis = Math.multiplyExact(rebasedDays, MILLIS_PER_DAY)
-    val timeZoneOffset = TimeZone.getDefault match {
-      case zoneInfo if zoneInfo.getClass.getName == "sun.util.calendar.ZoneInfo" =>
-        zoneInfoGetOffsetsByWallMethod.invoke(
-          zoneInfo, localMillis: java.lang.Long, null: Array[Int]).asInstanceOf[Int]
-      case timeZone: TimeZone => timeZone.getOffset(localMillis - timeZone.getRawOffset)
-    }
+    val timeZoneOffset = TimeZone.getDefault.getOffset(localMillis)
     new Date(localMillis - timeZoneOffset)
   }
 
