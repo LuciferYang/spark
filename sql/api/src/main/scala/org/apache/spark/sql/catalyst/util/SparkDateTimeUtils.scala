@@ -211,10 +211,7 @@ trait SparkDateTimeUtils {
   def toJavaDate(days: Int): Date = {
     val rebasedDays = rebaseGregorianToJulianDays(days)
     val localMillis = Math.multiplyExact(rebasedDays, MILLIS_PER_DAY)
-    val timeZoneOffset = TimeZone.getDefault match {
-      case zoneInfo: ZoneInfo => zoneInfo.getOffsetsByWall(localMillis, null)
-      case timeZone: TimeZone => timeZone.getOffset(localMillis - timeZone.getRawOffset)
-    }
+    val timeZoneOffset = TimeZone.getDefault.getOffset(localMillis)
     new Date(localMillis - timeZoneOffset)
   }
 
