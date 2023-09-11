@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.catalyst.util
 
+import java.lang.invoke.{MethodHandles, MethodType}
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, ZonedDateTime, ZoneId, ZoneOffset}
 import java.util.TimeZone
@@ -23,14 +24,13 @@ import java.util.concurrent.TimeUnit.{MICROSECONDS, NANOSECONDS}
 
 import scala.util.control.NonFatal
 
-import sun.util.calendar.ZoneInfo
-
 import org.apache.spark.sql.catalyst.trees.SQLQueryContext
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.{rebaseGregorianToJulianDays, rebaseGregorianToJulianMicros, rebaseJulianToGregorianDays, rebaseJulianToGregorianMicros}
 import org.apache.spark.sql.errors.ExecutionErrors
 import org.apache.spark.sql.types.{DateType, TimestampType}
 import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.util.SparkClassUtils
 
 trait SparkDateTimeUtils {
 
@@ -194,6 +194,15 @@ trait SparkDateTimeUtils {
     rebaseJulianToGregorianDays(julianDays)
   }
 
+  private val zoneInfoGetOffsetsByWallMethod = {
+    val lookup = MethodHandles.publicLookup()
+    lookup.findVirtual(
+      SparkClassUtils.classForName("sun.util.calendar.ZoneInfo"),
+      "getOffsetsByWall",
+      MethodType.methodType(
+        classOf[Int], classOf[Long], classOf[Array[Int]]))
+  }
+
   /**
    * Converts days since the epoch 1970-01-01 in Proleptic Gregorian calendar to a local date
    * at the default JVM time zone in the hybrid calendar (Julian + Gregorian). It rebases the given
@@ -212,7 +221,9 @@ trait SparkDateTimeUtils {
     val rebasedDays = rebaseGregorianToJulianDays(days)
     val localMillis = Math.multiplyExact(rebasedDays, MILLIS_PER_DAY)
     val timeZoneOffset = TimeZone.getDefault match {
-      case zoneInfo: ZoneInfo => zoneInfo.getOffsetsByWall(localMillis, null)
+      case zoneInfo if zoneInfo.getClass.getName == "sun.util.calendar.ZoneInfo" =>
+        zoneInfoGetOffsetsByWallMethod.invoke(
+          zoneInfo, localMillis: java.lang.Long, null: Array[Int]).asInstanceOf[Int]
       case timeZone: TimeZone => timeZone.getOffset(localMillis - timeZone.getRawOffset)
     }
     new Date(localMillis - timeZoneOffset)
