@@ -147,7 +147,7 @@ private[spark] object KVUtils extends Logging {
           logInfo("Detected incompatible DB versions, deleting...")
           path.listFiles().foreach(Utils.deleteRecursively)
           open(dbPath, metadata, conf, live)
-        case dbExc @ (_: RocksDBException) =>
+        case dbExc: RocksDBException =>
           // Get rid of the corrupted data and re-create it.
           logWarning(s"Failed to load disk store $dbPath :", dbExc)
           Utils.deleteRecursively(dbPath)
