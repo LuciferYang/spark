@@ -1781,6 +1781,23 @@ public class JavaDatasetSuite implements Serializable {
     Assertions.assertEquals(1, df.collectAsList().size());
   }
 
+  public static class ReadOnlyPropertyBean implements Serializable {
+      public boolean isEmpty() {
+        return true;
+      }
+  }
+
+  @Test
+  public void testReadOnlyPropertyBean() {
+    ReadOnlyPropertyBean bean = new ReadOnlyPropertyBean();
+    List<ReadOnlyPropertyBean> data = Arrays.asList(bean);
+    Dataset<ReadOnlyPropertyBean> df = spark.createDataset(data,
+            Encoders.bean(ReadOnlyPropertyBean.class));
+    Assert.assertEquals(1, df.schema().length());
+    Assert.assertEquals(1, df.collectAsList().size());
+
+  }
+
   public class CircularReference1Bean implements Serializable {
     private CircularReference2Bean child;
 
