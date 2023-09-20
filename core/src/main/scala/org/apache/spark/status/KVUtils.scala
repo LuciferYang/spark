@@ -26,7 +26,6 @@ import scala.reflect.{classTag, ClassTag}
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.fusesource.leveldbjni.internal.NativeDB
 import org.rocksdb.RocksDBException
 
 import org.apache.spark.SparkConf
@@ -95,7 +94,6 @@ private[spark] object KVUtils extends Logging {
 
     val kvSerializer = serializer(conf, live)
     val db = backend(conf, live) match {
-      case LEVELDB => new LevelDB(path, kvSerializer)
       case ROCKSDB => new RocksDB(path, kvSerializer)
     }
     val dbMeta = db.getMetadata(classTag[M].runtimeClass)
@@ -128,7 +126,6 @@ private[spark] object KVUtils extends Logging {
       val diskBackend = backend(conf, live)
 
       val dir = diskBackend match {
-        case LEVELDB => "listing.ldb"
         case ROCKSDB => "listing.rdb"
       }
 
@@ -150,7 +147,7 @@ private[spark] object KVUtils extends Logging {
           logInfo("Detected incompatible DB versions, deleting...")
           path.listFiles().foreach(Utils.deleteRecursively)
           open(dbPath, metadata, conf, live)
-        case dbExc @ (_: NativeDB.DBException | _: RocksDBException) =>
+        case dbExc @ (_: RocksDBException) =>
           // Get rid of the corrupted data and re-create it.
           logWarning(s"Failed to load disk store $dbPath :", dbExc)
           Utils.deleteRecursively(dbPath)

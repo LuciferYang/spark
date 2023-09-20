@@ -239,7 +239,7 @@ private[spark] object History {
     .createWithDefaultString("2g")
 
   object HybridStoreDiskBackend extends Enumeration {
-    val LEVELDB, ROCKSDB = Value
+    val ROCKSDB = Value
   }
 
   val HYBRID_STORE_DISK_BACKEND = ConfigBuilder("spark.history.store.hybridStore.diskBackend")

@@ -24,7 +24,7 @@ import java.util.Locale;
  * Support the use of LevelDB and RocksDB.
  */
 public enum DBBackend {
-    LEVELDB(".ldb"), ROCKSDB(".rdb");
+    ROCKSDB(".rdb");
 
     private final String fileSuffix;
 

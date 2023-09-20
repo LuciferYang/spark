@@ -49,7 +49,6 @@ import org.apache.spark.internal.config.Tests.IS_TESTING
 import org.apache.spark.internal.config.UI._
 import org.apache.spark.status.api.v1.ApplicationInfo
 import org.apache.spark.status.api.v1.JobData
-import org.apache.spark.tags.ExtendedLevelDBTest
 import org.apache.spark.ui.SparkUI
 import org.apache.spark.util.{ResetSystemProperties, ShutdownHookManager, Utils}
 
@@ -716,7 +715,7 @@ object HistoryServerSuite {
     // current behavior is correct, and write out the returned json to the test/resource files
 
     // SPARK-38851: Use LevelDB backend because it is the default.
-    val suite = new LevelDBBackendHistoryServerSuite
+    val suite = new RocksDBBackendHistoryServerSuite
     FileUtils.deleteDirectory(suite.getExpRoot)
     suite.getExpRoot.mkdirs()
     try {
@@ -792,12 +791,6 @@ class FakeAuthFilter extends Filter {
 
 object FakeAuthFilter {
   val FAKE_HTTP_USER = "HTTP_USER"
-}
-
-@ExtendedLevelDBTest
-class LevelDBBackendHistoryServerSuite extends HistoryServerSuite {
-  override protected def diskBackend: History.HybridStoreDiskBackend.Value =
-    HybridStoreDiskBackend.LEVELDB
 }
 
 class RocksDBBackendHistoryServerSuite extends HistoryServerSuite {

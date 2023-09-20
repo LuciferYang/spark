@@ -27,6 +27,9 @@ import org.rocksdb.RocksIterator;
 
 class RocksDBIterator<T> implements KVStoreIterator<T> {
 
+  private static final byte[] END_MARKER = new byte[] { '-' };
+  private static final byte KEY_SEPARATOR = 0x0;
+
   private final RocksDB db;
   private final boolean ascending;
   private final RocksIterator it;
@@ -255,8 +258,8 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   private boolean isEndMarker(byte[] key) {
     return (key.length > 2 &&
-        key[key.length - 2] == LevelDBTypeInfo.KEY_SEPARATOR &&
-        key[key.length - 1] == LevelDBTypeInfo.END_MARKER[0]);
+        key[key.length - 2] == KEY_SEPARATOR &&
+        key[key.length - 1] == END_MARKER[0]);
   }
 
   static int compare(byte[] a, byte[] b) {

@@ -18,13 +18,13 @@ package org.apache.spark.network.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.spark.network.shuffledb.DB;
 import org.apache.spark.network.shuffledb.DBBackend;
-import org.apache.spark.network.shuffledb.LevelDB;
 import org.apache.spark.network.shuffledb.RocksDB;
 import org.apache.spark.network.shuffledb.StoreVersion;
 
@@ -35,16 +35,11 @@ public class DBProvider {
         StoreVersion version,
         ObjectMapper mapper) throws IOException {
       if (dbFile != null) {
-        switch (dbBackend) {
-          case LEVELDB:
-            org.iq80.leveldb.DB levelDB = LevelDBProvider.initLevelDB(dbFile, version, mapper);
-            return levelDB != null ? new LevelDB(levelDB) : null;
-          case ROCKSDB:
-            org.rocksdb.RocksDB rocksDB = RocksDBProvider.initRockDB(dbFile, version, mapper);
-            return rocksDB != null ? new RocksDB(rocksDB) : null;
-          default:
-            throw new IllegalArgumentException("Unsupported DBBackend: " + dbBackend);
-        }
+          if (Objects.requireNonNull(dbBackend) == DBBackend.ROCKSDB) {
+              org.rocksdb.RocksDB rocksDB = RocksDBProvider.initRockDB(dbFile, version, mapper);
+              return rocksDB != null ? new RocksDB(rocksDB) : null;
+          }
+          throw new IllegalArgumentException("Unsupported DBBackend: " + dbBackend);
       }
       return null;
     }
@@ -52,12 +47,10 @@ public class DBProvider {
     @VisibleForTesting
     public static DB initDB(DBBackend dbBackend, File file) throws IOException {
       if (file != null) {
-        switch (dbBackend) {
-          case LEVELDB: return new LevelDB(LevelDBProvider.initLevelDB(file));
-          case ROCKSDB: return new RocksDB(RocksDBProvider.initRocksDB(file));
-          default:
-            throw new IllegalArgumentException("Unsupported DBBackend: " + dbBackend);
-        }
+          if (Objects.requireNonNull(dbBackend) == DBBackend.ROCKSDB) {
+              return new RocksDB(RocksDBProvider.initRocksDB(file));
+          }
+          throw new IllegalArgumentException("Unsupported DBBackend: " + dbBackend);
       }
       return null;
     }

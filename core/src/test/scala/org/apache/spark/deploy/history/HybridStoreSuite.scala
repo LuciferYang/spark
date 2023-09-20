@@ -18,7 +18,6 @@
 package org.apache.spark.deploy.history
 
 import java.io.File
-import java.util.NoSuchElementException
 import java.util.concurrent.LinkedBlockingQueue
 
 import org.apache.commons.io.FileUtils
@@ -28,7 +27,6 @@ import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.status.KVUtils._
-import org.apache.spark.tags.ExtendedLevelDBTest
 import org.apache.spark.util.Utils
 import org.apache.spark.util.kvstore._
 
@@ -172,7 +170,7 @@ abstract class HybridStoreSuite extends SparkFunSuite with BeforeAndAfter with T
     failAfter(2.seconds) {
       assert(listener.waitUntilDone())
     }
-    while (!store.getStore().isInstanceOf[LevelDB] && !store.getStore().isInstanceOf[RocksDB]) {
+    while (!store.getStore().isInstanceOf[RocksDB]) {
       Thread.sleep(10)
     }
   }
@@ -203,15 +201,6 @@ abstract class HybridStoreSuite extends SparkFunSuite with BeforeAndAfter with T
     def waitUntilDone(): Boolean = {
       results.take()
     }
-  }
-}
-
-@ExtendedLevelDBTest
-class LevelDBHybridStoreSuite extends HybridStoreSuite {
-  before {
-    dbpath = File.createTempFile("test.", ".ldb")
-    dbpath.delete()
-    db = new LevelDB(dbpath, new KVStoreScalaSerializer())
   }
 }
 
