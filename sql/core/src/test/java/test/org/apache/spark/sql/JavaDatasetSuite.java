@@ -1793,8 +1793,8 @@ public class JavaDatasetSuite implements Serializable {
     List<ReadOnlyPropertyBean> data = Arrays.asList(bean);
     Dataset<ReadOnlyPropertyBean> df = spark.createDataset(data,
             Encoders.bean(ReadOnlyPropertyBean.class));
-    Assert.assertEquals(1, df.schema().length());
-    Assert.assertEquals(1, df.collectAsList().size());
+    Assertions.assertEquals(1, df.schema().length());
+    Assertions.assertEquals(1, df.collectAsList().size());
 
   }
 
