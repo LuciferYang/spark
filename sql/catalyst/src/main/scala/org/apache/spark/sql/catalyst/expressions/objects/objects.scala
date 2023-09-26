@@ -1096,6 +1096,21 @@ case class MapObjects private(
               s"MODULE$$.make($builder.result());"
           )
 
+        case Some(cls) if classOf[scala.collection.immutable.ArraySeq[_]].isAssignableFrom(cls) =>
+          val tag = ctx.addReferenceObj("tag", elementClassTag())
+          val builderClassName = classOf[mutable.ArrayBuilder[_]].getName
+          val getBuilder = s"$builderClassName$$.MODULE$$.make($tag)"
+          val builder = ctx.freshName("collectionBuilder")
+          (
+            s"""
+                 ${classOf[Builder[_, _]].getName} $builder = $getBuilder;
+                 $builder.sizeHint($dataLength);
+               """,
+            (genValue: String) => s"$builder.$$plus$$eq($genValue);",
+            s"(${cls.getName}) ${classOf[scala.collection.immutable.ArraySeq[_]].getName}$$." +
+              s"MODULE$$.unsafeWrapArray($builder.result());"
+          )
+
         case Some(cls) if classOf[scala.collection.Seq[_]].isAssignableFrom(cls) ||
           classOf[scala.collection.Set[_]].isAssignableFrom(cls) =>
           // Scala sequence or set

@@ -829,6 +829,15 @@ class UDFSuite extends QueryTest with SharedSparkSession {
       Row(ArrayBuffer(100)))
   }
 
+  test("SPARK-32459: UDF should not fail on ArraySeq") {
+    val myUdf = udf((a: scala.collection.immutable.ArraySeq[Int]) =>
+      scala.collection.immutable.ArraySeq.unsafeWrapArray[Int](Array(a.head + 99)))
+    checkAnswer(Seq(Array(1))
+      .toDF("col")
+      .select(myUdf(Column("col"))),
+      Row(ArrayBuffer(100)))
+  }
+
   test("SPARK-34388: UDF name is propagated with registration for ScalaUDF") {
     spark.udf.register("udf34388", udf((value: Int) => value > 2))
     spark.sessionState.catalog.lookupFunction(
