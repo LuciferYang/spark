@@ -1576,7 +1576,7 @@ object TestSettings {
     (Test / javaOptions) += "-ea",
     (Test / javaOptions) ++= {
       val metaspaceSize = sys.env.get("METASPACE_SIZE").getOrElse("1300m")
-      val heapSize = sys.env.get("HEAP_SIZE").getOrElse("4g")
+      val heapSize = sys.env.get("HEAP_SIZE").getOrElse("5g")
       val extraTestJavaArgs = Array("-XX:+IgnoreUnrecognizedVMOptions",
         "--add-opens=java.base/java.lang=ALL-UNNAMED",
         "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
