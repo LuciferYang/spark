@@ -815,26 +815,4 @@ object DataSource extends Logging {
       throw QueryCompilationErrors.writeEmptySchemasUnsupportedByDataSourceError()
     }
   }
-
-  /**
-   * Resolve partition columns using output columns of the query plan.
-   */
-  def resolvePartitionColumns(
-      partitionColumns: Seq[Attribute],
-      outputColumns: Seq[Attribute],
-      plan: LogicalPlan,
-      resolver: Resolver): Seq[Attribute] = {
-    partitionColumns.map { col =>
-      // The partition columns created in `planForWritingFileFormat` should always be
-      // `UnresolvedAttribute` with a single name part.
-      assert(col.isInstanceOf[UnresolvedAttribute])
-      val unresolved = col.asInstanceOf[UnresolvedAttribute]
-      assert(unresolved.nameParts.length == 1)
-      val name = unresolved.nameParts.head
-      outputColumns.find(a => resolver(a.name, name)).getOrElse {
-        throw QueryCompilationErrors.cannotResolveAttributeError(
-          name, plan.output.map(_.name).mkString(", "))
-      }
-    }
-  }
 }
