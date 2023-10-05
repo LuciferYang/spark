@@ -80,8 +80,7 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
       // scalastyle:off classforname
       val resolved = ifaces.map(iface => Class.forName(iface, false, loader))
       // scalastyle:on classforname
-      java.lang.reflect.Proxy.newProxyInstance(
-        loader, resolved, DummyInvocationHandler.instance).getClass
+      java.lang.reflect.Proxy.newProxyInstance(loader, resolved, DummyInvocationHandler).getClass
     }
 
   }
@@ -90,14 +89,10 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
   def close(): Unit = { objIn.close() }
 }
 
-private[this] class DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
+private[this] object DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
   override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
     throw new UnsupportedOperationException("Not implemented")
   }
-}
-
-private[this] object DummyInvocationHandler {
-  val instance = new DummyInvocationHandler
 }
 
 private object JavaDeserializationStream {
