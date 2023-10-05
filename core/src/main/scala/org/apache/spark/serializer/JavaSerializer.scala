@@ -18,6 +18,7 @@
 package org.apache.spark.serializer
 
 import java.io._
+import java.lang.reflect.Method
 import java.nio.ByteBuffer
 
 import scala.reflect.ClassTag
@@ -79,13 +80,24 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
       // scalastyle:off classforname
       val resolved = ifaces.map(iface => Class.forName(iface, false, loader))
       // scalastyle:on classforname
-      java.lang.reflect.Proxy.getProxyClass(loader, resolved: _*)
+      java.lang.reflect.Proxy.newProxyInstance(
+        loader, resolved, DummyInvocationHandler.instance).getClass
     }
 
   }
 
   def readObject[T: ClassTag](): T = objIn.readObject().asInstanceOf[T]
   def close(): Unit = { objIn.close() }
+}
+
+private[this] class DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
+  override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
+    throw new UnsupportedOperationException("Not implemented")
+  }
+}
+
+private[this] object DummyInvocationHandler {
+  val instance = new DummyInvocationHandler
 }
 
 private object JavaDeserializationStream {
