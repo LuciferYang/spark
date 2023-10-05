@@ -80,7 +80,8 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
       // scalastyle:off classforname
       val resolved = ifaces.map(iface => Class.forName(iface, false, loader))
       // scalastyle:on classforname
-      java.lang.reflect.Proxy.newProxyInstance(loader, resolved, DummyInvocationHandler).getClass
+      java.lang.reflect.Proxy.newProxyInstance(
+        loader, resolved, DummyInvocationHandler).getClass
     }
 
   }
