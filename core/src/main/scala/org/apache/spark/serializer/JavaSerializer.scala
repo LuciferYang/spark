@@ -90,7 +90,7 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
   def close(): Unit = { objIn.close() }
 }
 
-private[this] object DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
+private[spark] object DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
   override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
     throw new UnsupportedOperationException("Not implemented")
   }
