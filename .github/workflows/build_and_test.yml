@@ -630,13 +630,6 @@ jobs:
         key: docs-coursier-${{ hashFiles('**/pom.xml', '**/plugins.sbt') }}
         restore-keys: |
           docs-coursier-
-    - name: Cache Maven local repository
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2/repository
-        key: docs-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          docs-maven-
     - name: Free up disk space
       run: |
         if [ -f ./dev/free_disk_space_container ]; then
