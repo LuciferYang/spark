@@ -18,7 +18,7 @@
 package org.apache.spark.serializer
 
 import java.io._
-import java.lang.reflect.Method
+import java.lang.reflect.{InvocationHandler, Method}
 import java.nio.ByteBuffer
 
 import scala.reflect.ClassTag
@@ -90,7 +90,7 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
   def close(): Unit = { objIn.close() }
 }
 
-private[spark] object DummyInvocationHandler extends java.lang.reflect.InvocationHandler {
+private[spark] object DummyInvocationHandler extends InvocationHandler {
   override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = {
     throw new UnsupportedOperationException("Not implemented")
   }
