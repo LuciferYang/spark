@@ -18,7 +18,7 @@
 package org.apache.spark.serializer
 
 import java.io._
-import java.lang.reflect.{InvocationHandler, Method}
+import java.lang.reflect.{InvocationHandler, Method, Proxy}
 import java.nio.ByteBuffer
 
 import scala.reflect.ClassTag
@@ -80,8 +80,7 @@ private[spark] class JavaDeserializationStream(in: InputStream, loader: ClassLoa
       // scalastyle:off classforname
       val resolved = ifaces.map(iface => Class.forName(iface, false, loader))
       // scalastyle:on classforname
-      java.lang.reflect.Proxy.newProxyInstance(
-        loader, resolved, DummyInvocationHandler).getClass
+      Proxy.newProxyInstance(loader, resolved, DummyInvocationHandler).getClass
     }
 
   }
