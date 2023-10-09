@@ -19,6 +19,7 @@ package org.apache.spark.util.kvstore;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.Cleaner;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -111,6 +112,8 @@ public class RocksDB implements KVStore {
    * to ensure that the iterator can be GCed, when it is only referenced here.
    */
   private final ConcurrentLinkedQueue<Reference<RocksDBIterator<?>>> iteratorTracker;
+
+  private static final Cleaner cleaner = Cleaner.create();
 
   public RocksDB(File path) throws Exception {
     this(path, new KVStoreSerializer());
@@ -285,6 +288,8 @@ public class RocksDB implements KVStore {
         try {
           RocksDBIterator<T> it = new RocksDBIterator<>(type, RocksDB.this, this);
           iteratorTracker.add(new WeakReference<>(it));
+          RocksIterator rocksIterator = it.internalIterator();
+          cleaner.register(it, () -> RocksDB.this.closeIterator(rocksIterator));
           return it;
         } catch (Exception e) {
           throw Throwables.propagate(e);
@@ -359,7 +364,7 @@ public class RocksDB implements KVStore {
    * Closes the given iterator if the DB is still open. Trying to close a JNI RocksDB handle
    * with a closed DB can cause JVM crashes, so this ensures that situation does not happen.
    */
-  void closeIterator(RocksDBIterator<?> it) throws IOException {
+  private void closeIterator(RocksIterator it) {
     notifyIteratorClosed(it);
     synchronized (this._db) {
       org.rocksdb.RocksDB _db = this._db.get();
@@ -373,8 +378,15 @@ public class RocksDB implements KVStore {
    * Remove iterator from iterator tracker. `RocksDBIterator` calls it to notify
    * iterator is closed.
    */
-  void notifyIteratorClosed(RocksDBIterator<?> it) {
-    iteratorTracker.removeIf(ref -> it.equals(ref.get()));
+  void notifyIteratorClosed(RocksIterator it) {
+    iteratorTracker.removeIf(ref -> {
+      RocksDBIterator<?> dbIterator = ref.get();
+      if (dbIterator != null) {
+        RocksIterator rocksIterator = dbIterator.internalIterator();
+        return rocksIterator != null && rocksIterator.equals(it);
+      }
+      return false;
+    });
   }
 
   /** Returns metadata about indices for the given type. */
