@@ -18,6 +18,7 @@
 package org.apache.spark.util.kvstore;
 
 import java.io.IOException;
+import java.lang.ref.Cleaner;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -26,6 +27,8 @@ import com.google.common.base.Throwables;
 import org.rocksdb.RocksIterator;
 
 class RocksDBIterator<T> implements KVStoreIterator<T> {
+
+  private static final Cleaner cleaner = Cleaner.create();
 
   private final RocksDB db;
   private final boolean ascending;
@@ -94,6 +97,7 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     if (params.skip > 0) {
       skip(params.skip);
     }
+    cleaner.register(this, new Destroyer(db, it));
   }
 
   @Override
@@ -176,16 +180,12 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   @Override
   public synchronized void close() throws IOException {
-    db.notifyIteratorClosed(it);
+    db.notifyIteratorClosed(this);
     if (!closed) {
       it.close();
       closed = true;
       next = null;
     }
-  }
-
-  RocksIterator internalIterator() {
-    return it;
   }
 
   private byte[] loadNext() {
@@ -266,4 +266,30 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     return a.length - b.length;
   }
 
+  private static class Destroyer implements Runnable {
+    private final RocksDB db;
+    private final RocksIterator rocksIterator;
+
+    private Destroyer(RocksDB db, RocksIterator rocksIterator) {
+      this.db = db;
+      this.rocksIterator = rocksIterator;
+    }
+
+    @Override
+    public void run() {
+      db.rocksDBIteratorTracker().removeIf(ref -> {
+        RocksDBIterator<?> dbIterator = ref.get();
+        if (dbIterator != null) {
+          return dbIterator.it.equals(rocksIterator);
+        }
+        return false;
+      });
+      synchronized (db.dbRef()) {
+        org.rocksdb.RocksDB rdb = db.dbRef().get();
+        if (rdb != null) {
+          rocksIterator.close();
+        }
+      }
+    }
+  }
 }
