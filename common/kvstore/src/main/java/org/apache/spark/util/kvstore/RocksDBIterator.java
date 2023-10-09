@@ -266,30 +266,22 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     return a.length - b.length;
   }
 
-  private static class Destroyer implements Runnable {
-    private final RocksDB db;
-    private final RocksIterator rocksIterator;
-
-    private Destroyer(RocksDB db, RocksIterator rocksIterator) {
-      this.db = db;
-      this.rocksIterator = rocksIterator;
-    }
-
+  private record Destroyer(RocksDB db, RocksIterator rocksIterator) implements Runnable {
     @Override
-    public void run() {
-      db.rocksDBIteratorTracker().removeIf(ref -> {
-        RocksDBIterator<?> dbIterator = ref.get();
-        if (dbIterator != null) {
-          return dbIterator.it.equals(rocksIterator);
-        }
-        return false;
-      });
-      synchronized (db.dbRef()) {
-        org.rocksdb.RocksDB rdb = db.dbRef().get();
-        if (rdb != null) {
-          rocksIterator.close();
+      public void run() {
+        db.rocksDBIteratorTracker().removeIf(ref -> {
+          RocksDBIterator<?> dbIterator = ref.get();
+          if (dbIterator != null) {
+            return dbIterator.it.equals(rocksIterator);
+          }
+          return false;
+        });
+        synchronized (db.dbRef()) {
+          org.rocksdb.RocksDB rdb = db.dbRef().get();
+          if (rdb != null) {
+            rocksIterator.close();
+          }
         }
       }
     }
-  }
 }
