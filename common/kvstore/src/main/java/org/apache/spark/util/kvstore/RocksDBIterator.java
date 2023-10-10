@@ -29,6 +29,7 @@ import org.rocksdb.RocksIterator;
 class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   private static final Cleaner cleaner = Cleaner.create();
+  private final Cleaner.Cleanable cleanable;
 
   private final RocksDB db;
   private final boolean ascending;
@@ -49,6 +50,7 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     this.db = db;
     this.ascending = params.ascending;
     this.it = db.db().newIterator();
+    this.cleanable = cleaner.register(this, new IteratorCleaner(db, it));
     this.type = type;
     this.ti = db.getTypeInfo(type);
     this.index = ti.index(params.index);
@@ -97,7 +99,6 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     if (params.skip > 0) {
       skip(params.skip);
     }
-    cleaner.register(this, new Destroyer(db, it));
   }
 
   @Override
@@ -180,9 +181,8 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   @Override
   public synchronized void close() throws IOException {
-    db.notifyIteratorClosed(this);
     if (!closed) {
-      it.close();
+      this.cleanable.clean();
       closed = true;
       next = null;
     }
@@ -266,7 +266,9 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     return a.length - b.length;
   }
 
-  private record Destroyer(RocksDB db, RocksIterator rocksIterator) implements Runnable {
+  private record IteratorCleaner(
+      RocksDB db,
+      RocksIterator rocksIterator) implements Runnable {
     @Override
     public void run() {
       db.rocksDBIteratorTracker().removeIf(ref -> {
