@@ -274,7 +274,7 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
       db.rocksDBIteratorTracker().removeIf(ref -> {
         RocksDBIterator<?> dbIterator = ref.get();
         if (dbIterator != null) {
-          return dbIterator.it.equals(rocksIterator);
+          return rocksIterator.equals(dbIterator.it);
         }
         return false;
       });
