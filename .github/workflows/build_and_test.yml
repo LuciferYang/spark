@@ -632,7 +632,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/coursier
-        key: docs-coursier-${{ hashFiles('**/pom.xml', '**/plugins.sbt') }}
+        key: docs-coursier-${{ hashFiles('**/pom.xml', '**/plugins.sbt', 'project/build.properties') }}
         restore-keys: |
           docs-coursier-
     - name: Free up disk space
