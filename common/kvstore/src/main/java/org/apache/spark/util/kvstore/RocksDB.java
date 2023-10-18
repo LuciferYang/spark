@@ -355,26 +355,12 @@ public class RocksDB implements KVStore {
     }
   }
 
-  /**
-   * Closes the given iterator if the DB is still open. Trying to close a JNI RocksDB handle
-   * with a closed DB can cause JVM crashes, so this ensures that situation does not happen.
-   */
-  void closeIterator(RocksDBIterator<?> it) throws IOException {
-    notifyIteratorClosed(it);
-    synchronized (this._db) {
-      org.rocksdb.RocksDB _db = this._db.get();
-      if (_db != null) {
-        it.close();
-      }
-    }
+  AtomicReference<org.rocksdb.RocksDB> dbRef() {
+    return _db;
   }
 
-  /**
-   * Remove iterator from iterator tracker. `RocksDBIterator` calls it to notify
-   * iterator is closed.
-   */
-  void notifyIteratorClosed(RocksDBIterator<?> it) {
-    iteratorTracker.removeIf(ref -> it.equals(ref.get()));
+  ConcurrentLinkedQueue<Reference<RocksDBIterator<?>>> dbIteratorTracker() {
+    return iteratorTracker;
   }
 
   /** Returns metadata about indices for the given type. */

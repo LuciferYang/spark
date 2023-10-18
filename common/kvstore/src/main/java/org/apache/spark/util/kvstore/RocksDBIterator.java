@@ -18,6 +18,7 @@
 package org.apache.spark.util.kvstore;
 
 import java.io.IOException;
+import java.lang.ref.Cleaner;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -27,6 +28,8 @@ import org.rocksdb.RocksIterator;
 
 class RocksDBIterator<T> implements KVStoreIterator<T> {
 
+  private static final Cleaner CLEANER = Cleaner.create();
+  private final Cleaner.Cleanable cleanable;
   private final RocksDB db;
   private final boolean ascending;
   private final RocksIterator it;
@@ -46,6 +49,7 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     this.db = db;
     this.ascending = params.ascending;
     this.it = db.db().newIterator();
+    this.cleanable = CLEANER.register(this, new ResourceCleaner(db, it));
     this.type = type;
     this.ti = db.getTypeInfo(type);
     this.index = ti.index(params.index);
@@ -176,22 +180,11 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
 
   @Override
   public synchronized void close() throws IOException {
-    db.notifyIteratorClosed(this);
     if (!closed) {
-      it.close();
+      this.cleanable.clean();
       closed = true;
       next = null;
     }
-  }
-
-  /**
-   * Because it's tricky to expose closeable iterators through many internal APIs, especially
-   * when Scala wrappers are used, this makes sure that, hopefully, the JNI resources held by
-   * the iterator will eventually be released.
-   */
-  @Override
-  protected void finalize() throws Throwable {
-    db.closeIterator(this);
   }
 
   private byte[] loadNext() {
@@ -272,4 +265,24 @@ class RocksDBIterator<T> implements KVStoreIterator<T> {
     return a.length - b.length;
   }
 
+  private record ResourceCleaner(
+      RocksDB db,
+      RocksIterator iterator) implements Runnable {
+    @Override
+    public void run() {
+      db.dbIteratorTracker().removeIf(ref -> {
+        RocksDBIterator<?> dbIterator = ref.get();
+        if (dbIterator != null) {
+          return iterator.equals(dbIterator.it);
+        }
+        return false;
+      });
+      synchronized (db.dbRef()) {
+        org.rocksdb.RocksDB rdb = db.dbRef().get();
+        if (rdb != null) {
+          iterator.close();
+        }
+      }
+    }
+  }
 }
