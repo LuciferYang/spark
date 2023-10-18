@@ -295,8 +295,8 @@ class LevelDBIterator<T> implements KVStoreIterator<T> {
         return false;
       });
       synchronized (db.dbRef()) {
-        org.iq80.leveldb.DB rdb = db.dbRef().get();
-        if (rdb != null) {
+        org.iq80.leveldb.DB ldb = db.dbRef().get();
+        if (ldb != null) {
           try {
             iterator.close();
           } catch (IOException e) {
