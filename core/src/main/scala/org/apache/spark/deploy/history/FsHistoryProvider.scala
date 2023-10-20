@@ -204,7 +204,7 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     if (!Utils.isTesting) {
       ThreadUtils.newDaemonFixedThreadPool(NUM_PROCESSING_THREADS, "log-replay-executor")
     } else {
-      ThreadUtils.sameThreadExecutorService
+      ThreadUtils.sameThreadExecutorService()
     }
   }
 

@@ -49,7 +49,7 @@ class FetchErrorDetailsHandlerSuite extends SharedSparkSession with ResourceHelp
       userId: String,
       sessionId: String,
       errorId: String): FetchErrorDetailsResponse = {
-    val promise = Promise[FetchErrorDetailsResponse]
+    val promise = Promise[FetchErrorDetailsResponse]()
     val handler =
       new SparkConnectFetchErrorDetailsHandler(new FetchErrorDetailsResponseObserver(promise))
     val context = proto.UserContext

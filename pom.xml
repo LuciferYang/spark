@@ -2972,7 +2972,12 @@
               -->
               <arg>-Wconf:msg=^(?=.*?method|value|type|object|trait|inheritance)(?=.*?deprecated)(?=.*?since 2.13).+$:s</arg>
               <arg>-Wconf:msg=^(?=.*?Widening conversion from)(?=.*?is deprecated because it loses precision).+$:s</arg>
-              <arg>-Wconf:msg=Auto-application to \`\(\)\` is deprecated:s</arg>
+
+              <arg>-Wconf:cat=deprecation&amp;msg=Auto-application to \`\(\)\` is deprecated:e</arg>
+              <arg>-Wconf:cat=deprecation&amp;msg=Auto-application to \`\(\)\` is deprecated&amp;site=org.apache.spark.rdd.RDDSuite:s</arg>
+              <arg>-Wconf:cat=deprecation&amp;msg=Auto-application to \`\(\)\` is deprecated&amp;site=org.apache.spark.scheduler.TaskSetManagerSuite:s</arg>
+              <arg>-Wconf:cat=deprecation&amp;msg=Auto-application to \`\(\)\` is deprecated&amp;site=org.apache.spark.streaming.ReceiverInputDStreamSuite:s</arg>
+              <arg>-Wconf:cat=deprecation&amp;msg=Auto-application to \`\(\)\` is deprecated&amp;site=org.apache.spark.streaming.kafka010.KafkaRDDSuite:s</arg>
               <!--
                 SPARK-35574 Prevent the recurrence of compilation warnings related to
                 `procedure syntax is deprecated`
