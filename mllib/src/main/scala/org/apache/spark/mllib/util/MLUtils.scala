@@ -117,7 +117,7 @@ object MLUtils extends Logging {
       ).resolveRelation(checkFilesExist = false))
       .select("value")
 
-    import lines.sqlContext.implicits._
+    import lines.sparkSession.implicits._
 
     lines.select(trim($"value").as("line"))
       .filter(not((length($"line") === 0).or($"line".startsWith("#"))))
