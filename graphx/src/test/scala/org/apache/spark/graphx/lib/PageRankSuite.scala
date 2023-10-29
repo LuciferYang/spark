@@ -309,7 +309,7 @@ class PageRankSuite extends SparkFunSuite with LocalSparkContext {
       val numIter = 10
       val vertices = vertexIdOffset until vertexIdOffset + numIter
       val chain1 = vertices.zip(vertices.tail)
-      val rawEdges = sc.parallelize(chain1, 1).map { case (s, d) => (s.toLong, d.toLong) }
+      val rawEdges = sc.parallelize(chain1, 1).map { case (s, d) => (s, d) }
       val chain = Graph.fromEdgeTuples(rawEdges, 1.0).cache()
       val resetProb = 0.15
       val tol = 0.0001

@@ -920,7 +920,7 @@ class V2SessionCatalogNamespaceSuite extends V2SessionCatalogBaseSuite {
 
     catalog.createNamespace(testNs, Map("location" -> expectedPath).asJava)
 
-    assert(expectedPath === spark.catalog.getDatabase(testNs(0)).locationUri.toString)
+    assert(expectedPath === spark.catalog.getDatabase(testNs(0)).locationUri)
 
     assert(catalog.namespaceExists(testNs) === true)
     val metadata = catalog.loadNamespaceMetadata(testNs).asScala

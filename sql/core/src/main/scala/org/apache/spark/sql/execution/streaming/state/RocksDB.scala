@@ -835,7 +835,7 @@ object RocksDBConf {
     }
 
     def getStringConf(conf: ConfEntry): String = {
-      Try { getConfigMap(conf).getOrElse(conf.fullName, conf.default).toString } getOrElse {
+      Try { getConfigMap(conf).getOrElse(conf.fullName, conf.default) } getOrElse {
         throw new IllegalArgumentException(
           s"Invalid value for '${conf.fullName}', must be a string"
         )

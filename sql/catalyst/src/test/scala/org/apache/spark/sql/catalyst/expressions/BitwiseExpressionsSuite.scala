@@ -35,14 +35,14 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     }
 
     // Need the extra toByte even though IntelliJ thought it's not needed.
-    check(1.toByte, (~1.toByte).toByte)
-    check(1000.toShort, (~1000.toShort).toShort)
+    check(1.toByte, (~1.toByte))
+    check(1000.toShort, (~1000.toShort))
     check(1000000, ~1000000)
     check(123456789123L, ~123456789123L)
 
     checkEvaluation(BitwiseNot(Literal.create(null, IntegerType)), null)
-    checkEvaluation(BitwiseNot(positiveShortLit), (~positiveShort).toShort)
-    checkEvaluation(BitwiseNot(negativeShortLit), (~negativeShort).toShort)
+    checkEvaluation(BitwiseNot(positiveShortLit), ~positiveShort)
+    checkEvaluation(BitwiseNot(negativeShortLit), ~negativeShort)
     checkEvaluation(BitwiseNot(positiveIntLit), ~positiveInt)
     checkEvaluation(BitwiseNot(negativeIntLit), ~negativeInt)
     checkEvaluation(BitwiseNot(positiveLongLit), ~positiveLong)

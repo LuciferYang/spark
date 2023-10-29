@@ -99,7 +99,7 @@ package object testPackage extends Assertions {
       case CALL_SITE_REGEX(func, file, line) =>
         assert(func === "getCallSite") // this is correct because we called it from outside of Spark
         assert(file === "SparkContextInfoSuite.scala")
-        assert(line.toInt === rddCreationLine.toInt + 2)
+        assert(line.toInt === rddCreationLine + 2)
       case _ => fail("Did not match expected call site format")
     }
   }

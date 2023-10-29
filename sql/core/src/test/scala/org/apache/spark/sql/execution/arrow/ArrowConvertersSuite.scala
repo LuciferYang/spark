@@ -487,7 +487,7 @@ class ArrowConvertersSuite extends SharedSparkSession {
 
     val data = List(1, 2, 3, 4, 5, 6)
     val data_tuples = for (d <- data) yield {
-      (d.toShort, d.toFloat, d.toInt, d.toDouble, d.toLong)
+      (d.toShort, d.toFloat, d, d.toDouble, d.toLong)
     }
     val df = data_tuples.toDF("a", "b", "c", "d", "e")
 

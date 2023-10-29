@@ -1429,7 +1429,7 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
       // to Long succeeds: even though IDE suggests `.toLong` is redundant, direct comparison
       // doesn't trigger unboxing and passes even without SPARK-29755, so don't remove
       // `.toLong` below. Please refer SPARK-29755 for more details.
-      assert(opt.get.toLong === expected.get.toLong)
+      assert(opt.get === expected.get)
     }
   }
 

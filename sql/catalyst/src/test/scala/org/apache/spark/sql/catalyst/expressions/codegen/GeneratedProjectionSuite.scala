@@ -190,7 +190,7 @@ class GeneratedProjectionSuite extends SparkFunSuite with ExpressionEvalHelper {
     // Even if the input row of the mutable projection has been changed, the target mutable row
     // should keep same.
     unsafeProj.apply(InternalRow(InternalRow(UTF8String.fromString("b"))))
-    assert(row.getStruct(0, 1).getString(0).toString == "a")
+    assert(row.getStruct(0, 1).getString(0) == "a")
   }
 
   test("SafeProjection should not cache content from the input row") {
@@ -207,7 +207,7 @@ class GeneratedProjectionSuite extends SparkFunSuite with ExpressionEvalHelper {
     // Even if the input row of the mutable projection has been changed, the target mutable row
     // should keep same.
     unsafeProj.apply(InternalRow(InternalRow(UTF8String.fromString("b"))))
-    assert(row.getStruct(0, 1).getString(0).toString == "a")
+    assert(row.getStruct(0, 1).getString(0) == "a")
   }
 
   test("SPARK-22699: GenerateSafeProjection should not use global variables for struct") {

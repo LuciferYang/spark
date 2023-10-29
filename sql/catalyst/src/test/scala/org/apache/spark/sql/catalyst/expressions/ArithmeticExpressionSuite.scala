@@ -449,7 +449,7 @@ class ArithmeticExpressionSuite extends SparkFunSuite with ExpressionEvalHelper 
     checkEvaluation(Pmod(Literal(7.2D), Literal(4.1D)), 3.1000000000000005)
     checkEvaluation(Pmod(Literal(Decimal(0.7)), Literal(Decimal(0.2))), Decimal(0.1))
     checkEvaluation(Pmod(Literal(2L), Literal(Long.MaxValue)), 2L)
-    checkEvaluation(Pmod(positiveShort, negativeShort), positiveShort.toShort)
+    checkEvaluation(Pmod(positiveShort, negativeShort), positiveShort)
     checkEvaluation(Pmod(positiveInt, negativeInt), positiveInt)
     checkEvaluation(Pmod(positiveLong, negativeLong), positiveLong)
 

@@ -745,7 +745,7 @@ class YarnAllocatorSuite extends SparkFunSuite
   }
 
   test("SPARK-38194: Configurable memory overhead factor") {
-    val executorMemory = sparkConf.get(EXECUTOR_MEMORY).toLong
+    val executorMemory = sparkConf.get(EXECUTOR_MEMORY)
     try {
       sparkConf.set(EXECUTOR_MEMORY_OVERHEAD_FACTOR, 0.5)
       val (handler, _) = createAllocator(maxExecutors = 1,

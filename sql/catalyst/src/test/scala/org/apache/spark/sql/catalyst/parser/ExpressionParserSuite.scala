@@ -975,7 +975,7 @@ class ExpressionParserSuite extends AnalysisTest {
   }
 
   def legacyIntervalLiteral(u: String, s: String): Literal = {
-    Literal(IntervalUtils.stringToInterval(s + " " + u.toString))
+    Literal(IntervalUtils.stringToInterval(s + " " + u))
   }
 
   test("intervals") {

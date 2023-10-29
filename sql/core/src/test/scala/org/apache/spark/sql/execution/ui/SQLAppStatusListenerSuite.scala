@@ -111,8 +111,8 @@ abstract class SQLAppStatusListenerSuite extends SharedSparkSession with JsonTes
     val info = new TaskInfo(
       taskId = taskId,
       attemptNumber = attemptNumber,
-      index = taskId.toInt,
-      partitionId = taskId.toInt,
+      index = taskId,
+      partitionId = taskId,
       // The following fields are not used in tests
       launchTime = 0,
       executorId = "",

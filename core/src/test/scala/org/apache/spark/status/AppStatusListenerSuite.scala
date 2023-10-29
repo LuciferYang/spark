@@ -1946,7 +1946,7 @@ abstract class AppStatusListenerSuite extends SparkFunSuite with BeforeAndAfter 
 
   private def createTasks(count: Int, execs: Array[String]): Seq[TaskInfo] = {
     (1 to count).map { id =>
-      val exec = execs(id.toInt % execs.length)
+      val exec = execs(id % execs.length)
       val taskId = nextTaskId()
       val taskIndex = id - 1
       val partitionId = taskIndex

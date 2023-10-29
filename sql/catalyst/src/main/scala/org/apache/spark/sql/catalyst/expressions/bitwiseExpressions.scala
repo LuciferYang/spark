@@ -186,9 +186,9 @@ case class BitwiseNot(child: Expression)
 
   private lazy val not: (Any) => Any = dataType match {
     case ByteType =>
-      ((evalE: Byte) => (~evalE).toByte).asInstanceOf[(Any) => Any]
+      ((evalE: Byte) => (~evalE)).asInstanceOf[(Any) => Any]
     case ShortType =>
-      ((evalE: Short) => (~evalE).toShort).asInstanceOf[(Any) => Any]
+      ((evalE: Short) => (~evalE)).asInstanceOf[(Any) => Any]
     case IntegerType =>
       ((evalE: Int) => ~evalE).asInstanceOf[(Any) => Any]
     case LongType =>

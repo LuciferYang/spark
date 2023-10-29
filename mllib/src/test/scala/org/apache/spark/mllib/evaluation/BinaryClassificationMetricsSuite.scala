@@ -97,7 +97,7 @@ class BinaryClassificationMetricsSuite extends SparkFunSuite with MLlibTestSpark
     val numPositives = 3 * w2 + 1 * w1
     val numNegatives = 2 * w1 + w3
     val precisions = numTruePositives.zip(numFalsePositives).map { case (t, f) =>
-      t.toDouble / (t + f)
+      t / (t + f)
     }
     val recalls = numTruePositives.map(_ / numPositives)
     val fpr = numFalsePositives.map(_ / numNegatives)

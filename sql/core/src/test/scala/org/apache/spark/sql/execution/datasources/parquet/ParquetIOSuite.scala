@@ -1162,7 +1162,7 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
       """.stripMargin)
 
     withTempPath { location =>
-      val extraMetadata = Map(ParquetReadSupport.SPARK_METADATA_KEY -> sparkSchema.toString)
+      val extraMetadata = Map(ParquetReadSupport.SPARK_METADATA_KEY -> sparkSchema)
       val path = new Path(location.getCanonicalPath)
       val conf = spark.sessionState.newHadoopConf()
       writeMetadata(parquetSchema, path, conf, extraMetadata)

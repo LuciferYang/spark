@@ -247,7 +247,6 @@ class ReattachableExecuteSuite extends SparkConnectServerTest {
       var lastSeenResponse: String = null
       val serverRetryBuffer = SparkEnv.get.conf
         .get(Connect.CONNECT_EXECUTE_REATTACHABLE_OBSERVER_RETRY_BUFFER_SIZE)
-        .toLong
 
       iter.hasNext // open iterator
       val execution = getExecutionHolder

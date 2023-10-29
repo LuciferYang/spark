@@ -43,7 +43,7 @@ class BasicExecutorFeatureStepSuite extends SparkFunSuite with BeforeAndAfter {
   private val DRIVER_PORT = 7098
   private val DRIVER_ADDRESS = RpcEndpointAddress(
     DRIVER_HOSTNAME,
-    DRIVER_PORT.toInt,
+    DRIVER_PORT,
     CoarseGrainedSchedulerBackend.ENDPOINT_NAME)
   private val DRIVER_POD_NAME = "driver-pod"
 

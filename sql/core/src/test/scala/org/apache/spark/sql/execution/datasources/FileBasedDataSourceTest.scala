@@ -51,7 +51,7 @@ private[sql] trait FileBasedDataSourceTest extends SQLTestUtils {
   protected def readFile(path: String, testVectorized: Boolean = true)
       (f: DataFrame => Unit): Unit = {
     withSQLConf(vectorizedReaderEnabledKey -> "false") {
-      f(spark.read.format(dataSourceName).load(path.toString))
+      f(spark.read.format(dataSourceName).load(path))
     }
     if (testVectorized) {
       Seq(true, false).foreach { enableNested =>
@@ -83,7 +83,7 @@ private[sql] trait FileBasedDataSourceTest extends SQLTestUtils {
   protected def withDataSourceDataFrame[T <: Product : ClassTag : TypeTag]
       (data: Seq[T], testVectorized: Boolean = true)
       (f: DataFrame => Unit): Unit = {
-    withDataSourceFile(data)(path => readFile(path.toString, testVectorized)(f))
+    withDataSourceFile(data)(path => readFile(path, testVectorized)(f))
   }
 
   /**

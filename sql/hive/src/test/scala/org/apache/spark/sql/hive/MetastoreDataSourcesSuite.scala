@@ -492,7 +492,7 @@ class MetastoreDataSourcesSuite extends QueryTest
           df.write
             .format("org.apache.spark.sql.json")
             .mode(SaveMode.Append)
-            .option("path", tempPath.toString)
+            .option("path", tempPath)
             .saveAsTable("savedJsonTable")
 
           checkAnswer(sql("SELECT * FROM savedJsonTable"), df)
@@ -500,7 +500,7 @@ class MetastoreDataSourcesSuite extends QueryTest
 
         // Data should not be deleted after we drop the table.
         sql("DROP TABLE savedJsonTable")
-        checkAnswer(read.json(tempPath.toString), df)
+        checkAnswer(read.json(tempPath), df)
       }
     }
   }

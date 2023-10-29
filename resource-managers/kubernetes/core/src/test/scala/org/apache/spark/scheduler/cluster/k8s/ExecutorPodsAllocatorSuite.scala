@@ -967,6 +967,6 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     (invocation: InvocationOnMock) => {
       val k8sConf: KubernetesExecutorConf = invocation.getArgument(0)
       KubernetesExecutorSpec(executorPodWithId(k8sConf.executorId.toInt,
-        k8sConf.resourceProfileId.toInt), Seq.empty)
+        k8sConf.resourceProfileId), Seq.empty)
   }
 }

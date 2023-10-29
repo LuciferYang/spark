@@ -434,7 +434,7 @@ class ReceivedBlockTrackerSuite extends SparkFunSuite with BeforeAndAfter with M
   def getWriteAheadLogFiles(): Seq[String] = {
     import ReceivedBlockTracker._
     val logDir = checkpointDirToLogDir(checkpointDirectory.toString)
-    getLogFilesInDirectory(logDir).map { _.toString }
+    getLogFilesInDirectory(logDir)
   }
 
   /** Create batch allocation object from the given info */

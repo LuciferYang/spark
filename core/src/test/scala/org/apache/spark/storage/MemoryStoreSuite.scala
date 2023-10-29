@@ -459,7 +459,7 @@ class MemoryStoreSuite
     val bytesPerSmallBlock = memStoreSize / numInitialBlocks
     def testFailureOnNthDrop(numValidBlocks: Int, readLockAfterDrop: Boolean): Unit = {
       val tc = TaskContext.empty()
-      val memManager = new UnifiedMemoryManager(conf, memStoreSize, memStoreSize.toInt / 2, 1)
+      val memManager = new UnifiedMemoryManager(conf, memStoreSize, memStoreSize / 2, 1)
       val blockInfoManager = new BlockInfoManager
       blockInfoManager.registerTask(tc.taskAttemptId)
       var droppedSoFar = 0

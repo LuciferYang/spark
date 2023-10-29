@@ -109,7 +109,7 @@ abstract class JsonSuite
       Decimal(longNumber), enforceCorrectType(longNumber, DecimalType.SYSTEM_DEFAULT))
 
     val doubleNumber: Double = 1.7976931348623157d
-    checkTypePromotion(doubleNumber.toDouble, enforceCorrectType(doubleNumber, DoubleType))
+    checkTypePromotion(doubleNumber, enforceCorrectType(doubleNumber, DoubleType))
 
     checkTypePromotion(DateTimeUtils.fromJavaTimestamp(new Timestamp(intNumber * 1000L)),
         enforceCorrectType(intNumber, TimestampType))

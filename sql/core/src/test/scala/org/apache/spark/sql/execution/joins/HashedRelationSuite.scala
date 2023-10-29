@@ -626,7 +626,7 @@ class HashedRelationSuite extends SharedSparkSession {
   }
 
   test("HashJoin: packing and unpacking with various key types in a LongType") {
-    val row = InternalRow((-1).toByte, (-2).toInt, (-3).toShort)
+    val row = InternalRow((-1).toByte, -2, (-3).toShort)
     val keys = Seq(BoundReference(0, ByteType, false),
       BoundReference(1, IntegerType, false),
       BoundReference(2, ShortType, false))

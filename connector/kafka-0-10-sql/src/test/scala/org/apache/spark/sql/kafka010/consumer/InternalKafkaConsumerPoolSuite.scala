@@ -186,7 +186,7 @@ class InternalKafkaConsumerPoolSuite extends SharedSparkSession {
 
     // wait up to twice than minEvictableIdleTimeMillis to ensure evictor thread to clear up
     // idle objects
-    eventually(timeout((minEvictableIdleTimeMillis.toLong * 2).seconds),
+    eventually(timeout((minEvictableIdleTimeMillis * 2).seconds),
       interval(evictorThreadRunIntervalMillis.milliseconds)) {
       assertPoolState(pool, numIdle = 0, numActive = 5, numTotal = 5)
     }

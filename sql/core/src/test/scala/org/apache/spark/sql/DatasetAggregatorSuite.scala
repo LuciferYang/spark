@@ -301,7 +301,7 @@ class DatasetAggregatorSuite extends QueryTest with SharedSparkSession {
 
     checkDataset(
       ds.groupByKey(_._1)
-        .agg(new ParameterizedTypeSum((x: (String, Int)) => x._2.toInt).toColumn),
+        .agg(new ParameterizedTypeSum((x: (String, Int)) => x._2).toColumn),
       ("a", 4), ("b", 3))
   }
 
