@@ -680,22 +680,22 @@ class RandomSamplerSuite extends SparkFunSuite with Matchers {
     val d = RandomSampler.roundingEpsilon / 2.0
 
     var sampler = new BernoulliCellSampler[Int](0.0, 0.0)
-    data.filter(_ => sampler.sample() > 0).toArray should be (Array.empty[Int])
+    data.filter(_ => sampler.sample() > 0) should be (Array.empty[Int])
 
     sampler = new BernoulliCellSampler[Int](0.5, 0.5)
-    data.filter(_ => sampler.sample() > 0).toArray should be (Array.empty[Int])
+    data.filter(_ => sampler.sample() > 0) should be (Array.empty[Int])
 
     sampler = new BernoulliCellSampler[Int](1.0, 1.0)
-    data.filter(_ => sampler.sample() > 0).toArray should be (Array.empty[Int])
+    data.filter(_ => sampler.sample() > 0) should be (Array.empty[Int])
 
     sampler = new BernoulliCellSampler[Int](0.0, 1.0)
-    data.filter(_ => sampler.sample() > 0).toArray should be (data)
+    data.filter(_ => sampler.sample() > 0) should be (data)
 
     sampler = new BernoulliCellSampler[Int](0.0 - d, 1.0 + d)
-    data.filter(_ => sampler.sample() > 0).toArray should be (data)
+    data.filter(_ => sampler.sample() > 0) should be (data)
 
     sampler = new BernoulliCellSampler[Int](0.5, 0.5 - d)
-    data.filter(_ => sampler.sample() > 0).toArray should be (Array.empty[Int])
+    data.filter(_ => sampler.sample() > 0) should be (Array.empty[Int])
   }
 
   test("bernoulli partitioning data") {

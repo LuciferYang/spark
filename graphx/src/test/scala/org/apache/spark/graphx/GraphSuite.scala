@@ -276,8 +276,8 @@ class GraphSuite extends SparkFunSuite with LocalSparkContext {
         sc.parallelize((1 to n).flatMap(x =>
           List((0: VertexId, x: VertexId), (0: VertexId, x: VertexId))), 1), "v")
       val star2 = doubleStar.groupEdges { (a, b) => a}
-      assert(star2.edges.collect().toArray.sorted(Edge.lexicographicOrdering[Int]) ===
-        star.edges.collect().toArray.sorted(Edge.lexicographicOrdering[Int]))
+      assert(star2.edges.collect().sorted(Edge.lexicographicOrdering[Int]) ===
+        star.edges.collect().sorted(Edge.lexicographicOrdering[Int]))
       assert(star2.vertices.collect().toSet === star.vertices.collect().toSet)
     }
   }

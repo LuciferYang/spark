@@ -98,7 +98,7 @@ class ApproximatePercentileSuite extends SparkFunSuite {
 
   test("class ApproximatePercentile, high level interface, update, merge, eval...") {
     val count = 10000
-    val data = (1 until 10000).toSeq
+    val data = (1 until 10000)
     val percentages = Array(0.25D, 0.5D, 0.75D)
     val accuracy = 10000
     val expectedPercentiles = percentages.map(count * _)

@@ -405,7 +405,7 @@ class SQLQueryTestSuite extends QueryTest with SharedSparkSession with SQLHelper
     }
 
     // List of SQL queries to run
-    val queries = tempQueries.map(_.trim).filter(_ != "").toSeq
+    val queries = tempQueries.map(_.trim).filter(_ != "")
       // Fix misplacement when comment is at the end of the query.
       .map(_.split("\n").filterNot(_.startsWith("--")).mkString("\n")).map(_.trim).filter(_ != "")
 

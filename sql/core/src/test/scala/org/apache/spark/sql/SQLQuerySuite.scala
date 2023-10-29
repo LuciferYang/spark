@@ -419,14 +419,14 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
   test("SQRT") {
     checkAnswer(
       sql("SELECT SQRT(key) FROM testData"),
-      (1 to 100).map(x => Row(math.sqrt(x.toDouble))).toSeq
+      (1 to 100).map(x => Row(math.sqrt(x.toDouble)))
     )
   }
 
   test("SQRT with automatic string casts") {
     checkAnswer(
       sql("SELECT SQRT(CAST(key AS STRING)) FROM testData"),
-      (1 to 100).map(x => Row(math.sqrt(x.toDouble))).toSeq
+      (1 to 100).map(x => Row(math.sqrt(x.toDouble)))
     )
   }
 
@@ -542,7 +542,7 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
 
     checkAnswer(
       sql("SELECT b FROM binaryData ORDER BY a DESC"),
-      (1 to 5).map(Row(_)).toSeq.reverse)
+      (1 to 5).map(Row(_)).reverse)
 
     checkAnswer(
       sql("SELECT * FROM arrayData ORDER BY data[0] ASC"),

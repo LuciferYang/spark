@@ -228,7 +228,7 @@ abstract class KinesisBackedBlockRDDTests(aggregateTestData: Boolean)
       require(numPartitionsInBM === numPartitions, "All partitions must be in BlockManager")
       require(numPartitionsInKinesis === 0, "No partitions must be in Kinesis")
       val rdd2 = new KinesisBackedBlockRDD[Array[Byte]](
-        sc, testUtils.regionName, testUtils.endpointUrl, blockIds.toArray, ranges,
+        sc, testUtils.regionName, testUtils.endpointUrl, blockIds, ranges,
         isBlockIdValid = Array.fill(blockIds.length)(false))
       intercept[SparkException] {
         rdd2.collect()

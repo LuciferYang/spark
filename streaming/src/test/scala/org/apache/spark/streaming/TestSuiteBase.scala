@@ -520,7 +520,7 @@ trait TestSuiteBase extends SparkFunSuite with BeforeAndAfterEach with Logging {
     val numBatches_ = if (numBatches > 0) numBatches else expectedOutput.size
     withStreamingContext(setupStreams[U, V](input, operation)) { ssc =>
       val output = runStreams[V](ssc, numBatches_, expectedOutput.size)
-      verifyOutput[V](output.toSeq, expectedOutput, useSet)
+      verifyOutput[V](output, expectedOutput, useSet)
     }
   }
 
@@ -559,7 +559,7 @@ trait TestSuiteBase extends SparkFunSuite with BeforeAndAfterEach with Logging {
     val numBatches_ = if (numBatches > 0) numBatches else expectedOutput.size
     withStreamingContext(setupStreams[U, V, W](input1, input2, operation)) { ssc =>
       val output = runStreams[W](ssc, numBatches_, expectedOutput.size)
-      verifyOutput[W](output.toSeq, expectedOutput, useSet)
+      verifyOutput[W](output, expectedOutput, useSet)
     }
   }
 }

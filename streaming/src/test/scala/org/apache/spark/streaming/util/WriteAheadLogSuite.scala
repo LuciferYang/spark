@@ -372,7 +372,7 @@ class FileBasedWriteAheadLogSuite
     val segments = writeDataManually(writtenData, testFile, allowBatching = false)
 
     // Get a random order of these segments and read them back
-    val writtenDataAndSegments = writtenData.zip(segments).toSeq.permutations.take(10).flatten
+    val writtenDataAndSegments = writtenData.zip(segments).permutations.take(10).flatten
     val reader = new FileBasedWriteAheadLogRandomReader(testFile, hadoopConf)
     writtenDataAndSegments.foreach { case (data, segment) =>
       assert(data === byteBufferToString(reader.read(segment)))
@@ -386,7 +386,7 @@ class FileBasedWriteAheadLogSuite
     val segments = writeDataUsingWriter(testFile, data)
 
     // Read a random sequence of segments and verify read data
-    val dataAndSegments = data.zip(segments).toSeq.permutations.take(10).flatten
+    val dataAndSegments = data.zip(segments).permutations.take(10).flatten
     val reader = new FileBasedWriteAheadLogRandomReader(testFile, hadoopConf)
     dataAndSegments.foreach { case (data, segment) =>
       assert(data === byteBufferToString(reader.read(segment)))

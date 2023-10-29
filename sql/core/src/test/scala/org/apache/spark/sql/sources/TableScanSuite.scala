@@ -148,7 +148,7 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
       Map(Map(s"str_$i" -> i.toFloat) -> Row(i.toLong)),
       Row(i, i.toString),
       Row(Seq(s"str_$i", s"str_${i + 1}"), Row(Seq(Date.valueOf(s"1970-01-${i + 1}")))))
-  }.toSeq
+  }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -201,23 +201,23 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
 
   sqlTest(
     "SELECT * FROM oneToTen",
-    (1 to 10).map(Row(_)).toSeq)
+    (1 to 10).map(Row(_)))
 
   sqlTest(
     "SELECT i FROM oneToTen",
-    (1 to 10).map(Row(_)).toSeq)
+    (1 to 10).map(Row(_)))
 
   sqlTest(
     "SELECT i FROM oneToTen WHERE i < 5",
-    (1 to 4).map(Row(_)).toSeq)
+    (1 to 4).map(Row(_)))
 
   sqlTest(
     "SELECT i * 2 FROM oneToTen",
-    (1 to 10).map(i => Row(i * 2)).toSeq)
+    (1 to 10).map(i => Row(i * 2)))
 
   sqlTest(
     "SELECT a.i, b.i FROM oneToTen a JOIN oneToTen b ON a.i = b.i + 1",
-    (2 to 10).map(i => Row(i, i - 1)).toSeq)
+    (2 to 10).map(i => Row(i, i - 1)))
 
   test("Schema and all fields") {
     val expectedSchema = StructType(
@@ -297,15 +297,15 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
 
   sqlTest(
     "SELECT `string$%Field` FROM tableWithSchema",
-    (1 to 10).map(i => Row(s"str_$i")).toSeq)
+    (1 to 10).map(i => Row(s"str_$i")))
 
   sqlTest(
     "SELECT int_Field FROM tableWithSchema WHERE int_Field < 5",
-    (1 to 4).map(Row(_)).toSeq)
+    (1 to 4).map(Row(_)))
 
   sqlTest(
     "SELECT `longField_:,<>=+/~^` * 2 FROM tableWithSchema",
-    (1 to 10).map(i => Row(i * 2.toLong)).toSeq)
+    (1 to 10).map(i => Row(i * 2.toLong)))
 
   sqlTest(
     "SELECT structFieldSimple.key, arrayFieldSimple[1] FROM tableWithSchema a where int_Field=1",
@@ -313,7 +313,7 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
 
   sqlTest(
     "SELECT structFieldComplex.Value.`value_(2)` FROM tableWithSchema",
-    (1 to 10).map(i => Row(Seq(Date.valueOf(s"1970-01-${i + 1}")))).toSeq)
+    (1 to 10).map(i => Row(Seq(Date.valueOf(s"1970-01-${i + 1}")))))
 
   test("Caching")  {
     // Cached Query Execution
@@ -321,28 +321,28 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
     assertCached(sql("SELECT * FROM oneToTen"))
     checkAnswer(
       sql("SELECT * FROM oneToTen"),
-      (1 to 10).map(Row(_)).toSeq)
+      (1 to 10).map(Row(_)))
 
     assertCached(sql("SELECT i FROM oneToTen"))
     checkAnswer(
       sql("SELECT i FROM oneToTen"),
-      (1 to 10).map(Row(_)).toSeq)
+      (1 to 10).map(Row(_)))
 
     assertCached(sql("SELECT i FROM oneToTen WHERE i < 5"))
     checkAnswer(
       sql("SELECT i FROM oneToTen WHERE i < 5"),
-      (1 to 4).map(Row(_)).toSeq)
+      (1 to 4).map(Row(_)))
 
     assertCached(sql("SELECT i * 2 FROM oneToTen"))
     checkAnswer(
       sql("SELECT i * 2 FROM oneToTen"),
-      (1 to 10).map(i => Row(i * 2)).toSeq)
+      (1 to 10).map(i => Row(i * 2)))
 
     assertCached(sql(
       "SELECT a.i, b.i FROM oneToTen a JOIN oneToTen b ON a.i = b.i + 1"), 2)
     checkAnswer(sql(
       "SELECT a.i, b.i FROM oneToTen a JOIN oneToTen b ON a.i = b.i + 1"),
-      (2 to 10).map(i => Row(i, i - 1)).toSeq)
+      (2 to 10).map(i => Row(i, i - 1)))
 
     // Verify uncaching
     spark.catalog.uncacheTable("oneToTen")
@@ -362,7 +362,7 @@ class TableScanSuite extends DataSourceTest with SharedSparkSession {
 
     checkAnswer(
       sql("SELECT * FROM oneToTenDef"),
-      (1 to 10).map(Row(_)).toSeq)
+      (1 to 10).map(Row(_)))
   }
 
   test("exceptions") {

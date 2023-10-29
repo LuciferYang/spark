@@ -361,23 +361,23 @@ class InsertSuite extends DataSourceTest with SharedSparkSession {
     assertCached(sql("SELECT a FROM jsonTable"))
     checkAnswer(
       sql("SELECT a FROM jsonTable"),
-      (1 to 10).map(Row(_)).toSeq)
+      (1 to 10).map(Row(_)))
 
     assertCached(sql("SELECT a FROM jsonTable WHERE a < 5"))
     checkAnswer(
       sql("SELECT a FROM jsonTable WHERE a < 5"),
-      (1 to 4).map(Row(_)).toSeq)
+      (1 to 4).map(Row(_)))
 
     assertCached(sql("SELECT a * 2 FROM jsonTable"))
     checkAnswer(
       sql("SELECT a * 2 FROM jsonTable"),
-      (1 to 10).map(i => Row(i * 2)).toSeq)
+      (1 to 10).map(i => Row(i * 2)))
 
     assertCached(sql(
       "SELECT x.a, y.a FROM jsonTable x JOIN jsonTable y ON x.a = y.a + 1"), 2)
     checkAnswer(sql(
       "SELECT x.a, y.a FROM jsonTable x JOIN jsonTable y ON x.a = y.a + 1"),
-      (2 to 10).map(i => Row(i, i - 1)).toSeq)
+      (2 to 10).map(i => Row(i, i - 1)))
 
     // Insert overwrite and keep the same schema.
     sql(
@@ -410,7 +410,7 @@ class InsertSuite extends DataSourceTest with SharedSparkSession {
 
     checkAnswer(
       sql("SELECT * FROM oneToTen"),
-      (1 to 10).map(Row(_)).toSeq
+      (1 to 10).map(Row(_))
     )
 
     checkError(

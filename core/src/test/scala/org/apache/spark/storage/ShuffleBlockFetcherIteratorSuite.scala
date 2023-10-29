@@ -570,7 +570,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite with PrivateMethodT
       ShuffleBlockId(0, 3, 1),
       ShuffleBlockId(0, 3, 2),
       ShuffleBlockId(0, 4, 1))
-    val remoteBlockList = remoteBlocks.map(id => (id, id.mapId * 31L + id.reduceId, 1)).toSeq
+    val remoteBlockList = remoteBlocks.map(id => (id, id.mapId * 31L + id.reduceId, 1))
     val expectedSizeInBytes = Utils.bytesToString(remoteBlockList.map(_._2).sum)
     val appender = new LogAppender(expectedSizeInBytes)
     withLogAppender(appender, level = Some(Level.INFO)) {

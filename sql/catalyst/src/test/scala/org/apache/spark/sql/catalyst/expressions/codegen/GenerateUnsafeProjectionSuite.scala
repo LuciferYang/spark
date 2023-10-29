@@ -97,7 +97,7 @@ object AlwaysNull extends InternalRow {
 
 object AlwaysNonNull extends InternalRow {
   private def stringToUTF8Array(stringArray: Array[String]): ArrayData = {
-    val utf8Array = stringArray.map(s => UTF8String.fromString(s)).toArray
+    val utf8Array = stringArray.map(s => UTF8String.fromString(s))
     ArrayData.toArrayData(utf8Array)
   }
   override def numFields: Int = 1

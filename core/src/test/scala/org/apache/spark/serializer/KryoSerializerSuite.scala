@@ -623,7 +623,7 @@ class KryoSerializerAutoResetDisabledSuite extends SparkFunSuite with SharedSpar
     }
     // Make sure we disregard some data
     assert(serialized.length > 2)
-    val trucated = serialized.take(2).toArray
+    val trucated = serialized.take(2)
     val deserializationStream = serInstance.deserializeStream(new ByteArrayInputStream(trucated))
     intercept[EOFException](
       serInstance.deserializeStream(new ByteArrayInputStream(trucated)).readValue()

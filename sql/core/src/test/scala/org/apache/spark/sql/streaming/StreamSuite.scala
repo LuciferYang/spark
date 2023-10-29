@@ -174,7 +174,7 @@ class StreamSuite extends StreamTest {
         try {
           query.processAllAvailable()
           val outputDf = spark.read.parquet(outputDir.getAbsolutePath).as[Long]
-          checkDatasetUnorderly[Long](outputDf, (0L to 10L).union((0L to 10L)).toArray: _*)
+          checkDatasetUnorderly[Long](outputDf, (0L to 10L).union((0L to 10L)): _*)
         } finally {
           query.stop()
         }
@@ -224,7 +224,7 @@ class StreamSuite extends StreamTest {
             // Parquet write page-level CRC checksums will change the file size and
             // affect the data order when reading these files. Please see PARQUET-1746 for details.
             val outputDf = spark.read.parquet(outputDir.getAbsolutePath).sort($"a").as[Long]
-            checkDataset[Long](outputDf, (0L to 10L).toArray: _*)
+            checkDataset[Long](outputDf, (0L to 10L): _*)
           } finally {
             query.stop()
           }

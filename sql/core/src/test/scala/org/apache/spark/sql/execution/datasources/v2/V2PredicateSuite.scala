@@ -188,7 +188,7 @@ class V2PredicateSuite extends SparkFunSuite {
       values(i) = LiteralValue(i, IntegerType)
       expected += i + ", "
     }
-    val predicate3 = new Predicate("IN", (ref("a") +: values).toArray[Expression])
+    val predicate3 = new Predicate("IN", (ref("a") +: values))
     expected = expected.dropRight(2)  // remove the last ", "
     expected += ")"
     assert(predicate3.describe.equals(expected))

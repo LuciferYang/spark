@@ -80,7 +80,7 @@ class DictionaryEncodingSuite extends SparkFunSuite {
         buffer.position(headerSize)
         assertResult(DictionaryEncoding.typeId, "Wrong compression scheme ID")(buffer.getInt())
 
-        val dictionary = buildDictionary(buffer).toMap
+        val dictionary = buildDictionary(buffer)
 
         dictValues.foreach { i =>
           assertResult(i, "Wrong dictionary entry") {

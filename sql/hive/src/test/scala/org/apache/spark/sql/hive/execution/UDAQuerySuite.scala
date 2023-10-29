@@ -372,7 +372,7 @@ abstract class UDAQuerySuite extends QueryTest with SQLTestUtils with TestHiveSi
   }
 
   test("verify aggregator ser/de behavior") {
-    val data = sparkContext.parallelize((1 to 100).toSeq, 3).toDF("value1")
+    val data = sparkContext.parallelize((1 to 100), 3).toDF("value1")
     val agg = udaf(CountSerDeAgg)
     checkAnswer(
       data.agg(agg($"value1")),

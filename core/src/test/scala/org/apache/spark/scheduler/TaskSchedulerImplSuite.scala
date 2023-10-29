@@ -1136,7 +1136,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
         // that are explicitly excluded, plus all executors on nodes that are excluded.
         val execsForExcludedNodes = offers.filter { offer =>
           nodeExcludelist.contains(offer.host)
-        }.map(_.executorId).toSeq
+        }.map(_.executorId)
         val executorsWithAnyExclusions = (execExcludelist ++ execsForExcludedNodes).toSet
 
         // Schedule a taskset, and make sure our test setup is correct -- we are able to schedule

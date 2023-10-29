@@ -643,7 +643,7 @@ class BasicOperationsSuite extends TestSuiteBase {
     }
   }
 
-  val cleanupTestInput = (0 until 10).map(x => Seq(x, x + 1)).toSeq
+  val cleanupTestInput = (0 until 10).map(x => Seq(x, x + 1))
 
   test("rdd cleanup - map and window") {
     val rememberDuration = Seconds(3)

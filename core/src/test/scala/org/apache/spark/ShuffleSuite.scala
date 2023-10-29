@@ -418,7 +418,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     val reader = manager.getReader[Int, Int](shuffleHandle, 0, 1, taskContext, metrics)
     TaskContext.unset()
     val readData = reader.read().toIndexedSeq
-    assert(readData === data1.toIndexedSeq || readData === data2.toIndexedSeq)
+    assert(readData === data1 || readData === data2)
 
     manager.unregisterShuffle(0)
   }

@@ -77,7 +77,7 @@ class IndexedRowMatrixSuite extends SparkFunSuite with MLlibTestSparkContext {
     val rowMat = idxRowMat.toRowMatrix()
     assert(rowMat.numCols() === n)
     assert(rowMat.numRows() === 3, "should drop empty rows")
-    assert(rowMat.rows.collect().toSeq === data.map(_.vector).toSeq)
+    assert(rowMat.rows.collect().toSeq === data.map(_.vector))
   }
 
   test("toCoordinateMatrix") {

@@ -192,7 +192,7 @@ class ExternalAppendOnlyMapSuite extends SparkFunSuite
 
     // groupByKey
     val result2 = rdd.groupByKey().collect().map(x => (x._1, x._2.toList)).toSet
-    assert(result2.toSet === Set[(Int, Seq[Int])]
+    assert(result2 === Set[(Int, Seq[Int])]
       ((0, List[Int](1, 1, 1, 1, 1)), (1, List[Int](1, 1, 1, 1, 1))))
     sc.stop()
   }

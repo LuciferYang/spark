@@ -382,7 +382,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
       assert(repartitioned.partitions.size === finalPartitions)
       val partitions = repartitioned.glom().collect()
       // assert all elements are present
-      assert(repartitioned.collect().sortWith(_ > _).toSeq === input.toSeq.sortWith(_ > _).toSeq)
+      assert(repartitioned.collect().sortWith(_ > _).toSeq === input.toSeq.sortWith(_ > _))
       // assert no bucket is overloaded or empty
       for (partition <- partitions) {
         val avg = input.size / finalPartitions
@@ -1238,7 +1238,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
     val numCoalescedPartitions = 50
     val locations = Array("locA", "locB")
 
-    val inputRDD = sc.makeRDD(Range(0, numInputPartitions).toArray[Int], numInputPartitions)
+    val inputRDD = sc.makeRDD(Range(0, numInputPartitions), numInputPartitions)
     assert(inputRDD.getNumPartitions == numInputPartitions)
 
     val locationPrefRDD = new LocationPrefRDD(inputRDD, { (p: Partition) =>

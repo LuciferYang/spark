@@ -67,7 +67,7 @@ object MasterFailureTest extends Logging {
 
   def testMap(directory: String, numBatches: Int, batchDuration: Duration): Unit = {
     // Input: time=1 ==> [ 1 ] , time=2 ==> [ 2 ] , time=3 ==> [ 3 ] , ...
-    val input = (1 to numBatches).map(_.toString).toSeq
+    val input = (1 to numBatches).map(_.toString)
     // Expected output: time=1 ==> [ 1 ] , time=2 ==> [ 2 ] , time=3 ==> [ 3 ] , ...
     val expectedOutput = (1 to numBatches)
 
@@ -89,7 +89,7 @@ object MasterFailureTest extends Logging {
 
   def testUpdateStateByKey(directory: String, numBatches: Int, batchDuration: Duration): Unit = {
     // Input: time=1 ==> [ a ] , time=2 ==> [ a, a ] , time=3 ==> [ a, a, a ] , ...
-    val input = (1 to numBatches).map(i => (1 to i).map(_ => "a").mkString(" ")).toSeq
+    val input = (1 to numBatches).map(i => (1 to i).map(_ => "a").mkString(" "))
     // Expected output: time=1 ==> [ (a, 1) ] , time=2 ==> [ (a, 3) ] , time=3 ==> [ (a,6) ] , ...
     val expectedOutput = (1L to numBatches).map(i => (1L to i).sum).map(j => ("a", j))
 

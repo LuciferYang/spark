@@ -35,10 +35,10 @@ class ComplexDataSuite extends SparkFunSuite {
     val testMap4 = Map(utf8("key1") -> 1, utf8("key2") -> 2)
 
     // ArrayBasedMapData
-    val testArrayMap1 = ArrayBasedMapData(testMap1.toMap)
-    val testArrayMap2 = ArrayBasedMapData(testMap2.toMap)
-    val testArrayMap3 = ArrayBasedMapData(testMap3.toMap)
-    val testArrayMap4 = ArrayBasedMapData(testMap4.toMap)
+    val testArrayMap1 = ArrayBasedMapData(testMap1)
+    val testArrayMap2 = ArrayBasedMapData(testMap2)
+    val testArrayMap3 = ArrayBasedMapData(testMap3)
+    val testArrayMap4 = ArrayBasedMapData(testMap4)
     assert(testArrayMap1 !== testArrayMap3)
     assert(testArrayMap2 !== testArrayMap4)
 

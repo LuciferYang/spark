@@ -1259,7 +1259,7 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with PrivateMethodTe
   }
 
   test("negative byte values in ByteBufferInputStream") {
-    val buffer = ByteBuffer.wrap(Array[Int](254, 255, 0, 1, 2).map(_.toByte).toArray)
+    val buffer = ByteBuffer.wrap(Array[Int](254, 255, 0, 1, 2).map(_.toByte))
     val stream = new ByteBufferInputStream(buffer)
     val temp = new Array[Byte](10)
     assert(stream.read() === 254, "unexpected byte read")

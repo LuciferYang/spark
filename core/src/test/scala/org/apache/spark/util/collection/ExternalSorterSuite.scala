@@ -546,7 +546,7 @@ class ExternalSorterSuite extends SparkFunSuite with LocalSparkContext {
       if (withPartialAgg) {
         v = v.groupBy(_._1).view.mapValues { s => s.map(_._2).sum }.toSet
       }
-      (p, v.toSet)
+      (p, v)
     }.toSet
     assert(results === expected)
   }

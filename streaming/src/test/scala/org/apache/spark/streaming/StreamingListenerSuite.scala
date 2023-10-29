@@ -41,7 +41,7 @@ import org.apache.spark.streaming.scheduler._
 
 class StreamingListenerSuite extends TestSuiteBase with LocalStreamingContext with Matchers {
 
-  val input = (1 to 4).map(Seq(_)).toSeq
+  val input = (1 to 4).map(Seq(_))
   val operation = (d: DStream[Int]) => d.map(x => x)
 
   // To make sure that the processing start and end times in collected

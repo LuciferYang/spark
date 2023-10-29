@@ -86,7 +86,7 @@ class GradientDescentSuite extends SparkFunSuite with MLlibTestSparkContext with
     }
 
     val dataRDD = sc.parallelize(data, 2).cache()
-    val initialWeightsWithIntercept = Vectors.dense(initialWeights.toArray :+ 1.0)
+    val initialWeightsWithIntercept = Vectors.dense(initialWeights :+ 1.0)
 
     val (_, loss) = GradientDescent.runMiniBatchSGD(
       dataRDD,
@@ -163,7 +163,7 @@ class GradientDescentSuite extends SparkFunSuite with MLlibTestSparkContext with
     }
 
     val dataRDD = sc.parallelize(data, 2).cache()
-    val initialWeightsWithIntercept = Vectors.dense(initialWeights.toArray :+ 1.0)
+    val initialWeightsWithIntercept = Vectors.dense(initialWeights :+ 1.0)
 
     val (_, loss) = GradientDescent.runMiniBatchSGD(
       dataRDD,

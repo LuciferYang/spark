@@ -104,7 +104,7 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext with Encryptio
     val rdd = sc.parallelize(1 to numWorkers)
     val results = new DummyBroadcastClass(rdd).doSomething()
 
-    assert(results.toSet === (1 to numWorkers).map(x => (x, false)).toSet)
+    assert(results === (1 to numWorkers).map(x => (x, false)).toSet)
   }
 
   test("Unpersisting TorrentBroadcast on executors only in local mode") {

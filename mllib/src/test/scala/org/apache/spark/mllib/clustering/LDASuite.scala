@@ -131,7 +131,7 @@ class LDASuite extends SparkFunSuite with MLlibTestSparkContext {
     val topDocsByTopicDistributions = { n: Int =>
       Range(0, k).map { topic =>
         val (doc, docWeights) = topicDistributions.sortBy(-_._2(topic)).take(n).unzip
-        (doc.toArray, docWeights.map(_(topic)).toArray)
+        (doc, docWeights.map(_(topic)))
       }.toArray
     }
 
@@ -579,7 +579,7 @@ private[clustering] object LDASuite {
     values = tinyTopicsAsArray.fold(Array.empty[Double])(_ ++ _))
   def tinyTopicDescription: Array[(Array[Int], Array[Double])] = tinyTopicsAsArray.map { topic =>
     val (termWeights, terms) = topic.zipWithIndex.sortBy(-_._1).unzip
-    (terms.toArray, termWeights.toArray)
+    (terms, termWeights)
   }
 
   def tinyCorpus: Array[(Long, Vector)] = Array(

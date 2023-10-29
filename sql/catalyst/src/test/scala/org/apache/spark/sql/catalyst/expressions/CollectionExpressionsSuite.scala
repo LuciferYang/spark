@@ -742,7 +742,7 @@ class CollectionExpressionsSuite
       List(Row(null, Array[Byte](1.toByte, 5.toByte))))
 
     val longLiteral =
-      Literal.create((0 to 1000).toSeq, ArrayType(IntegerType))
+      Literal.create((0 to 1000), ArrayType(IntegerType))
 
     checkEvaluation(ArraysZip(Seq(literals(0), longLiteral)),
       List(Row(9001, 0), Row(9002, 1), Row(9003, 2)) ++
@@ -750,13 +750,13 @@ class CollectionExpressionsSuite
 
     val manyLiterals = (0 to 1000).map { _ =>
       Literal.create(Seq(1), ArrayType(IntegerType))
-    }.toSeq
+    }
 
     val numbers = List(
-      Row(Seq(9001) ++ (0 to 1000).map { _ => 1 }.toSeq: _*),
-      Row(Seq(9002) ++ (0 to 1000).map { _ => null }.toSeq: _*),
-      Row(Seq(9003) ++ (0 to 1000).map { _ => null }.toSeq: _*),
-      Row(Seq(null) ++ (0 to 1000).map { _ => null }.toSeq: _*))
+      Row(Seq(9001) ++ (0 to 1000).map { _ => 1 }: _*),
+      Row(Seq(9002) ++ (0 to 1000).map { _ => null }: _*),
+      Row(Seq(9003) ++ (0 to 1000).map { _ => null }: _*),
+      Row(Seq(null) ++ (0 to 1000).map { _ => null }: _*))
     checkEvaluation(ArraysZip(Seq(literals(0)) ++ manyLiterals),
       List(numbers(0), numbers(1), numbers(2), numbers(3)))
 
