@@ -18,7 +18,6 @@
 package org.apache.spark.util
 
 import scala.collection.immutable
-import scala.language.implicitConversions
 
 /**
  * Implicit methods related to Scala Array.
