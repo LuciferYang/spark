@@ -19,6 +19,7 @@ package org.apache.spark.ml.classification
 
 import java.util.UUID
 
+import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -215,7 +216,7 @@ final class OneVsRestModel private[ml] (
 
       tmpModel.transform(df)
         .withColumn(accColName, updateUDF(col(accColName), col(tmpRawPredName)))
-        .select(columns: _*)
+        .select(immutable.ArraySeq.unsafeWrapArray(columns): _*)
     }
 
     if (handlePersistence) {

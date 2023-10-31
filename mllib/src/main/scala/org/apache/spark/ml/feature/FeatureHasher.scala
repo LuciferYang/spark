@@ -17,6 +17,8 @@
 
 package org.apache.spark.ml.feature
 
+import scala.collection.immutable
+
 import org.apache.spark.SparkException
 import org.apache.spark.annotation.Since
 import org.apache.spark.ml.Transformer
@@ -187,7 +189,8 @@ class FeatureHasher(@Since("2.3.0") override val uid: String) extends Transforme
     }
 
     val metadata = outputSchema($(outputCol)).metadata
-    dataset.withColumn($(outputCol), hashFeatures(struct($(inputCols).map(col): _*)), metadata)
+    dataset.withColumn($(outputCol),
+      hashFeatures(struct(immutable.ArraySeq.unsafeWrapArray($(inputCols).map(col)): _*)), metadata)
   }
 
   @Since("2.3.0")

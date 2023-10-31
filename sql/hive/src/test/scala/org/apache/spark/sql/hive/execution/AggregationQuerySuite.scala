@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.hive.execution
 
+import scala.collection.immutable
 import scala.util.Random
 
 import test.org.apache.spark.sql.MyDoubleAvg
@@ -942,7 +943,7 @@ abstract class AggregationQuerySuite extends QueryTest with SQLTestUtils with Te
           .find(r => r.getInt(0) == 50)
           .getOrElse(fail("A row with id 50 should be the expected answer."))
       checkAnswer(
-        df.agg(udaf(allColumns: _*)),
+        df.agg(udaf(immutable.ArraySeq.unsafeWrapArray(allColumns): _*)),
         // udaf returns a Row as the output value.
         Row(expectedAnswer)
       )

@@ -19,7 +19,7 @@ package org.apache.spark.ml.feature
 
 import java.util.NoSuchElementException
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 import org.apache.spark.SparkException
 import org.apache.spark.annotation.Since
@@ -150,7 +150,8 @@ class VectorAssembler @Since("1.4.0") (@Since("1.4.0") override val uid: String)
       }
     }
 
-    filteredDataset.select(col("*"), assembleFunc(struct(args: _*)).as($(outputCol), metadata))
+    filteredDataset.select(col("*"),
+      assembleFunc(struct(immutable.ArraySeq.unsafeWrapArray(args): _*)).as($(outputCol), metadata))
   }
 
   @Since("1.4.0")

@@ -179,7 +179,8 @@ private[spark] object PythonRDD extends Logging {
     type UnrolledPartition = Array[ByteArray]
     val allPartitions: Array[UnrolledPartition] =
       sc.runJob(rdd, (x: Iterator[ByteArray]) => x.toArray, partitions.asScala.toSeq)
-    val flattenedPartition: UnrolledPartition = Array.concat(allPartitions: _*)
+    val flattenedPartition: UnrolledPartition = allPartitions.flatten
+    // Array.concat(scala.collection.immutable.ArraySeq.unsafeWrapArray(allPartitions): _*)
     serveIterator(flattenedPartition.iterator,
       s"serve RDD ${rdd.id} with partitions ${partitions.asScala.mkString(",")}")
   }

@@ -19,6 +19,7 @@ package org.apache.spark.sql
 
 import java.util.concurrent.LinkedBlockingQueue
 
+import scala.collection.immutable
 import scala.sys.process._
 import scala.util.Try
 
@@ -169,7 +170,7 @@ class TPCDSTables(spark: SparkSession, dsdgenDir: String, scaleFactor: Int)
           }
           c.as(f.name)
         }
-        stringData.select(columns: _*)
+        stringData.select(immutable.ArraySeq.unsafeWrapArray(columns): _*)
       }
 
       convertedData

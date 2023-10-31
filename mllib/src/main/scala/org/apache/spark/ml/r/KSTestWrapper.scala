@@ -17,6 +17,8 @@
 
 package org.apache.spark.ml.r
 
+import scala.collection.immutable
+
 import org.apache.spark.mllib.stat.Statistics.kolmogorovSmirnovTest
 import org.apache.spark.mllib.stat.test.KolmogorovSmirnovTestResult
 import org.apache.spark.sql.{DataFrame, Row}
@@ -49,7 +51,8 @@ private[r] object KSTestWrapper {
       case Row(feature: Double) => feature
     }
 
-    val ksTestResult = kolmogorovSmirnovTest(rddData, distName, distParams : _*)
+    val ksTestResult =
+      kolmogorovSmirnovTest(rddData, distName, immutable.ArraySeq.unsafeWrapArray(distParams): _*)
 
     new KSTestWrapper(ksTestResult, distName, distParams)
   }

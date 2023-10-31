@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -240,7 +240,7 @@ case class Stack(children: Seq[Expression]) extends Generator {
         val index = row * numFields + col
         fields.update(col, if (index < values.length) values(index) else null)
       }
-      InternalRow(fields: _*)
+      InternalRow.fromSeq(immutable.ArraySeq.unsafeWrapArray(fields))
     }
   }
 
@@ -298,7 +298,7 @@ case class ReplicateRows(children: Seq[Expression]) extends Generator with Codeg
       for (col <- 0 until numColumns) {
         fields.update(col, values(col))
       }
-      InternalRow(fields: _*)
+      InternalRow.fromSeq(immutable.ArraySeq.unsafeWrapArray(fields))
     }
   }
 

@@ -1044,7 +1044,8 @@ abstract class RDD[T: ClassTag](
    */
   def collect(): Array[T] = withScope {
     val results = sc.runJob(this, (iter: Iterator[T]) => iter.toArray)
-    Array.concat(results: _*)
+    results.flatten
+    // Array.concat(scala.collection.immutable.ArraySeq.unsafeWrapArray(results): _*)
   }
 
   /**

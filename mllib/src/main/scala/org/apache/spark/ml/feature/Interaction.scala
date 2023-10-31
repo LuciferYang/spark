@@ -17,6 +17,7 @@
 
 package org.apache.spark.ml.feature
 
+import scala.collection.immutable
 import scala.collection.mutable.ArrayBuilder
 
 import org.apache.spark.SparkException
@@ -110,7 +111,8 @@ class Interaction @Since("1.6.0") (@Since("1.6.0") override val uid: String) ext
     }
     dataset.select(
       col("*"),
-      interactFunc(struct(featureCols: _*)).as($(outputCol), featureAttrs.toMetadata()))
+      interactFunc(struct(immutable.ArraySeq.unsafeWrapArray(featureCols): _*))
+        .as($(outputCol), featureAttrs.toMetadata()))
   }
 
   /**

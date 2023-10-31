@@ -17,6 +17,7 @@
 
 package org.apache.spark.ml.tree
 
+import scala.collection.immutable
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.fs.Path
@@ -535,7 +536,7 @@ private[ml] object EnsembleModelReadWrite {
       val newNodeDataCol = df.schema("nodeData").dataType match {
         case StructType(fields) =>
           val cols = fields.map(f => col(s"nodeData.${f.name}")) :+ lit(-1L).as("rawCount")
-          struct(cols: _*)
+          struct(immutable.ArraySeq.unsafeWrapArray(cols): _*)
       }
       df = df.withColumn("nodeData", newNodeDataCol)
     }

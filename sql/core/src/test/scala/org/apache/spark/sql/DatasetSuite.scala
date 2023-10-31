@@ -20,6 +20,7 @@ package org.apache.spark.sql
 import java.io.{Externalizable, ObjectInput, ObjectOutput}
 import java.sql.{Date, Timestamp}
 
+import scala.collection.immutable
 import scala.reflect.ClassTag
 import scala.util.Random
 
@@ -2061,7 +2062,7 @@ class DatasetSuite extends QueryTest
       val expected = Seq((Some(1), Some(1.2))).toDS()
       val joined = a.joinWith(b, lit(true))
       assert(joined.schema == expected.schema)
-      checkDataset(joined, expected.collect(): _*)
+      checkDataset(joined, immutable.ArraySeq.unsafeWrapArray(expected.collect()): _*)
     }
   }
 
@@ -2075,7 +2076,8 @@ class DatasetSuite extends QueryTest
     val ds1 = spark.createDataset(rdd)
     val ds2 = spark.createDataset(rdd)(encoder)
     assert(ds1.schema == ds2.schema)
-    checkDataset(ds1.select("_2._2"), ds2.select("_2._2").collect(): _*)
+    checkDataset(ds1.select("_2._2"),
+      immutable.ArraySeq.unsafeWrapArray(ds2.select("_2._2").collect()): _*)
   }
 
   test("SPARK-23862: Spark ExpressionEncoder should support Java Enum type from Scala") {

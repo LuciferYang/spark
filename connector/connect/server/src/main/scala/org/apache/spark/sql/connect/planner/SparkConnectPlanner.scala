@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.connect.planner
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -1181,7 +1181,7 @@ class SparkConnectPlanner(
           .ofRows(
             session,
             logicalPlan = logical.LocalRelation(normalize(structType).asInstanceOf[StructType]))
-          .toDF(normalized.names: _*)
+          .toDF(immutable.ArraySeq.unsafeWrapArray(normalized.names): _*)
           .to(normalized)
           .logicalPlan
           .asInstanceOf[Project]

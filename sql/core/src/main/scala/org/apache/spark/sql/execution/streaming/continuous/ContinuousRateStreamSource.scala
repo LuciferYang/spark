@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.streaming.continuous
 
+import scala.collection.immutable
+
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 
@@ -42,7 +44,7 @@ class RateStreamContinuousStream(rowsPerSecond: Long, numPartitions: Int) extend
       case RateStreamPartitionOffset(i, currVal, nextRead) =>
         (i, ValueRunTimeMsPair(currVal, nextRead))
     }
-    RateStreamOffset(Map(tuples: _*))
+    RateStreamOffset(Map(immutable.ArraySeq.unsafeWrapArray(tuples): _*))
   }
 
   override def deserializeOffset(json: String): Offset = {

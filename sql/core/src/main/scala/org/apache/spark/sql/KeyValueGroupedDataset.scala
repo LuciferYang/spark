@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql
 
+import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.api.java.function._
@@ -241,7 +242,8 @@ class KeyValueGroupedDataset[K, V] private[sql](
       SortExprs: Array[Column],
       f: FlatMapGroupsFunction[K, V, U],
       encoder: Encoder[U]): Dataset[U] = {
-    flatMapSortedGroups(SortExprs: _*)((key, data) => f.call(key, data.asJava).asScala)(encoder)
+    flatMapSortedGroups(immutable.ArraySeq.unsafeWrapArray(SortExprs): _*)(
+      (key, data) => f.call(key, data.asJava).asScala)(encoder)
   }
 
   /**
@@ -901,7 +903,8 @@ class KeyValueGroupedDataset[K, V] private[sql](
       otherSortExprs: Array[Column],
       f: CoGroupFunction[K, V, U, R],
       encoder: Encoder[R]): Dataset[R] = {
-    cogroupSorted(other)(thisSortExprs: _*)(otherSortExprs: _*)(
+    cogroupSorted(other)(immutable.ArraySeq.unsafeWrapArray(thisSortExprs): _*)(
+      immutable.ArraySeq.unsafeWrapArray(otherSortExprs): _*)(
       (key, left, right) => f.call(key, left.asJava, right.asJava).asScala)(encoder)
   }
 

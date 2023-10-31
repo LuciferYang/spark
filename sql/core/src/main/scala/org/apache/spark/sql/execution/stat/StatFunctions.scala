@@ -255,7 +255,7 @@ object StatFunctions extends Logging {
       }
       ds.select(mapColumns: _*)
         .withColumn("summary", explode(lit(selectedStatistics)))
-        .select(Array(col("summary")) ++ valueColumns: _*)
+        .select(Seq(col("summary")) ++ valueColumns: _*)
     }
   }
 }

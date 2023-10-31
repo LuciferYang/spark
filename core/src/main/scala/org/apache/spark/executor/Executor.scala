@@ -324,7 +324,8 @@ private[spark] class Executor(
   private val Seq(initialUserJars, initialUserFiles, initialUserArchives) =
     Seq("jar", "file", "archive").map { key =>
       conf.getOption(s"spark.app.initial.$key.urls").map { urls =>
-        immutable.Map(urls.split(",").map(url => (url, appStartTime)): _*)
+        immutable.Map(
+          immutable.ArraySeq.unsafeWrapArray(urls.split(",").map(url => (url, appStartTime))): _*)
       }.getOrElse(immutable.Map.empty)
     }
   updateDependencies(initialUserFiles, initialUserJars, initialUserArchives, defaultSessionState)

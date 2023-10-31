@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.csv
 import java.io.File
 import java.time.{Instant, LocalDate}
 
+import scala.collection.immutable
+
 import org.apache.spark.benchmark.Benchmark
 import org.apache.spark.sql.{Column, Dataset, Row}
 import org.apache.spark.sql.execution.benchmark.SqlBasedBenchmark
@@ -87,7 +89,7 @@ object CSVBenchmark extends SqlBasedBenchmark {
       }
       val cols100 = columnNames.take(100).map(Column(_))
       benchmark.addCase(s"Select 100 columns", numIters) { _ =>
-        ds.select(cols100: _*).noop()
+        ds.select(immutable.ArraySeq.unsafeWrapArray(cols100): _*).noop()
       }
       benchmark.addCase(s"Select one column", numIters) { _ =>
         ds.select($"col1").noop()
@@ -100,7 +102,7 @@ object CSVBenchmark extends SqlBasedBenchmark {
         (1 until colsNum).map(i => StructField(s"col$i", IntegerType)))
       val dsErr1 = spark.read.schema(schemaErr1).csv(path.getAbsolutePath)
       benchmark.addCase(s"Select 100 columns, one bad input field", numIters) { _ =>
-        dsErr1.select(cols100: _*).noop()
+        dsErr1.select(immutable.ArraySeq.unsafeWrapArray(cols100): _*).noop()
       }
 
       val badRecColName = "badRecord"
@@ -109,7 +111,8 @@ object CSVBenchmark extends SqlBasedBenchmark {
         .option("columnNameOfCorruptRecord", badRecColName)
         .csv(path.getAbsolutePath)
       benchmark.addCase(s"Select 100 columns, corrupt record field", numIters) { _ =>
-        dsErr2.select((Column(badRecColName) +: cols100): _*).noop()
+        dsErr2.select(Column(badRecColName) +: immutable.ArraySeq.unsafeWrapArray(cols100): _*)
+          .noop()
       }
 
       benchmark.run()

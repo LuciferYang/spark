@@ -19,6 +19,8 @@ package org.apache.spark.ml.util
 
 import java.io.File
 
+import scala.collection.immutable
+
 import org.scalatest.Suite
 
 import org.apache.spark.{DebugFilesystem, SparkConf, SparkContext, TestUtils}
@@ -107,13 +109,13 @@ trait MLTest extends StreamTest with TempDirectory { self: Suite =>
       otherResultCols: String*)
       (globalCheckFunction: Seq[Row] => Unit): Unit = {
 
-    val columnNames = dataframe.schema.fieldNames
+    val columnNames = immutable.ArraySeq.unsafeWrapArray(dataframe.schema.fieldNames)
     val stream = MemoryStream[A]
     val columnsWithMetadata = dataframe.schema.map { structField =>
       col(structField.name).as(structField.name, structField.metadata)
     }
     val streamDF = stream.toDS().toDF(columnNames: _*).select(columnsWithMetadata: _*)
-    val data = dataframe.as[A].collect()
+    val data = immutable.ArraySeq.unsafeWrapArray(dataframe.as[A].collect())
 
     val streamOutput = transformer.transform(streamDF)
       .select(firstResultCol, otherResultCols: _*)

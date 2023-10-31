@@ -19,6 +19,8 @@ package org.apache.spark.sql
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZoneId}
 
+import scala.collection.immutable
+
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.catalyst.parser.ParseException
 import org.apache.spark.sql.functions.{array, call_function, lit, map, map_from_arrays, map_from_entries, str_to_map, struct}
@@ -540,21 +542,23 @@ class ParametersSuite extends QueryTest with SharedSparkSession {
     }
     def createMap(keys: Array[_], values: Array[_]): Column = {
       val zipped = keys.map(k => Column(Literal(k))).zip(values.map(v => Column(Literal(v))))
-      map(zipped.map { case (k, v) => Seq(k, v) }.flatten: _*)
+      map(immutable.ArraySeq.unsafeWrapArray(zipped.flatMap { case (k, v) => Seq(k, v) }): _*)
     }
     def callMap(keys: Array[_], values: Array[_]): Column = {
       val zipped = keys.map(k => Column(Literal(k))).zip(values.map(v => Column(Literal(v))))
-      call_function("map", zipped.map { case (k, v) => Seq(k, v) }.flatten: _*)
+      call_function("map",
+        immutable.ArraySeq.unsafeWrapArray(zipped.flatMap { case (k, v) => Seq(k, v) }): _*)
     }
     def fromEntries(keys: Array[_], values: Array[_]): Column = {
       val structures = keys.zip(values)
         .map { case (k, v) => struct(Column(Literal(k)), Column(Literal(v)))}
-      map_from_entries(array(structures: _*))
+      map_from_entries(array(immutable.ArraySeq.unsafeWrapArray(structures): _*))
     }
     def callFromEntries(keys: Array[_], values: Array[_]): Column = {
       val structures = keys.zip(values)
         .map { case (k, v) => struct(Column(Literal(k)), Column(Literal(v)))}
-      call_function("map_from_entries", call_function("array", structures: _*))
+      call_function("map_from_entries",
+        call_function("array", immutable.ArraySeq.unsafeWrapArray(structures): _*))
     }
 
     Seq(fromArr(_, _), createMap(_, _), callFromArr(_, _), callMap(_, _)).foreach { f =>

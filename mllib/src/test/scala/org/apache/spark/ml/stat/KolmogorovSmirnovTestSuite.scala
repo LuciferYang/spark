@@ -17,6 +17,8 @@
 
 package org.apache.spark.ml.stat
 
+import scala.collection.immutable
+
 import org.apache.commons.math3.distribution.{ExponentialDistribution, NormalDistribution,
   RealDistribution, UniformRealDistribution}
 import org.apache.commons.math3.stat.inference.{KolmogorovSmirnovTest => Math3KSTest}
@@ -62,7 +64,7 @@ class KolmogorovSmirnovTestSuite
       } else {
         KolmogorovSmirnovTest.test(sampledDF, "sample",
           theoreticalDistByName._1,
-          theoreticalDistByName._2: _*
+          immutable.ArraySeq.unsafeWrapArray(theoreticalDistByName._2): _*
         ).head()
       }
     val theoreticalDistMath3 = if (theoreticalDist == null) {

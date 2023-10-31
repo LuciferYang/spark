@@ -24,6 +24,7 @@ import java.sql.{Date, Timestamp}
 import java.util.{Locale, UUID}
 import java.util.concurrent.atomic.AtomicLong
 
+import scala.collection.immutable
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Random
 
@@ -1181,7 +1182,7 @@ class DataFrameSuite extends QueryTest
 
   test("summary advanced") {
     val stats = Array("count", "50.01%", "max", "mean", "min", "25%")
-    val orderMatters = person2.summary(stats: _*)
+    val orderMatters = person2.summary(immutable.ArraySeq.unsafeWrapArray(stats): _*)
     assert(orderMatters.collect().map(_.getString(0)) === stats)
 
     val onlyPercentiles = person2.summary("0.1%", "99.9%")

@@ -17,7 +17,7 @@
 
 package org.apache.spark.ml.feature
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.Path
@@ -476,7 +476,7 @@ private class ColumnPruner(override val uid: String, val columnsToPrune: Set[Str
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     val columnsToKeep = dataset.columns.filter(!columnsToPrune.contains(_))
-    dataset.select(columnsToKeep.map(dataset.col): _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(columnsToKeep.map(dataset.col)): _*)
   }
 
   override def transformSchema(schema: StructType): StructType = {
@@ -564,7 +564,7 @@ private class VectorAttributeRewriter(
     }
     val otherCols = dataset.columns.filter(_ != vectorCol).map(dataset.col)
     val rewrittenCol = dataset.col(vectorCol).as(vectorCol, metadata)
-    dataset.select(otherCols :+ rewrittenCol : _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(otherCols) :+ rewrittenCol : _*)
   }
 
   override def transformSchema(schema: StructType): StructType = {

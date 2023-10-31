@@ -18,6 +18,7 @@
 package org.apache.spark.mllib.util
 
 import scala.annotation.varargs
+import scala.collection.immutable
 import scala.reflect.ClassTag
 
 import org.apache.spark.{SparkContext, SparkException}
@@ -359,7 +360,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(exprs: _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
   }
 
   /**
@@ -411,7 +412,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(exprs: _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
   }
 
   /**
@@ -461,7 +462,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(exprs: _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
   }
 
   /**
@@ -511,7 +512,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(exprs: _*)
+    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
   }
 
 

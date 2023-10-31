@@ -21,6 +21,7 @@ import java.io._
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 
+import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -709,7 +710,7 @@ class CliSuite extends SparkFunSuite {
           "--conf", s"${SQLConf.ERROR_MESSAGE_FORMAT.key}=$format",
           "--conf", s"${SQLConf.ANSI_ENABLED.key}=true",
           "-e", "select 1 / 0"),
-        errorResponses = Seq("DIVIDE_BY_ZERO"))(expected: _*)
+        errorResponses = Seq("DIVIDE_BY_ZERO"))(immutable.ArraySeq.unsafeWrapArray(expected): _*)
     }
     check(
       format = ErrorMessageFormat.PRETTY,

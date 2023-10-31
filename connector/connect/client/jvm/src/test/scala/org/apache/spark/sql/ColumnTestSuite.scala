@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import java.io.ByteArrayOutputStream
 
+import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.sql.{functions => fn}
@@ -207,5 +208,5 @@ class ColumnTestSuite extends ConnectFunSuite {
   private val structType1 = new StructType().add("a", "int").add("b", "string")
   private val structType2 = structType1.add("c", "binary")
   testColName(structType1, _.struct(structType1))
-  testColName(structType2, _.struct(structType2.fields: _*))
+  testColName(structType2, _.struct(immutable.ArraySeq.unsafeWrapArray(structType2.fields): _*))
 }

@@ -21,6 +21,7 @@ import java.util.{Iterator => JIterator}
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicLong
 
+import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.api.java.function._
@@ -286,7 +287,9 @@ class UserDefinedFunctionE2ETestSuite extends QueryTest {
     import session.implicits._
     val df = Seq((1, 2, 3)).toDF("a", "b", "c")
     val f = udf((row: Row) => row.schema.fieldNames)
-    checkDataset(df.select(f(struct(df.columns map col: _*))), Row(Seq("a", "b", "c")))
+    checkDataset(
+      df.select(f(struct(immutable.ArraySeq.unsafeWrapArray(df.columns map col): _*))),
+      Row(Seq("a", "b", "c")))
   }
 
   test("Filter with row input encoder") {

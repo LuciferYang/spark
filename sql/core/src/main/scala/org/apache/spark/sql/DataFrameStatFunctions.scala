@@ -19,6 +19,7 @@ package org.apache.spark.sql
 
 import java.{lang => jl, util => ju}
 
+import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.annotation.Stable
@@ -99,7 +100,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
       probabilities: Array[Double],
       relativeError: Double): Array[Array[Double]] = {
     StatFunctions.multipleApproxQuantiles(
-      df.select(cols.map(col): _*),
+      df.select(immutable.ArraySeq.unsafeWrapArray(cols.map(col)): _*),
       cols,
       probabilities,
       relativeError).map(_.toArray).toArray
