@@ -81,9 +81,6 @@ class DriverCommandFeatureStepSuite extends SparkFunSuite {
           envDriverPy.map(v => ENV_PYSPARK_DRIVER_PYTHON -> v :: Nil)
         ).flatten)
 
-      // scalastyle:off
-      println(pythonEnvs)
-
       val spec = applyFeatureStep(
         PythonMainAppResource(mainResource),
         conf = sparkConf,
