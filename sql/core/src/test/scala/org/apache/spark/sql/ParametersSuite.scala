@@ -550,7 +550,7 @@ class ParametersSuite extends QueryTest with SharedSparkSession {
     def fromEntries(keys: Array[_], values: Array[_]): Column = {
       val structures = keys.zip(values)
         .map { case (k, v) => struct(Column(Literal(k)), Column(Literal(v)))}
-      map_from_entries(array(structures: _*))
+      map_from_entries(array(structures.toImmutableArraySeq: _*))
     }
     def callFromEntries(keys: Array[_], values: Array[_]): Column = {
       val structures = keys.zip(values)
