@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql
 
-import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.api.java.function._
@@ -28,6 +27,7 @@ import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.expressions.ReduceAggregator
 import org.apache.spark.sql.internal.TypedAggUtils
 import org.apache.spark.sql.streaming.{GroupState, GroupStateTimeout, OutputMode}
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * A [[Dataset]] has been logically grouped by a user specified grouping key.  Users should not
@@ -242,7 +242,7 @@ class KeyValueGroupedDataset[K, V] private[sql](
       SortExprs: Array[Column],
       f: FlatMapGroupsFunction[K, V, U],
       encoder: Encoder[U]): Dataset[U] = {
-    flatMapSortedGroups(immutable.ArraySeq.unsafeWrapArray(SortExprs): _*)(
+    flatMapSortedGroups(SortExprs.toImmutableArraySeq: _*)(
       (key, data) => f.call(key, data.asJava).asScala)(encoder)
   }
 
@@ -903,8 +903,8 @@ class KeyValueGroupedDataset[K, V] private[sql](
       otherSortExprs: Array[Column],
       f: CoGroupFunction[K, V, U, R],
       encoder: Encoder[R]): Dataset[R] = {
-    cogroupSorted(other)(immutable.ArraySeq.unsafeWrapArray(thisSortExprs): _*)(
-      immutable.ArraySeq.unsafeWrapArray(otherSortExprs): _*)(
+    cogroupSorted(other)(thisSortExprs.toImmutableArraySeq: _*)(
+      otherSortExprs.toImmutableArraySeq: _*)(
       (key, left, right) => f.call(key, left.asJava, right.asJava).asScala)(encoder)
   }
 

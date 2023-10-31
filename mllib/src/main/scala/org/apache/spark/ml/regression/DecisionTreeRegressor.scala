@@ -17,8 +17,6 @@
 
 package org.apache.spark.ml.regression
 
-import scala.collection.immutable
-
 import org.apache.hadoop.fs.Path
 import org.json4s.{DefaultFormats, JObject}
 import org.json4s.JsonDSL._
@@ -38,6 +36,7 @@ import org.apache.spark.mllib.tree.model.{DecisionTreeModel => OldDecisionTreeMo
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * <a href="http://en.wikipedia.org/wiki/Decision_tree_learning">Decision tree</a>
@@ -131,7 +130,7 @@ class DecisionTreeRegressor @Since("1.4.0") (@Since("1.4.0") override val uid: S
 
     instr.logPipelineStage(this)
     instr.logDataset(instances)
-    instr.logParams(this, immutable.ArraySeq.unsafeWrapArray(params): _*)
+    instr.logParams(this, params.toImmutableArraySeq: _*)
 
     val trees = RandomForest.run(instances, strategy, numTrees = 1, featureSubsetStrategy = "all",
       seed = $(seed), instr = Some(instr), parentUID = Some(uid))

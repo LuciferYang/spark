@@ -21,7 +21,6 @@ import java.util.{Iterator => JIterator}
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicLong
 
-import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.api.java.function._
@@ -30,6 +29,7 @@ import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{PrimitiveIntEnco
 import org.apache.spark.sql.functions.{col, struct, udf}
 import org.apache.spark.sql.test.QueryTest
 import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * All tests in this class requires client UDF defined in this test class synced with the server.
@@ -287,8 +287,7 @@ class UserDefinedFunctionE2ETestSuite extends QueryTest {
     import session.implicits._
     val df = Seq((1, 2, 3)).toDF("a", "b", "c")
     val f = udf((row: Row) => row.schema.fieldNames)
-    checkDataset(
-      df.select(f(struct(immutable.ArraySeq.unsafeWrapArray(df.columns map col): _*))),
+    checkDataset(df.select(f(struct((df.columns map col).toImmutableArraySeq: _*))),
       Row(Seq("a", "b", "c")))
   }
 

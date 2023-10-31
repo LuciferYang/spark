@@ -19,7 +19,6 @@ package org.apache.spark.ml.classification
 
 import java.util.UUID
 
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -42,6 +41,7 @@ import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.ThreadUtils
 
 private[ml] trait ClassifierTypeTrait {
@@ -216,7 +216,7 @@ final class OneVsRestModel private[ml] (
 
       tmpModel.transform(df)
         .withColumn(accColName, updateUDF(col(accColName), col(tmpRawPredName)))
-        .select(immutable.ArraySeq.unsafeWrapArray(columns): _*)
+        .select(columns.toImmutableArraySeq: _*)
     }
 
     if (handlePersistence) {

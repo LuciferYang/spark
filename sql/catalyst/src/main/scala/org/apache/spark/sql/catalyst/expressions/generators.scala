@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -34,6 +34,7 @@ import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * An expression that produces zero or more rows given a single input row.
@@ -240,7 +241,7 @@ case class Stack(children: Seq[Expression]) extends Generator {
         val index = row * numFields + col
         fields.update(col, if (index < values.length) values(index) else null)
       }
-      InternalRow.fromSeq(immutable.ArraySeq.unsafeWrapArray(fields))
+      InternalRow(fields.toImmutableArraySeq: _*)
     }
   }
 
@@ -298,7 +299,7 @@ case class ReplicateRows(children: Seq[Expression]) extends Generator with Codeg
       for (col <- 0 until numColumns) {
         fields.update(col, values(col))
       }
-      InternalRow.fromSeq(immutable.ArraySeq.unsafeWrapArray(fields))
+      InternalRow(fields.toImmutableArraySeq: _*)
     }
   }
 

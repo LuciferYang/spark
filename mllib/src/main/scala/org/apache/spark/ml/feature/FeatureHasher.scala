@@ -17,8 +17,6 @@
 
 package org.apache.spark.ml.feature
 
-import scala.collection.immutable
-
 import org.apache.spark.SparkException
 import org.apache.spark.annotation.Since
 import org.apache.spark.ml.Transformer
@@ -33,6 +31,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.hash.Murmur3_x86_32.{hashInt, hashLong, hashUnsafeBytes2}
 import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.OpenHashMap
 
@@ -190,7 +189,7 @@ class FeatureHasher(@Since("2.3.0") override val uid: String) extends Transforme
 
     val metadata = outputSchema($(outputCol)).metadata
     dataset.withColumn($(outputCol),
-      hashFeatures(struct(immutable.ArraySeq.unsafeWrapArray($(inputCols).map(col)): _*)), metadata)
+      hashFeatures(struct($(inputCols).map(col).toImmutableArraySeq: _*)), metadata)
   }
 
   @Since("2.3.0")

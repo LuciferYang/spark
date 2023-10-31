@@ -80,6 +80,7 @@ import org.apache.spark.sql.streaming.{GroupStateTimeout, OutputMode, StreamingQ
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.storage.CacheId
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils
 
 final case class InvalidCommandInput(
@@ -1182,7 +1183,7 @@ class SparkConnectPlanner(
           .ofRows(
             session,
             logicalPlan = logical.LocalRelation(normalize(structType).asInstanceOf[StructType]))
-          .toDF(immutable.ArraySeq.unsafeWrapArray(normalized.names): _*)
+          .toDF(normalized.names.toImmutableArraySeq: _*)
           .to(normalized)
           .logicalPlan
           .asInstanceOf[Project]

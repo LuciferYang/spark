@@ -20,13 +20,12 @@ package org.apache.spark.ml.source.image
 import java.net.URI
 import java.nio.file.Paths
 
-import scala.collection.immutable
-
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.ml.image.ImageSchema._
 import org.apache.spark.mllib.util.MLlibTestSparkContext
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions.{col, substring_index}
+import org.apache.spark.util.ArrayImplicits._
 
 class ImageFileFormatSuite extends SparkFunSuite with MLlibTestSparkContext {
 
@@ -97,7 +96,7 @@ class ImageFileFormatSuite extends SparkFunSuite with MLlibTestSparkContext {
       .select(substring_index(col("image.origin"), "/", -1).as("origin"), col("cls"), col("date"))
       .collect()
 
-    assert(Set(immutable.ArraySeq.unsafeWrapArray(result): _*) === Set(
+    assert(Set(result.toImmutableArraySeq: _*) === Set(
       Row("29.5.a_b_EGDP022204.jpg", "kittens", "2018-01"),
       Row("54893.jpg", "kittens", "2018-02"),
       Row("DP153539.jpg", "kittens", "2018-02"),

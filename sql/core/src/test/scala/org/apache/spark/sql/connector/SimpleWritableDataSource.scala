@@ -19,7 +19,6 @@ package org.apache.spark.sql.connector
 
 import java.io.{BufferedReader, InputStreamReader, IOException}
 
-import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.hadoop.conf.Configuration
@@ -32,6 +31,7 @@ import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader, PartitionReaderFactory, ScanBuilder}
 import org.apache.spark.sql.connector.write._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
 
 /**
@@ -173,8 +173,8 @@ class CSVReaderFactory(conf: SerializableConfiguration)
         }
       }
 
-      override def get(): InternalRow = InternalRow.fromSeq(
-        immutable.ArraySeq.unsafeWrapArray(currentLine.split(",").map(_.trim.toInt)))
+      override def get(): InternalRow = InternalRow(
+        currentLine.split(",").map(_.trim.toInt).toImmutableArraySeq: _*)
 
       override def close(): Unit = {
         inputStream.close()

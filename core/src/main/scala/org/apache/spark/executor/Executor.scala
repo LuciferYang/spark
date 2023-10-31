@@ -54,6 +54,7 @@ import org.apache.spark.shuffle.{FetchFailedException, ShuffleBlockPusher}
 import org.apache.spark.status.api.v1.ThreadStackTrace
 import org.apache.spark.storage.{StorageLevel, TaskResultBlockId}
 import org.apache.spark.util._
+import org.apache.spark.util.ArrayImplicits._
 
 private[spark] class IsolatedSessionState(
   val sessionUUID: String,
@@ -324,8 +325,7 @@ private[spark] class Executor(
   private val Seq(initialUserJars, initialUserFiles, initialUserArchives) =
     Seq("jar", "file", "archive").map { key =>
       conf.getOption(s"spark.app.initial.$key.urls").map { urls =>
-        immutable.Map(
-          immutable.ArraySeq.unsafeWrapArray(urls.split(",").map(url => (url, appStartTime))): _*)
+        immutable.Map(urls.split(",").map(url => (url, appStartTime)).toImmutableArraySeq: _*)
       }.getOrElse(immutable.Map.empty)
     }
   updateDependencies(initialUserFiles, initialUserJars, initialUserArchives, defaultSessionState)

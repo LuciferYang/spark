@@ -18,7 +18,6 @@
 package org.apache.spark.mllib.util
 
 import scala.annotation.varargs
-import scala.collection.immutable
 import scala.reflect.ClassTag
 
 import org.apache.spark.{SparkContext, SparkException}
@@ -34,6 +33,7 @@ import org.apache.spark.sql.execution.datasources.DataSource
 import org.apache.spark.sql.execution.datasources.text.TextFileFormat
 import org.apache.spark.sql.functions._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.random.BernoulliCellSampler
 
 /**
@@ -360,7 +360,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
+    dataset.select(exprs.toImmutableArraySeq: _*)
   }
 
   /**
@@ -412,7 +412,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
+    dataset.select(exprs.toImmutableArraySeq: _*)
   }
 
   /**
@@ -462,7 +462,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
+    dataset.select(exprs.toImmutableArraySeq: _*)
   }
 
   /**
@@ -512,7 +512,7 @@ object MLUtils extends Logging {
         col(c)
       }
     }
-    dataset.select(immutable.ArraySeq.unsafeWrapArray(exprs): _*)
+    dataset.select(exprs.toImmutableArraySeq: _*)
   }
 
 

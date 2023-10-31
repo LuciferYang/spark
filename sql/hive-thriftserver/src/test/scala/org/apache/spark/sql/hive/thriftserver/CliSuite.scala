@@ -21,7 +21,6 @@ import java.io._
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 
-import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -41,6 +40,7 @@ import org.apache.spark.sql.hive.client.HiveClientImpl
 import org.apache.spark.sql.hive.test.HiveTestJars
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.util.{ThreadUtils, Utils}
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * A test suite for the `spark-sql` CLI tool.
@@ -710,7 +710,7 @@ class CliSuite extends SparkFunSuite {
           "--conf", s"${SQLConf.ERROR_MESSAGE_FORMAT.key}=$format",
           "--conf", s"${SQLConf.ANSI_ENABLED.key}=true",
           "-e", "select 1 / 0"),
-        errorResponses = Seq("DIVIDE_BY_ZERO"))(immutable.ArraySeq.unsafeWrapArray(expected): _*)
+        errorResponses = Seq("DIVIDE_BY_ZERO"))(expected.toImmutableArraySeq: _*)
     }
     check(
       format = ErrorMessageFormat.PRETTY,

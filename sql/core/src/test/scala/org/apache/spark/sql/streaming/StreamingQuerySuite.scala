@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 import scala.util.{Success, Try}
 
 import org.apache.commons.io.FileUtils
@@ -52,6 +52,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.util.{BlockingSource, MockSourceProvider, StreamManualClock}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.tags.SlowSQLTest
+import org.apache.spark.util.ArrayImplicits._
 
 @SlowSQLTest
 class StreamingQuerySuite extends StreamTest with BeforeAndAfter with Logging with MockitoSugar {
@@ -891,8 +892,7 @@ class StreamingQuerySuite extends StreamTest with BeforeAndAfter with Logging wi
       }
       override def getOffset: Option[Offset] = Some(LongOffset(1))
       override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-        spark.range(2)
-          .toDF(immutable.ArraySeq.unsafeWrapArray(MockSourceProvider.fakeSchema.fieldNames): _*)
+        spark.range(2).toDF(MockSourceProvider.fakeSchema.fieldNames.toImmutableArraySeq: _*)
       }
       override def schema: StructType = MockSourceProvider.fakeSchema
     }

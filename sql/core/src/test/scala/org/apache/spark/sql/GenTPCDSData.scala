@@ -19,7 +19,6 @@ package org.apache.spark.sql
 
 import java.util.concurrent.LinkedBlockingQueue
 
-import scala.collection.immutable
 import scala.sys.process._
 import scala.util.Try
 
@@ -29,6 +28,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.{col, rpad}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{CharType, StringType, StructField, StructType, VarcharType}
+import org.apache.spark.util.ArrayImplicits._
 
 // The classes in this file are basically moved from https://github.com/databricks/spark-sql-perf
 
@@ -170,7 +170,7 @@ class TPCDSTables(spark: SparkSession, dsdgenDir: String, scaleFactor: Int)
           }
           c.as(f.name)
         }
-        stringData.select(immutable.ArraySeq.unsafeWrapArray(columns): _*)
+        stringData.select(columns.toImmutableArraySeq: _*)
       }
 
       convertedData

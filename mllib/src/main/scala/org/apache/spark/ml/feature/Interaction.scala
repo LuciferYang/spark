@@ -17,7 +17,6 @@
 
 package org.apache.spark.ml.feature
 
-import scala.collection.immutable
 import scala.collection.mutable.ArrayBuilder
 
 import org.apache.spark.SparkException
@@ -31,6 +30,7 @@ import org.apache.spark.ml.util._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * Implements the feature interaction transform. This transformer takes in Double and Vector type
@@ -111,8 +111,8 @@ class Interaction @Since("1.6.0") (@Since("1.6.0") override val uid: String) ext
     }
     dataset.select(
       col("*"),
-      interactFunc(struct(immutable.ArraySeq.unsafeWrapArray(featureCols): _*))
-        .as($(outputCol), featureAttrs.toMetadata()))
+      interactFunc(struct(featureCols.toImmutableArraySeq: _*)).as($(outputCol),
+        featureAttrs.toMetadata()))
   }
 
   /**

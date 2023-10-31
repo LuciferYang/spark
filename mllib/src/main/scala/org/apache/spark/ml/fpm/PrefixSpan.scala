@@ -17,8 +17,6 @@
 
 package org.apache.spark.ml.fpm
 
-import scala.collection.immutable
-
 import org.apache.spark.annotation.Since
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.util.Identifiable
@@ -27,6 +25,7 @@ import org.apache.spark.mllib.fpm.{PrefixSpan => mllibPrefixSpan}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, LongType, StructField, StructType}
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * A parallel PrefixSpan algorithm to mine frequent sequential patterns.
@@ -137,7 +136,7 @@ final class PrefixSpan(@Since("2.4.0") override val uid: String) extends Params 
   @Since("2.4.0")
   def findFrequentSequentialPatterns(dataset: Dataset[_]): DataFrame = instrumented { instr =>
     instr.logDataset(dataset)
-    instr.logParams(this, immutable.ArraySeq.unsafeWrapArray(params): _*)
+    instr.logParams(this, params.toImmutableArraySeq: _*)
 
     val sequenceColParam = $(sequenceCol)
     val inputType = dataset.schema(sequenceColParam).dataType

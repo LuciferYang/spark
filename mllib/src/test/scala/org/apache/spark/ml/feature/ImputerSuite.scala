@@ -16,8 +16,6 @@
  */
 package org.apache.spark.ml.feature
 
-import scala.collection.immutable
-
 import org.apache.spark.SparkException
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.param.ParamsSuite
@@ -26,6 +24,7 @@ import org.apache.spark.mllib.util.TestingUtils._
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 
 class ImputerSuite extends MLTest with DefaultReadWriteTest {
 
@@ -343,8 +342,7 @@ class ImputerSuite extends MLTest with DefaultReadWriteTest {
     val types = Seq(IntegerType, LongType)
     for (mType <- types) {
       // cast all columns to desired data type for testing
-      val df2 = df.select(
-        immutable.ArraySeq.unsafeWrapArray(df.columns.map(c => col(c).cast(mType))): _*)
+      val df2 = df.select(df.columns.map(c => col(c).cast(mType)).toImmutableArraySeq: _*)
       ImputerSuite.iterateStrategyTest(true, imputer, df2)
     }
   }
@@ -365,8 +363,7 @@ class ImputerSuite extends MLTest with DefaultReadWriteTest {
     val types = Seq(IntegerType, LongType)
     for (mType <- types) {
       // cast all columns to desired data type for testing
-      val df2 = df.select(
-        immutable.ArraySeq.unsafeWrapArray(df.columns.map(c => col(c).cast(mType))): _*)
+      val df2 = df.select(df.columns.map(c => col(c).cast(mType)).toImmutableArraySeq: _*)
       ImputerSuite.iterateStrategyTest(false, imputer, df2)
     }
   }
@@ -388,8 +385,7 @@ class ImputerSuite extends MLTest with DefaultReadWriteTest {
     val types = Seq(IntegerType, LongType)
     for (mType <- types) {
       // cast all columns to desired data type for testing
-      val df2 = df.select(
-        immutable.ArraySeq.unsafeWrapArray(df.columns.map(c => col(c).cast(mType))): _*)
+      val df2 = df.select(df.columns.map(c => col(c).cast(mType)).toImmutableArraySeq: _*)
       ImputerSuite.iterateStrategyTest(true, imputer, df2)
     }
   }
@@ -411,8 +407,7 @@ class ImputerSuite extends MLTest with DefaultReadWriteTest {
     val types = Seq(IntegerType, LongType)
     for (mType <- types) {
       // cast all columns to desired data type for testing
-      val df2 = df.select(
-        immutable.ArraySeq.unsafeWrapArray(df.columns.map(c => col(c).cast(mType))): _*)
+      val df2 = df.select(df.columns.map(c => col(c).cast(mType)).toImmutableArraySeq: _*)
       ImputerSuite.iterateStrategyTest(false, imputer, df2)
     }
   }

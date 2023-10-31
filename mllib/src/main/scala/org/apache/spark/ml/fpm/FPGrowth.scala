@@ -17,7 +17,6 @@
 
 package org.apache.spark.ml.fpm
 
-import scala.collection.immutable
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.fs.Path
@@ -37,6 +36,7 @@ import org.apache.spark.sql.expressions.SparkUserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.VersionUtils
 
 /**
@@ -165,7 +165,7 @@ class FPGrowth @Since("2.2.0") (
 
     instr.logPipelineStage(this)
     instr.logDataset(dataset)
-    instr.logParams(this, immutable.ArraySeq.unsafeWrapArray(params): _*)
+    instr.logParams(this, params.toImmutableArraySeq: _*)
     val data = dataset.select($(itemsCol))
     val items = data.where(col($(itemsCol)).isNotNull).rdd.map(r => r.getSeq[Any](0).toArray)
     val mllibFP = new MLlibFPGrowth().setMinSupport($(minSupport))

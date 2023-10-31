@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.hive.execution
 
-import scala.collection.immutable
 import scala.util.Random
 
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFMax
@@ -34,6 +33,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.tags.SlowHiveTest
+import org.apache.spark.util.ArrayImplicits._
 
 @SlowHiveTest
 class ObjectHashAggregateSuite
@@ -154,13 +154,13 @@ class ObjectHashAggregateSuite
       val aggFunctions = schema.fieldNames.map(f => typed_count(col(f)))
 
       checkAnswer(
-        df.agg(aggFunctions.head, immutable.ArraySeq.unsafeWrapArray(aggFunctions.tail): _*),
+        df.agg(aggFunctions.head, aggFunctions.tail.toImmutableArraySeq: _*),
         Row.fromSeq(data.map(_.toSeq).transpose.map(_.count(_ != null): Long))
       )
 
       checkAnswer(
         df.groupBy($"id" % 4 as "mod")
-          .agg(aggFunctions.head, immutable.ArraySeq.unsafeWrapArray(aggFunctions.tail): _*),
+          .agg(aggFunctions.head, aggFunctions.tail.toImmutableArraySeq: _*),
         data.groupBy(_.getInt(0) % 4).map { case (key, value) =>
           key -> Row.fromSeq(value.map(_.toSeq).transpose.map(_.count(_ != null): Long))
         }.toSeq.map {
@@ -170,7 +170,7 @@ class ObjectHashAggregateSuite
 
       withSQLConf(SQLConf.OBJECT_AGG_SORT_BASED_FALLBACK_THRESHOLD.key -> "5") {
         checkAnswer(
-          df.agg(aggFunctions.head, immutable.ArraySeq.unsafeWrapArray(aggFunctions.tail): _*),
+          df.agg(aggFunctions.head, aggFunctions.tail.toImmutableArraySeq: _*),
           Row.fromSeq(data.map(_.toSeq).transpose.map(_.count(_ != null): Long))
         )
       }

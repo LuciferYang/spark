@@ -19,7 +19,7 @@ package org.apache.spark.ml.feature
 
 import java.util.NoSuchElementException
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 import org.apache.spark.SparkException
 import org.apache.spark.annotation.Since
@@ -32,6 +32,7 @@ import org.apache.spark.ml.util._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * A feature transformer that merges multiple columns into a vector column.
@@ -151,7 +152,7 @@ class VectorAssembler @Since("1.4.0") (@Since("1.4.0") override val uid: String)
     }
 
     filteredDataset.select(col("*"),
-      assembleFunc(struct(immutable.ArraySeq.unsafeWrapArray(args): _*)).as($(outputCol), metadata))
+      assembleFunc(struct(args.toImmutableArraySeq: _*)).as($(outputCol), metadata))
   }
 
   @Since("1.4.0")

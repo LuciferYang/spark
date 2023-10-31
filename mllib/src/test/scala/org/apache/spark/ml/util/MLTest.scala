@@ -19,8 +19,6 @@ package org.apache.spark.ml.util
 
 import java.io.File
 
-import scala.collection.immutable
-
 import org.scalatest.Suite
 
 import org.apache.spark.{DebugFilesystem, SparkConf, SparkContext, TestUtils}
@@ -35,6 +33,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.StreamTest
 import org.apache.spark.sql.test.TestSparkSession
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils
 
 trait MLTest extends StreamTest with TempDirectory { self: Suite =>
@@ -109,18 +108,19 @@ trait MLTest extends StreamTest with TempDirectory { self: Suite =>
       otherResultCols: String*)
       (globalCheckFunction: Seq[Row] => Unit): Unit = {
 
-    val columnNames = immutable.ArraySeq.unsafeWrapArray(dataframe.schema.fieldNames)
+    val columnNames = dataframe.schema.fieldNames
     val stream = MemoryStream[A]
     val columnsWithMetadata = dataframe.schema.map { structField =>
       col(structField.name).as(structField.name, structField.metadata)
     }
-    val streamDF = stream.toDS().toDF(columnNames: _*).select(columnsWithMetadata: _*)
-    val data = immutable.ArraySeq.unsafeWrapArray(dataframe.as[A].collect())
+    val streamDF = stream.toDS().toDF(columnNames.toImmutableArraySeq: _*)
+      .select(columnsWithMetadata: _*)
+    val data = dataframe.as[A].collect()
 
     val streamOutput = transformer.transform(streamDF)
       .select(firstResultCol, otherResultCols: _*)
     testStream(streamOutput) (
-      AddData(stream, data: _*),
+      AddData(stream, data.toImmutableArraySeq: _*),
       CheckAnswer(globalCheckFunction)
     )
   }

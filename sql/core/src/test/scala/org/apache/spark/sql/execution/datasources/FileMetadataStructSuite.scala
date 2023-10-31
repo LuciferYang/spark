@@ -21,8 +21,6 @@ import java.io.File
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
-import scala.collection.immutable
-
 import org.apache.spark.TestUtils
 import org.apache.spark.paths.SparkPath
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, QueryTest, Row}
@@ -34,6 +32,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType}
+import org.apache.spark.util.ArrayImplicits._
 
 class FileMetadataStructSuite extends QueryTest with SharedSparkSession {
 
@@ -1077,8 +1076,7 @@ class FileMetadataStructSuite extends QueryTest with SharedSparkSession {
       // Transform the result into a literal that can be used in an expression.
       val metadataColumnFields = metadataColumnRow.schema.fields
         .map(field => lit(metadataColumnRow.getAs[Any](field.name)).as(field.name))
-      val metadataColumnStruct =
-        struct(immutable.ArraySeq.unsafeWrapArray(metadataColumnFields): _*)
+      val metadataColumnStruct = struct(metadataColumnFields.toImmutableArraySeq: _*)
 
       val selectSingleRowDf = spark.read.load(dir.getAbsolutePath)
         .where(col("_metadata").equalTo(lit(metadataColumnStruct)))

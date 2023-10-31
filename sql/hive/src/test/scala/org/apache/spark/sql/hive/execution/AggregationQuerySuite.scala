@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.hive.execution
 
-import scala.collection.immutable
 import scala.util.Random
 
 import test.org.apache.spark.sql.MyDoubleAvg
@@ -34,7 +33,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.types.DataTypeTestUtils.{dayTimeIntervalTypes, unsafeRowMutableFieldTypes}
 import org.apache.spark.tags.SlowHiveTest
 import org.apache.spark.unsafe.UnsafeAlignedOffset
-
+import org.apache.spark.util.ArrayImplicits._
 
 class ScalaAggregateFunction(schema: StructType) extends UserDefinedAggregateFunction {
 
@@ -943,7 +942,7 @@ abstract class AggregationQuerySuite extends QueryTest with SQLTestUtils with Te
           .find(r => r.getInt(0) == 50)
           .getOrElse(fail("A row with id 50 should be the expected answer."))
       checkAnswer(
-        df.agg(udaf(immutable.ArraySeq.unsafeWrapArray(allColumns): _*)),
+        df.agg(udaf(allColumns.toImmutableArraySeq: _*)),
         // udaf returns a Row as the output value.
         Row(expectedAnswer)
       )

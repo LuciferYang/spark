@@ -17,7 +17,6 @@
 
 package org.apache.spark.ml.tree
 
-import scala.collection.immutable
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.fs.Path
@@ -35,6 +34,7 @@ import org.apache.spark.mllib.tree.model.{DecisionTreeModel => OldDecisionTreeMo
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit, struct}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.VersionUtils
 import org.apache.spark.util.collection.OpenHashMap
 
@@ -536,7 +536,7 @@ private[ml] object EnsembleModelReadWrite {
       val newNodeDataCol = df.schema("nodeData").dataType match {
         case StructType(fields) =>
           val cols = fields.map(f => col(s"nodeData.${f.name}")) :+ lit(-1L).as("rawCount")
-          struct(immutable.ArraySeq.unsafeWrapArray(cols): _*)
+          struct(cols.toImmutableArraySeq: _*)
       }
       df = df.withColumn("nodeData", newNodeDataCol)
     }

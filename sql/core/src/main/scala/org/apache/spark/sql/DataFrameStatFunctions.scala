@@ -19,7 +19,6 @@ package org.apache.spark.sql
 
 import java.{lang => jl, util => ju}
 
-import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.annotation.Stable
@@ -28,6 +27,7 @@ import org.apache.spark.sql.catalyst.expressions.aggregate.{BloomFilterAggregate
 import org.apache.spark.sql.execution.stat._
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.sketch.{BloomFilter, CountMinSketch}
 
 /**
@@ -100,7 +100,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
       probabilities: Array[Double],
       relativeError: Double): Array[Array[Double]] = {
     StatFunctions.multipleApproxQuantiles(
-      df.select(immutable.ArraySeq.unsafeWrapArray(cols.map(col)): _*),
+      df.select(cols.map(col).toImmutableArraySeq: _*),
       cols,
       probabilities,
       relativeError).map(_.toArray).toArray

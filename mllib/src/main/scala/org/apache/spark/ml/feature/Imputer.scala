@@ -17,8 +17,6 @@
 
 package org.apache.spark.ml.feature
 
-import scala.collection.immutable
-
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.SparkException
@@ -30,6 +28,7 @@ import org.apache.spark.ml.util._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * Params for [[Imputer]] and [[ImputerModel]].
@@ -169,21 +168,21 @@ class Imputer @Since("2.2.0") (@Since("2.2.0") override val uid: String)
       case Imputer.mean =>
         // Function avg will ignore null automatically.
         // For a column only containing null, avg will return null.
-        val row = dataset.select(immutable.ArraySeq.unsafeWrapArray(cols.map(avg)): _*).head()
+        val row = dataset.select(cols.map(avg).toImmutableArraySeq: _*).head()
         Array.tabulate(numCols)(i => if (row.isNullAt(i)) Double.NaN else row.getDouble(i))
 
       case Imputer.median =>
         // Function approxQuantile will ignore null automatically.
         // For a column only containing null, approxQuantile will return an empty array.
-        dataset.select(immutable.ArraySeq.unsafeWrapArray(cols): _*)
-          .stat.approxQuantile(inputColumns, Array(0.5), $(relativeError))
+        dataset.select(cols.toImmutableArraySeq: _*).stat
+          .approxQuantile(inputColumns, Array(0.5), $(relativeError))
           .map(_.headOption.getOrElse(Double.NaN))
 
       case Imputer.mode =>
         import spark.implicits._
         // If there is more than one mode, choose the smallest one to keep in line
         // with sklearn.impute.SimpleImputer (using scipy.stats.mode).
-        val modes = dataset.select(immutable.ArraySeq.unsafeWrapArray(cols): _*).flatMap { row =>
+        val modes = dataset.select(cols.toImmutableArraySeq: _*).flatMap { row =>
           // Ignore null.
           Iterator.range(0, numCols)
             .flatMap(i => if (row.isNullAt(i)) None else Some((i, row.getDouble(i))))
