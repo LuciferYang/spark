@@ -45,6 +45,7 @@ import org.apache.spark.partial.GroupedCountEvaluator
 import org.apache.spark.partial.PartialResult
 import org.apache.spark.resource.ResourceProfile
 import org.apache.spark.storage.{RDDBlockId, StorageLevel}
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.{ExternalAppendOnlyMap, OpenHashMap,
   Utils => collectionUtils}
@@ -1044,8 +1045,7 @@ abstract class RDD[T: ClassTag](
    */
   def collect(): Array[T] = withScope {
     val results = sc.runJob(this, (iter: Iterator[T]) => iter.toArray)
-    results.flatten
-    // Array.concat(scala.collection.immutable.ArraySeq.unsafeWrapArray(results): _*)
+    Array.concat(results.toImmutableArraySeq: _*)
   }
 
   /**
