@@ -474,7 +474,7 @@ private[spark] object ResourceUtils extends Logging {
       if (maxTaskPerExec < (execAmount * numParts / taskAmount)) {
         val origTaskAmount = treq.amount
         val taskReqStr = s"${origTaskAmount}/${numParts}"
-        val resourceNumSlots = Math.floor((execAmount * numParts / taskAmount).toDouble).toInt
+        val resourceNumSlots = Math.floor(execAmount.toDouble * numParts / taskAmount).toInt
         val message = s"The configuration of resource: ${treq.resourceName} " +
           s"(exec = ${execAmount}, task = ${taskReqStr}, " +
           s"runnable tasks = ${resourceNumSlots}) will " +
