@@ -97,7 +97,7 @@ private[spark] object StratifiedSamplingUtils extends Logging {
         // TODO change this to the streaming version
         if (acceptResult.areBoundsEmpty) {
           val n = counts.get(key)
-          val sampleSize = math.ceil(n * fraction).toLong
+          val sampleSize = math.ceil(n * fraction).toLong.toDouble
           val lmbd1 = PoissonBounds.getLowerBound(sampleSize)
           val lmbd2 = PoissonBounds.getUpperBound(sampleSize)
           acceptResult.acceptBound = lmbd1 / n
