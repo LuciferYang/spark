@@ -35,6 +35,49 @@ import org.apache.spark.util.ArrayImplicits._
  */
 object ToIndexedSeqBenchmark extends BenchmarkBase {
 
+  def testCreateIndexedSeq2(valuesPerIteration: Int): Unit = {
+    val benchmark = new Benchmark(
+      s"Test create a IndexedSeq",
+      valuesPerIteration,
+      output = output)
+
+    benchmark.addCase("Array fill") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val seq = Array.fill(1000)(1).toImmutableArraySeq
+      }
+    }
+
+    benchmark.addCase("Indexed fill") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = IndexedSeq.fill(1000)(1)
+      }
+    }
+
+    benchmark.addCase("new Array toImmutableArraySeq") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).toImmutableArraySeq
+      }
+    }
+
+    benchmark.addCase("new IndexedSeq toImmutableArraySeq") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = IndexedSeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+      }
+    }
+
+    benchmark.addCase("new Array empty toImmutableArraySeq") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = Array.emptyDoubleArray.toImmutableArraySeq
+      }
+    }
+
+    benchmark.addCase("new IndexedSeq empty") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = IndexedSeq.empty[Double]
+      }
+    }
+  }
+
   def testCreateIndexedSeq(valuesPerIteration: Int, size: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -126,5 +169,7 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
     testCreateIndexedSeq(valuesPerIteration, 2000)
     testCreateIndexedSeq(valuesPerIteration, 5000)
     testCreateIndexedSeq(valuesPerIteration, 10000)
+
+    testCreateIndexedSeq2(valuesPerIteration)
   }
 }
