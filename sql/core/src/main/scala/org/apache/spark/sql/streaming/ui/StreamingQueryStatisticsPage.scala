@@ -370,12 +370,12 @@ private[ui] class StreamingQueryStatisticsPage(parent: StreamingQueryTab)
     val maxBatchTime =
       withNoProgress(query, parseProgressTimestamp(query.lastProgress.timestamp), 0L)
     val maxRecordRate =
-      withNoProgress(query, query.recentProgress.map(_.inputRowsPerSecond).max, 0L)
-    val minRecordRate = 0L
+      withNoProgress(query, query.recentProgress.map(_.inputRowsPerSecond).max, 0.0)
+    val minRecordRate = 0.0
     val maxProcessRate =
-      withNoProgress(query, query.recentProgress.map(_.processedRowsPerSecond).max, 0L)
+      withNoProgress(query, query.recentProgress.map(_.processedRowsPerSecond).max, 0.0)
 
-    val minProcessRate = 0L
+    val minProcessRate = 0.0
     val maxRows = withNoProgress(query, query.recentProgress.map(_.numInputRows).max, 0L)
     val minRows = 0L
     val maxBatchDuration = withNoProgress(query, query.recentProgress.map(_.batchDuration).max, 0L)
@@ -389,10 +389,10 @@ private[ui] class StreamingQueryStatisticsPage(parent: StreamingQueryTab)
         withNumberInvalid { p.processedRowsPerSecond })), Array.empty[(Long, Double)])
     val inputRowsData = withNoProgress(query,
       query.recentProgress.map(p => (parseProgressTimestamp(p.timestamp),
-        withNumberInvalid { p.numInputRows })), Array.empty[(Long, Double)])
+        withNumberInvalid { p.numInputRows.toDouble })), Array.empty[(Long, Double)])
     val batchDurations = withNoProgress(query,
       query.recentProgress.map(p => (parseProgressTimestamp(p.timestamp),
-        withNumberInvalid { p.batchDuration })), Array.empty[(Long, Double)])
+        withNumberInvalid { p.batchDuration.toDouble })), Array.empty[(Long, Double)])
     val operationDurationData = withNoProgress(
       query,
       query.recentProgress.map { p =>
@@ -435,8 +435,8 @@ private[ui] class StreamingQueryStatisticsPage(parent: StreamingQueryTab)
         inputRowsData,
         minBatchTime,
         maxBatchTime,
-        minRows,
-        maxRows,
+        minRows.toDouble,
+        maxRows.toDouble,
         "records")
     graphUIDataForInputRows.generateDataJs(jsCollector)
 
@@ -447,8 +447,8 @@ private[ui] class StreamingQueryStatisticsPage(parent: StreamingQueryTab)
         batchDurations,
         minBatchTime,
         maxBatchTime,
-        minBatchDuration,
-        maxBatchDuration,
+        minBatchDuration.toDouble,
+        maxBatchDuration.toDouble,
         "ms")
     graphUIDataForBatchDuration.generateDataJs(jsCollector)
 
@@ -459,8 +459,8 @@ private[ui] class StreamingQueryStatisticsPage(parent: StreamingQueryTab)
         Seq.empty[(Long, Double)],
         0L,
         0L,
-        0L,
-        0L,
+        0.0,
+        0.0,
         "ms")
 
     val table = if (query.lastProgress != null) {
