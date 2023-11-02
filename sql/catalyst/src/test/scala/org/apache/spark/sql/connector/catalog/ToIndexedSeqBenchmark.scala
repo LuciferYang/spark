@@ -76,6 +76,7 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
         val value = IndexedSeq.empty[Double]
       }
     }
+    benchmark.run()
   }
 
   def testCreateIndexedSeq(valuesPerIteration: Int, size: Int): Unit = {
