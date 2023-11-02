@@ -40,7 +40,7 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.util.collection.Utils
+import org.apache.spark.util.collection.{PrimitiveKeyOpenHashMap, Utils}
 
 /**
  * A parallel PrefixSpan algorithm to mine frequent sequential patterns.
@@ -456,8 +456,7 @@ object PrefixSpan extends Logging {
     def genPrefixItems: Iterator[(Int, Long)] = {
       val n1 = items.length - 1
       // For each unique item (subject to sign) in this sequence, we output exact one split.
-      // TODO: use PrimitiveKeyOpenHashMap
-      val prefixes = mutable.Map.empty[Int, Long]
+      val prefixes = new PrimitiveKeyOpenHashMap[Int, Long]
       // a) items that can be assembled to the last itemset of the prefix
       partialStarts.foreach { start =>
         var i = start
