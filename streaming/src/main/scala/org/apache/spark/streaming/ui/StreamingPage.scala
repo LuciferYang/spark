@@ -186,14 +186,14 @@ private[ui] class StreamingPage(parent: StreamingTab)
       (for (m1 <- schedulingDelay.max; m2 <- processingTime.max; m3 <- totalDelay.max) yield
         m1 max m2 max m3).getOrElse(0L)
     // Should start at 0
-    val minTime = 0L
+    val minTime = 0.0
     val (maxTime, normalizedUnit) = UIUtils.normalizeDuration(_maxTime)
     val formattedUnit = UIUtils.shortTimeUnitString(normalizedUnit)
 
     // Use the max input rate for all InputDStreams' graphs to make the Y axis ranges same.
     // If it's not an integral number, just use its ceil integral number.
-    val maxRecordRate = recordRateForAllStreams.max.map(_.ceil.toLong).getOrElse(0L)
-    val minRecordRate = 0L
+    val maxRecordRate = recordRateForAllStreams.max.map(_.ceil.toLong.toDouble).getOrElse(0.0)
+    val minRecordRate = 0.0
 
     val batchInterval = UIUtils.convertToTimeUnit(listener.batchDuration, normalizedUnit)
 
@@ -344,8 +344,8 @@ private[ui] class StreamingPage(parent: StreamingTab)
     val maxYCalculated = listener.receivedRecordRateWithBatchTime.values
       .flatMap { case streamAndRates => streamAndRates.map { case (_, recordRate) => recordRate } }
       .reduceOption[Double](math.max)
-      .map(_.ceil.toLong)
-      .getOrElse(0L)
+      .map(_.ceil.toLong.toDouble)
+      .getOrElse(0.0)
 
     val content: Seq[Node] = listener.receivedRecordRateWithBatchTime.toList.sortBy(_._1).flatMap {
       case (streamId, recordRates) =>
