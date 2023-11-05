@@ -73,7 +73,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
   def approxQuantile(
       col: String,
       probabilities: Array[Double],
-      relativeError: Double): Array[Double] = {
+      relativeError: Double): Array[Double] = withOrigin {
     approxQuantile(Array(col), probabilities, relativeError).head
   }
 
@@ -98,7 +98,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
   def approxQuantile(
       cols: Array[String],
       probabilities: Array[Double],
-      relativeError: Double): Array[Array[Double]] = {
+      relativeError: Double): Array[Array[Double]] = withOrigin {
     StatFunctions.multipleApproxQuantiles(
       df.select(cols.map(col).toImmutableArraySeq: _*),
       cols,
@@ -133,7 +133,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def cov(col1: String, col2: String): Double = {
+  def cov(col1: String, col2: String): Double = withOrigin {
     StatFunctions.calculateCov(df, Seq(col1, col2))
   }
 
@@ -155,7 +155,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def corr(col1: String, col2: String, method: String): Double = {
+  def corr(col1: String, col2: String, method: String): Double = withOrigin {
     require(method == "pearson", "Currently only the calculation of the Pearson Correlation " +
       "coefficient is supported.")
     StatFunctions.pearsonCorrelation(df, Seq(col1, col2))
@@ -211,7 +211,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def crosstab(col1: String, col2: String): DataFrame = {
+  def crosstab(col1: String, col2: String): DataFrame = withOrigin {
     StatFunctions.crossTabulate(df, col1, col2)
   }
 
@@ -258,7 +258,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def freqItems(cols: Array[String], support: Double): DataFrame = {
+  def freqItems(cols: Array[String], support: Double): DataFrame = withOrigin {
     FrequentItems.singlePassFreqItems(df, cols, support)
   }
 
@@ -277,7 +277,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def freqItems(cols: Array[String]): DataFrame = {
+  def freqItems(cols: Array[String]): DataFrame = withOrigin {
     FrequentItems.singlePassFreqItems(df, cols, 0.01)
   }
 
@@ -321,7 +321,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def freqItems(cols: Seq[String], support: Double): DataFrame = {
+  def freqItems(cols: Seq[String], support: Double): DataFrame = withOrigin {
     FrequentItems.singlePassFreqItems(df, cols, support)
   }
 
@@ -340,7 +340,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 1.4.0
    */
-  def freqItems(cols: Seq[String]): DataFrame = {
+  def freqItems(cols: Seq[String]): DataFrame = withOrigin {
     FrequentItems.singlePassFreqItems(df, cols, 0.01)
   }
 
@@ -416,7 +416,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    *
    * @since 3.0.0
    */
-  def sampleBy[T](col: Column, fractions: Map[T, Double], seed: Long): DataFrame = {
+  def sampleBy[T](col: Column, fractions: Map[T, Double], seed: Long): DataFrame = withOrigin {
     require(fractions.values.forall(p => p >= 0.0 && p <= 1.0),
       s"Fractions must be in [0, 1], but got $fractions.")
     import org.apache.spark.sql.functions.{rand, udf}
@@ -498,7 +498,11 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    * @return a `CountMinSketch` over column `colName`
    * @since 2.0.0
    */
-  def countMinSketch(col: Column, eps: Double, confidence: Double, seed: Int): CountMinSketch = {
+  def countMinSketch(
+      col: Column,
+      eps: Double,
+      confidence: Double,
+      seed: Int): CountMinSketch = withOrigin {
     val countMinSketchAgg = new CountMinSketchAgg(
       col.expr,
       Literal(eps, DoubleType),
@@ -556,7 +560,7 @@ final class DataFrameStatFunctions private[sql](df: DataFrame) {
    * @param numBits expected number of bits of the filter.
    * @since 2.0.0
    */
-  def bloomFilter(col: Column, expectedNumItems: Long, numBits: Long): BloomFilter = {
+  def bloomFilter(col: Column, expectedNumItems: Long, numBits: Long): BloomFilter = withOrigin {
     val bloomFilterAgg = new BloomFilterAggregate(
       col.expr,
       Literal(expectedNumItems, LongType),

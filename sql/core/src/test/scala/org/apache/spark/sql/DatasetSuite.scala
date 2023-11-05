@@ -607,7 +607,8 @@ class DatasetSuite extends QueryTest
         }
       },
       errorClass = "INVALID_USAGE_OF_STAR_OR_REGEX",
-      parameters = Map("elem" -> "'*'", "prettyName" -> "MapGroups"))
+      parameters = Map("elem" -> "'*'", "prettyName" -> "MapGroups"),
+      context = ExpectedContext(fragment = "$", getCurrentClassCallSitePattern))
   }
 
   test("groupBy function, flatMapSorted") {
@@ -635,7 +636,8 @@ class DatasetSuite extends QueryTest
         }
       },
       errorClass = "INVALID_USAGE_OF_STAR_OR_REGEX",
-      parameters = Map("elem" -> "'*'", "prettyName" -> "MapGroups"))
+      parameters = Map("elem" -> "'*'", "prettyName" -> "MapGroups"),
+      context = ExpectedContext(fragment = "$", getCurrentClassCallSitePattern))
   }
 
   test("groupBy, flatMapSorted desc") {
@@ -2291,7 +2293,8 @@ class DatasetSuite extends QueryTest
           sqlState = None,
           parameters = Map(
             "objectName" -> s"`${colName.replace(".", "`.`")}`",
-            "proposal" -> "`field.1`, `field 2`"))
+            "proposal" -> "`field.1`, `field 2`"),
+          context = ExpectedContext(fragment = "select", getCurrentClassCallSitePattern))
       }
     }
   }
@@ -2305,7 +2308,8 @@ class DatasetSuite extends QueryTest
       sqlState = None,
       parameters = Map(
         "objectName" -> "`the`.`id`",
-        "proposal" -> "`the.id`"))
+        "proposal" -> "`the.id`"),
+      context = ExpectedContext(fragment = "select", getCurrentClassCallSitePattern))
   }
 
   test("SPARK-39783: backticks in error message for map candidate key with dots") {
@@ -2319,7 +2323,8 @@ class DatasetSuite extends QueryTest
       sqlState = None,
       parameters = Map(
         "objectName" -> "`nonexisting`",
-        "proposal" -> "`map`, `other.column`"))
+        "proposal" -> "`map`, `other.column`"),
+      context = ExpectedContext(fragment = "$", getCurrentClassCallSitePattern))
   }
 
   test("groupBy.as") {
@@ -2660,6 +2665,22 @@ class DatasetSuite extends QueryTest
     assert(join.count() == 1000000)
   }
 
+  test("SPARK-45022: exact DatasetQueryContext call site") {
+    withSQLConf(SQLConf.ANSI_ENABLED.key -> "true") {
+      val df = Seq(1).toDS()
+      var callSitePattern: String = null
+      checkError(
+        exception = intercept[AnalysisException] {
+          callSitePattern = getNextLineCallSitePattern()
+          val c = col("a")
+          df.select(c)
+        },
+        errorClass = "UNRESOLVED_COLUMN.WITH_SUGGESTION",
+        sqlState = "42703",
+        parameters = Map("objectName" -> "`a`", "proposal" -> "`value`"),
+        context = ExpectedContext(fragment = "col", callSitePattern = callSitePattern))
+    }
+  }
 }
 
 class DatasetLargeResultCollectingSuite extends QueryTest
