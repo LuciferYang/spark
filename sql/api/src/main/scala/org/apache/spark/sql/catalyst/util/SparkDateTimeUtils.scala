@@ -23,8 +23,6 @@ import java.util.concurrent.TimeUnit.{MICROSECONDS, NANOSECONDS}
 
 import scala.util.control.NonFatal
 
-import sun.util.calendar.ZoneInfo
-
 import org.apache.spark.QueryContext
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.{rebaseGregorianToJulianDays, rebaseGregorianToJulianMicros, rebaseJulianToGregorianDays, rebaseJulianToGregorianMicros}
@@ -211,13 +209,7 @@ trait SparkDateTimeUtils {
   def toJavaDate(days: Int): Date = {
     val rebasedDays = rebaseGregorianToJulianDays(days)
     val localMillis = Math.multiplyExact(rebasedDays, MILLIS_PER_DAY)
-    val timeZoneOffset = TimeZone.getDefault match {
-      case zoneInfo: ZoneInfo =>
-        // scalastyle:off
-        println(s"TimeZone.getDefault return ZoneInfo = $zoneInfo")
-        zoneInfo.getOffsetsByWall(localMillis, null)
-      case timeZone: TimeZone => timeZone.getOffset(localMillis - timeZone.getRawOffset)
-    }
+    val timeZoneOffset = TimeZone.getDefault.getOffset(localMillis)
     new Date(localMillis - timeZoneOffset)
   }
 
