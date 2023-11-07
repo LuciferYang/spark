@@ -150,6 +150,19 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
         length(builder.result())
       }
     }
+
+    benchmark.addCase("Use ArrayBuffer") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        import scala.collection.mutable.ArrayBuffer
+        val values = new ArrayBuffer[Any](size)
+        var i = 0
+        while (i < size) {
+          values += i
+          i += 1
+        }
+        length(values.toIndexedSeq)
+      }
+    }
     benchmark.run()
   }
 
@@ -171,6 +184,6 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
     testCreateIndexedSeq(valuesPerIteration, 5000)
     testCreateIndexedSeq(valuesPerIteration, 10000)
 
-    testCreateIndexedSeq2(valuesPerIteration)
+    // testCreateIndexedSeq2(valuesPerIteration)
   }
 }
