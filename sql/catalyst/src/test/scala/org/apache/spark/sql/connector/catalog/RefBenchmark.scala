@@ -149,10 +149,42 @@ object RefBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  def testInvokeFunction2(valuesPerIteration: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      "Test invoke bufferCleaner function", valuesPerIteration, output = output)
+
+    val ref = bufferCleanerByRef
+    val bufRefs = (0 until valuesPerIteration).map(_ => ByteBuffer.allocateDirect(10))
+    benchmark.addCase("Use Refection") { _: Int =>
+      bufRefs.foreach(buf => ref(buf.asInstanceOf[DirectBuffer]))
+    }
+
+    val ref2 = bufferCleanerByRef2
+    val bufRefs2 = (0 until valuesPerIteration).map(_ => ByteBuffer.allocateDirect(10))
+    benchmark.addCase("Use Refection 2") { _: Int =>
+      bufRefs2.foreach(buf => ref2(buf))
+    }
+
+    val ref3 = bufferCleanerByRef3
+    val bufRefs3 = (0 until valuesPerIteration).map(_ => ByteBuffer.allocateDirect(10))
+    benchmark.addCase("Use Refection 3") { _: Int =>
+      bufRefs3.foreach(buf => ref3(buf))
+    }
+
+    val mh = bufferCleanerByMH
+    val bufMhs = (0 until valuesPerIteration).map(_ => ByteBuffer.allocateDirect(10))
+    benchmark.addCase("Use MethodHandles") { _: Int =>
+      bufMhs.foreach(buf => mh(buf))
+    }
+    benchmark.run()
+  }
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
 
     val valuesPerIteration = 1000000
      testCreateFunction(valuesPerIteration)
      testInvokeFunction(valuesPerIteration)
+     testInvokeFunction2(valuesPerIteration)
   }
 }
