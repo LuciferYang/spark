@@ -39,12 +39,12 @@ import org.apache.spark.util.Utils
  */
 object RefBenchmark extends BenchmarkBase {
 
-  private def bufferCleanerByRef: DirectBuffer => Unit = {
-    val unsafeClass = Utils.classForName("sun.misc.Unsafe")
-    val cleanerMethod = unsafeClass.getMethod("invokeCleaner", classOf[ByteBuffer])
-    val unsafeField = unsafeClass.getDeclaredField("theUnsafe")
+  private val bufferCleanerByRef: DirectBuffer => Unit = {
+    val cleanerMethod = Utils.classForName("sun.misc.Unsafe")
+      .getMethod("invokeCleaner", classOf[ByteBuffer])
+    val unsafeField = classOf[Unsafe].getDeclaredField("theUnsafe")
     unsafeField.setAccessible(true)
-    val unsafe = unsafeField.get(null)
+    val unsafe = unsafeField.get(null).asInstanceOf[Unsafe]
     buffer: DirectBuffer => cleanerMethod.invoke(unsafe, buffer)
   }
 
@@ -69,6 +69,15 @@ object RefBenchmark extends BenchmarkBase {
     buffer: ByteBuffer => unsafe.invokeCleaner(buffer)
   }
 
+  private def bufferCleanerByRef3: ByteBuffer => Unit = {
+    val unsafeClass = Utils.classForName("sun.misc.Unsafe")
+    val cleanerMethod = unsafeClass.getMethod("invokeCleaner", classOf[ByteBuffer])
+    val unsafeField = unsafeClass.getDeclaredField("theUnsafe")
+    unsafeField.setAccessible(true)
+    val unsafe = unsafeField.get(null)
+    buffer: ByteBuffer => cleanerMethod.invoke(unsafe, buffer)
+  }
+
   def testCreateFunction(valuesPerIteration: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -89,6 +98,11 @@ object RefBenchmark extends BenchmarkBase {
     benchmark.addCase("Use Refection 2") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         bufferCleanerByRef2
+      }
+    }
+    benchmark.addCase("Use Refection 3") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        bufferCleanerByRef3
       }
     }
     benchmark.run()
@@ -120,6 +134,14 @@ object RefBenchmark extends BenchmarkBase {
     benchmark.addCase("Use Refection 2") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         ref2(bufRef2)
+      }
+    }
+
+    val ref3 = bufferCleanerByRef3
+    val bufRef3 = ByteBuffer.allocateDirect(10)
+    benchmark.addCase("Use Refection 3") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        ref3(bufRef3)
       }
     }
     benchmark.run()
