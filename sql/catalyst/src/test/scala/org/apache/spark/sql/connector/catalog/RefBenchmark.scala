@@ -63,12 +63,10 @@ object RefBenchmark extends BenchmarkBase {
   }
 
   private def bufferCleanerByRef2: ByteBuffer => Unit = {
-    val cleanerMethod =
-      Utils.classForName("sun.misc.Unsafe").getMethod("invokeCleaner", classOf[ByteBuffer])
     val unsafeField = classOf[Unsafe].getDeclaredField("theUnsafe")
     unsafeField.setAccessible(true)
     val unsafe = unsafeField.get(null).asInstanceOf[Unsafe]
-    buffer: ByteBuffer => cleanerMethod.invoke(unsafe, buffer)
+    buffer: ByteBuffer => unsafe.invokeCleaner(buffer)
   }
 
   def testCreateFunction(valuesPerIteration: Int): Unit = {
@@ -130,7 +128,6 @@ object RefBenchmark extends BenchmarkBase {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
 
     val valuesPerIteration = 1000000
-
      testCreateFunction(valuesPerIteration)
      testInvokeFunction(valuesPerIteration)
   }
