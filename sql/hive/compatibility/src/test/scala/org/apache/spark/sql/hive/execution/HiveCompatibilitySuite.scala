@@ -36,13 +36,13 @@ class HiveCompatibilitySuite extends HiveQueryFileTest with BeforeAndAfter {
   private lazy val hiveQueryDir = TestHive.getHiveFile(
     "ql/src/test/queries/clientpositive".split("/").mkString(File.separator))
 
-  private val originalColumnBatchSize = TestHive.conf.columnBatchSize
-  private val originalInMemoryPartitionPruning = TestHive.conf.inMemoryPartitionPruning
-  private val originalCrossJoinEnabled = TestHive.conf.crossJoinEnabled
-  private val originalSessionLocalTimeZone = TestHive.conf.sessionLocalTimeZone
-  private val originalAnsiMode = TestHive.conf.getConf(SQLConf.ANSI_ENABLED)
+  private val originalColumnBatchSize = TestHive.sparkSession.sessionState.conf.columnBatchSize
+  private val originalInMemoryPartitionPruning = TestHive.sparkSession.sessionState.conf.inMemoryPartitionPruning
+  private val originalCrossJoinEnabled = TestHive.sparkSession.sessionState.conf.crossJoinEnabled
+  private val originalSessionLocalTimeZone = TestHive.sparkSession.sessionState.conf.sessionLocalTimeZone
+  private val originalAnsiMode = TestHive.sparkSession.sessionState.conf.getConf(SQLConf.ANSI_ENABLED)
   private val originalCreateHiveTable =
-    TestHive.conf.getConf(SQLConf.LEGACY_CREATE_HIVE_TABLE_BY_DEFAULT)
+    TestHive.sparkSession.sessionState.conf.getConf(SQLConf.LEGACY_CREATE_HIVE_TABLE_BY_DEFAULT)
 
   def testCases: Seq[(String, File)] = {
     hiveQueryDir.listFiles.map(f => f.getName.stripSuffix(".q") -> f)

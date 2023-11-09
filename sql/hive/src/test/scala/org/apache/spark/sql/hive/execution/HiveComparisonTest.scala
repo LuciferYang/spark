@@ -455,7 +455,7 @@ abstract class HiveComparisonTest extends SparkFunSuite with BeforeAndAfterAll {
       }
 
       val savedSettings = new util.HashMap[String, String]
-      savedSettings.putAll(TestHive.conf.settings)
+      savedSettings.putAll(TestHive.sparkSession.sessionState.conf.settings)
       try {
         try {
           if (tryWithoutResettingFirst && canSpeculativelyTryWithoutReset) {
@@ -475,8 +475,8 @@ abstract class HiveComparisonTest extends SparkFunSuite with BeforeAndAfterAll {
       } catch {
         case tf: org.scalatest.exceptions.TestFailedException => throw tf
       } finally {
-        TestHive.conf.settings.clear()
-        TestHive.conf.settings.putAll(savedSettings)
+        TestHive.sparkSession.sessionState.conf.settings.clear()
+        TestHive.sparkSession.sessionState.conf.settings.putAll(savedSettings)
       }
     }
   }
