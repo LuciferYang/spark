@@ -40,11 +40,11 @@ import org.apache.spark.util.Utils
 object RefBenchmark extends BenchmarkBase {
 
   private def bufferCleanerByRef: DirectBuffer => Unit = {
-    val cleanerMethod =
-      Utils.classForName("sun.misc.Unsafe").getMethod("invokeCleaner", classOf[ByteBuffer])
-    val unsafeField = classOf[Unsafe].getDeclaredField("theUnsafe")
+    val unsafeClass = Utils.classForName("sun.misc.Unsafe")
+    val cleanerMethod = unsafeClass.getMethod("invokeCleaner", classOf[ByteBuffer])
+    val unsafeField = unsafeClass.getDeclaredField("theUnsafe")
     unsafeField.setAccessible(true)
-    val unsafe = unsafeField.get(null).asInstanceOf[Unsafe]
+    val unsafe = unsafeField.get(null)
     buffer: DirectBuffer => cleanerMethod.invoke(unsafe, buffer)
   }
 
