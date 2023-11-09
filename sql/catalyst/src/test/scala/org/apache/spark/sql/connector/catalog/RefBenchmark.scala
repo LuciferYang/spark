@@ -39,7 +39,7 @@ import org.apache.spark.util.Utils
  */
 object RefBenchmark extends BenchmarkBase {
 
-  private val bufferCleanerByRef: DirectBuffer => Unit = {
+  private def bufferCleanerByRef: DirectBuffer => Unit = {
     val cleanerMethod = Utils.classForName("sun.misc.Unsafe")
       .getMethod("invokeCleaner", classOf[ByteBuffer])
     val unsafeField = classOf[Unsafe].getDeclaredField("theUnsafe")
@@ -85,26 +85,28 @@ object RefBenchmark extends BenchmarkBase {
 
     benchmark.addCase("Use Refection") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        bufferCleanerByRef
-      }
-    }
-
-    benchmark.addCase("Use MethodHandle") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        bufferCleanerByMH
+        val r = bufferCleanerByRef
       }
     }
 
     benchmark.addCase("Use Refection 2") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        bufferCleanerByRef2
+        val r = bufferCleanerByRef2
       }
     }
+
     benchmark.addCase("Use Refection 3") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        bufferCleanerByRef3
+        val r = bufferCleanerByRef3
       }
     }
+
+    benchmark.addCase("Use MethodHandle") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val r = bufferCleanerByMH
+      }
+    }
+
     benchmark.run()
   }
 
@@ -121,14 +123,6 @@ object RefBenchmark extends BenchmarkBase {
       }
     }
 
-    val mh = bufferCleanerByMH
-    val bufMh = ByteBuffer.allocateDirect(10)
-    benchmark.addCase("Use MethodHandles") { _: Int =>
-      for (_ <- 0L until valuesPerIteration) {
-        mh(bufMh)
-      }
-    }
-
     val ref2 = bufferCleanerByRef2
     val bufRef2 = ByteBuffer.allocateDirect(10)
     benchmark.addCase("Use Refection 2") { _: Int =>
@@ -142,6 +136,14 @@ object RefBenchmark extends BenchmarkBase {
     benchmark.addCase("Use Refection 3") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
         ref3(bufRef3)
+      }
+    }
+
+    val mh = bufferCleanerByMH
+    val bufMh = ByteBuffer.allocateDirect(10)
+    benchmark.addCase("Use MethodHandles") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        mh(bufMh)
       }
     }
     benchmark.run()
