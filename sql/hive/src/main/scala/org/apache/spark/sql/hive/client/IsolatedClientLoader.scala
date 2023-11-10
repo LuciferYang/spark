@@ -20,11 +20,12 @@ package org.apache.spark.sql.hive.client
 import java.io.{File, PrintStream}
 import java.lang.reflect.InvocationTargetException
 import java.net.{URL, URLClassLoader}
+import java.nio.file.{Files, Paths}
 import java.util
 
 import scala.util.Try
 
-import org.apache.commons.io.{FileUtils, IOUtils}
+import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.{JavaVersion, SystemUtils}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
@@ -139,10 +140,10 @@ private[hive] object IsolatedClientLoader extends Logging {
     }
     val allFiles = classpaths.map(new File(_)).toSet
 
-    // TODO: Remove copy logic.
-    val tempDir = Utils.createTempDir(namePrefix = s"hive-${version}")
-    allFiles.foreach(f => FileUtils.copyFileToDirectory(f, tempDir))
-    logInfo(s"Downloaded metastore jars to ${tempDir.getCanonicalPath}")
+    val tempDir = Utils.createTempDir(namePrefix = s"hive-$version")
+    val tmpDirPath = tempDir.getCanonicalPath
+    allFiles.foreach(f => Files.createSymbolicLink(Paths.get(tmpDirPath, f.getName), f.toPath))
+    logInfo(s"Downloaded metastore jars to $tmpDirPath")
     tempDir.listFiles().map(_.toURI.toURL)
   }
 
