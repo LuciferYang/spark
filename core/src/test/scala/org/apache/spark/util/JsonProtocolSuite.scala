@@ -120,16 +120,10 @@ class JsonProtocolSuite extends SparkFunSuite {
       new ExecutorInfo("Hostee.awesome.com", 11, logUrlMap, attributes, resources, 4,
         Some(1), Some(0)))
     val executorRemoved = SparkListenerExecutorRemoved(executorRemovedTime, "exec2", "test reason")
-    val executorBlacklisted = SparkListenerExecutorBlacklisted(executorExcludedTime, "exec1", 22)
-    val executorUnblacklisted =
-      SparkListenerExecutorUnblacklisted(executorUnexcludedTime, "exec1")
-    val nodeBlacklisted = SparkListenerNodeBlacklisted(nodeExcludedTime, "node1", 33)
     val executorExcluded = SparkListenerExecutorExcluded(executorExcludedTime, "exec1", 22)
     val executorUnexcluded =
       SparkListenerExecutorUnexcluded(executorUnexcludedTime, "exec1")
     val nodeExcluded = SparkListenerNodeExcluded(nodeExcludedTime, "node1", 33)
-    val nodeUnblacklisted =
-      SparkListenerNodeUnblacklisted(nodeUnexcludedTime, "node1")
     val nodeUnexcluded =
       SparkListenerNodeUnexcluded(nodeUnexcludedTime, "node1")
     val executorMetricsUpdate = {
@@ -188,12 +182,8 @@ class JsonProtocolSuite extends SparkFunSuite {
     testEvent(executorAdded, executorAddedJsonString)
     testEvent(executorAddedWithTime, executorAddedWithTimeJsonString)
     testEvent(executorRemoved, executorRemovedJsonString)
-    testEvent(executorBlacklisted, executorBlacklistedJsonString)
-    testEvent(executorUnblacklisted, executorUnblacklistedJsonString)
     testEvent(executorExcluded, executorExcludedJsonString)
     testEvent(executorUnexcluded, executorUnexcludedJsonString)
-    testEvent(nodeBlacklisted, nodeBlacklistedJsonString)
-    testEvent(nodeUnblacklisted, nodeUnblacklistedJsonString)
     testEvent(nodeExcluded, nodeExcludedJsonString)
     testEvent(nodeUnexcluded, nodeUnexcludedJsonString)
     testEvent(executorMetricsUpdate, executorMetricsUpdateJsonString)

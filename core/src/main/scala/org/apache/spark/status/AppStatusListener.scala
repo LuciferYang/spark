@@ -288,28 +288,13 @@ private[spark] class AppStatusListener(
     }
   }
 
-  // Note, the blacklisted functions are left here for backwards compatibility to allow
-  // new history server to properly read and display older event logs.
-  override def onExecutorBlacklisted(event: SparkListenerExecutorBlacklisted): Unit = {
-    updateExecExclusionStatus(event.executorId, true)
-  }
-
   override def onExecutorExcluded(event: SparkListenerExecutorExcluded): Unit = {
     updateExecExclusionStatus(event.executorId, true)
-  }
-
-  override def onExecutorBlacklistedForStage(
-      event: SparkListenerExecutorBlacklistedForStage): Unit = {
-    updateExclusionStatusForStage(event.stageId, event.stageAttemptId, event.executorId)
   }
 
   override def onExecutorExcludedForStage(
       event: SparkListenerExecutorExcludedForStage): Unit = {
     updateExclusionStatusForStage(event.stageId, event.stageAttemptId, event.executorId)
-  }
-
-  override def onNodeBlacklistedForStage(event: SparkListenerNodeBlacklistedForStage): Unit = {
-    updateNodeExclusionStatusForStage(event.stageId, event.stageAttemptId, event.hostId)
   }
 
   override def onNodeExcludedForStage(event: SparkListenerNodeExcludedForStage): Unit = {
@@ -331,24 +316,12 @@ private[spark] class AppStatusListener(
     maybeUpdate(stage, now)
   }
 
-  override def onExecutorUnblacklisted(event: SparkListenerExecutorUnblacklisted): Unit = {
-    updateExecExclusionStatus(event.executorId, false)
-  }
-
   override def onExecutorUnexcluded(event: SparkListenerExecutorUnexcluded): Unit = {
     updateExecExclusionStatus(event.executorId, false)
   }
 
-  override def onNodeBlacklisted(event: SparkListenerNodeBlacklisted): Unit = {
-    updateNodeExcluded(event.hostId, true)
-  }
-
   override def onNodeExcluded(event: SparkListenerNodeExcluded): Unit = {
     updateNodeExcluded(event.hostId, true)
-  }
-
-  override def onNodeUnblacklisted(event: SparkListenerNodeUnblacklisted): Unit = {
-    updateNodeExcluded(event.hostId, false)
   }
 
   override def onNodeUnexcluded(event: SparkListenerNodeUnexcluded): Unit = {
@@ -397,10 +370,8 @@ private[spark] class AppStatusListener(
     // executor.
     if (exec.isExcluded != excluded) {
       if (excluded) {
-        appStatusSource.foreach(_.BLACKLISTED_EXECUTORS.inc())
         appStatusSource.foreach(_.EXCLUDED_EXECUTORS.inc())
       } else {
-        appStatusSource.foreach(_.UNBLACKLISTED_EXECUTORS.inc())
         appStatusSource.foreach(_.UNEXCLUDED_EXECUTORS.inc())
       }
       exec.isExcluded = excluded

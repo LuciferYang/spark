@@ -63,8 +63,6 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(!taskSetExcludelist.isExecutorExcludedForTaskSet("exec1"))
     verify(listenerBusMock, never())
       .post(isA(classOf[SparkListenerExecutorExcludedForStage]))
-    verify(listenerBusMock, never())
-      .post(isA(classOf[SparkListenerExecutorBlacklistedForStage]))
 
     assert(!taskSetExcludelist.isNodeExcludedForTaskSet("hostA"))
     verify(listenerBusMock, never())
@@ -77,15 +75,11 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(taskSetExcludelist.isExecutorExcludedForTaskSet("exec1"))
     verify(listenerBusMock).post(
       SparkListenerExecutorExcludedForStage(0, "exec1", 2, 0, attemptId))
-    verify(listenerBusMock).post(
-      SparkListenerExecutorBlacklistedForStage(0, "exec1", 2, 0, attemptId))
 
 
     assert(!taskSetExcludelist.isNodeExcludedForTaskSet("hostA"))
     verify(listenerBusMock, never())
       .post(isA(classOf[SparkListenerNodeExcludedForStage]))
-    verify(listenerBusMock, never())
-      .post(isA(classOf[SparkListenerNodeBlacklistedForStage]))
 
     // Mark one task as failed on exec2 -- not enough for any further excluding yet.
     taskSetExcludelist.updateExcludedForFailedTask(
@@ -97,8 +91,6 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(!taskSetExcludelist.isNodeExcludedForTaskSet("hostA"))
     verify(listenerBusMock, never())
       .post(isA(classOf[SparkListenerNodeExcludedForStage]))
-    verify(listenerBusMock, never())
-      .post(isA(classOf[SparkListenerNodeBlacklistedForStage]))
 
     // Mark another task as failed on exec2 -- now we exclude exec2, which also leads to
     // excluding the entire node.
@@ -110,14 +102,10 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(taskSetExcludelist.isExecutorExcludedForTaskSet("exec2"))
     verify(listenerBusMock).post(
       SparkListenerExecutorExcludedForStage(0, "exec2", 2, 0, attemptId))
-    verify(listenerBusMock).post(
-      SparkListenerExecutorBlacklistedForStage(0, "exec2", 2, 0, attemptId))
 
     assert(taskSetExcludelist.isNodeExcludedForTaskSet("hostA"))
     verify(listenerBusMock).post(
       SparkListenerNodeExcludedForStage(0, "hostA", 2, 0, attemptId))
-    verify(listenerBusMock).post(
-      SparkListenerNodeBlacklistedForStage(0, "hostA", 2, 0, attemptId))
 
     // Make sure the exclude has the correct per-task && per-executor responses, over a wider
     // range of inputs.
@@ -136,8 +124,6 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
         if (badExec) {
           verify(listenerBusMock).post(
             SparkListenerExecutorExcludedForStage(0, executor, 2, 0, attemptId))
-          verify(listenerBusMock).post(
-            SparkListenerExecutorBlacklistedForStage(0, executor, 2, 0, attemptId))
         }
       }
     }
@@ -275,14 +261,10 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(taskSetExcludlist.isExecutorExcludedForTaskSet("1"))
     verify(listenerBusMock)
       .post(SparkListenerExecutorExcludedForStage(time, "1", 2, 0, attemptId))
-    verify(listenerBusMock)
-      .post(SparkListenerExecutorBlacklistedForStage(time, "1", 2, 0, attemptId))
 
     assert(!taskSetExcludlist.isNodeExcludedForTaskSet("hostA"))
     verify(listenerBusMock, never()).post(
       SparkListenerNodeExcludedForStage(time, "hostA", 2, 0, attemptId))
-    verify(listenerBusMock, never()).post(
-      SparkListenerNodeBlacklistedForStage(time, "hostA", 2, 0, attemptId))
 
     time += 1
     clock.setTime(time)
@@ -295,15 +277,11 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     assert(taskSetExcludlist.isExecutorExcludedForTaskSet("2"))
     verify(listenerBusMock)
       .post(SparkListenerExecutorExcludedForStage(time, "2", 2, 0, attemptId))
-    verify(listenerBusMock)
-      .post(SparkListenerExecutorBlacklistedForStage(time, "2", 2, 0, attemptId))
 
     assert(!taskSetExcludlist.isNodeExcludedForTaskSet("hostA"))
     assert(!taskSetExcludlist.isNodeExcludedForTaskSet("hostB"))
     verify(listenerBusMock, never())
       .post(isA(classOf[SparkListenerNodeExcludedForStage]))
-    verify(listenerBusMock, never())
-      .post(isA(classOf[SparkListenerNodeBlacklistedForStage]))
   }
 
 }
