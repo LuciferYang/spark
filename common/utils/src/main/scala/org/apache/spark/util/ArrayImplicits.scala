@@ -31,5 +31,8 @@ private[spark] object ArrayImplicits {
      */
     def toImmutableArraySeq: immutable.ArraySeq[T] =
       immutable.ArraySeq.unsafeWrapArray(xs)
+
+    @inline def toImmutableArraySeq2: immutable.ArraySeq[T] =
+      immutable.ArraySeq.unsafeWrapArray(xs)
   }
 }

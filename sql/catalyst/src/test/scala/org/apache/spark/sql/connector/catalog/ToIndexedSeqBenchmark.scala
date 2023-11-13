@@ -35,6 +35,28 @@ import org.apache.spark.util.ArrayImplicits._
  */
 object ToIndexedSeqBenchmark extends BenchmarkBase {
 
+  def testInline(valuesPerIteration: Int): Unit = {
+    val benchmark = new Benchmark(
+      s"Test inline vs noinline",
+      valuesPerIteration,
+      output = output)
+
+    val ints = Array.fill(1000)(1)
+
+    benchmark.addCase("no inline") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val seq = ints.toImmutableArraySeq
+      }
+    }
+
+    benchmark.addCase("inline") { _: Int =>
+      for (_ <- 0L until valuesPerIteration) {
+        val value = ints.toImmutableArraySeq2
+      }
+    }
+    benchmark.run()
+  }
+
   def testCreateIndexedSeq2(valuesPerIteration: Int): Unit = {
     val benchmark = new Benchmark(
       s"Test create a IndexedSeq",
@@ -170,6 +192,8 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
 
     val valuesPerIteration = 100000
 
+    testInline(valuesPerIteration)
+
     testCreateIndexedSeq(valuesPerIteration, 1)
     testCreateIndexedSeq(valuesPerIteration, 2)
     testCreateIndexedSeq(valuesPerIteration, 5)
@@ -184,6 +208,6 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
     testCreateIndexedSeq(valuesPerIteration, 5000)
     testCreateIndexedSeq(valuesPerIteration, 10000)
 
-    // testCreateIndexedSeq2(valuesPerIteration)
+    testCreateIndexedSeq2(valuesPerIteration)
   }
 }
