@@ -37,6 +37,7 @@ import static org.apache.spark.sql.catalyst.util.DateTimeConstants.*;
  *   <li>a long value representing the number of `microseconds` in this interval.</li>
  * </ul>
  *
+ * `CalendarInterval` is represented by `months`, `days` and `microseconds`.
  * The `months` and `days` are not units of time with a constant length (unlike hours, seconds), so
  * they are two separated fields from microseconds. One month may be equal to 28, 29, 30 or 31 days
  * and one day may be equal to 23, 24 or 25 hours (daylight saving).
@@ -44,22 +45,9 @@ import static org.apache.spark.sql.catalyst.util.DateTimeConstants.*;
  * @since 3.0.0
  */
 @Unstable
-public final class CalendarInterval implements Serializable {
+public record CalendarInterval(int months, int days, long microseconds) implements Serializable {
   // NOTE: If you're moving or renaming this file, you should also update Unidoc configuration
   // specified in 'SparkBuild.scala'.
-  public final int months;
-  public final int days;
-  public final long microseconds;
-
-  // CalendarInterval is represented by months, days and microseconds. Months and days are not
-  // units of time with a constant length (unlike hours, seconds), so they are two separated fields
-  // from microseconds. One month may be equal to 29, 30 or 31 days and one day may be equal to
-  // 23, 24 or 25 hours (daylight saving)
-  public CalendarInterval(int months, int days, long microseconds) {
-    this.months = months;
-    this.days = days;
-    this.microseconds = microseconds;
-  }
 
   @Override
   public boolean equals(Object o) {

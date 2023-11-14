@@ -298,9 +298,9 @@ public final class UnsafeRow extends InternalRow implements Externalizable, Kryo
       Platform.putLong(baseObject, getFieldOffset(ordinal), (cursor << 32) | 16L);
     } else {
       long longVal =
-        ((long) value.months & 0xFFFFFFFFL) | (((long) value.days << 32) & 0xFFFFFFFF00000000L);
+        ((long) value.months() & 0xFFFFFFFFL) | (((long) value.days() << 32) & 0xFFFFFFFF00000000L);
       Platform.putLong(baseObject, baseOffset + cursor, longVal);
-      Platform.putLong(baseObject, baseOffset + cursor + 8, value.microseconds);
+      Platform.putLong(baseObject, baseOffset + cursor + 8, value.microseconds());
       setLong(ordinal, (cursor << 32) | 16L);
     }
   }

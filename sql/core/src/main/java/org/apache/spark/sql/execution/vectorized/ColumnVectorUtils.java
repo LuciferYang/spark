@@ -164,9 +164,9 @@ public class ColumnVectorUtils {
       } else if (t instanceof CalendarIntervalType) {
         CalendarInterval c = (CalendarInterval)o;
         dst.appendStruct(false);
-        dst.getChild(0).appendInt(c.months);
-        dst.getChild(1).appendInt(c.days);
-        dst.getChild(2).appendLong(c.microseconds);
+        dst.getChild(0).appendInt(c.months());
+        dst.getChild(1).appendInt(c.days());
+        dst.getChild(2).appendLong(c.microseconds());
       } else if (t instanceof DateType) {
         dst.appendInt(DateTimeUtils.fromJavaDate((Date) o));
       } else if (t instanceof TimestampType) {

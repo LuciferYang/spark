@@ -303,8 +303,8 @@ public class ConstantColumnVector extends ColumnVector {
    * Sets the CalendarInterval `value` for all rows
    */
   public void setCalendarInterval(CalendarInterval value) {
-    this.childData[0].setInt(value.months);
-    this.childData[1].setInt(value.days);
-    this.childData[2].setLong(value.microseconds);
+    this.childData[0].setInt(value.months());
+    this.childData[1].setInt(value.days());
+    this.childData[2].setLong(value.microseconds());
   }
 }

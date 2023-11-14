@@ -431,9 +431,9 @@ public abstract class WritableColumnVector extends ColumnVector {
   }
 
   public void putInterval(int rowId, CalendarInterval value) {
-    getChild(0).putInt(rowId, value.months);
-    getChild(1).putInt(rowId, value.days);
-    getChild(2).putLong(rowId, value.microseconds);
+    getChild(0).putInt(rowId, value.months());
+    getChild(1).putInt(rowId, value.days());
+    getChild(2).putLong(rowId, value.microseconds());
   }
 
   @Override
