@@ -65,6 +65,7 @@ class AnsiTypeCoercionSuite extends TypeCoercionSuiteBase {
 
   private def shouldCastStringLiteral(to: AbstractDataType, expected: DataType): Unit = {
     val input = Literal("123")
+    val i = "123".size
     val castResult = AnsiTypeCoercion.implicitCast(input, to)
     assert(DataTypeUtils.equalsIgnoreCaseAndNullability(
       castResult.map(_.dataType).orNull, expected),
