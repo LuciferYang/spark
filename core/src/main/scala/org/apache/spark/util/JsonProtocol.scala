@@ -34,6 +34,7 @@ import org.apache.spark.resource.{ExecutorResourceRequest, ResourceInformation, 
 import org.apache.spark.scheduler._
 import org.apache.spark.scheduler.cluster.ExecutorInfo
 import org.apache.spark.storage._
+import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.Utils.weakIntern
 
 /**
@@ -387,7 +388,7 @@ private[spark] object JsonProtocol extends JsonUtils {
       includeAccumulables: Boolean): Unit = {
     g.writeStartObject()
     g.writeNumberField("Stage ID", stageInfo.stageId)
-    g.writeNumberField("Stage Attempt ID", stageInfo.attemptNumber)
+    g.writeNumberField("Stage Attempt ID", stageInfo.attemptNumber())
     g.writeStringField("Stage Name", stageInfo.name)
     g.writeNumberField ("Number of Tasks", stageInfo.numTasks)
     g.writeArrayFieldStart("RDD Info")
@@ -1149,8 +1150,8 @@ private[spark] object JsonProtocol extends JsonUtils {
 
     val rpId = jsonOption(json.get("Resource Profile Id")).map(_.extractInt)
     val stageProf = rpId.getOrElse(ResourceProfile.DEFAULT_RESOURCE_PROFILE_ID)
-    val stageInfo = new StageInfo(stageId, attemptId, stageName, numTasks, rddInfos,
-      parentIds, details, resourceProfileId = stageProf,
+    val stageInfo = new StageInfo(stageId, attemptId, stageName, numTasks,
+      rddInfos.toImmutableArraySeq, parentIds, details, resourceProfileId = stageProf,
       isShufflePushEnabled = isShufflePushEnabled,
       shuffleMergerCount = shufflePushMergersCount)
     stageInfo.submissionTime = submissionTime

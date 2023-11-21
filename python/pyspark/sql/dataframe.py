@@ -1603,7 +1603,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         self.rdd.foreachPartition(f)  # type: ignore[arg-type]
 
     def cache(self) -> "DataFrame":
-        """Persists the :class:`DataFrame` with the default storage level (`MEMORY_AND_DISK`).
+        """Persists the :class:`DataFrame` with the default storage level (`MEMORY_AND_DISK_DESER`).
 
         .. versionadded:: 1.3.0
 
@@ -1612,7 +1612,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Notes
         -----
-        The default storage level has changed to `MEMORY_AND_DISK` to match Scala in 2.0.
+        The default storage level has changed to `MEMORY_AND_DISK_DESER` to match Scala in 3.0.
 
         Returns
         -------
@@ -2646,7 +2646,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         on: Optional[Union[str, List[str], Column, List[Column]]] = None,
         how: Optional[str] = None,
     ) -> "DataFrame":
-        """Joins with another :class:`DataFrame`, using the given join expression.
+        """
+        Joins with another :class:`DataFrame`, using the given join expression.
 
         .. versionadded:: 1.3.0
 
@@ -2675,39 +2676,55 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Examples
         --------
-        The following performs a full outer join between ``df1`` and ``df2``.
+        The following examples demonstrate various join types among ``df1``, ``df2``, and ``df3``.
 
+        >>> import pyspark.sql.functions as sf
         >>> from pyspark.sql import Row
-        >>> from pyspark.sql.functions import desc
-        >>> df = spark.createDataFrame([(2, "Alice"), (5, "Bob")]).toDF("age", "name")
-        >>> df2 = spark.createDataFrame([Row(height=80, name="Tom"), Row(height=85, name="Bob")])
-        >>> df3 = spark.createDataFrame([Row(age=2, name="Alice"), Row(age=5, name="Bob")])
-        >>> df4 = spark.createDataFrame([
-        ...     Row(age=10, height=80, name="Alice"),
-        ...     Row(age=5, height=None, name="Bob"),
-        ...     Row(age=None, height=None, name="Tom"),
-        ...     Row(age=None, height=None, name=None),
+        >>> df = spark.createDataFrame([Row(name="Alice", age=2), Row(name="Bob", age=5)])
+        >>> df2 = spark.createDataFrame([Row(name="Tom", height=80), Row(name="Bob", height=85)])
+        >>> df3 = spark.createDataFrame([
+        ...     Row(name="Alice", age=10, height=80),
+        ...     Row(name="Bob", age=5, height=None),
+        ...     Row(name="Tom", age=None, height=None),
+        ...     Row(name=None, age=None, height=None),
         ... ])
 
         Inner join on columns (default)
 
-        >>> df.join(df2, 'name').select(df.name, df2.height).show()
-        +----+------+
-        |name|height|
-        +----+------+
-        | Bob|    85|
-        +----+------+
-        >>> df.join(df4, ['name', 'age']).select(df.name, df.age).show()
-        +----+---+
-        |name|age|
-        +----+---+
-        | Bob|  5|
-        +----+---+
+        >>> df.join(df2, "name").show()
+        +----+---+------+
+        |name|age|height|
+        +----+---+------+
+        | Bob|  5|    85|
+        +----+---+------+
 
-        Outer join for both DataFrames on the 'name' column.
+        >>> df.join(df3, ["name", "age"]).show()
+        +----+---+------+
+        |name|age|height|
+        +----+---+------+
+        | Bob|  5|  NULL|
+        +----+---+------+
 
-        >>> df.join(df2, df.name == df2.name, 'outer').select(
-        ...     df.name, df2.height).sort(desc("name")).show()
+        Outer join on a single column with an explicit join condition.
+
+        When the join condition is explicited stated: `df.name == df2.name`, this will
+        produce all records where the names match, as well as those that don't (since
+        it's an outer join). If there are names in `df2` that are not present in `df`,
+        they will appear with `NULL` in the `name` column of `df`, and vice versa for `df2`.
+
+        >>> joined = df.join(df2, df.name == df2.name, "outer").sort(sf.desc(df.name))
+        >>> joined.show() # doctest: +SKIP
+        +-----+----+----+------+
+        | name| age|name|height|
+        +-----+----+----+------+
+        |  Bob|   5| Bob|    85|
+        |Alice|   2|NULL|  NULL|
+        | NULL|NULL| Tom|    80|
+        +-----+----+----+------+
+
+        To unambiguously select output columns, specify the dataframe along with the column name:
+
+        >>> joined.select(df.name, df2.height).show() # doctest: +SKIP
         +-----+------+
         | name|height|
         +-----+------+
@@ -2715,27 +2732,91 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |Alice|  NULL|
         | NULL|    80|
         +-----+------+
-        >>> df.join(df2, 'name', 'outer').select('name', 'height').sort(desc("name")).show()
-        +-----+------+
-        | name|height|
-        +-----+------+
-        |  Tom|    80|
-        |  Bob|    85|
-        |Alice|  NULL|
-        +-----+------+
 
-        Outer join for both DataFrams with multiple columns.
+        However, in self-joins, direct column references can cause ambiguity:
 
-        >>> df.join(
-        ...     df3,
-        ...     [df.name == df3.name, df.age == df3.age],
-        ...     'outer'
-        ... ).select(df.name, df3.age).show()
+        >>> df.join(df, df.name == df.name, "outer").select(df.name).show() # doctest: +SKIP
+        Traceback (most recent call last):
+        ...
+        pyspark.errors.exceptions.captured.AnalysisException: Column name#0 are ambiguous...
+
+        A better approach is to assign aliases to the dataframes, and then reference
+        the ouptut columns from the join operation using these aliases:
+
+        >>> df.alias("a").join(
+        ...     df.alias("b"), sf.col("a.name") == sf.col("b.name"), "outer"
+        ... ).sort(sf.desc("a.name")).select("a.name", "b.age").show()
+        +-----+---+
+        | name|age|
+        +-----+---+
+        |  Bob|  5|
+        |Alice|  2|
+        +-----+---+
+
+        Outer join on a single column with implicit join condition using column name
+
+        When you provide the column name directly as the join condition, Spark will treat
+        both name columns as one, and will not produce separate columns for `df.name` and
+        `df2.name`. This avoids having duplicate columns in the output.
+
+        >>> df.join(df2, "name", "outer").sort(sf.desc("name")).show()
+        +-----+----+------+
+        | name| age|height|
+        +-----+----+------+
+        |  Tom|NULL|    80|
+        |  Bob|   5|    85|
+        |Alice|   2|  NULL|
+        +-----+----+------+
+
+        Outer join on multiple columns
+
+        >>> df.join(df3, ["name", "age"], "outer").show()
+        +-----+----+------+
+        | name| age|height|
+        +-----+----+------+
+        | NULL|NULL|  NULL|
+        |Alice|   2|  NULL|
+        |Alice|  10|    80|
+        |  Bob|   5|  NULL|
+        |  Tom|NULL|  NULL|
+        +-----+----+------+
+
+        Left outer join on columns
+
+        >>> df.join(df2, "name", "left_outer").show()
+        +-----+---+------+
+        | name|age|height|
+        +-----+---+------+
+        |Alice|  2|  NULL|
+        |  Bob|  5|    85|
+        +-----+---+------+
+
+        Right outer join on columns
+
+        >>> df.join(df2, "name", "right_outer").show()
+        +----+----+------+
+        |name| age|height|
+        +----+----+------+
+        | Tom|NULL|    80|
+        | Bob|   5|    85|
+        +----+----+------+
+
+        Left semi join on columns
+
+        >>> df.join(df2, "name", "left_semi").show()
+        +----+---+
+        |name|age|
+        +----+---+
+        | Bob|  5|
+        +----+---+
+
+        Left anti join on columns
+
+        >>> df.join(df2, "name", "left_anti").show()
         +-----+---+
         | name|age|
         +-----+---+
         |Alice|  2|
-        |  Bob|  5|
         +-----+---+
         """
 
@@ -4674,14 +4755,41 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Examples
         --------
+        Example 1: Intersecting two DataFrames with the same schema
+
         >>> df1 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3), ("c", 4)], ["C1", "C2"])
         >>> df2 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3)], ["C1", "C2"])
-        >>> df1.intersect(df2).sort(df1.C1.desc()).show()
+        >>> result_df = df1.intersect(df2).sort("C1", "C2")
+        >>> result_df.show()
         +---+---+
         | C1| C2|
         +---+---+
-        |  b|  3|
         |  a|  1|
+        |  b|  3|
+        +---+---+
+
+        Example 2: Intersecting two DataFrames with different schemas
+
+        >>> df1 = spark.createDataFrame([(1, "A"), (2, "B")], ["id", "value"])
+        >>> df2 = spark.createDataFrame([(2, "B"), (3, "C")], ["id", "value"])
+        >>> result_df = df1.intersect(df2).sort("id", "value")
+        >>> result_df.show()
+        +---+-----+
+        | id|value|
+        +---+-----+
+        |  2|    B|
+        +---+-----+
+
+        Example 3: Intersecting all rows from two DataFrames with mismatched columns
+
+        >>> df1 = spark.createDataFrame([(1, 2), (1, 2), (3, 4)], ["A", "B"])
+        >>> df2 = spark.createDataFrame([(1, 2), (1, 2)], ["C", "D"])
+        >>> result_df = df1.intersect(df2).sort("A", "B")
+        >>> result_df.show()
+        +---+---+
+        |  A|  B|
+        +---+---+
+        |  1|  2|
         +---+---+
         """
         return DataFrame(self._jdf.intersect(other._jdf), self.sparkSession)
@@ -4710,15 +4818,43 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Examples
         --------
+        Example 1: Intersecting two DataFrames with the same schema
+
         >>> df1 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3), ("c", 4)], ["C1", "C2"])
         >>> df2 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3)], ["C1", "C2"])
-        >>> df1.intersectAll(df2).sort("C1", "C2").show()
+        >>> result_df = df1.intersectAll(df2).sort("C1", "C2")
+        >>> result_df.show()
         +---+---+
         | C1| C2|
         +---+---+
         |  a|  1|
         |  a|  1|
         |  b|  3|
+        +---+---+
+
+        Example 2: Intersecting two DataFrames with different schemas
+
+        >>> df1 = spark.createDataFrame([(1, "A"), (2, "B")], ["id", "value"])
+        >>> df2 = spark.createDataFrame([(2, "B"), (3, "C")], ["id", "value"])
+        >>> result_df = df1.intersectAll(df2).sort("id", "value")
+        >>> result_df.show()
+        +---+-----+
+        | id|value|
+        +---+-----+
+        |  2|    B|
+        +---+-----+
+
+        Example 3: Intersecting all rows from two DataFrames with mismatched columns
+
+        >>> df1 = spark.createDataFrame([(1, 2), (1, 2), (3, 4)], ["A", "B"])
+        >>> df2 = spark.createDataFrame([(1, 2), (1, 2)], ["C", "D"])
+        >>> result_df = df1.intersectAll(df2).sort("A", "B")
+        >>> result_df.show()
+        +---+---+
+        |  A|  B|
+        +---+---+
+        |  1|  2|
+        |  1|  2|
         +---+---+
         """
         return DataFrame(self._jdf.intersectAll(other._jdf), self.sparkSession)
@@ -4748,13 +4884,39 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Examples
         --------
+        Example 1: Subtracting two DataFrames with the same schema
+
         >>> df1 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3), ("c", 4)], ["C1", "C2"])
         >>> df2 = spark.createDataFrame([("a", 1), ("a", 1), ("b", 3)], ["C1", "C2"])
-        >>> df1.subtract(df2).show()
+        >>> result_df = df1.subtract(df2)
+        >>> result_df.show()
         +---+---+
         | C1| C2|
         +---+---+
         |  c|  4|
+        +---+---+
+
+        Example 2: Subtracting two DataFrames with different schemas
+
+        >>> df1 = spark.createDataFrame([(1, "A"), (2, "B")], ["id", "value"])
+        >>> df2 = spark.createDataFrame([(2, "B"), (3, "C")], ["id", "value"])
+        >>> result_df = df1.subtract(df2)
+        >>> result_df.show()
+        +---+-----+
+        | id|value|
+        +---+-----+
+        |  1|    A|
+        +---+-----+
+
+        Example 3: Subtracting two DataFrames with mismatched columns
+
+        >>> df1 = spark.createDataFrame([(1, 2)], ["A", "B"])
+        >>> df2 = spark.createDataFrame([(1, 2)], ["C", "D"])
+        >>> result_df = df1.subtract(df2)
+        >>> result_df.show()
+        +---+---+
+        |  A|  B|
+        +---+---+
         +---+---+
         """
         return DataFrame(getattr(self._jdf, "except")(other._jdf), self.sparkSession)
@@ -4893,7 +5055,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         subset: Optional[Union[str, Tuple[str, ...], List[str]]] = None,
     ) -> "DataFrame":
         """Returns a new :class:`DataFrame` omitting rows with null values.
-        :func:`DataFrame.dropna` and :func:`DataFrameNaFunctions.drop` are aliases of each other.
+        :func:`DataFrame.dropna` and :func:`DataFrameNaFunctions.drop` are
+        aliases of each other.
 
         .. versionadded:: 1.3.1
 
@@ -4902,12 +5065,10 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Parameters
         ----------
-        how : str, optional
-            'any' or 'all'.
+        how : str, optional, the values that can be 'any' or 'all', default 'any'.
             If 'any', drop a row if it contains any nulls.
             If 'all', drop a row only if all its values are null.
-        thresh: int, optional
-            default None
+        thresh: int, optional, default None.
             If specified, drop rows that have less than `thresh` non-null values.
             This overwrites the `how` parameter.
         subset : str, tuple or list, optional
@@ -4927,11 +5088,45 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...     Row(age=None, height=None, name="Tom"),
         ...     Row(age=None, height=None, name=None),
         ... ])
+
+        Example 1: Drop the row if it contains any nulls.
+
         >>> df.na.drop().show()
         +---+------+-----+
         |age|height| name|
         +---+------+-----+
         | 10|    80|Alice|
+        +---+------+-----+
+
+        Example 2: Drop the row only if all its values are null.
+
+        >>> df.na.drop(how='all').show()
+        +----+------+-----+
+        | age|height| name|
+        +----+------+-----+
+        |  10|    80|Alice|
+        |   5|  NULL|  Bob|
+        |NULL|  NULL|  Tom|
+        +----+------+-----+
+
+        Example 3: Drop rows that have less than `thresh` non-null values.
+
+        >>> df.na.drop(thresh=2).show()
+        +---+------+-----+
+        |age|height| name|
+        +---+------+-----+
+        | 10|    80|Alice|
+        |  5|  NULL|  Bob|
+        +---+------+-----+
+
+        Example 4: Drop rows with non-null values in the specified columns.
+
+        >>> df.na.drop(subset=['age', 'name']).show()
+        +---+------+-----+
+        |age|height| name|
+        +---+------+-----+
+        | 10|    80|Alice|
+        |  5|  NULL|  Bob|
         +---+------+-----+
         """
         if how is not None and how not in ["any", "all"]:
@@ -4972,8 +5167,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         value: Union["LiteralType", Dict[str, "LiteralType"]],
         subset: Optional[Union[str, Tuple[str, ...], List[str]]] = None,
     ) -> "DataFrame":
-        """Replace null values, alias for ``na.fill()``.
-        :func:`DataFrame.fillna` and :func:`DataFrameNaFunctions.fill` are aliases of each other.
+        """Returns a new :class:`DataFrame` which null values are filled with new value.
+        :func:`DataFrame.fillna` and :func:`DataFrameNaFunctions.fill` are
+        aliases of each other.
 
         .. versionadded:: 1.3.1
 
@@ -4982,8 +5178,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Parameters
         ----------
-        value : int, float, string, bool or dict
-            Value to replace null values with.
+        value : int, float, string, bool or dict, the value to replace null values with.
             If the value is a dict, then `subset` is ignored and `value` must be a mapping
             from column name (string) to replacement value. The replacement value must be
             an int, float, boolean, or string.
@@ -5003,11 +5198,11 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         >>> df = spark.createDataFrame([
         ...     (10, 80.5, "Alice", None),
         ...     (5, None, "Bob", None),
-        ... 	(None, None, "Tom", None),
+        ...     (None, None, "Tom", None),
         ...     (None, None, None, True)],
         ...     schema=["age", "height", "name", "bool"])
 
-        Fill all null values with 50 for numeric columns.
+        Example 1: Fill all null values with 50 for numeric columns.
 
         >>> df.na.fill(50).show()
         +---+------+-----+----+
@@ -5019,7 +5214,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 50|  50.0| NULL|true|
         +---+------+-----+----+
 
-        Fill all null values with ``False`` for boolean columns.
+        Example 2: Fill all null values with ``False`` for boolean columns.
 
         >>> df.na.fill(False).show()
         +----+------+-----+-----+
@@ -5031,7 +5226,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|  NULL| NULL| true|
         +----+------+-----+-----+
 
-        Fill all null values with to 50 and "unknown" for 'age' and 'name' column respectively.
+        Example 3: Fill all null values with to 50 and "unknown" for
+            'age' and 'name' column respectively.
 
         >>> df.na.fill({'age': 50, 'name': 'unknown'}).show()
         +---+------+-------+----+
@@ -5042,6 +5238,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         | 50|  NULL|    Tom|NULL|
         | 50|  NULL|unknown|true|
         +---+------+-------+----+
+
+        Example 4: Fill all null values with "Spark" for 'name' column.
+
+        >>> df.na.fill(value = 'Spark', subset = 'name').show()
+        +----+------+-----+----+
+        | age|height| name|bool|
+        +----+------+-----+----+
+        |  10|  80.5|Alice|NULL|
+        |   5|  NULL|  Bob|NULL|
+        |NULL|  NULL|  Tom|NULL|
+        |NULL|  NULL|Spark|true|
+        +----+------+-----+----+
         """
         if not isinstance(value, (float, int, str, bool, dict)):
             raise PySparkTypeError(
@@ -5132,8 +5340,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Parameters
         ----------
-        to_replace : bool, int, float, string, list or dict
-            Value to be replaced.
+        to_replace : bool, int, float, string, list or dict, the value to be replaced.
             If the value is a dict, then `value` is ignored or can be omitted, and `to_replace`
             must be a mapping between a value and a replacement.
         value : bool, int, float, string or None, optional
@@ -5161,7 +5368,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         ...     (None, None, None)],
         ...     schema=["age", "height", "name"])
 
-        Replace 10 to 20 in all columns.
+        Example 1: Replace 10 to 20 in all columns.
 
         >>> df.na.replace(10, 20).show()
         +----+------+-----+
@@ -5173,7 +5380,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|  NULL| NULL|
         +----+------+-----+
 
-        Replace 'Alice' to null in all columns.
+        Example 2: Replace 'Alice' to null in all columns.
 
         >>> df.na.replace('Alice', None).show()
         +----+------+----+
@@ -5185,7 +5392,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|  NULL|NULL|
         +----+------+----+
 
-        Replace 'Alice' to 'A', and 'Bob' to 'B' in the 'name' column.
+        Example 3: Replace 'Alice' to 'A', and 'Bob' to 'B' in the 'name' column.
 
         >>> df.na.replace(['Alice', 'Bob'], ['A', 'B'], 'name').show()
         +----+------+----+
@@ -5196,6 +5403,18 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         |NULL|    10| Tom|
         |NULL|  NULL|NULL|
         +----+------+----+
+
+        Example 4: Replace 10 to 20 in the 'name' column.
+
+        >>> df.na.replace(10, 18, 'age').show()
+        +----+------+-----+
+        | age|height| name|
+        +----+------+-----+
+        |  18|    80|Alice|
+        |   5|  NULL|  Bob|
+        |NULL|    10|  Tom|
+        |NULL|  NULL| NULL|
+        +----+------+-----+
         """
         if value is _NoValue:
             if isinstance(to_replace, dict):
@@ -6418,16 +6637,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         return DataFrameWriterV2(self, table)
 
-    # Keep to_pandas_on_spark for backward compatibility for now.
-    def to_pandas_on_spark(
-        self, index_col: Optional[Union[str, List[str]]] = None
-    ) -> "PandasOnSparkDataFrame":
-        warnings.warn(
-            "DataFrame.to_pandas_on_spark is deprecated. Use DataFrame.pandas_api instead.",
-            FutureWarning,
-        )
-        return self.pandas_api(index_col)
-
     def pandas_api(
         self, index_col: Optional[Union[str, List[str]]] = None
     ) -> "PandasOnSparkDataFrame":
@@ -6489,12 +6698,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
             index_names=index_names,  # type: ignore[arg-type]
         )
         return PandasOnSparkDataFrame(internal)
-
-    # Keep to_koalas for backward compatibility for now.
-    def to_koalas(
-        self, index_col: Optional[Union[str, List[str]]] = None
-    ) -> "PandasOnSparkDataFrame":
-        return self.pandas_api(index_col)
 
 
 def _to_scala_map(sc: SparkContext, jm: Dict) -> JavaObject:

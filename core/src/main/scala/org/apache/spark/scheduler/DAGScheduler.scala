@@ -51,6 +51,7 @@ import org.apache.spark.rpc.RpcTimeout
 import org.apache.spark.storage._
 import org.apache.spark.storage.BlockManagerMessages.BlockManagerHeartbeat
 import org.apache.spark.util._
+import org.apache.spark.util.ArrayImplicits._
 
 /**
  * The high-level scheduling layer that implements stage-oriented scheduling. It computes a DAG of
@@ -355,7 +356,7 @@ private[spark] class DAGScheduler(
       blockManagerId: BlockManagerId,
       // (stageId, stageAttemptId) -> metrics
       executorUpdates: mutable.Map[(Int, Int), ExecutorMetrics]): Boolean = {
-    listenerBus.post(SparkListenerExecutorMetricsUpdate(execId, accumUpdates,
+    listenerBus.post(SparkListenerExecutorMetricsUpdate(execId, accumUpdates.toImmutableArraySeq,
       executorUpdates))
     blockManagerMaster.driverHeartbeatEndPoint.askSync[Boolean](
       BlockManagerHeartbeat(blockManagerId),
@@ -701,7 +702,7 @@ private[spark] class DAGScheduler(
       val toVisit = waitingForVisit.remove(0)
       if (!visited(toVisit)) {
         visited += toVisit
-        Option(toVisit.getResourceProfile).foreach(resourceProfiles += _)
+        Option(toVisit.getResourceProfile()).foreach(resourceProfiles += _)
         toVisit.dependencies.foreach {
           case shuffleDep: ShuffleDependency[_, _, _] =>
             parents += shuffleDep
@@ -838,7 +839,7 @@ private[spark] class DAGScheduler(
     if (registeredStages.isEmpty || registeredStages.get.isEmpty) {
       logError("No stages registered for job " + job.jobId)
     } else {
-      stageIdToStage.filterKeys(stageId => registeredStages.get.contains(stageId)).foreach {
+      stageIdToStage.view.filterKeys(stageId => registeredStages.get.contains(stageId)).foreach {
         case (stageId, stage) =>
           val jobSet = stage.jobIds
           if (!jobSet.contains(job.jobId)) {
@@ -1324,7 +1325,8 @@ private[spark] class DAGScheduler(
     activeJobs += job
     finalStage.setActiveJob(job)
     val stageIds = jobIdToStageIds(jobId).toArray
-    val stageInfos = stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo))
+    val stageInfos =
+      stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo)).toImmutableArraySeq
     listenerBus.post(
       SparkListenerJobStart(job.jobId, jobSubmissionTime, stageInfos,
         Utils.cloneProperties(properties)))
@@ -1364,7 +1366,8 @@ private[spark] class DAGScheduler(
     activeJobs += job
     finalStage.addActiveJob(job)
     val stageIds = jobIdToStageIds(jobId).toArray
-    val stageInfos = stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo))
+    val stageInfos =
+      stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo)).toImmutableArraySeq
     listenerBus.post(
       SparkListenerJobStart(job.jobId, jobSubmissionTime, stageInfos,
         Utils.cloneProperties(properties)))
@@ -1605,7 +1608,7 @@ private[spark] class DAGScheduler(
             val locs = taskIdToLocations(id)
             val part = partitions(id)
             stage.pendingPartitions += id
-            new ShuffleMapTask(stage.id, stage.latestInfo.attemptNumber, taskBinary,
+            new ShuffleMapTask(stage.id, stage.latestInfo.attemptNumber(), taskBinary,
               part, stage.numPartitions, locs, artifacts, properties, serializedTaskMetrics,
               Option(jobId), Option(sc.applicationId), sc.applicationAttemptId,
               stage.rdd.isBarrier())
@@ -1616,7 +1619,7 @@ private[spark] class DAGScheduler(
             val p: Int = stage.partitions(id)
             val part = partitions(p)
             val locs = taskIdToLocations(id)
-            new ResultTask(stage.id, stage.latestInfo.attemptNumber,
+            new ResultTask(stage.id, stage.latestInfo.attemptNumber(),
               taskBinary, part, stage.numPartitions, locs, id, artifacts, properties,
               serializedTaskMetrics, Option(jobId), Option(sc.applicationId),
               sc.applicationAttemptId, stage.rdd.isBarrier())
@@ -1638,7 +1641,7 @@ private[spark] class DAGScheduler(
       }
 
       taskScheduler.submitTasks(new TaskSet(
-        tasks.toArray, stage.id, stage.latestInfo.attemptNumber, jobId, properties,
+        tasks.toArray, stage.id, stage.latestInfo.attemptNumber(), jobId, properties,
         stage.resourceProfileId, shuffleId))
     } else {
       // Because we posted SparkListenerStageSubmitted earlier, we should mark
@@ -1939,10 +1942,10 @@ private[spark] class DAGScheduler(
         val failedStage = stageIdToStage(task.stageId)
         val mapStage = shuffleIdToMapStage(shuffleId)
 
-        if (failedStage.latestInfo.attemptNumber != task.stageAttemptId) {
+        if (failedStage.latestInfo.attemptNumber() != task.stageAttemptId) {
           logInfo(s"Ignoring fetch failure from $task as it's from $failedStage attempt" +
             s" ${task.stageAttemptId} and there is a more recent attempt for that stage " +
-            s"(attempt ${failedStage.latestInfo.attemptNumber}) running")
+            s"(attempt ${failedStage.latestInfo.attemptNumber()}) running")
         } else {
           val ignoreStageFailure = ignoreDecommissionFetchFailure &&
             isExecutorDecommissioningOrDecommissioned(taskScheduler, bmAddress)
@@ -2166,10 +2169,10 @@ private[spark] class DAGScheduler(
 
         // Always fail the current stage and retry all the tasks when a barrier task fail.
         val failedStage = stageIdToStage(task.stageId)
-        if (failedStage.latestInfo.attemptNumber != task.stageAttemptId) {
+        if (failedStage.latestInfo.attemptNumber() != task.stageAttemptId) {
           logInfo(s"Ignoring task failure from $task as it's from $failedStage attempt" +
             s" ${task.stageAttemptId} and there is a more recent attempt for that stage " +
-            s"(attempt ${failedStage.latestInfo.attemptNumber}) running")
+            s"(attempt ${failedStage.latestInfo.attemptNumber()}) running")
         } else {
           logInfo(s"Marking $failedStage (${failedStage.name}) as failed due to a barrier task " +
             "failed.")

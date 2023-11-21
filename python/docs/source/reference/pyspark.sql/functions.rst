@@ -509,11 +509,11 @@ Partition Transformation Functions
 .. autosummary::
     :toctree: api/
 
-    years
-    months
-    days
-    hours
-    bucket
+    partitioning.years
+    partitioning.months
+    partitioning.days
+    partitioning.hours
+    partitioning.bucket
 
 
 CSV Functions
@@ -547,6 +547,7 @@ XML Functions
 
     from_xml
     schema_of_xml
+    to_xml
     xpath
     xpath_boolean
     xpath_double
