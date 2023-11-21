@@ -45,6 +45,9 @@ class ThriftServerPageSuite extends SparkFunSuite with BeforeAndAfter {
    * Run a dummy session and return the store
    */
   private def getStatusStore: HiveThriftServer2AppStatusStore = {
+    val tmpDir = new java.io.File(sys.props("java.io.tmpdir"))
+    // scalastyle:off
+    println(s"tmpDir is $tmpDir, exists = ${tmpDir.exists()}")
     kvstore = new ElementTrackingStore(new InMemoryStore, new SparkConf())
     val server = mock(classOf[HiveThriftServer2], RETURNS_SMART_NULLS)
     val sparkConf = new SparkConf
