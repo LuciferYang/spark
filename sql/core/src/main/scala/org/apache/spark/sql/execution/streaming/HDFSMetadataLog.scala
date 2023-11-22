@@ -24,10 +24,10 @@ import java.util.{Collections, LinkedHashMap => JLinkedHashMap}
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.{ClassTagExtensions, DefaultScalaModule}
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs._
-import org.json4s.{Formats, NoTypeHints}
-import org.json4s.jackson.Serialization
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
@@ -47,11 +47,14 @@ import org.apache.spark.util.ArrayImplicits._
  * Note: [[HDFSMetadataLog]] doesn't support S3-like file systems as they don't guarantee listing
  * files in a directory always shows the latest files.
  */
-class HDFSMetadataLog[T <: AnyRef: ClassTag](sparkSession: SparkSession, path: String)
-                                            (private final implicit val manifest: Manifest[T])
-    extends MetadataLog[T] with Logging {
+class HDFSMetadataLog[T <: AnyRef : ClassTag](sparkSession: SparkSession, path: String)
+  extends MetadataLog[T] with Logging {
 
-  private implicit val formats: Formats = Serialization.formats(NoTypeHints)
+  protected val mapper: ObjectMapper with ClassTagExtensions = {
+    val ret = new ObjectMapper() with ClassTagExtensions
+    ret.registerModule(DefaultScalaModule)
+    ret
+  }
 
   // Avoid serializing generic sequences, see SPARK-17372
   require(implicitly[ClassTag[T]].runtimeClass != classOf[Seq[_]],
@@ -107,7 +110,7 @@ class HDFSMetadataLog[T <: AnyRef: ClassTag](sparkSession: SparkSession, path: S
    * in the caller.
    */
   protected def serialize(metadata: T, out: OutputStream): Unit = {
-    Serialization.write(metadata, out)
+    mapper.writeValue(out, metadata)
   }
 
   /**
@@ -117,7 +120,7 @@ class HDFSMetadataLog[T <: AnyRef: ClassTag](sparkSession: SparkSession, path: S
    */
   protected def deserialize(in: InputStream): T = {
     val reader = new InputStreamReader(in, StandardCharsets.UTF_8)
-    Serialization.read[T](reader)
+    mapper.readValue[T](reader)
   }
 
   /**
