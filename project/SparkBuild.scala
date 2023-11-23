@@ -232,6 +232,8 @@ object SparkBuild extends PomBuild {
         "-Wconf:cat=deprecation:wv,any:e",
         // 2.13-specific warning hits to be muted (as narrowly as possible) and addressed separately
         "-Wunused:imports",
+        "-opt:l:inline",
+        "-Yopt-inline-heuristics:at-inline-annotated",
         // SPARK-33775 Suppress compilation warnings that contain the following contents.
         // TODO(SPARK-33805): Undo the corresponding deprecated usage suppression rule after
         //  fixed.

@@ -101,6 +101,7 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
     benchmark.run()
   }
 
+  @scala.annotation.nowarn
   def testCreateIndexedSeq(valuesPerIteration: Int, size: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -194,20 +195,20 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
 
     testInline(valuesPerIteration)
 
-    testCreateIndexedSeq(valuesPerIteration, 1)
-    testCreateIndexedSeq(valuesPerIteration, 2)
-    testCreateIndexedSeq(valuesPerIteration, 5)
-    testCreateIndexedSeq(valuesPerIteration, 10)
-    testCreateIndexedSeq(valuesPerIteration, 20)
-    testCreateIndexedSeq(valuesPerIteration, 50)
-    testCreateIndexedSeq(valuesPerIteration, 100)
-    testCreateIndexedSeq(valuesPerIteration, 200)
-    testCreateIndexedSeq(valuesPerIteration, 500)
-    testCreateIndexedSeq(valuesPerIteration, 1000)
-    testCreateIndexedSeq(valuesPerIteration, 2000)
-    testCreateIndexedSeq(valuesPerIteration, 5000)
-    testCreateIndexedSeq(valuesPerIteration, 10000)
-
-    testCreateIndexedSeq2(valuesPerIteration)
+//    testCreateIndexedSeq(valuesPerIteration, 1)
+//    testCreateIndexedSeq(valuesPerIteration, 2)
+//    testCreateIndexedSeq(valuesPerIteration, 5)
+//    testCreateIndexedSeq(valuesPerIteration, 10)
+//    testCreateIndexedSeq(valuesPerIteration, 20)
+//    testCreateIndexedSeq(valuesPerIteration, 50)
+//    testCreateIndexedSeq(valuesPerIteration, 100)
+//    testCreateIndexedSeq(valuesPerIteration, 200)
+//    testCreateIndexedSeq(valuesPerIteration, 500)
+//    testCreateIndexedSeq(valuesPerIteration, 1000)
+//    testCreateIndexedSeq(valuesPerIteration, 2000)
+//    testCreateIndexedSeq(valuesPerIteration, 5000)
+//    testCreateIndexedSeq(valuesPerIteration, 10000)
+//
+//    testCreateIndexedSeq2(valuesPerIteration)
   }
 }
