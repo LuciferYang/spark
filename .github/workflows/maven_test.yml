@@ -115,6 +115,7 @@ jobs:
       HIVE_PROFILE: ${{ matrix.hive }}
       SPARK_LOCAL_IP: localhost
       GITHUB_PREV_SHA: ${{ github.event.before }}
+      ADDITIONAL_REMOTE_REPOSITORIES: "https://maven.aliyun.com/repository/central/,https://maven-central.storage-download.googleapis.com/maven2/"
     steps:
       - name: Checkout Spark repository
         uses: actions/checkout@v4
