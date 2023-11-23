@@ -29,10 +29,10 @@ private[spark] object ArrayImplicits {
     /**
      * Wraps an Array[T] as an immutable.ArraySeq[T] without copying.
      */
-    def toImmutableArraySeq: immutable.ArraySeq[T] =
+    @inline def toImmutableArraySeq: immutable.ArraySeq[T] =
       immutable.ArraySeq.unsafeWrapArray(xs)
 
-    @inline def toImmutableArraySeq2: immutable.ArraySeq[T] =
+    def toImmutableArraySeq2: immutable.ArraySeq[T] =
       immutable.ArraySeq.unsafeWrapArray(xs)
   }
 }

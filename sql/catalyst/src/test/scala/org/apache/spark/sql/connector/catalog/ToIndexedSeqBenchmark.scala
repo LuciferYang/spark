@@ -43,15 +43,15 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
 
     val ints = Array.fill(1000)(1)
 
-    benchmark.addCase("no inline") { _: Int =>
+    benchmark.addCase("in inline") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val seq = ints.toImmutableArraySeq
+        val seq = ints.toImmutableArraySeq2
       }
     }
 
     benchmark.addCase("inline") { _: Int =>
       for (_ <- 0L until valuesPerIteration) {
-        val value = ints.toImmutableArraySeq2
+        val value = ints.toImmutableArraySeq
       }
     }
     benchmark.run()
@@ -195,20 +195,20 @@ object ToIndexedSeqBenchmark extends BenchmarkBase {
 
     testInline(valuesPerIteration)
 
-//    testCreateIndexedSeq(valuesPerIteration, 1)
-//    testCreateIndexedSeq(valuesPerIteration, 2)
-//    testCreateIndexedSeq(valuesPerIteration, 5)
-//    testCreateIndexedSeq(valuesPerIteration, 10)
-//    testCreateIndexedSeq(valuesPerIteration, 20)
-//    testCreateIndexedSeq(valuesPerIteration, 50)
-//    testCreateIndexedSeq(valuesPerIteration, 100)
-//    testCreateIndexedSeq(valuesPerIteration, 200)
-//    testCreateIndexedSeq(valuesPerIteration, 500)
-//    testCreateIndexedSeq(valuesPerIteration, 1000)
-//    testCreateIndexedSeq(valuesPerIteration, 2000)
-//    testCreateIndexedSeq(valuesPerIteration, 5000)
-//    testCreateIndexedSeq(valuesPerIteration, 10000)
-//
-//    testCreateIndexedSeq2(valuesPerIteration)
+    testCreateIndexedSeq(valuesPerIteration, 1)
+    testCreateIndexedSeq(valuesPerIteration, 2)
+    testCreateIndexedSeq(valuesPerIteration, 5)
+    testCreateIndexedSeq(valuesPerIteration, 10)
+    testCreateIndexedSeq(valuesPerIteration, 20)
+    testCreateIndexedSeq(valuesPerIteration, 50)
+    testCreateIndexedSeq(valuesPerIteration, 100)
+    testCreateIndexedSeq(valuesPerIteration, 200)
+    testCreateIndexedSeq(valuesPerIteration, 500)
+    testCreateIndexedSeq(valuesPerIteration, 1000)
+    testCreateIndexedSeq(valuesPerIteration, 2000)
+    testCreateIndexedSeq(valuesPerIteration, 5000)
+    testCreateIndexedSeq(valuesPerIteration, 10000)
+
+    testCreateIndexedSeq2(valuesPerIteration)
   }
 }
