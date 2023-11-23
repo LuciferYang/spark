@@ -142,13 +142,6 @@ jobs:
           key: build-${{ hashFiles('**/pom.xml', 'project/build.properties', 'build/mvn', 'build/sbt', 'build/sbt-launch-lib.bash', 'build/spark-build-info') }}
           restore-keys: |
             build-
-      - name: Cache Maven local repository
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: java${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            java${{ matrix.java }}-maven-
       - name: Install Java ${{ matrix.java }}
         uses: actions/setup-java@v3
         with:
