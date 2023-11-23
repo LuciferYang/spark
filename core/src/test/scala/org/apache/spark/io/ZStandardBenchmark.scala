@@ -59,10 +59,10 @@ object ZStandardBenchmark extends BenchmarkBase {
           .set(IO_COMPRESSION_ZSTD_BUFFERPOOL_ENABLED, enablePool)
           .set(IO_COMPRESSION_ZSTD_LEVEL, level)
         val condition = if (enablePool) "with" else "without"
+        val codec = new ZStdCompressionCodec(conf)
         benchmark.addCase(s"Compression $N times at level $level $condition buffer pool") { _ =>
           (1 until N).foreach { _ =>
-            val os = new ZStdCompressionCodec(conf)
-              .compressedOutputStream(new ByteArrayOutputStream())
+            val os = codec.compressedOutputStream(new ByteArrayOutputStream())
             for (i <- 1 until numInteger) {
               os.write(i)
             }
@@ -79,8 +79,9 @@ object ZStandardBenchmark extends BenchmarkBase {
         val conf = new SparkConf(false)
           .set(IO_COMPRESSION_ZSTD_BUFFERPOOL_ENABLED, enablePool)
           .set(IO_COMPRESSION_ZSTD_LEVEL, level)
+        val codec = new ZStdCompressionCodec(conf)
         val outputStream = new ByteArrayOutputStream()
-        val out = new ZStdCompressionCodec(conf).compressedOutputStream(outputStream)
+        val out = codec.compressedOutputStream(outputStream)
         for (i <- 1 until numInteger) {
           out.write(i)
         }
@@ -91,8 +92,8 @@ object ZStandardBenchmark extends BenchmarkBase {
         benchmark.addCase(s"Decompression $N times from level $level $condition buffer pool") { _ =>
           (1 until N).foreach { _ =>
             val bais = new ByteArrayInputStream(bytes)
-            val is = new ZStdCompressionCodec(conf).compressedInputStream(bais)
-            for (i <- 1 until numInteger) {
+            val is = codec.compressedInputStream(bais)
+            for (_ <- 1 until numInteger) {
               is.read()
             }
             is.close()
