@@ -115,7 +115,6 @@ jobs:
       HIVE_PROFILE: ${{ matrix.hive }}
       SPARK_LOCAL_IP: localhost
       GITHUB_PREV_SHA: ${{ github.event.before }}
-      ADDITIONAL_REMOTE_REPOSITORIES: "https://maven.aliyun.com/repository/central/,https://maven-central.storage-download.googleapis.com/maven2/"
     steps:
       - name: Checkout Spark repository
         uses: actions/checkout@v4
@@ -143,6 +142,13 @@ jobs:
           key: build-${{ hashFiles('**/pom.xml', 'project/build.properties', 'build/mvn', 'build/sbt', 'build/sbt-launch-lib.bash', 'build/spark-build-info') }}
           restore-keys: |
             build-
+      - name: Cache Maven local repository
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: java${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            java${{ matrix.java }}-maven-
       - name: Install Java ${{ matrix.java }}
         uses: actions/setup-java@v3
         with:
@@ -171,7 +177,7 @@ jobs:
           export TERM=vt100 && script -qfc 'echo exit | amm -s' && rm typescript
           # `set -e` to make the exit status as expected due to use `script -q -e -c` to run the commands
           set -e
-          export MAVEN_OPTS="-Xss4m -Xmx4g -XX:ReservedCodeCacheSize=128m -Dorg.slf4j.simpleLogger.defaultLogLevel=WARN"
+          export MAVEN_OPTS="-Xss64m -Xmx4g -Xms4g -XX:ReservedCodeCacheSize=128m -Dorg.slf4j.simpleLogger.defaultLogLevel=WARN"
           export MAVEN_CLI_OPTS="--no-transfer-progress"
           export JAVA_VERSION=${{ matrix.java }}
           # Replace with the real module name, for example, connector#kafka-0-10 -> connector/kafka-0-10
