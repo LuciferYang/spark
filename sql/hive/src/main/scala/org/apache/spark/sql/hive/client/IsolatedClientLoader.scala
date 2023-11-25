@@ -123,7 +123,7 @@ private[hive] object IsolatedClientLoader extends Logging {
       Seq(s"org.apache.hadoop:hadoop-client:$hadoopVersion")
     }
     val hiveArtifacts = version.extraDeps ++
-      Seq("hive-metastore", "hive-exec-core", "hive-common", "hive-serde")
+      Seq("hive-metastore", "hive-exec", "hive-common", "hive-serde")
         .map(a => s"org.apache.hive:$a:${version.fullVersion}") ++
       Seq("com.google.guava:guava:14.0.1") ++ hadoopJarNames
 
