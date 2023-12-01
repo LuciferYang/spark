@@ -38,7 +38,7 @@ object MapViewBenchmark extends BenchmarkBase {
       s"Get value by key loopTimes = $loopTimes, keyLength = $keyLength",
       loopTimes * keyLength, output = output)
 
-    val input = (0 until keyLength)
+    val input = 0 until keyLength
 
     val mapView = input.groupBy(identity).view.mapValues(_.length).mapValues(_ + 1)
 
@@ -48,19 +48,10 @@ object MapViewBenchmark extends BenchmarkBase {
       }
     }
 
-    var doCompute = true
-    var map: Map[Int, Int] = null
-
-    def getMap(): Map[Int, Int] = {
-      if (doCompute) {
-        map = input.groupBy(identity).transform((_, v) => v.length).transform((_, v) => v + 1)
-        doCompute = false
-      }
-      map
-    }
+    val mapContainer = new MapContainer(input)
 
     benchmark.addCase("Use Map") { _: Int =>
-      val data = getMap()
+      val data = mapContainer.map
       for (_ <- 0L until loopTimes) {
         input.foreach(k => data.getOrElse(k, 0))
       }
@@ -74,5 +65,10 @@ object MapViewBenchmark extends BenchmarkBase {
     testGetValueByKey(5, 100000)
     testGetValueByKey(10, 100000)
     testGetValueByKey(50, 100000)
+  }
+
+  class MapContainer(input: Range) {
+    lazy val map: Map[Int, Int] =
+      input.groupBy(identity).transform((_, v) => v.length).transform((_, v) => v + 1)
   }
 }
