@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.connector.catalog
 
+import scala.collection.MapView
+
 import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
 
 /**
@@ -40,15 +42,14 @@ object MapViewBenchmark extends BenchmarkBase {
 
     val input = 0 until keyLength
 
-    val mapView = input.groupBy(identity).view.mapValues(_.length).mapValues(_ + 1)
+    val mapContainer = new MapContainer(input)
 
     benchmark.addCase("Use MapView") { _: Int =>
+      val data = mapContainer.mapView
       for (_ <- 0L until loopTimes) {
-        input.foreach(k => mapView.getOrElse(k, 0))
+        input.foreach(k => data.getOrElse(k, 0))
       }
     }
-
-    val mapContainer = new MapContainer(input)
 
     benchmark.addCase("Use Map") { _: Int =>
       val data = mapContainer.map
@@ -70,5 +71,8 @@ object MapViewBenchmark extends BenchmarkBase {
   class MapContainer(input: Range) {
     lazy val map: Map[Int, Int] =
       input.groupBy(identity).transform((_, v) => v.length).transform((_, v) => v + 1)
+        .transform((_, v) => v + 1).transform((_, v) => v + 1)
+    lazy val mapView: MapView[Int, Int] = input.groupBy(identity)
+      .view.mapValues(_.length).mapValues(_ + 1).mapValues( _ + 1).mapValues( _ + 1)
   }
 }
