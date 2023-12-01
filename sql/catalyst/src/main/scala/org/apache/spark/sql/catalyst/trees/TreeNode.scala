@@ -363,8 +363,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]]
       case s: Seq[_] =>
         s.map(mapChild)
       case m: Map[_, _] =>
-        // `mapValues` is lazy and we need to force it to materialize by converting to Map
-        m.view.mapValues(mapChild).toMap
+        m.toMap.transform((_, v) => mapChild(v))
       case arg: TreeNode[_] if containsChild(arg) => mapTreeNode(arg)
       case Some(child) => Some(mapChild(child))
       case nonChild: AnyRef => nonChild
@@ -783,12 +782,13 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]]
         arg.asInstanceOf[BaseType].clone()
       case Some(arg: TreeNode[_]) if containsChild(arg) =>
         Some(arg.asInstanceOf[BaseType].clone())
-      // `mapValues` is lazy and we need to force it to materialize by converting to Map
-      case m: Map[_, _] => m.view.mapValues {
-        case arg: TreeNode[_] if containsChild(arg) =>
-          arg.asInstanceOf[BaseType].clone()
-        case other => other
-      }.toMap
+      case m: Map[_, _] => m.toMap.transform { (_, v) =>
+        v match {
+          case arg: TreeNode[_] if containsChild(arg) =>
+            arg.asInstanceOf[BaseType].clone()
+          case other => other
+        }
+      }
       case d: DataType => d // Avoid unpacking Structs
       case args: LazyList[_] => args.map(mapChild).force // Force materialization on stream
       case args: Iterable[_] => args.map(mapChild)
