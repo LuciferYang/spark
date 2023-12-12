@@ -26,7 +26,6 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.util.{quoteIfNeeded, ResolveDefaultColumns}
 import org.apache.spark.sql.connector.catalog.{CatalogV2Util, SupportsMetadataColumns, Table, TableCatalog}
 import org.apache.spark.sql.connector.expressions.IdentityTransform
-import org.apache.spark.util.ArrayImplicits._
 
 case class DescribeTableExec(
     output: Seq[Attribute],
@@ -105,16 +104,16 @@ case class DescribeTableExec(
         rows ++= table.partitioning
           .map(_.asInstanceOf[IdentityTransform].ref.fieldNames())
           .map { fieldNames =>
-            val nestedField = table.schema.findNestedField(fieldNames.toImmutableArraySeq)
-            assert(nestedField.isDefined,
+            val columnOpt = table.columns.find(column => fieldNames.contains(column.name()))
+            assert(columnOpt.isDefined,
               s"Not found the partition column ${fieldNames.map(quoteIfNeeded).mkString(".")} " +
-              s"in the table schema ${table.schema().catalogString}.")
-            nestedField.get
-          }.map { case (path, field) =>
+              s"in the table schema ${table.columns().map(_.name()).mkString(", ")}.")
+            columnOpt.get
+          }.map { column =>
             toCatalystRow(
-              (path :+ field.name).map(quoteIfNeeded(_)).mkString("."),
-              field.dataType.simpleString,
-              field.getComment().orNull)
+              quoteIfNeeded(column.name()),
+              column.dataType.simpleString,
+              column.comment())
           }
       } else {
         rows += emptyRow()
