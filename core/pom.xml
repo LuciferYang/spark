@@ -60,6 +60,10 @@
       <artifactId>chill-java</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.esotericsoftware</groupId>
+      <artifactId>kryo</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.github.jnr</groupId>
       <artifactId>jnr-posix</artifactId>
       <scope>test</scope>
