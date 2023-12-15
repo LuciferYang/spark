@@ -30,9 +30,9 @@ import scala.util.control.NonFatal
 
 import com.esotericsoftware.kryo.{Kryo, KryoException, Serializer => KryoClassSerializer}
 import com.esotericsoftware.kryo.io.{Input => KryoInput, Output => KryoOutput}
-import com.esotericsoftware.kryo.io.{UnsafeInput => KryoUnsafeInput, UnsafeOutput => KryoUnsafeOutput}
-import com.esotericsoftware.kryo.pool.{KryoCallback, KryoFactory, KryoPool}
 import com.esotericsoftware.kryo.serializers.{JavaSerializer => KryoJavaSerializer}
+import com.esotericsoftware.kryo.unsafe.{UnsafeInput => KryoUnsafeInput, UnsafeOutput => KryoUnsafeOutput}
+import com.esotericsoftware.kryo.util.Pool
 import com.twitter.chill.{AllScalaRegistrar, EmptyScalaKryoInstantiator}
 import org.apache.avro.generic.{GenericContainer, GenericData, GenericRecord}
 import org.roaringbitmap.RoaringBitmap
@@ -105,34 +105,21 @@ class KryoSerializer(conf: SparkConf)
     }
 
   @transient
-  private lazy val factory: KryoFactory = new KryoFactory() {
+  private lazy val factory: Pool[Kryo] = new Pool[Kryo](true, false, 8) {
     override def create: Kryo = {
       newKryo()
     }
   }
 
-  private class PoolWrapper extends KryoPool {
-    private var pool: KryoPool = getPool
-
-    override def borrow(): Kryo = pool.borrow()
-
-    override def release(kryo: Kryo): Unit = pool.release(kryo)
-
-    override def run[T](kryoCallback: KryoCallback[T]): T = pool.run(kryoCallback)
-
-    def reset(): Unit = {
-      pool = getPool
-    }
-
-    private def getPool: KryoPool = {
-      new KryoPool.Builder(factory).softReferences.build
-    }
+  private class InternalKryoPool(threadSafe: Boolean, softReferences: Boolean, maximumCapacity: Int)
+    extends Pool[Kryo](threadSafe, softReferences, maximumCapacity) {
+    override def create(): Kryo = newKryo()
   }
 
   @transient
-  private lazy val internalPool = new PoolWrapper
+  private lazy val internalPool = new InternalKryoPool(true, false, 8)
 
-  def pool: KryoPool = internalPool
+  def pool: Pool[Kryo] = internalPool
 
   def newKryo(): Kryo = {
     val instantiator = new EmptyScalaKryoInstantiator
@@ -321,9 +308,9 @@ class KryoDeserializationStream(
       return false
     }
 
-    val eof = input.eof()
-    if (eof) close()
-    !eof
+    val end = input.end()
+    if (end) close()
+    !end
   }
 
   override def readObject[T: ClassTag](): T = {
@@ -404,7 +391,7 @@ private[spark] class KryoSerializerInstance(
    */
   private[serializer] def borrowKryo(): Kryo = {
     if (usePool) {
-      val kryo = ks.pool.borrow()
+      val kryo = ks.pool.obtain()
       kryo.reset()
       kryo
     } else {
