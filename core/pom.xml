@@ -61,7 +61,7 @@
     </dependency>
     <dependency>
       <groupId>com.esotericsoftware</groupId>
-      <artifactId>kryo5</artifactId>
+      <artifactId>kryo</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.jnr</groupId>

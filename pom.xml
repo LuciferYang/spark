@@ -476,7 +476,7 @@
       </dependency>
       <dependency>
         <groupId>com.esotericsoftware</groupId>
-        <artifactId>kryo5</artifactId>
+        <artifactId>kryo</artifactId>
         <version>5.5.0</version>
       </dependency>
       <dependency>
