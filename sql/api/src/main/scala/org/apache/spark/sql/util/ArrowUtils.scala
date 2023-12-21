@@ -35,6 +35,8 @@ private[sql] object ArrowUtils {
 
   val rootAllocator = new RootAllocator(Long.MaxValue)
 
+  private[this] val defaultDecimalBitWidth = 128
+
   // todo: support more types.
 
   /** Maps data type from Spark to Arrow. NOTE: timeZoneId required for TimestampTypes */
@@ -51,7 +53,8 @@ private[sql] object ArrowUtils {
     case BinaryType if !largeVarTypes => ArrowType.Binary.INSTANCE
     case StringType if largeVarTypes => ArrowType.LargeUtf8.INSTANCE
     case BinaryType if largeVarTypes => ArrowType.LargeBinary.INSTANCE
-    case DecimalType.Fixed(precision, scale) => new ArrowType.Decimal(precision, scale)
+    case DecimalType.Fixed(precision, scale) =>
+      new ArrowType.Decimal(precision, scale, defaultDecimalBitWidth)
     case DateType => new ArrowType.Date(DateUnit.DAY)
     case TimestampType if timeZoneId == null =>
       throw SparkException.internalError("Missing timezoneId where it is mandatory.")
