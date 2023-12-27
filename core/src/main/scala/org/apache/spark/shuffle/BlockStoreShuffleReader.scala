@@ -119,7 +119,6 @@ private[spark] class BlockStoreShuffleReader[K, C](
       case Some(keyOrd: Ordering[K]) =>
         // Create an ExternalSorter to sort the data.
         val sorter: ExternalSorter[K, _, C] = if (dep.aggregator.isDefined) {
-          aggregated = true
           if (dep.mapSideCombine) {
             new ExternalSorter[K, C, C](context,
               Option(new Aggregator[K, C, C](identity,
