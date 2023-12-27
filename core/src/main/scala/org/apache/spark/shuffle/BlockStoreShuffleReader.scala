@@ -112,7 +112,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
     val interruptibleIter = new InterruptibleIterator[(Any, Any)](context, metricIter)
 
     // Sort the output if there is a sort ordering defined.
-    var aggregated = false
+    val aggregated = dep.keyOrdering.isDefined && dep.aggregator.isDefined
     // The type of the value cannot be determined here, maybe the type of value
     // or the type of combined value.
     val sortedIter: Iterator[Product2[K, Nothing]] = dep.keyOrdering match {
