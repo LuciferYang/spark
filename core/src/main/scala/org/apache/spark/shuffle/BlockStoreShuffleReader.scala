@@ -122,7 +122,9 @@ private[spark] class BlockStoreShuffleReader[K, C](
           aggregated = true
           if (dep.mapSideCombine) {
             new ExternalSorter[K, C, C](context,
-              dep.aggregator.asInstanceOf[Option[Aggregator[K, C, C]]],
+              Option(new Aggregator[K, C, C](identity,
+                dep.aggregator.get.mergeCombiners,
+                dep.aggregator.get.mergeCombiners)),
               ordering = Some(keyOrd), serializer = dep.serializer)
           } else {
             new ExternalSorter[K, Nothing, C](context,
