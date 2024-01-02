@@ -409,7 +409,7 @@ trait SparkDateTimeUtils {
       segment == 6 || (segment == 0 && digits >= 4 && digits <= maxDigitsYear) ||
         // For the zoneId segment(7), it's could be zero digits when it's a region-based zone ID
         (segment == 7 && digits <= 2) ||
-        (segment != 0 && segment != 6 && segment != 7 && digits > 0 && digits <= 2)
+        (segment != 0 && segment != 7 && digits > 0 && digits <= 2)
     }
     if (s == null) {
       return (Array.empty, None, false)
