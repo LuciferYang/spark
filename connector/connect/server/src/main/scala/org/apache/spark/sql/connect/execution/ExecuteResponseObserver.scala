@@ -251,11 +251,11 @@ private[connect] class ExecuteResponseObserver[T <: Message](val executeHolder: 
   private def removeCachedResponses(lastSentIndex: Long) = {
     var i = lastSentIndex
     var totalResponsesSize = 0L
-    while (i >= 1 && responses.get(i).isDefined && totalResponsesSize < retryBufferSize) {
-      totalResponsesSize += responses.get(i).get.serializedByteSize
+    while (i >= 1 && responses.contains(i) && totalResponsesSize < retryBufferSize) {
+      totalResponsesSize += responses(i).serializedByteSize
       i -= 1
     }
-    if (responses.get(i).isDefined) {
+    if (responses.contains(i)) {
       logDebug(
         s"AUTORELEASE opId=${executeHolder.operationId} until idx=$i. " +
           s"cachedUntilConsumed=$cachedSizeUntilHighestConsumed " +
@@ -275,8 +275,8 @@ private[connect] class ExecuteResponseObserver[T <: Message](val executeHolder: 
    */
   private def removeResponsesUntilIndex(index: Long, autoRemoved: Boolean = false) = {
     var i = index
-    while (i >= 1 && responses.get(i).isDefined) {
-      val r = responses.get(i).get
+    while (i >= 1 && responses.contains(i)) {
+      val r = responses(i)
       cachedSizeUntilHighestConsumed.remove(r)
       cachedSizeUntilLastProduced.remove(r)
       if (autoRemoved) autoRemovedSize.add(r)
