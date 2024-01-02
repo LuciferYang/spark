@@ -970,11 +970,11 @@ private[spark] class MapOutputTrackerMaster(
    */
   def equallyDivide(numElements: Int, numBuckets: Int): Seq[Seq[Int]] = {
     val elementsPerBucket = numElements / numBuckets
-    val remaining = numElements % numBuckets
-    val splitPoint = (elementsPerBucket + 1) * remaining
     if (elementsPerBucket == 0) {
-      rangeGrouped(0.until(splitPoint), elementsPerBucket + 1)
+      rangeGrouped(0.until(numElements), 1)
     } else {
+      val remaining = numElements % numBuckets
+      val splitPoint = (elementsPerBucket + 1) * remaining
       rangeGrouped(0.until(splitPoint), elementsPerBucket + 1) ++
         rangeGrouped(splitPoint.until(numElements), elementsPerBucket)
     }
