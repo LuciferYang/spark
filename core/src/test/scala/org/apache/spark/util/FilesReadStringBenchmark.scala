@@ -68,5 +68,6 @@ object FilesReadStringBenchmark extends BenchmarkBase {
     testReadToString(1000)
     testReadToString(10000)
     testReadToString(100000)
+    testReadToString(1000000)
   }
 }
