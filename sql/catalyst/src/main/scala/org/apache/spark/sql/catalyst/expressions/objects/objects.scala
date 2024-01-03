@@ -1117,7 +1117,7 @@ case class MapObjects private(
               s"MODULE$$.make($builder.result());"
           )
 
-        case Some(cls) if classOf[scala.collection.immutable.ArraySeq[_]].isAssignableFrom(cls) =>
+        case Some(cls) if classOf[immutable.ArraySeq[_]].isAssignableFrom(cls) =>
           val tag = ctx.addReferenceObj("tag", elementClassTag())
           val builderClassName = classOf[mutable.ArrayBuilder[_]].getName
           val getBuilder = s"$builderClassName$$.MODULE$$.make($tag)"
