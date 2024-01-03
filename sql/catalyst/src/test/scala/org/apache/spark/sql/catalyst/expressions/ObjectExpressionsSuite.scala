@@ -363,8 +363,10 @@ class ObjectExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
           assert(result.asInstanceOf[java.util.List[_]].asScala == expected)
         case a if classOf[mutable.ArraySeq[Int]].isAssignableFrom(a) =>
           assert(result == mutable.ArraySeq.make[Int](expected.toArray))
+          assert(result.getClass == classOf[mutable.ArraySeq.ofRef[_]])
         case a if classOf[immutable.ArraySeq[Int]].isAssignableFrom(a) =>
           assert(result == immutable.ArraySeq.unsafeWrapArray[Int](expected.toArray))
+          assert(result.getClass == classOf[immutable.ArraySeq.ofRef[_]])
         case s if classOf[Seq[_]].isAssignableFrom(s) =>
           assert(result.asInstanceOf[Seq[_]] == expected)
         case s if classOf[scala.collection.Set[_]].isAssignableFrom(s) =>
