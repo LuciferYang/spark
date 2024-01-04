@@ -52,12 +52,12 @@ object FilesReadStringBenchmark extends BenchmarkBase {
       }
     }
 
-    benchmark.addCase("Use Java") { _: Int =>
-      java.nio.file.Files.readString(file.toPath, Charset.forName("UTF-8"))
-    }
-
     benchmark.addCase("Use Guava") { _: Int =>
       com.google.common.io.Files.toString(file, com.google.common.base.Charsets.UTF_8)
+    }
+
+    benchmark.addCase("Use Java") { _: Int =>
+      java.nio.file.Files.readString(file.toPath, Charset.forName("UTF-8"))
     }
     benchmark.run()
   }
