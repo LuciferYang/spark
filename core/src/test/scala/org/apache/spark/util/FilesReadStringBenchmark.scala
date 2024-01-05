@@ -36,6 +36,33 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  */
 object FilesReadStringBenchmark extends BenchmarkBase {
 
+  def testReadToBytes(size: Int): Unit = {
+
+    val benchmark = new Benchmark(
+      s"Test read bytes from file with file size = ${size * 10}",
+      size,
+      output = output)
+
+    val tmpDir = Utils.createTempDir()
+    val file = new File(tmpDir, "test.txt")
+    Utils.tryWithResource(Files.newOutputStream(file.toPath)) { os =>
+      val data = "0123456789".getBytes(Charset.forName("UTF-8"))
+      for (_ <- 0 until size) {
+        os.write(data)
+      }
+    }
+
+    benchmark.addCase("Use Guava toByteArray") { _: Int =>
+      com.google.common.io.Files.toByteArray(file)
+    }
+
+    benchmark.addCase("Use Java readAllBytes") { _: Int =>
+      java.nio.file.Files.readAllBytes(file.toPath)
+    }
+
+    benchmark.run()
+  }
+
   def testReadToString(size: Int): Unit = {
 
     val benchmark = new Benchmark(
@@ -60,14 +87,6 @@ object FilesReadStringBenchmark extends BenchmarkBase {
       java.nio.file.Files.readString(file.toPath, Charset.forName("UTF-8"))
     }
 
-    benchmark.addCase("Use Guava toByteArray") { _: Int =>
-      com.google.common.io.Files.toByteArray(file)
-    }
-
-    benchmark.addCase("Use Java readAllBytes") { _: Int =>
-      java.nio.file.Files.readAllBytes(file.toPath)
-    }
-
     benchmark.run()
   }
 
@@ -80,5 +99,14 @@ object FilesReadStringBenchmark extends BenchmarkBase {
     testReadToString(500000)
     testReadToString(1000000)
     testReadToString(5000000)
+
+    testReadToBytes(10)
+    testReadToBytes(100)
+    testReadToBytes(1000)
+    testReadToBytes(10000)
+    testReadToBytes(100000)
+    testReadToBytes(500000)
+    testReadToBytes(1000000)
+    testReadToBytes(5000000)
   }
 }
