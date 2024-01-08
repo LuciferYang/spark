@@ -52,12 +52,12 @@ object FilesReadStringBenchmark extends BenchmarkBase {
       }
     }
 
-    benchmark.addCase("Use Guava toByteArray") { _: Int =>
-      com.google.common.io.Files.toByteArray(file)
-    }
-
     benchmark.addCase("Use Java readAllBytes") { _: Int =>
       java.nio.file.Files.readAllBytes(file.toPath)
+    }
+
+    benchmark.addCase("Use Guava toByteArray") { _: Int =>
+      com.google.common.io.Files.toByteArray(file)
     }
 
     benchmark.run()
