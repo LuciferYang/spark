@@ -403,6 +403,7 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     podsAllocatorUnderTest.setTotalExpectedExecutors(
       Map(defaultProfile -> 1))
     snapshotsStore.notifySubscribers()
+    // scalastyle:off println
     assert(podsAllocatorUnderTest.numOutstandingPods.get() == 0)
     verify(podResource, times(4)).create()
     verify(labeledPods).withLabelIn(SPARK_EXECUTOR_ID_LABEL, "3", "4")
