@@ -20,7 +20,7 @@ scheme is fixed and set to `sc://`. The full URI has to be a
 be parsed properly by most systems. For example, hostnames have to be valid and
 cannot contain arbitrary characters. Configuration parameter are passed in the 
 style of the HTTP URL Path Parameter Syntax. This is similar to the JDBC connection
-strings. The path component must be empty. All parameters are interpreted **case sensitive**.
+strings. The path component must be empty. All parameters are interpreted **case-sensitive**.
 
 ```shell
 sc://hostname:port/;param1=value;param2=value
@@ -58,7 +58,7 @@ sc://hostname:port/;param1=value;param2=value
     <td>token</td>
     <td>String</td>
     <td>When this param is set in the URL, it will enable standard
-    bearer token authentication using GRPC. By default this value is not set.
+    bearer token authentication using GRPC. By default, this value is not set.
     Setting this value enables SSL.</td>
     <td><pre>token=ABCDEFGH</pre></td>
   </tr>
@@ -75,7 +75,7 @@ sc://hostname:port/;param1=value;param2=value
     <td>user_id</td>
     <td>String</td>
     <td>User ID to automatically set in the Spark Connect UserContext message.
-    This is necssary for the appropriate Spark Session management. This is an
+    This is necessary for the appropriate Spark Session management. This is an
     *optional* parameter and depending on the deployment this parameter might
     be automatically injected using other means.</td>
     <td>
@@ -99,7 +99,7 @@ sc://hostname:port/;param1=value;param2=value
     allows to provide this session ID to allow sharing Spark Sessions for the same users
     for example across multiple languages. The value must be provided in a valid UUID 
     string format.<br/>
-    <i>Default: A UUID generated randomly.</td>
+    <i>Default: A UUID generated randomly.</i></td>
     <td><pre>session_id=550e8400-e29b-41d4-a716-446655440000</pre></td>
   </tr>
 </table>
@@ -129,7 +129,7 @@ server_url = "sc://myhost.com:443/;use_ssl=true;token=ABCDEFG"
 
 As mentioned above, Spark Connect uses a regular GRPC client and the server path
 cannot be configured to remain compatible with the GRPC standard and HTTP. For
-example the following examles are invalid.
+example the following examples are invalid.
 
 ```python
 server_url = "sc://myhost.com:443/mypathprefix/;token=AAAAAAA"
