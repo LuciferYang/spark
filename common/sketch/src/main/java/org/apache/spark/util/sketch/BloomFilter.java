@@ -209,6 +209,11 @@ public abstract class BloomFilter {
    * @param p false positive rate (must be 0 &lt; p &lt; 1)
    */
   public static long optimalNumOfBits(long n, double p) {
+    if (p <= 0D || p >= 1D) {
+      throw new IllegalArgumentException(
+        "False positive probability must be within range (0.0, 1.0)"
+      );
+    }
     return (long) (-n * Math.log(p) / (Math.log(2) * Math.log(2)));
   }
 
@@ -242,12 +247,6 @@ public abstract class BloomFilter {
    * will result in its saturation, and a sharp deterioration of its false positive probability.
    */
   public static BloomFilter create(long expectedNumItems, double fpp) {
-    if (fpp <= 0D || fpp >= 1D) {
-      throw new IllegalArgumentException(
-        "False positive probability must be within range (0.0, 1.0)"
-      );
-    }
-
     return create(expectedNumItems, optimalNumOfBits(expectedNumItems, fpp));
   }
 
