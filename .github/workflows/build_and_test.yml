@@ -797,10 +797,13 @@ jobs:
       matrix:
         include:
           - java: 17
+            if: inputs.branch == 'branch-3.4'
             os: ubuntu-22.04 
           - java: 21
+            if: inputs.branch != 'branch-3.4'
             os: ubuntu-22.04 
           - java: 21
+            if: inputs.branch != 'branch-3.4'
             os: macos-14 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 300
