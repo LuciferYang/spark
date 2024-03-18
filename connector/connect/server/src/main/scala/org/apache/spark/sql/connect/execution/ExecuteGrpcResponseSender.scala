@@ -312,7 +312,6 @@ private[connect] class ExecuteGrpcResponseSender[T <: Message](
           !grpcCallObserver.isReady() &&
           deadlineTimeMillis >= System.currentTimeMillis()) {
           val timeout = Math.max(1, deadlineTimeMillis - System.currentTimeMillis())
-          var sleepStart = System.nanoTime()
           logTrace(s"Wait for grpcCallObserver to become ready with timeout=$timeout ms.")
           grpcCallObserverReadySignal.wait(timeout)
           logTrace(s"Reacquired grpcCallObserverReadySignal lock after waiting.")
