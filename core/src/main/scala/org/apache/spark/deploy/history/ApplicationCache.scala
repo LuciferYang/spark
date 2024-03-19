@@ -303,6 +303,8 @@ private[history] class CacheMetrics(prefix: String) extends Source {
 
   override val metricRegistry: MetricRegistry = new MetricRegistry
 
+  init()
+
   /**
    * Startup actions.
    * This includes registering metrics with [[metricRegistry]]
