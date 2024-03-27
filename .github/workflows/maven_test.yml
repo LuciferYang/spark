@@ -62,17 +62,7 @@ jobs:
           - hive2.3
         modules:
           - >-
-            core,launcher,common#unsafe,common#kvstore,common#network-common,common#network-shuffle,common#sketch,common#utils
-          - >-
-            graphx,streaming,hadoop-cloud
-          - >-
-            mllib-local,mllib
-          - >-
             repl,sql#hive-thriftserver
-          - >-
-            connector#kafka-0-10,connector#kafka-0-10-sql,connector#kafka-0-10-token-provider,connector#spark-ganglia-lgpl,connector#protobuf,connector#avro
-          - >-
-            sql#api,sql#catalyst,resource-managers#yarn,resource-managers#kubernetes#core
         # Here, we split Hive and SQL tests into some of slow ones and the rest of them.
         included-tags: [ "" ]
         excluded-tags: [ "" ]
@@ -206,6 +196,9 @@ jobs:
       - name: Clean up local Maven repository
         run: |  
           rm -rf ~/.m2/repository/org/apache/spark
+      - name: Cat HiveThriftServer2 out
+        run: |
+          cat /home/runner/work/spark/spark/logs/spark-runner-org.apache.spark.sql.hive.thriftserver.HiveThriftServer2-*.out
       - name: Upload test results to report
         if: always()
         uses: actions/upload-artifact@v4
