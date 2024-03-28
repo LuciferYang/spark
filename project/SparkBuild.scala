@@ -311,14 +311,10 @@ object SparkBuild extends PomBuild {
 
     (Compile / javacOptions) ++= Seq(
       "-encoding", UTF_8.name(),
-      "-source", javaVersion.value
-    ),
-    // This -target and Xlint:unchecked options cannot be set in the Compile configuration scope since
-    // `javadoc` doesn't play nicely with them; see https://github.com/sbt/sbt/issues/355#issuecomment-3817629
-    // for additional discussion and explanation.
-    (Compile / compile / javacOptions) ++= Seq(
+      "-source", javaVersion.value,
       "-target", javaVersion.value,
       "-Xlint:unchecked"
+
     ),
 
     (Compile / scalacOptions) ++= Seq(
