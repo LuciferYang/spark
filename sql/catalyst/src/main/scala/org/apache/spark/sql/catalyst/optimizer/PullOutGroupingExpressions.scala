@@ -50,7 +50,7 @@ object PullOutGroupingExpressions extends Rule[LogicalPlan] {
     plan.transformWithPruning(_.containsPattern(AGGREGATE)) {
       case a: Aggregate if a.resolved =>
         val complexGroupingExpressionMap = mutable.LinkedHashMap.empty[Expression, NamedExpression]
-        val newGroupingExpressions = a.groupingExpressions.toIndexedSeq.map {
+        val newGroupingExpressions = a.groupingExpressions.map {
           case e if !e.foldable && e.children.nonEmpty =>
             complexGroupingExpressionMap
               .getOrElseUpdate(e.canonicalized, Alias(e, "_groupingexpression")())
