@@ -548,10 +548,10 @@ case class JsonTuple(children: Seq[Expression])
         // check to see if this field is desired in the output
         val jsonField = parser.currentName
         var idx = fieldNames.indexOf(jsonField)
+        // it is, copy the child tree to the correct location in the output row
+        val output = new ByteArrayOutputStream()
         if (idx >= 0) {
-          // it is, copy the child tree to the correct location in the output row
-          val output = new ByteArrayOutputStream()
-
+          output.reset()
           // write the output directly to UTF8 encoded byte array
           if (parser.nextToken() != JsonToken.VALUE_NULL) {
             Utils.tryWithResource(jsonFactory.createGenerator(output, JsonEncoding.UTF8)) {
