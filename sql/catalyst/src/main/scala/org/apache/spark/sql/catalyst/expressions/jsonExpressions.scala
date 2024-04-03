@@ -541,6 +541,8 @@ case class JsonTuple(children: Seq[Expression])
     }
 
     val row = Array.ofDim[Any](fieldNames.length)
+    // it is, copy the child tree to the correct location in the output row
+    val output = new ByteArrayOutputStream()
 
     // start reading through the token stream, looking for any requested field names
     while (parser.nextToken() != JsonToken.END_OBJECT) {
@@ -548,12 +550,10 @@ case class JsonTuple(children: Seq[Expression])
         // check to see if this field is desired in the output
         val jsonField = parser.currentName
         var idx = fieldNames.indexOf(jsonField)
-        // it is, copy the child tree to the correct location in the output row
-        val output = new ByteArrayOutputStream()
         if (idx >= 0) {
-          output.reset()
           // write the output directly to UTF8 encoded byte array
           if (parser.nextToken() != JsonToken.VALUE_NULL) {
+            output.reset()
             Utils.tryWithResource(jsonFactory.createGenerator(output, JsonEncoding.UTF8)) {
               generator => copyCurrentStructure(generator, parser)
             }
