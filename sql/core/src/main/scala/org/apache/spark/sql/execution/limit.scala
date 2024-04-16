@@ -60,44 +60,13 @@ case class CollectLimitExec(limit: Int = -1, child: SparkPlan, offset: Int = 0) 
       child.executeCollect().drop(offset)
     }
   }
-  private val serializer: Serializer = new UnsafeRowSerializer(child.output.size)
   private lazy val writeMetrics =
     SQLShuffleWriteMetricsReporter.createShuffleWriteMetrics(sparkContext)
   private lazy val readMetrics =
     SQLShuffleReadMetricsReporter.createShuffleReadMetrics(sparkContext)
   override lazy val metrics = readMetrics ++ writeMetrics
   protected override def doExecute(): RDD[InternalRow] = {
-    val childRDD = child.execute()
-    if (childRDD.getNumPartitions == 0) {
-      new ParallelCollectionRDD(sparkContext, Seq.empty[InternalRow], 1, Map.empty)
-    } else {
-      val singlePartitionRDD = if (childRDD.getNumPartitions == 1) {
-        childRDD
-      } else {
-        val locallyLimited = if (limit >= 0) {
-          childRDD.mapPartitionsInternal(_.take(limit))
-        } else {
-          childRDD
-        }
-        new ShuffledRowRDD(
-          ShuffleExchangeExec.prepareShuffleDependency(
-            locallyLimited,
-            child.output,
-            SinglePartition,
-            serializer,
-            writeMetrics),
-          readMetrics)
-      }
-      if (limit >= 0) {
-        if (offset > 0) {
-          singlePartitionRDD.mapPartitionsInternal(_.slice(offset, limit))
-        } else {
-          singlePartitionRDD.mapPartitionsInternal(_.take(limit))
-        }
-      } else {
-        singlePartitionRDD.mapPartitionsInternal(_.drop(offset))
-      }
-    }
+    sparkContext.parallelize(executeCollect(), numSlices = 1)
   }
 
   override def stringArgs: Iterator[Any] = {
