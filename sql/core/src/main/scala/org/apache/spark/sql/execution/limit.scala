@@ -66,7 +66,7 @@ case class CollectLimitExec(limit: Int = -1, child: SparkPlan, offset: Int = 0) 
     SQLShuffleReadMetricsReporter.createShuffleReadMetrics(sparkContext)
   override lazy val metrics = readMetrics ++ writeMetrics
   protected override def doExecute(): RDD[InternalRow] = {
-    sparkContext.parallelize(executeCollect(), numSlices = 1)
+    sparkContext.parallelize(executeCollect().toImmutableArraySeq, numSlices = 1)
   }
 
   override def stringArgs: Iterator[Any] = {
