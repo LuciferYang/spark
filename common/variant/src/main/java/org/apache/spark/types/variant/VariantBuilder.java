@@ -269,7 +269,6 @@ public class VariantBuilder {
       maxId = Math.max(maxId, fields.get(i).id);
       String key = fields.get(i).key;
       if (key.equals(fields.get(i - 1).key)) {
-        @SuppressWarnings("unchecked")
         Map<String, String> parameters = Map$.MODULE$.<String, String>empty().updated("key", key);
         throw new SparkRuntimeException("VARIANT_DUPLICATE_KEY", parameters,
             null, new QueryContext[]{}, "");
