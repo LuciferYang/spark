@@ -20,21 +20,29 @@ package org.apache.spark.unsafe.map;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectOutput;
 import java.util.Iterator;
 import java.util.LinkedList;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoSerializable;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Closeables;
 
+import org.apache.spark.SparkConf;
 import org.apache.spark.SparkEnv;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.internal.LogKeys;
 import org.apache.spark.internal.SparkLogger;
 import org.apache.spark.internal.SparkLoggerFactory;
 import org.apache.spark.internal.MDC;
+import org.apache.spark.internal.config.package$;
 import org.apache.spark.memory.MemoryConsumer;
 import org.apache.spark.memory.SparkOutOfMemoryError;
 import org.apache.spark.memory.TaskMemoryManager;
+import org.apache.spark.memory.UnifiedMemoryManager;
 import org.apache.spark.serializer.SerializerManager;
 import org.apache.spark.storage.BlockManager;
 import org.apache.spark.unsafe.Platform;
@@ -1007,5 +1015,60 @@ public final class BytesToBytesMap extends MemoryConsumer {
       longArray.set(newPos * 2 + 1, hashcode);
     }
     freeArray(oldLongArray);
+  }
+
+  public void writeToKryoOutput(Output output) {
+    output.writeLong(numKeys);
+    output.writeLong(numValues);
+
+    byte[] buffer = new byte[64];
+    MapIterator iterator = iterator();
+    while (iterator.hasNext()) {
+      Location loc = iterator.next();
+      // [key size] [values size] [key bytes] [value bytes]
+      output.writeInt(loc.getKeyLength());
+      output.writeInt(loc.getValueLength());
+      buffer = write(loc.getKeyBase(), loc.getKeyOffset(), loc.getKeyLength(), buffer, output);
+      buffer = write(loc.getValueBase(), loc.getValueOffset(), loc.getValueLength(), buffer, output);
+    }
+  }
+
+  private byte[] write(Object base, long offset, int length, byte[] buffer, Output output) {
+    if (buffer.length < length) {
+      buffer = new byte[length];
+    }
+    Platform.copyMemory(base, offset, buffer, Platform.BYTE_ARRAY_OFFSET, length);
+    output.write(buffer, 0, length);
+    return buffer;
+  }
+
+  public void writeToObjectOutput(ObjectOutput out) throws IOException {
+    out.writeLong(numKeys);
+    out.writeLong(numValues);
+
+    byte[] buffer = new byte[64];
+    MapIterator iterator = iterator();
+    while (iterator.hasNext()) {
+      Location loc = iterator.next();
+      // [key size] [values size] [key bytes] [value bytes]
+      out.writeInt(loc.getKeyLength());
+      out.writeInt(loc.getValueLength());
+      buffer = write(loc.getKeyBase(), loc.getKeyOffset(), loc.getKeyLength(), buffer, out);
+      buffer = write(loc.getValueBase(), loc.getValueOffset(), loc.getValueLength(), buffer, out);
+    }
+  }
+
+  private byte[] write(
+      Object base,
+      long offset,
+      int length,
+      byte[] buffer,
+      ObjectOutput out) throws IOException {
+    if (buffer.length < length) {
+      buffer = new byte[length];
+    }
+    Platform.copyMemory(base, offset, buffer, Platform.BYTE_ARRAY_OFFSET, length);
+    out.write(buffer, 0, length);
+    return buffer;
   }
 }

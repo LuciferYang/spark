@@ -345,41 +345,15 @@ private[joins] class UnsafeHashedRelation(
   }
 
   override def writeExternal(out: ObjectOutput): Unit = Utils.tryOrIOException {
-    write(out.writeInt, out.writeLong, out.write)
+    out.writeInt(numKeys)
+    out.writeInt(numFields)
+    binaryMap.writeToObjectOutput(out)
   }
 
   override def write(kryo: Kryo, out: Output): Unit = Utils.tryOrIOException {
-    write(out.writeInt, out.writeLong, out.write)
-  }
-
-  private def write(
-      writeInt: (Int) => Unit,
-      writeLong: (Long) => Unit,
-      writeBuffer: (Array[Byte], Int, Int) => Unit) : Unit = {
-    writeInt(numKeys)
-    writeInt(numFields)
-    // TODO: move these into BytesToBytesMap
-    writeLong(binaryMap.numKeys())
-    writeLong(binaryMap.numValues())
-
-    var buffer = new Array[Byte](64)
-    def write(base: Object, offset: Long, length: Int): Unit = {
-      if (buffer.length < length) {
-        buffer = new Array[Byte](length)
-      }
-      Platform.copyMemory(base, offset, buffer, Platform.BYTE_ARRAY_OFFSET, length)
-      writeBuffer(buffer, 0, length)
-    }
-
-    val iter = binaryMap.iterator()
-    while (iter.hasNext) {
-      val loc = iter.next()
-      // [key size] [values size] [key bytes] [value bytes]
-      writeInt(loc.getKeyLength)
-      writeInt(loc.getValueLength)
-      write(loc.getKeyBase, loc.getKeyOffset, loc.getKeyLength)
-      write(loc.getValueBase, loc.getValueOffset, loc.getValueLength)
-    }
+    out.writeInt(numKeys)
+    out.writeInt(numFields)
+    binaryMap.writeToKryoOutput(out)
   }
 
   override def readExternal(in: ObjectInput): Unit = Utils.tryOrIOException {
