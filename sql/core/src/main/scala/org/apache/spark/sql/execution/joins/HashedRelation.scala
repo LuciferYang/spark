@@ -18,13 +18,12 @@
 package org.apache.spark.sql.execution.joins
 
 import java.io._
-
 import com.esotericsoftware.kryo.{Kryo, KryoSerializable}
 import com.esotericsoftware.kryo.io.{Input, Output}
-
 import org.apache.spark.{SparkConf, SparkEnv, SparkException, SparkUnsupportedOperationException}
 import org.apache.spark.internal.config.{BUFFER_PAGESIZE, MEMORY_OFFHEAP_ENABLED}
 import org.apache.spark.memory._
+import org.apache.spark.serializer.OutputWrapper
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
@@ -345,15 +344,28 @@ private[joins] class UnsafeHashedRelation(
   }
 
   override def writeExternal(out: ObjectOutput): Unit = Utils.tryOrIOException {
-    out.writeInt(numKeys)
-    out.writeInt(numFields)
-    binaryMap.writeToObjectOutput(out)
+    write(out.writeInt, out.writeLong, out.write)
   }
 
   override def write(kryo: Kryo, out: Output): Unit = Utils.tryOrIOException {
-    out.writeInt(numKeys)
-    out.writeInt(numFields)
-    binaryMap.writeToKryoOutput(out)
+    write(out.writeInt, out.writeLong, out.write)
+  }
+
+  private def write(
+      writeIntFn: Int => Unit,
+      writeLongFn: Long => Unit,
+      writeBuffer: (Array[Byte], Int, Int) => Unit) : Unit = {
+    writeIntFn(numKeys)
+    writeIntFn(numFields)
+    val wrapper = new BytesToBytesMap.OutputWrapper {
+      override def writeInt(value: Int): Unit = writeIntFn(value)
+
+      override def writeLong(value: Long): Unit = writeLongFn(value)
+
+      override def write(bytes: Array[Byte], offset: Int, length: Int): Unit =
+        writeBuffer(bytes, offset, length)
+    }
+    binaryMap.writeToOutput(wrapper)
   }
 
   override def readExternal(in: ObjectInput): Unit = Utils.tryOrIOException {
