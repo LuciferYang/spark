@@ -1021,7 +1021,8 @@ public final class BytesToBytesMap extends MemoryConsumer {
       output.writeInt(loc.getKeyLength());
       output.writeInt(loc.getValueLength());
       buffer = write(loc.getKeyBase(), loc.getKeyOffset(), loc.getKeyLength(), buffer, output);
-      buffer = write(loc.getValueBase(), loc.getValueOffset(), loc.getValueLength(), buffer, output);
+      buffer = write(
+        loc.getValueBase(), loc.getValueOffset(), loc.getValueLength(), buffer, output);
     }
   }
 
