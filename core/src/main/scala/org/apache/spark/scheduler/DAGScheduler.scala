@@ -19,7 +19,7 @@ package org.apache.spark.scheduler
 
 import java.io.NotSerializableException
 import java.util.Properties
-import java.util.concurrent.{ConcurrentHashMap, ExecutorService, ScheduledFuture, TimeoutException, TimeUnit}
+import java.util.concurrent.{CompletableFuture, ConcurrentHashMap, ExecutorService, ScheduledFuture, TimeoutException, TimeUnit}
 import java.util.concurrent.{Future => JFutrue}
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -29,8 +29,6 @@ import scala.collection.mutable
 import scala.collection.mutable.{HashMap, HashSet, ListBuffer}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-
-import com.google.common.util.concurrent.{Futures, SettableFuture}
 
 import org.apache.spark._
 import org.apache.spark.broadcast.Broadcast
@@ -2437,11 +2435,11 @@ private[spark] class DAGScheduler(
     val shuffleId = stage.shuffleDep.shuffleId
     val shuffleMergeId = stage.shuffleDep.shuffleMergeId
     val numMergers = stage.shuffleDep.getMergerLocs.length
-    val results = (0 until numMergers).map(_ => SettableFuture.create[Boolean]())
+    val results = (0 until numMergers).map(_ => new CompletableFuture[Boolean]())
     externalShuffleClient.foreach { shuffleClient =>
       val scheduledFutures =
         if (!registerMergeResults) {
-          results.foreach(_.set(true))
+          results.foreach(_.complete(true))
           // Finalize in separate thread as shuffle merge is a no-op in this case
           stage.shuffleDep.getMergerLocs.map {
             case shuffleServiceLoc =>
@@ -2477,7 +2475,7 @@ private[spark] class DAGScheduler(
                         assert(shuffleId == statuses.shuffleId)
                         eventProcessLoop.post(RegisterMergeStatuses(stage, MergeStatus.
                           convertMergeStatusesToMergeStatusArr(statuses, shuffleServiceLoc)))
-                        results(index).set(true)
+                        results(index).complete(true)
                       }
 
                       override def onShuffleMergeFailure(e: Throwable): Unit = {
@@ -2487,7 +2485,7 @@ private[spark] class DAGScheduler(
                         // Do not fail the future as this would cause dag scheduler to prematurely
                         // give up on waiting for merge results from the remaining shuffle services
                         // if one fails
-                        results(index).set(false)
+                        results(index).complete(false)
                       }
                     })
                 }
@@ -2499,7 +2497,7 @@ private[spark] class DAGScheduler(
       // from all shuffle services are received or not.
       var timedOut = false
       try {
-        Futures.allAsList(results: _*).get(shuffleMergeResultsTimeoutSec, TimeUnit.SECONDS)
+        CompletableFuture.allOf(results: _*).get(shuffleMergeResultsTimeoutSec, TimeUnit.SECONDS)
       } catch {
         case _: TimeoutException =>
           timedOut = true
