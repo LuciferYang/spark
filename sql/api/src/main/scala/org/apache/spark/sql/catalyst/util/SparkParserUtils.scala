@@ -16,7 +16,7 @@
  */
 package org.apache.spark.sql.catalyst.util
 
-import java.lang.{Long => JLong, StringBuilder => JStringBuilder}
+import java.lang.{StringBuilder => JStringBuilder}
 
 import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import org.antlr.v4.runtime.misc.Interval
@@ -28,7 +28,9 @@ trait SparkParserUtils {
 
   /** Unescape backslash-escaped string enclosed by quotes. */
   def unescapeSQLString(b: String): String = {
-    def appendEscapedChar(n: Char, sb: JStringBuilder): Unit = {
+    val sb = new JStringBuilder(b.length())
+
+    def appendEscapedChar(n: Char): Unit = {
       n match {
         case '0' => sb.append('\u0000')
         case 'b' => sb.append('\b')
@@ -43,13 +45,13 @@ trait SparkParserUtils {
       }
     }
 
-    def allCharsAreHex(s: String, start: Int, length: Int): Boolean = {
-      val end = start + length - 1
+    // Helper method to check if all characters in a substring are hexadecimal
+    def allCharsAreHex(s: Array[Char], start: Int, length: Int): Boolean = {
+      val end = start + length
       var i = start
       while (i < end) {
-        val c = s.charAt(i)
-        val cIsHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-        if (!cIsHex) {
+        val c = s(i)
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
           return false
         }
         i += 1
@@ -57,66 +59,59 @@ trait SparkParserUtils {
       true
     }
 
-    def isThreeDigitOctalEscape(s: String, start: Int): Boolean = {
-      val firstChar = s.charAt(start)
-      val secondChar = s.charAt(start + 1)
-      val thirdChar = s.charAt(start + 2)
+    // Helper method to check if the next three characters form a valid octal escape
+    def isThreeDigitOctalEscape(s: Array[Char], start: Int): Boolean = {
+      val firstChar = s(start)
+      val secondChar = s(start + 1)
+      val thirdChar = s(start + 2)
       (firstChar == '0' || firstChar == '1') &&
         (secondChar >= '0' && secondChar <= '7') &&
         (thirdChar >= '0' && thirdChar <= '7')
     }
 
-    val isRawString = {
-      val firstChar = b.charAt(0)
-      firstChar == 'r' || firstChar == 'R'
-    }
+    // Convert string to char array for faster access
+    val chars = b.toCharArray
+    val length = chars.length
+
+    // Check for raw string
+    val isRawString = chars(0) == 'r' || chars(0) == 'R'
 
     if (isRawString) {
       // Skip the 'r' or 'R' and the first and last quotations enclosing the string literal.
-      b.substring(2, b.length - 1)
+      new String(chars, 2, length - 3)
     } else if (b.indexOf('\\') == -1) {
-      // Fast path for the common case where the string has no escaped characters,
-      // in which case we just skip the first and last quotations enclosing the string literal.
-      b.substring(1, b.length - 1)
+      // Fast path for the common case where the string has no escaped characters.
+      new String(chars, 1, length - 2)
     } else {
-      val sb = new JStringBuilder(b.length())
       // Skip the first and last quotations enclosing the string literal.
       var i = 1
-      val length = b.length - 1
-      while (i < length) {
-        val c = b.charAt(i)
-        if (c != '\\' || i + 1 == length) {
+      while (i < length - 1) {
+        val c = chars(i)
+        if (c != '\\' || i + 1 == length - 1) {
           // Either a regular character or a backslash at the end of the string:
           sb.append(c)
           i += 1
         } else {
           // A backslash followed by at least one character:
           i += 1
-          val cAfterBackslash = b.charAt(i)
-          if (cAfterBackslash == 'u' && i + 1 + 4 <= length && allCharsAreHex(b, i + 1, 4)) {
-            // \u0000 style 16-bit unicode character literals.
-            sb.append(Integer.parseInt(b, i + 1, i + 1 + 4, 16).toChar)
-            i += 1 + 4
-          } else if (cAfterBackslash == 'U' && i + 1 + 8 <= length && allCharsAreHex(b, i + 1, 8)) {
-            // \U00000000 style 32-bit unicode character literals.
-            // Use Long to treat codePoint as unsigned in the range of 32-bit.
-            val codePoint = JLong.parseLong(b, i + 1, i + 1 + 8, 16)
-            if (codePoint < 0x10000) {
-              sb.append((codePoint & 0xFFFF).toChar)
-            } else {
-              val highSurrogate = (codePoint - 0x10000) / 0x400 + 0xD800
-              val lowSurrogate = (codePoint - 0x10000) % 0x400 + 0xDC00
-              sb.append(highSurrogate.toChar)
-              sb.append(lowSurrogate.toChar)
-            }
-            i += 1 + 8
-          } else if (i + 3 <= length && isThreeDigitOctalEscape(b, i)) {
-            // \000 style character literals.
-            sb.append(Integer.parseInt(b, i, i + 3, 8).toChar)
-            i += 3
-          } else {
-            appendEscapedChar(cAfterBackslash, sb)
-            i += 1
+          val cAfterBackslash = chars(i)
+          cAfterBackslash match {
+            case 'u' if i + 4 < length && allCharsAreHex(chars, i + 1, 4) =>
+              // \u0000 style 16-bit unicode character literals.
+              sb.append(Integer.parseInt(new String(chars, i + 1, 4), 16).toChar)
+              i += 5
+            case 'U' if i + 8 < length && allCharsAreHex(chars, i + 1, 8) =>
+              // \U00000000 style 32-bit unicode character literals.
+              val codePoint = Integer.parseInt(new String(chars, i + 1, 8), 16)
+              sb.appendCodePoint(codePoint)
+              i += 9
+            case _ if i + 2 < length && isThreeDigitOctalEscape(chars, i) =>
+              // \000 style character literals.
+              sb.append(Integer.parseInt(new String(chars, i, 3), 8).toChar)
+              i += 3
+            case _ =>
+              appendEscapedChar(cAfterBackslash)
+              i += 1
           }
         }
       }
