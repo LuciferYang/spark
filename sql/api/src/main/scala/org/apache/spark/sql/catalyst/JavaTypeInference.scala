@@ -108,11 +108,8 @@ object JavaTypeInference {
       val elementEncoder = encoderFor(c.getComponentType, seenTypeSet, typeVariables)
       ArrayEncoder(elementEncoder, elementEncoder.nullable)
 
-    case c: Class[_] if classOf[JList[_]].isAssignableFrom(c) =>
-      val element = encoderFor(c.getTypeParameters.array(0), seenTypeSet, typeVariables)
-      IterableEncoder(ClassTag(c), element, element.nullable, lenientSerialization = false)
-
-    case c: Class[_] if classOf[JSet[_]].isAssignableFrom(c) =>
+    case c: Class[_] if classOf[JList[_]].isAssignableFrom(c) ||
+        classOf[JSet[_]].isAssignableFrom(c) =>
       val element = encoderFor(c.getTypeParameters.array(0), seenTypeSet, typeVariables)
       IterableEncoder(ClassTag(c), element, element.nullable, lenientSerialization = false)
 
