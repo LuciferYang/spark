@@ -108,11 +108,7 @@ class PythonForeachWriterSuite extends SparkFunSuite with Eventually with Mockit
             outputBuffer.synchronized {
               outputBuffer += iterator.next().getInt(0)
             }
-            try {
-              Thread.sleep(sleepPerRowReadMs)
-            } catch {
-              case _: InterruptedException => // Ignore the interruption
-            }
+            Thread.sleep(sleepPerRowReadMs)
           }
         } finally {
           buffer.close()
@@ -122,7 +118,11 @@ class PythonForeachWriterSuite extends SparkFunSuite with Eventually with Mockit
     thread.start()
 
     def add(ints: Seq[Int]): Unit = {
-      ints.foreach { i => buffer.add(intProj.apply(new GenericInternalRow(Array[Any](i)))) }
+      ints.foreach { i =>
+        // scalastyle:off
+        println(s"Adding $i")
+        buffer.add(intProj.apply(new GenericInternalRow(Array[Any](i))))
+      }
     }
 
     def allAdded(): Unit = { buffer.allRowsAdded() }
