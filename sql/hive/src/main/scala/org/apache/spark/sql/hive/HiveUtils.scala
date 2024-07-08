@@ -321,7 +321,7 @@ private[spark] object HiveUtils extends Logging {
       hadoopConf: Configuration,
       configurations: Map[String, String] = Map.empty): HiveClient = {
     val sqlConf = new SQLConf
-    sqlConf.setConf(SQLContext.getSQLProperties(conf))
+    sqlConf.setConf(SparkSession.getSQLProperties(conf))
     val hiveMetastoreVersion = HiveUtils.hiveMetastoreVersion(sqlConf)
     val hiveMetastoreJars = HiveUtils.hiveMetastoreJars(sqlConf)
     val hiveMetastoreSharedPrefixes = HiveUtils.hiveMetastoreSharedPrefixes(sqlConf)

@@ -1056,42 +1056,14 @@ object SQLContext {
       data: Iterator[_],
       beanClass: Class[_],
       attrs: Seq[AttributeReference]): Iterator[InternalRow] = {
-    def createStructConverter(cls: Class[_], fieldTypes: Seq[DataType]): Any => InternalRow = {
-      val methodConverters =
-        JavaTypeInference.getJavaBeanReadableProperties(cls).zip(fieldTypes)
-          .map { case (property, fieldType) =>
-            val method = property.getReadMethod
-            method -> createConverter(method.getReturnType, fieldType)
-          }
-      value =>
-        if (value == null) {
-          null
-        } else {
-          new GenericInternalRow(
-            methodConverters.map { case (method, converter) =>
-              converter(method.invoke(value))
-            })
-        }
-    }
-    def createConverter(cls: Class[_], dataType: DataType): Any => Any = dataType match {
-      case struct: StructType => createStructConverter(cls, struct.map(_.dataType))
-      case _ => CatalystTypeConverters.createToCatalystConverter(dataType)
-    }
-    val dataConverter = createStructConverter(beanClass, attrs.map(_.dataType))
-    data.map(dataConverter)
+    SparkSession.beansToRows(data, beanClass, attrs)
   }
 
   /**
    * Extract `spark.sql.*` properties from the conf and return them as a [[Properties]].
    */
   private[sql] def getSQLProperties(sparkConf: SparkConf): Properties = {
-    val properties = new Properties
-    sparkConf.getAll.foreach { case (key, value) =>
-      if (key.startsWith("spark.sql")) {
-        properties.setProperty(key, value)
-      }
-    }
-    properties
+    SparkSession.getSQLProperties(sparkConf)
   }
 
 }

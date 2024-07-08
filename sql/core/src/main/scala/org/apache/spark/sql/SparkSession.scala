@@ -18,7 +18,7 @@
 package org.apache.spark.sql
 
 import java.io.Closeable
-import java.util.{ServiceLoader, UUID}
+import java.util.{Properties, ServiceLoader, UUID}
 import java.util.concurrent.TimeUnit._
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalog.Catalog
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.analysis.{NameParameterizedQuery, PosParameterizedQuery, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.encoders._
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, GenericInternalRow}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Range}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils
@@ -429,7 +429,7 @@ class SparkSession private(
     val className = beanClass.getName
     val rowRdd = rdd.mapPartitions { iter =>
     // BeanInfo is not serializable so we must rediscover it remotely for each partition.
-      SQLContext.beansToRows(iter, Utils.classForName(className), attributeSeq)
+      SparkSession.beansToRows(iter, Utils.classForName(className), attributeSeq)
     }
     Dataset.ofRows(self, LogicalRDD(attributeSeq, rowRdd.setName(rdd.name))(self))
   }
@@ -455,7 +455,7 @@ class SparkSession private(
    */
   def createDataFrame(data: java.util.List[_], beanClass: Class[_]): DataFrame = withActive {
     val attrSeq = getSchema(beanClass)
-    val rows = SQLContext.beansToRows(data.asScala.iterator, beanClass, attrSeq)
+    val rows = SparkSession.beansToRows(data.asScala.iterator, beanClass, attrSeq)
     Dataset.ofRows(self, LocalRelation(attrSeq, rows.toSeq))
   }
 
@@ -1281,6 +1281,53 @@ object SparkSession extends Logging {
       })
       newSession
     }
+  }
+
+  /**
+   * Converts an iterator of Java Beans to InternalRow using the provided
+   * bean info & schema. This is not related to the singleton, but is a static
+   * method for internal use.
+   */
+  private[sql] def beansToRows(
+      data: Iterator[_],
+      beanClass: Class[_],
+      attrs: Seq[AttributeReference]): Iterator[InternalRow] = {
+    def createStructConverter(cls: Class[_], fieldTypes: Seq[DataType]): Any => InternalRow = {
+      val methodConverters =
+        JavaTypeInference.getJavaBeanReadableProperties(cls).zip(fieldTypes)
+          .map { case (property, fieldType) =>
+            val method = property.getReadMethod
+            method -> createConverter(method.getReturnType, fieldType)
+          }
+      value =>
+        if (value == null) {
+          null
+        } else {
+          new GenericInternalRow(
+            methodConverters.map { case (method, converter) =>
+              converter(method.invoke(value))
+            })
+        }
+    }
+    def createConverter(cls: Class[_], dataType: DataType): Any => Any = dataType match {
+      case struct: StructType => createStructConverter(cls, struct.map(_.dataType))
+      case _ => CatalystTypeConverters.createToCatalystConverter(dataType)
+    }
+    val dataConverter = createStructConverter(beanClass, attrs.map(_.dataType))
+    data.map(dataConverter)
+  }
+
+  /**
+   * Extract `spark.sql.*` properties from the conf and return them as a [[Properties]].
+   */
+  private[sql] def getSQLProperties(sparkConf: SparkConf): Properties = {
+    val properties = new Properties
+    sparkConf.getAll.foreach { case (key, value) =>
+      if (key.startsWith("spark.sql")) {
+        properties.setProperty(key, value)
+      }
+    }
+    properties
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////
