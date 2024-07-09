@@ -29,8 +29,8 @@ private[spark] class MountVolumesFeatureStep(conf: KubernetesConf)
   extends KubernetesFeatureConfigStep {
   import MountVolumesFeatureStep._
 
-  val additionalResources = ArrayBuffer.empty[HasMetadata]
-  val accessMode = if (conf.get(KUBERNETES_USE_LEGACY_PVC_ACCESS_MODE)) {
+  val additionalResources: ArrayBuffer[HasMetadata] = ArrayBuffer.empty[HasMetadata]
+  val accessMode: String = if (conf.get(KUBERNETES_USE_LEGACY_PVC_ACCESS_MODE)) {
     "ReadWriteOnce"
   } else {
     PVC_ACCESS_MODE

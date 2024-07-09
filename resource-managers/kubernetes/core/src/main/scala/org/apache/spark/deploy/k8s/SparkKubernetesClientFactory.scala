@@ -144,8 +144,8 @@ object SparkKubernetesClientFactory extends Logging {
 
   object ClientType extends Enumeration {
     import scala.language.implicitConversions
-    val Driver = Val(DRIVER_CLIENT_REQUEST_TIMEOUT, DRIVER_CLIENT_CONNECTION_TIMEOUT)
-    val Submission = Val(SUBMISSION_CLIENT_REQUEST_TIMEOUT, SUBMISSION_CLIENT_CONNECTION_TIMEOUT)
+    val Driver: Val = Val(DRIVER_CLIENT_REQUEST_TIMEOUT, DRIVER_CLIENT_CONNECTION_TIMEOUT)
+    val Submission: Val = Val(SUBMISSION_CLIENT_REQUEST_TIMEOUT, SUBMISSION_CLIENT_CONNECTION_TIMEOUT)
 
     protected case class Val(
         requestTimeoutEntry: ConfigEntry[Int],

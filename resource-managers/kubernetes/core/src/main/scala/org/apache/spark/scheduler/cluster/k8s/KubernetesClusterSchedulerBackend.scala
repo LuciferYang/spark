@@ -57,7 +57,7 @@ private[spark] class KubernetesClusterSchedulerBackend(
     extends CoarseGrainedSchedulerBackend(scheduler, sc.env.rpcEnv) {
   private val appId = KubernetesConf.getKubernetesAppId()
 
-  protected override val minRegisteredRatio =
+  protected override val minRegisteredRatio: Double =
     if (conf.get(SCHEDULER_MIN_REGISTERED_RESOURCES_RATIO).isEmpty) {
       0.8
     } else {

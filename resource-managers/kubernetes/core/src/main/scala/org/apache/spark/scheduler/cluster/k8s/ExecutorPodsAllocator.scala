@@ -52,13 +52,13 @@ class ExecutorPodsAllocator(
 
   protected val PVC_COUNTER = new AtomicInteger(0)
 
-  protected val maxPVCs = if (Utils.isDynamicAllocationEnabled(conf)) {
+  protected val maxPVCs: Int = if (Utils.isDynamicAllocationEnabled(conf)) {
     conf.get(DYN_ALLOCATION_MAX_EXECUTORS)
   } else {
     conf.getInt(EXECUTOR_INSTANCES.key, DEFAULT_NUMBER_EXECUTORS)
   }
 
-  protected val podAllocOnPVC = conf.get(KUBERNETES_DRIVER_OWN_PVC) &&
+  protected val podAllocOnPVC: Boolean = conf.get(KUBERNETES_DRIVER_OWN_PVC) &&
     conf.get(KUBERNETES_DRIVER_REUSE_PVC) && conf.get(KUBERNETES_DRIVER_WAIT_TO_REUSE_PVC)
 
   // ResourceProfile id -> total expected executors per profile, currently we don't remove
@@ -67,30 +67,30 @@ class ExecutorPodsAllocator(
 
   protected val rpIdToResourceProfile = new mutable.HashMap[Int, ResourceProfile]
 
-  protected val podAllocationSize = conf.get(KUBERNETES_ALLOCATION_BATCH_SIZE)
+  protected val podAllocationSize: Int = conf.get(KUBERNETES_ALLOCATION_BATCH_SIZE)
 
-  protected val podAllocationDelay = conf.get(KUBERNETES_ALLOCATION_BATCH_DELAY)
+  protected val podAllocationDelay: Long = conf.get(KUBERNETES_ALLOCATION_BATCH_DELAY)
 
-  protected val maxPendingPods = conf.get(KUBERNETES_MAX_PENDING_PODS)
+  protected val maxPendingPods: Int = conf.get(KUBERNETES_MAX_PENDING_PODS)
 
-  protected val maxNumExecutorFailures = ExecutorFailureTracker.maxNumExecutorFailures(conf)
+  protected val maxNumExecutorFailures: Int = ExecutorFailureTracker.maxNumExecutorFailures(conf)
 
-  protected val podCreationTimeout = math.max(
+  protected val podCreationTimeout: Long = math.max(
     podAllocationDelay * 5,
     conf.get(KUBERNETES_ALLOCATION_EXECUTOR_TIMEOUT))
 
-  protected val driverPodReadinessTimeout = conf.get(KUBERNETES_ALLOCATION_DRIVER_READINESS_TIMEOUT)
+  protected val driverPodReadinessTimeout: Long = conf.get(KUBERNETES_ALLOCATION_DRIVER_READINESS_TIMEOUT)
 
-  protected val executorIdleTimeout = conf.get(DYN_ALLOCATION_EXECUTOR_IDLE_TIMEOUT) * 1000
+  protected val executorIdleTimeout: Long = conf.get(DYN_ALLOCATION_EXECUTOR_IDLE_TIMEOUT) * 1000
 
-  protected val namespace = conf.get(KUBERNETES_NAMESPACE)
+  protected val namespace: String = conf.get(KUBERNETES_NAMESPACE)
 
-  protected val kubernetesDriverPodName = conf
+  protected val kubernetesDriverPodName: Option[String] = conf
     .get(KUBERNETES_DRIVER_POD_NAME)
 
-  protected val shouldDeleteExecutors = conf.get(KUBERNETES_DELETE_EXECUTORS)
+  protected val shouldDeleteExecutors: Boolean = conf.get(KUBERNETES_DELETE_EXECUTORS)
 
-  val driverPod = kubernetesDriverPodName
+  val driverPod: Option[Pod] = kubernetesDriverPodName
     .map(name => Option(kubernetesClient.pods()
       .inNamespace(namespace)
       .withName(name)
@@ -101,25 +101,25 @@ class ExecutorPodsAllocator(
 
   // Executor IDs that have been requested from Kubernetes but have not been detected in any
   // snapshot yet. Mapped to the (ResourceProfile id, timestamp) when they were created.
-  protected val newlyCreatedExecutors = mutable.LinkedHashMap.empty[Long, (Int, Long)]
+  protected val newlyCreatedExecutors: mutable.LinkedHashMap[Long,(Int, Long)] = mutable.LinkedHashMap.empty[Long, (Int, Long)]
 
   // Executor IDs that have been requested from Kubernetes but have not been detected in any POD
   // snapshot yet but already known by the scheduler backend. Mapped to the ResourceProfile id.
-  protected val schedulerKnownNewlyCreatedExecs = mutable.LinkedHashMap.empty[Long, Int]
+  protected val schedulerKnownNewlyCreatedExecs: mutable.LinkedHashMap[Long,Int] = mutable.LinkedHashMap.empty[Long, Int]
 
-  protected val dynamicAllocationEnabled = Utils.isDynamicAllocationEnabled(conf)
+  protected val dynamicAllocationEnabled: Boolean = Utils.isDynamicAllocationEnabled(conf)
 
   // visible for tests
   val numOutstandingPods = new AtomicInteger()
 
-  protected var lastSnapshot = ExecutorPodsSnapshot()
+  protected var lastSnapshot: ExecutorPodsSnapshot = ExecutorPodsSnapshot()
 
   protected var appId: String = _
 
   // Executors that have been deleted by this allocator but not yet detected as deleted in
   // a snapshot from the API server. This is used to deny registration from these executors
   // if they happen to come up before the deletion takes effect.
-  @volatile protected var deletedExecutorIds = Set.empty[Long]
+  @volatile protected var deletedExecutorIds: Set[Long] = Set.empty[Long]
 
   @volatile private var failedExecutorIds = Set.empty[Long]
 
@@ -414,7 +414,7 @@ class ExecutorPodsAllocator(
     numOutstandingPods.set(totalPendingCount + newlyCreatedExecutors.size)
   }
 
-  protected def getReusablePVCs(applicationId: String, pvcsInUse: Seq[String]) = {
+  protected def getReusablePVCs(applicationId: String, pvcsInUse: Seq[String]): mutable.Buffer[PersistentVolumeClaim] = {
     if (conf.get(KUBERNETES_DRIVER_OWN_PVC) && conf.get(KUBERNETES_DRIVER_REUSE_PVC) &&
         driverPod.nonEmpty) {
       try {

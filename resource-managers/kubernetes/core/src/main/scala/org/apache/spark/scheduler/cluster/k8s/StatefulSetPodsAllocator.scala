@@ -33,6 +33,7 @@ import org.apache.spark.deploy.k8s.KubernetesUtils.addOwnerReference
 import org.apache.spark.internal.Logging
 import org.apache.spark.resource.ResourceProfile
 import org.apache.spark.util.{Clock, Utils}
+import io.fabric8.kubernetes.api.model.Pod
 
 class StatefulSetPodsAllocator(
     conf: SparkConf,
@@ -44,14 +45,14 @@ class StatefulSetPodsAllocator(
 
   protected val rpIdToResourceProfile = new mutable.HashMap[Int, ResourceProfile]
 
-  protected val driverPodReadinessTimeout = conf.get(KUBERNETES_ALLOCATION_DRIVER_READINESS_TIMEOUT)
+  protected val driverPodReadinessTimeout: Long = conf.get(KUBERNETES_ALLOCATION_DRIVER_READINESS_TIMEOUT)
 
-  protected val namespace = conf.get(KUBERNETES_NAMESPACE)
+  protected val namespace: String = conf.get(KUBERNETES_NAMESPACE)
 
-  protected val kubernetesDriverPodName = conf
+  protected val kubernetesDriverPodName: Option[String] = conf
     .get(KUBERNETES_DRIVER_POD_NAME)
 
-  val driverPod = kubernetesDriverPodName
+  val driverPod: Option[Pod] = kubernetesDriverPodName
     .map(name => Option(kubernetesClient.pods()
       .inNamespace(namespace)
       .withName(name)

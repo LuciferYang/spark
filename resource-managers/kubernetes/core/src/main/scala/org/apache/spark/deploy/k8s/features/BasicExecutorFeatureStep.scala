@@ -66,7 +66,7 @@ private[spark] class BasicExecutorFeatureStep(
     kubernetesConf.get(MEMORY_OVERHEAD_FACTOR)
   }
 
-  val execResources = ResourceProfile.getResourcesForClusterManager(
+  val execResources: ResourceProfile.ExecutorResourcesOrDefaults = ResourceProfile.getResourcesForClusterManager(
     resourceProfile.id,
     resourceProfile.executorResources,
     minimumMemoryOverhead,

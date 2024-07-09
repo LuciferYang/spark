@@ -28,6 +28,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.hive.HiveUtils
 import org.apache.spark.sql.hive.thriftserver._
+import java.{util => ju}
 
 /**
  * Executes queries using Spark SQL, and maintains a list of handles to active queries.
@@ -35,7 +36,7 @@ import org.apache.spark.sql.hive.thriftserver._
 private[thriftserver] class SparkSQLOperationManager()
   extends OperationManager with Logging {
 
-  val handleToOperation = ReflectionUtils
+  val handleToOperation: ju.Map[OperationHandle,Operation] = ReflectionUtils
     .getSuperField[JMap[OperationHandle, Operation]](this, "handleToOperation")
 
   val sessionToContexts = new ConcurrentHashMap[SessionHandle, SQLContext]()

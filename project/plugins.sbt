@@ -47,3 +47,5 @@ addSbtPlugin("com.github.sbt" % "sbt-pom-reader" % "2.4.0")
 addSbtPlugin("net.aichler" % "sbt-jupiter-interface" % "0.11.1")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.7")
+
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.12.1")

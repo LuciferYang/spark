@@ -118,7 +118,7 @@ private[spark] class Client(
   // Executor related configurations
   private val executorMemory = sparkConf.get(EXECUTOR_MEMORY)
   // Executor offHeap memory in MiB.
-  protected val executorOffHeapMemory = Utils.executorOffHeapMemorySizeAsMb(sparkConf)
+  protected val executorOffHeapMemory: Int = Utils.executorOffHeapMemorySizeAsMb(sparkConf)
 
   private val executorMemoryOvereadFactor = sparkConf.get(EXECUTOR_MEMORY_OVERHEAD_FACTOR)
   private val minMemoryOverhead = sparkConf.get(EXECUTOR_MIN_MEMORY_OVERHEAD)
@@ -1442,7 +1442,7 @@ private[spark] object Client extends Logging {
   val LOCALIZED_HADOOP_CONF_DIR = "__hadoop_conf__"
 
   // File containing the conf archive in the AM. See prepareLocalResources().
-  val LOCALIZED_CONF_ARCHIVE = LOCALIZED_CONF_DIR + ".zip"
+  val LOCALIZED_CONF_ARCHIVE: String = LOCALIZED_CONF_DIR + ".zip"
 
   // Name of the file in the conf archive containing Spark configuration.
   val SPARK_CONF_FILE = "__spark_conf__.properties"

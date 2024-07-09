@@ -50,7 +50,7 @@ private[spark] abstract class YarnSchedulerBackend(
 
   private val stopped = new AtomicBoolean(false)
 
-  override val minRegisteredRatio =
+  override val minRegisteredRatio: Double =
     if (conf.get(config.SCHEDULER_MIN_REGISTERED_RESOURCES_RATIO).isEmpty) {
       0.8
     } else {

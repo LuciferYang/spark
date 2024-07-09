@@ -31,6 +31,7 @@ import org.apache.logging.log4j.core.Logger
 
 import org.apache.spark.internal.{Logging, MDC}
 import org.apache.spark.internal.LogKeys.NODE_LOCATION
+import org.apache.logging.log4j
 
 /**
  * Re-implement YARN's [[RackResolver]] for hadoop releases without YARN-9332.
@@ -40,7 +41,7 @@ import org.apache.spark.internal.LogKeys.NODE_LOCATION
 private[spark] class SparkRackResolver(conf: Configuration) extends Logging {
 
   // RackResolver logs an INFO message whenever it resolves a rack, which is way too often.
-  val logger = LogManager.getLogger(classOf[RackResolver])
+  val logger: log4j.Logger = LogManager.getLogger(classOf[RackResolver])
   if (logger.getLevel != Level.WARN) {
     logger.asInstanceOf[Logger].setLevel(Level.WARN)
   }

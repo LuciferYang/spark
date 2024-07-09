@@ -1053,7 +1053,7 @@ private object YarnAllocator {
   val MEM_REGEX = "[0-9.]+ [KMG]B"
   val DECOMMISSIONING_NODES_CACHE_SIZE = 200
 
-  val NOT_APP_AND_SYSTEM_FAULT_EXIT_STATUS = Set(
+  val NOT_APP_AND_SYSTEM_FAULT_EXIT_STATUS: Set[Int] = Set(
     ContainerExitStatus.KILLED_BY_RESOURCEMANAGER,
     ContainerExitStatus.KILLED_BY_APPMASTER,
     ContainerExitStatus.KILLED_AFTER_APP_COMPLETION,

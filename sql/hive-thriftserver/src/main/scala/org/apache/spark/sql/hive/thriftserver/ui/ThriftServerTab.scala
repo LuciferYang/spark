@@ -21,6 +21,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.ui.{SparkUI, SparkUITab}
+import java.{util => ju}
 
 /**
  * Spark Web UI tab that shows statistics of jobs running in the thrift server.
@@ -32,7 +33,7 @@ private[thriftserver] class ThriftServerTab(
   override val name = "JDBC/ODBC Server"
 
   val parent = sparkUI
-  val startTime = sparkUI.store.applicationInfo().attempts.head.startTime
+  val startTime: ju.Date = sparkUI.store.applicationInfo().attempts.head.startTime
 
   attachPage(new ThriftServerPage(this))
   attachPage(new ThriftServerSessionPage(this))
