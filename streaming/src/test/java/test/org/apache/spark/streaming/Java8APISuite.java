@@ -33,6 +33,7 @@ import scala.Tuple2;
 
 import com.google.common.collect.Sets;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.HashPartitioner;
@@ -847,9 +848,7 @@ public class Java8APISuite extends LocalJavaStreamingContext implements Serializ
     Assertions.assertEquals(expected, result);
   }
 
-  /**
-   * This test is only for testing the APIs. It's not necessary to run it.
-   */
+  @Disabled("This test is only for testing the APIs. It's not necessary to run it.")
   public void testMapWithStateAPI() {
     JavaPairRDD<String, Boolean> initialRDD = null;
     JavaPairDStream<String, Integer> wordsDstream = null;

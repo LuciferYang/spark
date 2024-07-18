@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.util.ManualClock;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.HashPartitioner;
@@ -42,9 +43,7 @@ import org.apache.spark.streaming.api.java.JavaMapWithStateDStream;
 
 public class JavaMapWithStateSuite extends LocalJavaStreamingContext implements Serializable {
 
-  /**
-   * This test is only for testing the APIs. It's not necessary to run it.
-   */
+  @Disabled("This test is only for testing the APIs. It's not necessary to run it.")
   public void testAPI() {
     JavaPairRDD<String, Boolean> initialRDD = null;
     JavaPairDStream<String, Integer> wordsDstream = null;

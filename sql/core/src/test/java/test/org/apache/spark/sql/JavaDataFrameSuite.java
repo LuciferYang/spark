@@ -121,9 +121,8 @@ public class JavaDataFrameSuite {
     df2.select(col("*"), randn(5L));
   }
 
-  @Disabled
+  @Disabled("This test case is intended ignored, but to make sure it compiles correctly")
   public void testShow() {
-    // This test case is intended ignored, but to make sure it compiles correctly
     Dataset<Row> df = spark.table("testData");
     df.show();
     df.show(1000);
