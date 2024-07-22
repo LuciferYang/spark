@@ -402,6 +402,7 @@ jobs:
     - name: Checkout Spark repository
       uses: actions/checkout@v2
       # In order to fetch changed files
+      # for test
       with:
         fetch-depth: 0
         repository: apache/spark
