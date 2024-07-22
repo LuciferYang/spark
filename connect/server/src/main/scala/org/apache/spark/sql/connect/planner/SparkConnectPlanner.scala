@@ -1244,17 +1244,16 @@ class SparkConnectPlanner(
   }
 
   private def transformLocalRelation(rel: proto.LocalRelation): LogicalPlan = {
-    var schema: StructType = null
-    if (rel.hasSchema) {
+    val schema: StructType = if (rel.hasSchema) {
       val schemaType = DataType.parseTypeWithFallback(
         rel.getSchema,
         parseDatatypeString,
         fallbackParser = DataType.fromJson)
-      schema = schemaType match {
+      schemaType match {
         case s: StructType => s
         case d => StructType(Seq(StructField("value", d)))
       }
-    }
+    } else null
 
     if (rel.hasData) {
       val (rows, structType) = ArrowConverters.fromBatchWithSchemaIterator(
@@ -1897,14 +1896,12 @@ class SparkConnectPlanner(
         val children = fun.getArgumentsList.asScala.map(transformExpression)
         val timeCol = children.head
         val windowDuration = extractString(children(1), "windowDuration")
-        var slideDuration = windowDuration
-        if (fun.getArgumentsCount >= 3) {
-          slideDuration = extractString(children(2), "slideDuration")
-        }
-        var startTime = "0 second"
-        if (fun.getArgumentsCount == 4) {
-          startTime = extractString(children(3), "startTime")
-        }
+        val slideDuration = if (fun.getArgumentsCount >= 3) {
+          extractString(children(2), "slideDuration")
+        } else windowDuration
+        val startTime = if (fun.getArgumentsCount == 4) {
+          extractString(children(3), "startTime")
+        } else "0 second"
         Some(
           Alias(TimeWindow(timeCol, windowDuration, slideDuration, startTime), "window")(
             nonInheritableMetadataKeys = Seq(Dataset.DATASET_ID_KEY, Dataset.COL_POS_KEY)))
@@ -1949,10 +1946,9 @@ class SparkConnectPlanner(
         extractDataTypeFromJSON(fun.getArguments(1)).map { dataType =>
           val children = fun.getArgumentsList.asScala.map(transformExpression)
           val schema = CharVarcharUtils.failIfHasCharVarchar(dataType)
-          var options = Map.empty[String, String]
-          if (children.length == 3) {
-            options = extractMapData(children(2), "Options")
-          }
+          val options = if (children.length == 3) {
+            extractMapData(children(2), "Options")
+          } else Map.empty[String, String]
           JsonToStructs(schema = schema, options = options, child = children.head)
         }
 
@@ -1967,10 +1963,9 @@ class SparkConnectPlanner(
                 .asInstanceOf[StructType]
             case _ => throw DataTypeErrors.failedParsingStructTypeError(dataType.sql)
           }
-          var options = Map.empty[String, String]
-          if (children.length == 3) {
-            options = extractMapData(children(2), "Options")
-          }
+          val options = if (children.length == 3) {
+            extractMapData(children(2), "Options")
+          } else Map.empty[String, String]
           XmlToStructs(schema = schema, options = options, child = children.head)
         }
 
@@ -1978,18 +1973,16 @@ class SparkConnectPlanner(
       case "from_avro" if Seq(2, 3).contains(fun.getArgumentsCount) =>
         val children = fun.getArgumentsList.asScala.map(transformExpression)
         val jsonFormatSchema = extractString(children(1), "jsonFormatSchema")
-        var options = Map.empty[String, String]
-        if (fun.getArgumentsCount == 3) {
-          options = extractMapData(children(2), "Options")
-        }
+        val options = if (fun.getArgumentsCount == 3) {
+          extractMapData(children(2), "Options")
+        } else Map.empty[String, String]
         Some(AvroDataToCatalyst(children.head, jsonFormatSchema, options))
 
       case "to_avro" if Seq(1, 2).contains(fun.getArgumentsCount) =>
         val children = fun.getArgumentsList.asScala.map(transformExpression)
-        var jsonFormatSchema = Option.empty[String]
-        if (fun.getArgumentsCount == 2) {
-          jsonFormatSchema = Some(extractString(children(1), "jsonFormatSchema"))
-        }
+        val jsonFormatSchema = if (fun.getArgumentsCount == 2) {
+          Some(extractString(children(1), "jsonFormatSchema"))
+        } else Option.empty[String]
         Some(CatalystDataToAvro(children.head, jsonFormatSchema))
 
       // PS(Pandas API on Spark)-specific functions
