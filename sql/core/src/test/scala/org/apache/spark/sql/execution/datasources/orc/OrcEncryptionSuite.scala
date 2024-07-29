@@ -38,9 +38,13 @@ class OrcEncryptionSuite extends OrcTest with SharedSparkSession {
 
   test("Write and read an encrypted file") {
     val conf = spark.sessionState.newHadoopConf()
+    // scalastyle:off
+    println(conf.get("hadoop.security.key.provider.path"))
     val provider = HadoopShimsFactory.get.getHadoopKeyProvider(conf, new Random)
+    println(provider.getClass.getName)
     assume(!provider.getKeyNames.isEmpty,
       s"$provider doesn't has the test keys. ORC shim is created with old Hadoop libraries")
+    provider.getKeyNames.forEach(println)
 
     val df = originalData.toDF("ssn", "email", "name")
 
