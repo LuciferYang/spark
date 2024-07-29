@@ -123,6 +123,8 @@ public class FakeKeyProvider extends KeyProvider {
 
     @Override
     public KeyProvider createProvider(URI uri, Configuration conf) throws IOException {
+      System.out.println("uri: " + uri);
+      System.out.println("uri schema: " + uri.getScheme());
       if ("test".equals(uri.getScheme())) {
         KeyProvider provider = new FakeKeyProvider(conf);
         // populate a couple keys into the provider
