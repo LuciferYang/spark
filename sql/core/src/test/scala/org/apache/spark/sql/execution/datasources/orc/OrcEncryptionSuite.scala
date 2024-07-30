@@ -37,16 +37,18 @@ class OrcEncryptionSuite extends OrcTest with SharedSparkSession {
   }
 
   override def beforeAll(): Unit = {
-    super.beforeAll()
+    // Backup `CryptoUtils#keyProviderCache` and clear it.
     keyProviderCacheRef.entrySet()
       .forEach(e => keyProviderCacheBackup.put(e.getKey, e.getValue))
     keyProviderCacheRef.clear()
+    super.beforeAll()
   }
 
   override def afterAll(): Unit = {
+    super.afterAll()
+    // Restore `CryptoUtils#keyProviderCache`.
     keyProviderCacheRef.clear()
     keyProviderCacheBackup.foreach { case (k, v) => keyProviderCacheRef.put(k, v) }
-    super.afterAll()
   }
 
   val originalData = Seq(("123456789", "dongjoon@apache.org", "Dongjoon Hyun"))
