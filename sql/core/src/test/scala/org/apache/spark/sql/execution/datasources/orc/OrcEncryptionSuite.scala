@@ -17,9 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.orc
 
+import java.lang.invoke.MethodHandles
+import java.util.{Map => JMap}
 import java.util.Random
 
-import org.apache.orc.impl.HadoopShimsFactory
+import scala.collection.mutable
+
+import org.apache.orc.impl.{CryptoUtils, HadoopShimsFactory, KeyProvider}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
@@ -32,19 +36,37 @@ class OrcEncryptionSuite extends OrcTest with SharedSparkSession {
     super.sparkConf.set("spark.hadoop.hadoop.security.key.provider.path", "test:///")
   }
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    keyProviderCacheRef.entrySet()
+      .forEach(e => keyProviderCacheBackup.put(e.getKey, e.getValue))
+    keyProviderCacheRef.clear()
+  }
+
+  override def afterAll(): Unit = {
+    keyProviderCacheRef.clear()
+    keyProviderCacheBackup.foreach { case (k, v) => keyProviderCacheRef.put(k, v) }
+    super.afterAll()
+  }
+
   val originalData = Seq(("123456789", "dongjoon@apache.org", "Dongjoon Hyun"))
   val rowDataWithoutKey =
     Row(null, "841626795E7D351555B835A002E3BF10669DE9B81C95A3D59E10865AC37EA7C3", "Dongjoon Hyun")
 
+  private val keyProviderCacheBackup: mutable.Map[String, KeyProvider] = mutable.Map.empty
+
+  private val keyProviderCacheRef: JMap[String, KeyProvider] = {
+    val clazz = classOf[CryptoUtils]
+    val lookup = MethodHandles.privateLookupIn(clazz, MethodHandles.lookup())
+    lookup.findStaticVarHandle(clazz, "keyProviderCache", classOf[JMap[_, _]])
+      .get().asInstanceOf[JMap[String, KeyProvider]]
+  }
+
   test("Write and read an encrypted file") {
     val conf = spark.sessionState.newHadoopConf()
-    // scalastyle:off
-    println(conf.get("hadoop.security.key.provider.path"))
     val provider = HadoopShimsFactory.get.getHadoopKeyProvider(conf, new Random)
-    println(provider.getClass.getName)
     assume(!provider.getKeyNames.isEmpty,
       s"$provider doesn't has the test keys. ORC shim is created with old Hadoop libraries")
-    provider.getKeyNames.forEach(println)
 
     val df = originalData.toDF("ssn", "email", "name")
 
