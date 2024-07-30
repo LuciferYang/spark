@@ -31,12 +31,17 @@ class QueryContextSuite extends QueryTest with SharedSparkSession {
       val e = intercept[SparkArithmeticException] {
         spark.range(1).select(lit(1) / lit(0)).collect()
       }
-      assert(e.getQueryContext.head.summary() ==
+      assert(replaceLineNumberToStar(e.getQueryContext.head.summary()) ==
         """== DataFrame ==
           |"div" was called from
-          |org.apache.spark.sql.errors.QueryContextSuite.$anonfun$new$3(QueryContextSuite.scala:32)
-          |org.scalatest.Assertions.intercept(Assertions.scala:749)
+          |org.apache.spark.sql.errors.QueryContextSuite.$anonfun$new$3(QueryContextSuite.scala:*)
+          |org.scalatest.Assertions.intercept(Assertions.scala:*)
           |""".stripMargin)
     }
+  }
+
+  private def replaceLineNumberToStar(input: String): String = {
+    val pattern = """(\(\w+\.scala:)\d+(\))""".r
+    pattern.replaceAllIn(input, m => s"${m.group(1)}*${m.group(2)}")
   }
 }
