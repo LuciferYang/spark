@@ -55,6 +55,17 @@ public class MergedBlockMetaSuccess extends AbstractResponseMessage {
   }
 
   @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    } else if (other instanceof MergedBlockMetaSuccess o) {
+      return requestId == o.requestId && numChunks == o.numChunks;
+    } else {
+      return false;
+    }
+  }
+
+  @Override
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE)
       .append("requestId", requestId).append("numChunks", numChunks).toString();

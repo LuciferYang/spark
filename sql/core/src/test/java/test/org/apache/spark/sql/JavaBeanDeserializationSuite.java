@@ -640,6 +640,10 @@ public class JavaBeanDeserializationSuite implements Serializable {
       }
       return false;
     }
+
+    public int hashCode() {
+      return Objects.hash(k, v);
+    }
   }
 
   public static final class LocalDateInstantRecord {

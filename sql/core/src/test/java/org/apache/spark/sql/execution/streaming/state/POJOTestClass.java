@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.streaming.state;
 
+import java.util.Objects;
+
 /**
  * A POJO class used for tests of arbitrary state SQL encoder.
  */
@@ -73,6 +75,11 @@ public class POJOTestClass {
   public boolean equals(Object obj) {
     POJOTestClass testObj = (POJOTestClass) obj;
     return id == testObj.id && name.equals(testObj.name);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(id, name);
   }
 }
 
