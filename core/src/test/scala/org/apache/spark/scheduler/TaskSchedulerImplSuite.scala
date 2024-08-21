@@ -63,7 +63,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
   var taskScheduler: TaskSchedulerImpl = null
   var dagScheduler: DAGScheduler = null
 
-  val stageToMockTaskSetExcludelist = new HashMap[Int, TaskSetExcludelist]()
+  val stageToMockTaskSetExcludelist = new HashMap[Int, TaskSetExcludeList]()
   val stageToMockTaskSetManager = new HashMap[Int, TaskSetManager]()
 
   override def beforeEach(): Unit = {
@@ -116,7 +116,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
           val tsm = super.createTaskSetManager(taskSet, maxFailures)
           // we need to create a spied tsm just so we can set the TaskSetExcludelist
           val tsmSpy = spy[TaskSetManager](tsm)
-          val taskSetExcludelist = mock[TaskSetExcludelist]
+          val taskSetExcludelist = mock[TaskSetExcludeList]
           when(tsmSpy.taskSetExcludelistHelperOpt).thenReturn(Some(taskSetExcludelist))
           stageToMockTaskSetManager(taskSet.stageId) = tsmSpy
           stageToMockTaskSetExcludelist(taskSet.stageId) = taskSetExcludelist

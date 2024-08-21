@@ -444,7 +444,7 @@ class TaskSetManagerSuite
 
     // offers not accepted due to excludelist are not delay schedule rejects
     val tsmSpy = spy[TaskSetManager](manager)
-    val excludelist = mock(classOf[TaskSetExcludelist])
+    val excludelist = mock(classOf[TaskSetExcludeList])
     when(tsmSpy.taskSetExcludelistHelperOpt).thenReturn(Some(excludelist))
     when(excludelist.isNodeExcludedForTaskSet(any())).thenReturn(true)
     val (task, taskReject, _) = tsmSpy.resourceOffer("exec2", "host2", ANY)
@@ -1472,7 +1472,7 @@ class TaskSetManagerSuite
     val tsm = new TaskSetManager(sched, taskSet, 4)
     // we need a spy so we can attach our mock excludelist
     val tsmSpy = spy[TaskSetManager](tsm)
-    val excludelist = mock(classOf[TaskSetExcludelist])
+    val excludelist = mock(classOf[TaskSetExcludeList])
     when(tsmSpy.taskSetExcludelistHelperOpt).thenReturn(Some(excludelist))
 
     // make some offers to our taskset, to get tasks we will fail

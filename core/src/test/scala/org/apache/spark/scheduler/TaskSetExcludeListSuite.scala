@@ -24,7 +24,7 @@ import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.internal.config
 import org.apache.spark.util.ManualClock
 
-class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
+class TaskSetExcludeListSuite extends SparkFunSuite with MockitoSugar {
 
   private var listenerBusMock: LiveListenerBus = _
 
@@ -38,7 +38,7 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
       .set(config.EXCLUDE_ON_FAILURE_ENABLED.key, "true")
     val clock = new ManualClock
     val attemptId = 0
-    val taskSetExcludelist = new TaskSetExcludelist(
+    val taskSetExcludelist = new TaskSetExcludeList(
       listenerBusMock, conf, stageId = 0, stageAttemptId = attemptId, clock = clock)
 
     clock.setTime(0)
@@ -171,7 +171,7 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     val clock = new ManualClock
 
     val attemptId = 0
-    val taskSetExcludlist = new TaskSetExcludelist(
+    val taskSetExcludlist = new TaskSetExcludeList(
       listenerBusMock, conf, stageId = 0, stageAttemptId = attemptId, clock = clock)
 
     var time = 0
@@ -263,7 +263,7 @@ class TaskSetExcludelistSuite extends SparkFunSuite with MockitoSugar {
     val clock = new ManualClock
 
     val attemptId = 0
-    val taskSetExcludlist = new TaskSetExcludelist(
+    val taskSetExcludlist = new TaskSetExcludeList(
       listenerBusMock, conf, stageId = 0, stageAttemptId = attemptId, clock = clock)
     var time = 0
     clock.setTime(time)

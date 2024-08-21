@@ -142,9 +142,9 @@ private[spark] class TaskSetManager(
   private var totalResultSize = 0L
   private var calculatedTasks = 0
 
-  private[scheduler] val taskSetExcludelistHelperOpt: Option[TaskSetExcludelist] = {
+  private[scheduler] val taskSetExcludelistHelperOpt: Option[TaskSetExcludeList] = {
     healthTracker.map { _ =>
-      new TaskSetExcludelist(sched.sc.listenerBus, conf, stageId, taskSet.stageAttemptId, clock)
+      new TaskSetExcludeList(sched.sc.listenerBus, conf, stageId, taskSet.stageAttemptId, clock)
     }
   }
 

@@ -88,8 +88,8 @@ class HealthTrackerSuite extends SparkFunSuite with MockitoSugar with LocalSpark
     scheduler
   }
 
-  def createTaskSetExcludelist(stageId: Int = 0): TaskSetExcludelist = {
-    new TaskSetExcludelist(listenerBusMock, conf, stageId, stageAttemptId = 0, clock = clock)
+  def createTaskSetExcludelist(stageId: Int = 0): TaskSetExcludeList = {
+    new TaskSetExcludeList(listenerBusMock, conf, stageId, stageAttemptId = 0, clock = clock)
   }
 
   test("executors can be excluded with only a few failures per stage") {

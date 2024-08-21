@@ -35,7 +35,7 @@ import org.apache.spark.util.Clock
  * [[TaskSetManager]] this class is designed only to be called from code with a lock on the
  * TaskScheduler (e.g. its event handlers). It should not be called from other threads.
  */
-private[scheduler] class TaskSetExcludelist(
+private[scheduler] class TaskSetExcludeList(
     private val listenerBus: LiveListenerBus,
     val conf: SparkConf,
     val stageId: Int,
