@@ -49,7 +49,7 @@ import org.apache.spark.util.ArrayImplicits._
  */
 abstract class InMemoryBaseTable(
     val name: String,
-    val schema: StructType,
+    override val columns: Array[Column],
     override val partitioning: Array[Transform],
     override val properties: util.Map[String, String],
     val distribution: Distribution = Distributions.unspecified(),
@@ -59,6 +59,9 @@ abstract class InMemoryBaseTable(
     val isDistributionStrictlyRequired: Boolean = true,
     val numRowsPerSplit: Int = Int.MaxValue)
   extends Table with SupportsRead with SupportsWrite with SupportsMetadataColumns {
+
+  @scala.annotation.nowarn("cat=deprecation")
+  override def schema: StructType = CatalogV2Util.v2ColumnsToStructType(columns)
 
   protected object PartitionKeyColumn extends MetadataColumn {
     override def name: String = "_partition"

@@ -33,10 +33,10 @@ import org.apache.spark.sql.types.StructType
  */
 class InMemoryPartitionTable(
     name: String,
-    schema: StructType,
+    columns: Array[Column],
     partitioning: Array[Transform],
     properties: util.Map[String, String])
-  extends InMemoryTable(name, schema, partitioning, properties) with SupportsPartitionManagement {
+  extends InMemoryTable(name, columns, partitioning, properties) with SupportsPartitionManagement {
   import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
   protected val memoryTablePartitions: util.Map[InternalRow, util.Map[String, String]] =

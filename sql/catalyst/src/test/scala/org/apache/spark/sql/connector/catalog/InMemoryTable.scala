@@ -32,7 +32,7 @@ import org.apache.spark.util.ArrayImplicits._
  */
 class InMemoryTable(
     name: String,
-    schema: StructType,
+    columns: Array[Column],
     override val partitioning: Array[Transform],
     override val properties: util.Map[String, String],
     distribution: Distribution = Distributions.unspecified(),
@@ -41,7 +41,7 @@ class InMemoryTable(
     advisoryPartitionSize: Option[Long] = None,
     isDistributionStrictlyRequired: Boolean = true,
     override val numRowsPerSplit: Int = Int.MaxValue)
-  extends InMemoryBaseTable(name, schema, partitioning, properties, distribution,
+  extends InMemoryBaseTable(name, columns, partitioning, properties, distribution,
     ordering, numPartitions, advisoryPartitionSize, isDistributionStrictlyRequired,
     numRowsPerSplit) with SupportsDelete {
 

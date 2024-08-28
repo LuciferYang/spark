@@ -30,10 +30,10 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 class InMemoryRowLevelOperationTable(
     name: String,
-    schema: StructType,
+    columns: Array[Column],
     partitioning: Array[Transform],
     properties: util.Map[String, String])
-  extends InMemoryTable(name, schema, partitioning, properties) with SupportsRowLevelOperations {
+  extends InMemoryTable(name, columns, partitioning, properties) with SupportsRowLevelOperations {
 
   private final val PARTITION_COLUMN_REF = FieldReference(PartitionKeyColumn.name)
   private final val SUPPORTS_DELTAS = "supports-deltas"

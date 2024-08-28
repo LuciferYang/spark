@@ -30,10 +30,10 @@ import org.apache.spark.util.ArrayImplicits._
  */
 class InMemoryAtomicPartitionTable (
     name: String,
-    schema: StructType,
+    columns: Array[Column],
     partitioning: Array[Transform],
     properties: util.Map[String, String])
-  extends InMemoryPartitionTable(name, schema, partitioning, properties)
+  extends InMemoryPartitionTable(name, columns, partitioning, properties)
   with SupportsAtomicPartitionManagement {
 
   override def createPartition(
