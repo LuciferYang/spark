@@ -61,7 +61,7 @@ abstract class InMemoryBaseTable(
   extends Table with SupportsRead with SupportsWrite with SupportsMetadataColumns {
 
   @scala.annotation.nowarn("cat=deprecation")
-  override def schema: StructType = CatalogV2Util.v2ColumnsToStructType(columns)
+  override def schema(): StructType = CatalogV2Util.v2ColumnsToStructType(columns)
 
   protected object PartitionKeyColumn extends MetadataColumn {
     override def name: String = "_partition"
