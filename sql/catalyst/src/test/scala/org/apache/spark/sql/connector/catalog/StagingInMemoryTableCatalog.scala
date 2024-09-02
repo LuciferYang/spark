@@ -39,8 +39,7 @@ class StagingInMemoryTableCatalog extends InMemoryTableCatalog with StagingTable
     validateStagedTable(partitions, properties)
     new TestStagedCreateTable(
       ident,
-      new InMemoryTable(s"$name.${ident.quoted}",
-        CatalogV2Util.v2ColumnsToStructType(columns), partitions, properties))
+      new InMemoryTable(s"$name.${ident.quoted}", columns, partitions, properties))
   }
 
   override def stageReplace(
@@ -51,8 +50,7 @@ class StagingInMemoryTableCatalog extends InMemoryTableCatalog with StagingTable
     validateStagedTable(partitions, properties)
     new TestStagedReplaceTable(
       ident,
-      new InMemoryTable(s"$name.${ident.quoted}",
-        CatalogV2Util.v2ColumnsToStructType(columns), partitions, properties))
+      new InMemoryTable(s"$name.${ident.quoted}", columns, partitions, properties))
   }
 
   override def stageCreateOrReplace(
@@ -63,8 +61,7 @@ class StagingInMemoryTableCatalog extends InMemoryTableCatalog with StagingTable
     validateStagedTable(partitions, properties)
     new TestStagedCreateOrReplaceTable(
       ident,
-      new InMemoryTable(s"$name.${ident.quoted}",
-        CatalogV2Util.v2ColumnsToStructType(columns), partitions, properties))
+      new InMemoryTable(s"$name.${ident.quoted}", columns, partitions, properties))
   }
 
   private def validateStagedTable(

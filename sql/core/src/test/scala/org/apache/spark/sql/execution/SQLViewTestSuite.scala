@@ -554,7 +554,7 @@ class OneTableCatalog extends InMemoryCatalog {
     if (ident.namespace.isEmpty && ident.name == "t") {
       new InMemoryTable(
         "t",
-        StructType.fromDDL("c1 INT"),
+        CatalogV2Util.structTypeToV2Columns(StructType.fromDDL("c1 INT")),
         Array.empty,
         Map.empty[String, String].asJava)
     } else {

@@ -96,7 +96,7 @@ class InMemoryTableSessionCatalog extends TestV2SessionCatalogBase[InMemoryTable
       schema: StructType,
       partitions: Array[Transform],
       properties: java.util.Map[String, String]): InMemoryTable = {
-    new InMemoryTable(name, schema, partitions, properties)
+    new InMemoryTable(name, CatalogV2Util.structTypeToV2Columns(schema), partitions, properties)
   }
 
   override def loadTable(ident: Identifier): Table = {
@@ -124,7 +124,8 @@ class InMemoryTableSessionCatalog extends TestV2SessionCatalogBase[InMemoryTable
           throw new IllegalArgumentException(s"Cannot drop all fields")
         }
 
-        val newTable = new InMemoryTable(table.name, schema, table.partitioning, properties)
+        val newTable = new InMemoryTable(table.name,
+          CatalogV2Util.structTypeToV2Columns(schema), table.partitioning, properties)
           .withData(table.data)
 
         tables.put(ident, newTable)
