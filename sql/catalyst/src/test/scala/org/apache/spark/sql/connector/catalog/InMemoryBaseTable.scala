@@ -61,7 +61,7 @@ abstract class InMemoryBaseTable(
   extends Table with SupportsRead with SupportsWrite with SupportsMetadataColumns {
 
   @scala.annotation.nowarn("cat=deprecation")
-  override def schema(): StructType = CatalogV2Util.v2ColumnsToStructType(columns)
+  override def schema: StructType = CatalogV2Util.v2ColumnsToStructType(columns)
 
   protected object PartitionKeyColumn extends MetadataColumn {
     override def name: String = "_partition"
@@ -215,7 +215,7 @@ abstract class InMemoryBaseTable(
       val newRows = new BufferedRows(to)
       rows.rows.foreach { r =>
         val newRow = new GenericInternalRow(r.numFields)
-        for (i <- 0 until r.numFields) newRow.update(i, r.get(i, schema(i).dataType))
+        for (i <- 0 until r.numFields) newRow.update(i, r.get(i, schema.apply(i).dataType))
         for (i <- 0 until partitionSchema.length) {
           val j = schema.fieldIndex(partitionSchema(i).name)
           newRow.update(j, to(i))

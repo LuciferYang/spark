@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Exists, ScalaUDF}
 import org.apache.spark.sql.catalyst.plans.logical.{Assignment, Filter, MergeIntoTable, ReplaceData, UpdateAction}
 import org.apache.spark.sql.catalyst.trees.TreePattern
-import org.apache.spark.sql.connector.catalog.InMemoryRowLevelOperationTable
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, InMemoryRowLevelOperationTable}
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -31,9 +31,10 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 class ResolveEncodersInUDFSuite extends AnalysisTest {
   test("SPARK-48921: ScalaUDF encoders in subquery should be resolved for MergeInto") {
     val table = new InMemoryRowLevelOperationTable("table",
-      StructType(StructField("a", IntegerType) ::
-        StructField("b", DoubleType) ::
-        StructField("c", StringType) :: Nil),
+      CatalogV2Util.structTypeToV2Columns(
+        StructType(StructField("a", IntegerType) ::
+          StructField("b", DoubleType) ::
+          StructField("c", StringType) :: Nil)),
       Array.empty,
       new java.util.HashMap[String, String]()
     )

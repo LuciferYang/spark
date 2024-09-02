@@ -103,7 +103,6 @@ class BasicInMemoryTableCatalog extends TableCatalog {
       advisoryPartitionSize: Option[Long],
       distributionStrictlyRequired: Boolean = true,
       numRowsPerSplit: Int = Int.MaxValue): Table = {
-    val schema = CatalogV2Util.v2ColumnsToStructType(columns)
     if (tables.containsKey(ident)) {
       throw new TableAlreadyExistsException(ident.asMultipartIdentifier)
     }
@@ -111,7 +110,7 @@ class BasicInMemoryTableCatalog extends TableCatalog {
     InMemoryTableCatalog.maybeSimulateFailedTableCreation(properties)
 
     val tableName = s"$name.${ident.quoted}"
-    val table = new InMemoryTable(tableName, schema, partitions, properties, distribution,
+    val table = new InMemoryTable(tableName, columns, partitions, properties, distribution,
       ordering, requiredNumPartitions, advisoryPartitionSize, distributionStrictlyRequired,
       numRowsPerSplit)
     tables.put(ident, table)
@@ -130,7 +129,8 @@ class BasicInMemoryTableCatalog extends TableCatalog {
       throw new IllegalArgumentException(s"Cannot drop all fields")
     }
 
-    val newTable = new InMemoryTable(table.name, schema, finalPartitioning, properties)
+    val newTable = new InMemoryTable(table.name,
+      CatalogV2Util.structTypeToV2Columns(schema), finalPartitioning, properties)
       .withData(table.data)
 
     tables.put(ident, newTable)

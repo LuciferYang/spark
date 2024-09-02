@@ -37,8 +37,7 @@ class InMemoryRowLevelOperationTableCatalog extends InMemoryTableCatalog {
     InMemoryTableCatalog.maybeSimulateFailedTableCreation(properties)
 
     val tableName = s"$name.${ident.quoted}"
-    val schema = CatalogV2Util.v2ColumnsToStructType(columns)
-    val table = new InMemoryRowLevelOperationTable(tableName, schema, partitions, properties)
+    val table = new InMemoryRowLevelOperationTable(tableName, columns, partitions, properties)
     tables.put(ident, table)
     namespaces.putIfAbsent(ident.namespace.toList, Map())
     table

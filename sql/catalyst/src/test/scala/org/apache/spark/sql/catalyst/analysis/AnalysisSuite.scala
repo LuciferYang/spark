@@ -42,7 +42,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, RangePartitioning, RoundRobinPartitioning}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.util._
-import org.apache.spark.sql.connector.catalog.InMemoryTable
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, InMemoryTable}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.internal.SQLConf
@@ -64,7 +64,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
     val schema2 = new StructType().add("c", VarcharType(5))
     val schema3 = new StructType().add("c", ArrayType(CharType(5)))
     Seq(schema1, schema2, schema3).foreach { schema =>
-      val table = new InMemoryTable("t", schema, Array.empty, Map.empty[String, String].asJava)
+      val table = new InMemoryTable("t",
+        CatalogV2Util.structTypeToV2Columns(schema), Array.empty, Map.empty[String, String].asJava)
       checkError(
         exception = intercept[SparkException] {
           DataSourceV2Relation(
