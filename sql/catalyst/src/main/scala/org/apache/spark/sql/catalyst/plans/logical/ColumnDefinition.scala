@@ -56,7 +56,7 @@ case class ColumnDefinition(
       dataType,
       nullable,
       comment.orNull,
-      defaultValue.map(_.toV2(statement, name)).orNull,
+      defaultValue.map(_.toV2(statement, name, dataType)).orNull,
       generationExpression.orNull,
       if (metadata == Metadata.empty) null else metadata.json)
   }
@@ -155,9 +155,10 @@ case class DefaultValueExpression(child: Expression, originalSQL: String)
     copy(child = newChild)
 
   // Convert the default expression to ColumnDefaultValue, which is required by DS v2 APIs.
-  def toV2(statement: String, colName: String): ColumnDefaultValue = child match {
-    case Literal(value, dataType) =>
-      new ColumnDefaultValue(originalSQL, LiteralValue(value, dataType))
+  def toV2(statement: String, colName: String,
+      columnDataType: DataType): ColumnDefaultValue = child match {
+    case Literal(value, _) =>
+      new ColumnDefaultValue(originalSQL, LiteralValue(value, columnDataType))
     case _ =>
       throw QueryCompilationErrors.defaultValueNotConstantError(statement, colName, originalSQL)
   }
