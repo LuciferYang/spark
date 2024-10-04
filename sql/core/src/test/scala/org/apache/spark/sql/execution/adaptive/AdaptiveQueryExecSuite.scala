@@ -921,7 +921,7 @@ class AdaptiveQueryExecSuite
 
     withUserDefinedFunction("slow_udf" -> true) {
       spark.udf.register("slow_udf", () => {
-        Thread.sleep(3000)
+        Thread.sleep(6000)
         1
       })
 
