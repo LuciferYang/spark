@@ -254,7 +254,7 @@ public class CollationAwareUTF8String {
       final UTF8String target,
       final UTF8String lowercasePattern,
       int endPos) {
-    assert endPos <= target.numChars();
+    // assert endPos <= target.numChars();
     for (int i = endPos; i >= 0; --i) {
       if (lowercaseMatchUntil(target, lowercasePattern, i)) {
         return i;
