@@ -71,13 +71,14 @@ private[spark] object NonFateSharingCache {
 
   def apply[K, V](
       maximumSize: Long,
-      expireAfterAccess: (Long, TimeUnit)): NonFateSharingCache[K, V] = {
+      expireAfterAccessTime: Long,
+      expireAfterAccessTimeUnit: TimeUnit): NonFateSharingCache[K, V] = {
     val builder = CacheBuilder.newBuilder().asInstanceOf[CacheBuilder[K, V]]
     if (maximumSize > 0L) {
       builder.maximumSize(maximumSize)
     }
-    if(expireAfterAccess != null) {
-      builder.expireAfterAccess(expireAfterAccess._1, expireAfterAccess._2)
+    if(expireAfterAccessTime > 0) {
+      builder.expireAfterAccess(expireAfterAccessTime, expireAfterAccessTimeUnit)
     }
     new NonFateSharingCache(builder.build[K, V]())
   }
