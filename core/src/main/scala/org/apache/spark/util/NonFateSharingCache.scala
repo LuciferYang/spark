@@ -18,8 +18,9 @@
 package org.apache.spark.util
 
 import java.util.concurrent.Callable
-
 import com.google.common.cache.{Cache, CacheBuilder, CacheLoader, LoadingCache}
+
+import scala.concurrent.duration.TimeUnit
 
 /**
  * SPARK-43300: Guava cache fate-sharing behavior might lead to unexpected cascade failure:
@@ -67,6 +68,19 @@ private[spark] object NonFateSharingCache {
     new NonFateSharingLoadingCache(builder.build[K, V](new CacheLoader[K, V] {
       override def load(k: K): V = loadingFunc.apply(k)
     }))
+  }
+
+  def apply[K, V](
+      maximumSize: Long = 0L,
+      expireAfterAccess: (Long, TimeUnit)): NonFateSharingCache[K, V] = {
+    val builder = CacheBuilder.newBuilder().asInstanceOf[CacheBuilder[K, V]]
+    if (maximumSize > 0L) {
+      builder.maximumSize(maximumSize)
+    }
+    if(expireAfterAccess != null) {
+      builder.expireAfterAccess(expireAfterAccess._1, expireAfterAccess._2)
+    }
+    new NonFateSharingCache(builder.build[K, V]())
   }
 }
 
