@@ -614,7 +614,7 @@ object RocksDBStateStoreProvider {
   private val MAX_AVRO_ENCODERS_IN_CACHE = 1000
   // Add the cache at companion object level so it persists across provider instances
   private val avroEncoderMap: NonFateSharingCache[String, AvroEncoder] = {
-    NonFateSharingCache(MAX_AVRO_ENCODERS_IN_CACHE, (1, TimeUnit.HOURS))
+    NonFateSharingCache(MAX_AVRO_ENCODERS_IN_CACHE, 1, TimeUnit.HOURS)
   }
 
   def getAvroEnc(
