@@ -17,10 +17,9 @@
 
 package org.apache.spark.util
 
-import java.util.concurrent.Callable
-import com.google.common.cache.{Cache, CacheBuilder, CacheLoader, LoadingCache}
+import java.util.concurrent.{Callable, TimeUnit}
 
-import scala.concurrent.duration.TimeUnit
+import com.google.common.cache.{Cache, CacheBuilder, CacheLoader, LoadingCache}
 
 /**
  * SPARK-43300: Guava cache fate-sharing behavior might lead to unexpected cascade failure:
