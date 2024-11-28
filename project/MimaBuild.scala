@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-import sbt._
-import sbt.Keys.version
-
-import com.typesafe.tools.mima.core._
+import sbt.*
+import sbt.Keys.{resolvers, version}
+import com.typesafe.tools.mima.core.*
 import com.typesafe.tools.mima.core.MissingClassProblem
 import com.typesafe.tools.mima.core.MissingTypesProblem
-import com.typesafe.tools.mima.core.ProblemFilters._
-import com.typesafe.tools.mima.plugin.MimaKeys.{mimaBinaryIssueFilters, mimaPreviousArtifacts, mimaFailOnNoPrevious}
+import com.typesafe.tools.mima.core.ProblemFilters.*
+import com.typesafe.tools.mima.plugin.MimaKeys.{mimaBinaryIssueFilters, mimaFailOnNoPrevious, mimaPreviousArtifacts}
 
 object MimaBuild {
 
@@ -93,7 +92,8 @@ object MimaBuild {
     Seq(
       mimaFailOnNoPrevious := true,
       mimaPreviousArtifacts := Set(organization %% id % previousSparkVersion),
-      mimaBinaryIssueFilters ++= ignoredABIProblems(sparkHome, version.value)
+      mimaBinaryIssueFilters ++= ignoredABIProblems(sparkHome, version.value),
+      resolvers -= Resolver.mavenLocal
     )
   }
 
