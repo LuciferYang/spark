@@ -16,7 +16,7 @@
  */
 
 import sbt.*
-import sbt.Keys.{resolvers, version}
+import sbt.Keys.{externalResolvers, resolvers, version}
 import com.typesafe.tools.mima.core.*
 import com.typesafe.tools.mima.core.MissingClassProblem
 import com.typesafe.tools.mima.core.MissingTypesProblem
@@ -93,7 +93,8 @@ object MimaBuild {
       mimaFailOnNoPrevious := true,
       mimaPreviousArtifacts := Set(organization %% id % previousSparkVersion),
       mimaBinaryIssueFilters ++= ignoredABIProblems(sparkHome, version.value),
-      resolvers -= Resolver.mavenLocal
+      resolvers -= Resolver.mavenLocal,
+      externalResolvers := resolvers.value
     )
   }
 
