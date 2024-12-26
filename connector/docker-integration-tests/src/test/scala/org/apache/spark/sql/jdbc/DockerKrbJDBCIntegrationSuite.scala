@@ -155,7 +155,7 @@ abstract class DockerKrbJDBCIntegrationSuite extends DockerJDBCIntegrationSuite 
     val df = sqlContext.read.jdbc(jdbcUrl, tableName, props)
 
     val schema = df.schema
-    assert(schema.map(_.dataType).toSeq === Seq(StringType, StringType))
+    assert(schema.map(_.dataType) === Seq(StringType, StringType))
     val rows = df.collect()
     assert(rows.length === 1)
     assert(rows(0).getString(0) === "foo")

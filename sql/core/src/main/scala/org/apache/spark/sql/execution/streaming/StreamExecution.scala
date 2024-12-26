@@ -360,10 +360,10 @@ abstract class StreamExecution(
           toDebugString(includeLogicalPlan = isInitialized),
           cause = cause,
           getLatestExecutionContext().startOffsets
-            .toOffsetSeq(sources.toSeq, getLatestExecutionContext().offsetSeqMetadata)
+            .toOffsetSeq(sources, getLatestExecutionContext().offsetSeqMetadata)
             .toString,
           getLatestExecutionContext().endOffsets
-            .toOffsetSeq(sources.toSeq, getLatestExecutionContext().offsetSeqMetadata)
+            .toOffsetSeq(sources, getLatestExecutionContext().offsetSeqMetadata)
             .toString,
           errorClass = "STREAM_FAILED",
           messageParameters = Map(

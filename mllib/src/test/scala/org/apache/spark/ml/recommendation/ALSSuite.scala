@@ -861,7 +861,7 @@ class ALSSuite extends MLTest with DefaultReadWriteTest with Logging {
       val topItems = model.recommendForAllUsers(k)
       assert(topItems.count() == numUsers)
       assert(topItems.columns.contains("user"))
-      checkRecommendations(topItems, expectedUpToN.toMap, "item")
+      checkRecommendations(topItems, expectedUpToN, "item")
     }
   }
 
@@ -882,7 +882,7 @@ class ALSSuite extends MLTest with DefaultReadWriteTest with Logging {
       val topUsers = getALSModel.recommendForAllItems(k)
       assert(topUsers.count() == numItems)
       assert(topUsers.columns.contains("item"))
-      checkRecommendations(topUsers, expectedUpToN.toMap, "user")
+      checkRecommendations(topUsers, expectedUpToN, "user")
     }
   }
 
@@ -904,7 +904,7 @@ class ALSSuite extends MLTest with DefaultReadWriteTest with Logging {
       val topItems = model.recommendForUserSubset(userSubset, k)
       assert(topItems.count() == numUsersSubset)
       assert(topItems.columns.contains("user"))
-      checkRecommendations(topItems, expectedUpToN.toMap, "item")
+      checkRecommendations(topItems, expectedUpToN, "item")
     }
   }
 
@@ -926,7 +926,7 @@ class ALSSuite extends MLTest with DefaultReadWriteTest with Logging {
       val topUsers = model.recommendForItemSubset(itemSubset, k)
       assert(topUsers.count() == numItemsSubset)
       assert(topUsers.columns.contains("item"))
-      checkRecommendations(topUsers, expectedUpToN.toMap, "user")
+      checkRecommendations(topUsers, expectedUpToN, "user")
     }
   }
 

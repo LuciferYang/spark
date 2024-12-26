@@ -54,7 +54,7 @@ class LBFGSSuite extends SparkFunSuite with MLlibTestSparkContext with Matchers 
   test("LBFGS loss should be decreasing and match the result of Gradient Descent.") {
     val regParam = 0
 
-    val initialWeightsWithIntercept = Vectors.dense(1.0 +: initialWeights.toArray)
+    val initialWeightsWithIntercept = Vectors.dense(1.0 +: initialWeights)
     val convergenceTol = 1e-12
     val numIterations = 10
 

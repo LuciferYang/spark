@@ -249,7 +249,7 @@ class PostgresIntegrationSuite extends DockerJDBCIntegrationSuite {
     assert(rows(0).getString(9) == "192.168.0.0/16")
     assert(rows(0).getSeq(10) == Seq(1, 2))
     assert(rows(0).getSeq(11) == Seq("a", null, "b"))
-    assert(rows(0).getSeq(12).toSeq == Seq(0.11f, 0.22f))
+    assert(rows(0).getSeq(12) == Seq(0.11f, 0.22f))
     assert(rows(0).getSeq(13) == Seq("0.11", "0.22").map(BigDecimal(_).bigDecimal))
     assert(rows(0).getString(14) == "d1")
     assert(rows(0).getFloat(15) == 1.01f)

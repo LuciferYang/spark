@@ -383,7 +383,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
       assert(repartitioned.partitions.length === finalPartitions)
       val partitions = repartitioned.glom().collect()
       // assert all elements are present
-      assert(repartitioned.collect().sortWith(_ > _).toSeq === input.toSeq.sortWith(_ > _).toSeq)
+      assert(repartitioned.collect().sortWith(_ > _).toSeq === input.sortWith(_ > _))
       // assert no bucket is overloaded or empty
       for (partition <- partitions) {
         val avg = input.size / finalPartitions

@@ -71,43 +71,43 @@ class PrunedScanSuite extends DataSourceTest with SharedSparkSession {
 
   sqlTest(
     "SELECT * FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i, i * 2)).toSeq)
+    (1 to 10).map(i => Row(i, i * 2)))
 
   sqlTest(
     "SELECT a, b FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i, i * 2)).toSeq)
+    (1 to 10).map(i => Row(i, i * 2)))
 
   sqlTest(
     "SELECT b, a FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i * 2, i)).toSeq)
+    (1 to 10).map(i => Row(i * 2, i)))
 
   sqlTest(
     "SELECT a FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i)).toSeq)
+    (1 to 10).map(i => Row(i)))
 
   sqlTest(
     "SELECT a, a FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i, i)).toSeq)
+    (1 to 10).map(i => Row(i, i)))
 
   sqlTest(
     "SELECT b FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i * 2)).toSeq)
+    (1 to 10).map(i => Row(i * 2)))
 
   sqlTest(
     "SELECT a * 2 FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i * 2)).toSeq)
+    (1 to 10).map(i => Row(i * 2)))
 
   sqlTest(
     "SELECT A AS b FROM oneToTenPruned",
-    (1 to 10).map(i => Row(i)).toSeq)
+    (1 to 10).map(i => Row(i)))
 
   sqlTest(
     "SELECT x.b, y.a FROM oneToTenPruned x JOIN oneToTenPruned y ON x.a = y.b",
-    (1 to 5).map(i => Row(i * 4, i)).toSeq)
+    (1 to 5).map(i => Row(i * 4, i)))
 
   sqlTest(
     "SELECT x.a, y.b FROM oneToTenPruned x JOIN oneToTenPruned y ON x.a = y.b",
-    (2 to 10 by 2).map(i => Row(i, i)).toSeq)
+    (2 to 10 by 2).map(i => Row(i, i)))
 
   testPruning("SELECT * FROM oneToTenPruned", "a", "b")
   testPruning("SELECT a, b FROM oneToTenPruned", "a", "b")

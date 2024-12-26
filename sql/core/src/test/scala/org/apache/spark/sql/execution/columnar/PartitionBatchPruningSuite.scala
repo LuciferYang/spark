@@ -178,7 +178,7 @@ class PartitionBatchPruningSuite extends SharedSparkSession with AdaptiveSparkPl
     spark.conf.set(SQLConf.IN_MEMORY_PARTITION_PRUNING.key, false)
 
     val df = sql("SELECT key FROM pruningData WHERE key = 1")
-    val result = df.collect().map(_(0)).toArray
+    val result = df.collect().map(_(0))
     assert(result.length === 1)
 
     val (readPartitions, readBatches) = collect(df.queryExecution.executedPlan) {
@@ -199,7 +199,7 @@ class PartitionBatchPruningSuite extends SharedSparkSession with AdaptiveSparkPl
       val queryExecution = df.queryExecution
 
       assertResult(expectedQueryResult.toArray, s"Wrong query result: $queryExecution") {
-        df.collect().map(_(0)).toArray
+        df.collect().map(_(0))
       }
 
       val (readPartitions, readBatches) = collect(df.queryExecution.executedPlan) {

@@ -125,7 +125,7 @@ object Benchmarks {
           // Force GC to minimize the side effect.
           System.gc()
           try {
-            runBenchmark.invoke(null, args.tail.toArray)
+            runBenchmark.invoke(null, args.tail)
           } catch {
             case e: Throwable if !isFailFast =>
               // scalastyle:off println

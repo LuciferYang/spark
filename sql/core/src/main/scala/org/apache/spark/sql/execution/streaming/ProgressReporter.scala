@@ -586,7 +586,7 @@ abstract class ProgressContext(
             "avg" -> stats.avg.toLong).transform((_, v) => progressReporter.formatTimestamp(v))
       }.headOption.getOrElse(Map.empty) ++ watermarkTimestamp
 
-    ExecutionStats(sourceToNumInputRows, stateOperators, eventTimeStats.toMap, sinkOutput)
+    ExecutionStats(sourceToNumInputRows, stateOperators, eventTimeStats, sinkOutput)
   }
 
   /**

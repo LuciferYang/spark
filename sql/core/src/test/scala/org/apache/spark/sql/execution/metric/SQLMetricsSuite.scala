@@ -61,7 +61,7 @@ class SQLMetricsSuite extends SharedSparkSession with SQLMetricsTestUtils
       random.nextBytes(bytes)
       (bytes, random.nextInt(100))
     }
-    manyBytes.toSeq.toDF("a", "b")
+    manyBytes.toDF("a", "b")
   }
 
   test("LocalTableScanExec computes metrics in collect and take") {
@@ -389,7 +389,7 @@ class SQLMetricsSuite extends SharedSparkSession with SQLMetricsTestUtils
       SQLConf.SHUFFLE_PARTITIONS.key -> "2",
       SQLConf.PREFER_SORTMERGEJOIN.key -> "false") {
       val df1 = Seq((1, "1"), (2, "2")).toDF("key", "value")
-      val df2 = (1 to 10).map(i => (i, i.toString)).toSeq.toDF("key", "value")
+      val df2 = (1 to 10).map(i => (i, i.toString)).toDF("key", "value")
       // Assume the execution plan is
       // Project(nodeId = 0)
       // +- ShuffledHashJoin(nodeId = 1)
@@ -419,7 +419,7 @@ class SQLMetricsSuite extends SharedSparkSession with SQLMetricsTestUtils
 
   test("ShuffledHashJoin(left, outer) metrics") {
     val leftDf = Seq((1, "1"), (2, "2")).toDF("key", "value")
-    val rightDf = (1 to 10).map(i => (i, i.toString)).toSeq.toDF("key2", "value")
+    val rightDf = (1 to 10).map(i => (i, i.toString)).toDF("key2", "value")
     Seq((0L, "right_outer", leftDf, rightDf, 10L, false),
       (0L, "left_outer", rightDf, leftDf, 10L, false),
       (1L, "right_outer", leftDf, rightDf, 10L, true),

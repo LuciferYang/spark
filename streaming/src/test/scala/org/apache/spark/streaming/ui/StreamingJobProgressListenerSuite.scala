@@ -32,7 +32,7 @@ class StreamingJobProgressListenerSuite
   with LocalStreamingContext
   with Matchers {
 
-  val input = (1 to 4).map(Seq(_)).toSeq
+  val input = (1 to 4).map(Seq(_))
   val operation = (d: DStream[Int]) => d.map(x => x)
 
   private def createJobStart(

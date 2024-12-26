@@ -299,7 +299,7 @@ class MapOutputTrackerSuite extends SparkFunSuite with LocalSparkContext {
       Seq(4, 4, 4, 4, 3),
       Seq(4, 4, 4, 4, 4))
     cases.zip(expects).foreach { case ((num, divisor), expect) =>
-      val answer = func(num, divisor).toSeq
+      val answer = func(num, divisor)
       var wholeSplit = (0 until num)
       answer.zip(expect).foreach { case (split, expectSplitLength) =>
         val (currentSplit, rest) = wholeSplit.splitAt(expectSplitLength)

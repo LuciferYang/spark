@@ -59,7 +59,7 @@ class PartitionedWriteSuite extends QueryTest with SharedSparkSession {
 
     checkAnswer(
       spark.read.load(path.getCanonicalPath),
-      (0 to 99).map(Row(1, _)).toSeq)
+      (0 to 99).map(Row(1, _)))
 
     Utils.deleteRecursively(path)
   }
@@ -74,7 +74,7 @@ class PartitionedWriteSuite extends QueryTest with SharedSparkSession {
 
     checkAnswer(
       spark.read.load(path.getCanonicalPath),
-      (0 to 99).map(Row(1, _)).toSeq ++ (0 to 99).map(Row(1, _)).toSeq)
+      (0 to 99).map(Row(1, _)) ++ (0 to 99).map(Row(1, _)))
 
     Utils.deleteRecursively(path)
   }

@@ -241,7 +241,7 @@ class CheckpointSuite extends TestSuiteBase with LocalStreamingContext with DStr
     val secondNumBatches = firstNumBatches * 2
 
     // Setup the streams
-    val input = (1 to 10).map(_ => Seq("a")).toSeq
+    val input = (1 to 10).map(_ => Seq("a"))
     val operation = (st: DStream[String]) => {
       val updateFunc = (values: Seq[Int], state: Option[Int]) => {
         Some(values.sum + state.getOrElse(0))
@@ -473,7 +473,7 @@ class CheckpointSuite extends TestSuiteBase with LocalStreamingContext with DStr
   test("recovery with invertible reduceByKeyAndWindow operation") {
     val n = 10
     val w = 4
-    val input = (1 to n).map(_ => Seq("a")).toSeq
+    val input = (1 to n).map(_ => Seq("a"))
     val output = Seq(
       Seq(("a", 1)), Seq(("a", 2)), Seq(("a", 3))) ++ (1 to (n - w + 1)).map(x => Seq(("a", 4)))
     val operation = (st: DStream[String]) => {
@@ -591,8 +591,8 @@ class CheckpointSuite extends TestSuiteBase with LocalStreamingContext with DStr
   // that the system can recover from a master failure. This assumes as reliable,
   // replayable input source - TestInputDStream.
   test("recovery with updateStateByKey operation") {
-    val input = (1 to 10).map(_ => Seq("a")).toSeq
-    val output = (1 to 10).map(x => Seq(("a", x))).toSeq
+    val input = (1 to 10).map(_ => Seq("a"))
+    val output = (1 to 10).map(x => Seq(("a", x)))
     val operation = (st: DStream[String]) => {
       val updateFunc = (values: Seq[Int], state: Option[Int]) => {
         Some((values.sum + state.getOrElse(0)))

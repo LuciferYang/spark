@@ -454,7 +454,7 @@ object StateStoreBasicOperationsBenchmark extends SqlBasedBenchmark {
         valueRow.setInt(0, valueIdx + Random.nextInt(Int.MaxValue))
         val valueUnsafeRow = valueProjection(valueRow).copy()
         valueUnsafeRow
-      }.toSeq
+      }
 
       val keyUnsafeRow = keyProjection(keyRow).copy()
 

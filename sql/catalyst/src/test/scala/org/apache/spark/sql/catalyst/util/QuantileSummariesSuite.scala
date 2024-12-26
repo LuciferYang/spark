@@ -208,8 +208,8 @@ class QuantileSummariesSuite extends SparkFunSuite {
     }
 
     // length of data21 is 4 * length of data22
-    val data21 = data.zipWithIndex.filter(_._2 % 5 != 0).map(_._1).toSeq
-    val data22 = data.zipWithIndex.filter(_._2 % 5 == 0).map(_._1).toSeq
+    val data21 = data.zipWithIndex.filter(_._2 % 5 != 0).map(_._1)
+    val data22 = data.zipWithIndex.filter(_._2 % 5 == 0).map(_._1)
 
     test(
       s"Merging unbalanced interleaved lists with epsi=$epsi and seq=$seq_name, " +
