@@ -566,8 +566,6 @@ class AvroStateEncoder(
 
   private lazy val rangeScanAvroType = SchemaConverters.toAvroType(rangeScanAvroSchema)
 
-  private lazy val rangeScanAvroProjection = UnsafeProjection.create(rangeScanAvroSchema)
-
   // Existing remainder key schema definitions
   // Remaining Key schema and projection definitions used by the Avro Serializers
   // and Deserializers

@@ -840,12 +840,6 @@ class RocksDBFileManager(
       log"${MDC(LogKeys.FILE_NAME, files.mkString("\n\t"))}")
   }
 
-  private def newDFSFileName(localFileName: String): String = {
-    val baseName = FilenameUtils.getBaseName(localFileName)
-    val extension = FilenameUtils.getExtension(localFileName)
-    s"$baseName-${UUID.randomUUID}.$extension"
-  }
-
   def newDFSFileName(localFileName: String, dfsFileSuffix: String): String = {
     val baseName = FilenameUtils.getBaseName(localFileName)
     val extension = FilenameUtils.getExtension(localFileName)

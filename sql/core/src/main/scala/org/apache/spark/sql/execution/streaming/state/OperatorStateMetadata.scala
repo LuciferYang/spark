@@ -55,7 +55,6 @@ case class StateStoreMetadataV2(
   extends StateStoreMetadata with Serializable
 
 object StateStoreMetadataV2 {
-  private implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   @scala.annotation.nowarn
   private implicit val manifest = Manifest
@@ -228,7 +227,6 @@ object OperatorStateMetadataV1 {
 }
 
 object OperatorStateMetadataV2 {
-  private implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   @scala.annotation.nowarn
   private implicit val manifest = Manifest

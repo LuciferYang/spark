@@ -160,7 +160,6 @@ object ExtractGroupingPythonUDFFromAggregate extends Rule[LogicalPlan] {
 object ExtractPythonUDFs extends Rule[LogicalPlan] {
 
   private type EvalType = Int
-  private type EvalTypeChecker = EvalType => Boolean
 
   private def hasScalarPythonUDF(e: Expression): Boolean = {
     e.exists(PythonUDF.isScalarPythonUDF)

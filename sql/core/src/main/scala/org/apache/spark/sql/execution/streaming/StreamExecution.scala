@@ -202,9 +202,6 @@ abstract class StreamExecution(
   /* Get the call site in the caller thread; will pass this into the micro batch thread */
   private val callSite = Utils.getCallSite()
 
-  /* Make sure we propagate the ArtifactSet to the micro batch thread. */
-  private val jobArtifactState = JobArtifactSet.getCurrentJobArtifactState.orNull
-
   /** Used to report metrics to coda-hale. This uses id for easier tracking across restarts. */
   lazy val streamMetrics = new MetricsReporter(
     this, s"spark.streaming.${Option(name).getOrElse(id)}")
