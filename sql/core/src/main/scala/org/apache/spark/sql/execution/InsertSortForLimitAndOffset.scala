@@ -49,6 +49,7 @@ object InsertSortForLimitAndOffset extends Rule[SparkPlan] {
   }
 
   object SinglePartitionShuffleWithGlobalOrdering {
+    @scala.annotation.tailrec
     def unapply(plan: SparkPlan): Option[Seq[SortOrder]] = plan match {
       case ShuffleExchangeExec(SinglePartition, SparkPlanWithGlobalOrdering(ordering), _, _) =>
         Some(ordering)
