@@ -19,9 +19,12 @@ package org.apache.spark.sql.execution.python
 
 import java.io.{DataInputStream, DataOutputStream}
 import java.net.ServerSocket
+
 import scala.concurrent.ExecutionContext
+
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
+
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.api.python.{BasePythonRunner, ChainedPythonFunctions, PythonFunction, PythonRDD, PythonWorkerUtils, StreamingPythonRunner}
 import org.apache.spark.internal.Logging
