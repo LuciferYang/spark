@@ -53,7 +53,7 @@ import org.apache.spark.util.Utils
  */
 class TransformWithStateInPandasStateServer(
     stateServerSocket: ServerSocket,
-    statefulProcessorHandle: StatefulProcessorHandleImplBase,
+    val statefulProcessorHandle: StatefulProcessorHandleImplBase,
     groupingKeySchema: StructType,
     timeZoneId: String,
     errorOnDuplicatedFieldNames: Boolean,

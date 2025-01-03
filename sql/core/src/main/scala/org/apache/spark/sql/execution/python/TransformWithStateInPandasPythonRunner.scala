@@ -19,19 +19,16 @@ package org.apache.spark.sql.execution.python
 
 import java.io.{DataInputStream, DataOutputStream}
 import java.net.ServerSocket
-
 import scala.concurrent.ExecutionContext
-
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
-
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.api.python.{BasePythonRunner, ChainedPythonFunctions, PythonFunction, PythonRDD, PythonWorkerUtils, StreamingPythonRunner}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.python.TransformWithStateInPandasPythonRunner.{GroupedInType, InType}
-import org.apache.spark.sql.execution.streaming.{DriverStatefulProcessorHandleImpl, StatefulProcessorHandleImpl}
+import org.apache.spark.sql.execution.streaming.{DriverStatefulProcessorHandleImpl, StatefulProcessorHandleImpl, StatefulProcessorHandleState}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -247,7 +244,7 @@ class TransformWithStateInPandasPythonPreInitRunner(
   private var dataOut: DataOutputStream = _
   private var dataIn: DataInputStream = _
 
-  private var daemonThread: Thread = _
+  private var daemonThread: TransformWithStateInPandasStateServerThread = _
 
   override def init(): (DataOutputStream, DataInputStream) = {
     val result = super.init()
@@ -275,29 +272,38 @@ class TransformWithStateInPandasPythonPreInitRunner(
   override def stop(): Unit = {
     super.stop()
     closeServerSocketChannelSilently(stateServerSocket)
-    daemonThread.stop()
+    daemonThread.stopStateServer()
   }
 
   private def startStateServer(): Unit = {
     initStateServer()
 
-    daemonThread = new Thread {
-      override def run(): Unit = {
-        try {
-          new TransformWithStateInPandasStateServer(stateServerSocket, processorHandleImpl,
-            groupingKeySchema, timeZoneId, errorOnDuplicatedFieldNames = true,
-            largeVarTypes = sqlConf.arrowUseLargeVarTypes,
-            sqlConf.arrowTransformWithStateInPandasMaxRecordsPerBatch).run()
-        } catch {
-          case e: Exception =>
-            throw new SparkException("TransformWithStateInPandas state server " +
-              "daemon thread exited unexpectedly (crashed)", e)
-        }
-      }
-    }
+    daemonThread = new TransformWithStateInPandasStateServerThread
     daemonThread.setDaemon(true)
     daemonThread.setName("stateConnectionListenerThread")
     daemonThread.start()
+  }
+
+  private class TransformWithStateInPandasStateServerThread extends Thread {
+    private var server: TransformWithStateInPandasStateServer = _
+
+    def stopStateServer(): Unit = {
+      server.statefulProcessorHandle.setHandleState(StatefulProcessorHandleState.CLOSED)
+    }
+
+    override def run(): Unit = {
+      try {
+        server = new TransformWithStateInPandasStateServer(stateServerSocket, processorHandleImpl,
+          groupingKeySchema, timeZoneId, errorOnDuplicatedFieldNames = true,
+          largeVarTypes = sqlConf.arrowUseLargeVarTypes,
+          sqlConf.arrowTransformWithStateInPandasMaxRecordsPerBatch)
+        server.run()
+      } catch {
+        case e: Exception =>
+          throw new SparkException("TransformWithStateInPandas state server " +
+            "daemon thread exited unexpectedly (crashed)", e)
+      }
+    }
   }
 }
 
