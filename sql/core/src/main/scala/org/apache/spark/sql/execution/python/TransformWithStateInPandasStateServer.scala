@@ -20,12 +20,14 @@ package org.apache.spark.sql.execution.python
 import java.io.{BufferedInputStream, BufferedOutputStream, DataInputStream, DataOutputStream, EOFException}
 import java.net.ServerSocket
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.mutable
 
 import com.google.protobuf.ByteString
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
+import org.apache.commons.io.IOUtils
 
 import org.apache.spark.internal.{Logging, LogKeys, MDC}
 import org.apache.spark.sql.{Encoders, Row}
@@ -79,6 +81,11 @@ class TransformWithStateInPandasStateServer(
     ExpressionEncoder(groupingKeySchema).resolveAndBind().createDeserializer()
   private var inputStream: DataInputStream = _
   private var outputStream: DataOutputStream = outputStreamForTest
+  private val shouldStop = new AtomicBoolean(false)
+
+  def stop(): Unit = {
+    shouldStop.compareAndSet(false, true)
+  }
 
   /** State variable related class variables */
   // A map to store the value state name -> (value state, schema, value row deserializer) mapping.
@@ -145,7 +152,8 @@ class TransformWithStateInPandasStateServer(
     )
 
     while (listeningSocket.isConnected &&
-      statefulProcessorHandle.getHandleState != StatefulProcessorHandleState.CLOSED) {
+      statefulProcessorHandle.getHandleState != StatefulProcessorHandleState.CLOSED &&
+      !shouldStop.get()) {
       try {
         val version = inputStream.readInt()
         if (version != -1) {

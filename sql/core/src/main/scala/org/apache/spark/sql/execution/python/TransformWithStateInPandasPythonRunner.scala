@@ -247,7 +247,7 @@ class TransformWithStateInPandasPythonPreInitRunner(
   private var dataOut: DataOutputStream = _
   private var dataIn: DataInputStream = _
 
-  private var daemonThread: Thread = _
+  private var daemonThread: TransformWithStateInPandasStateServerThread = _
 
   override def init(): (DataOutputStream, DataInputStream) = {
     val result = super.init()
@@ -275,29 +275,40 @@ class TransformWithStateInPandasPythonPreInitRunner(
   override def stop(): Unit = {
     super.stop()
     closeServerSocketChannelSilently(stateServerSocket)
-    daemonThread.stop()
+    daemonThread.stopStateServer()
   }
 
   private def startStateServer(): Unit = {
     initStateServer()
 
-    daemonThread = new Thread {
-      override def run(): Unit = {
-        try {
-          new TransformWithStateInPandasStateServer(stateServerSocket, processorHandleImpl,
-            groupingKeySchema, timeZoneId, errorOnDuplicatedFieldNames = true,
-            largeVarTypes = sqlConf.arrowUseLargeVarTypes,
-            sqlConf.arrowTransformWithStateInPandasMaxRecordsPerBatch).run()
-        } catch {
-          case e: Exception =>
-            throw new SparkException("TransformWithStateInPandas state server " +
-              "daemon thread exited unexpectedly (crashed)", e)
-        }
-      }
-    }
+    daemonThread = new TransformWithStateInPandasStateServerThread()
     daemonThread.setDaemon(true)
     daemonThread.setName("stateConnectionListenerThread")
     daemonThread.start()
+  }
+
+  private class TransformWithStateInPandasStateServerThread extends Thread {
+
+    private var stateServer: TransformWithStateInPandasStateServer = _
+
+    def stopStateServer(): Unit = {
+      stateServer.stop()
+    }
+
+    override def run(): Unit = {
+      try {
+        stateServer =
+          new TransformWithStateInPandasStateServer(stateServerSocket, processorHandleImpl,
+            groupingKeySchema, timeZoneId, errorOnDuplicatedFieldNames = true,
+            largeVarTypes = sqlConf.arrowUseLargeVarTypes,
+            sqlConf.arrowTransformWithStateInPandasMaxRecordsPerBatch)
+        stateServer.run()
+      } catch {
+        case e: Exception =>
+          throw new SparkException("TransformWithStateInPandas state server " +
+            "daemon thread exited unexpectedly (crashed)", e)
+      }
+    }
   }
 }
 
