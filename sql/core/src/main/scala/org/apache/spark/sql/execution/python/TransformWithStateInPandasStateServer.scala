@@ -27,7 +27,6 @@ import scala.collection.mutable
 import com.google.protobuf.ByteString
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.ArrowStreamWriter
-import org.apache.commons.io.IOUtils
 
 import org.apache.spark.internal.{Logging, LogKeys, MDC}
 import org.apache.spark.sql.{Encoders, Row}
