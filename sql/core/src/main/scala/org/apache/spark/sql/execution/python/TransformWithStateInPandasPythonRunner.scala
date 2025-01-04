@@ -276,6 +276,7 @@ class TransformWithStateInPandasPythonPreInitRunner(
     super.stop()
     closeServerSocketChannelSilently(stateServerSocket)
     daemonThread.interrupt()
+    daemonThread.join()
   }
 
   private def startStateServer(): Unit = {
