@@ -38,8 +38,7 @@ public class ToJavaArrayUtils {
 
   // Boolean nullable
   public static Boolean[] toBoxedBooleanArray(ArrayData arrayData) {
-    return (Boolean[]) arrayData.toArray(BooleanType,
-        ClassTag$.MODULE$.apply(java.lang.Boolean.class));
+    return arrayData.toArray(BooleanType, ClassTag$.MODULE$.apply(Boolean.class));
   }
 
   // byte
@@ -50,7 +49,7 @@ public class ToJavaArrayUtils {
 
   // Byte nullable
   public static Byte[] toBoxedByteArray(ArrayData arrayData) {
-    return (Byte[]) arrayData.toArray(ByteType, ClassTag$.MODULE$.apply(java.lang.Byte.class));
+    return arrayData.toArray(ByteType, ClassTag$.MODULE$.apply(Byte.class));
   }
 
   // short
@@ -61,7 +60,7 @@ public class ToJavaArrayUtils {
 
   // Short nullable
   public static Short[] toBoxedShortArray(ArrayData arrayData) {
-    return (Short[]) arrayData.toArray(ShortType, ClassTag$.MODULE$.apply(java.lang.Short.class));
+    return arrayData.toArray(ShortType, ClassTag$.MODULE$.apply(Short.class));
   }
 
   // int
@@ -72,8 +71,7 @@ public class ToJavaArrayUtils {
 
   // Integer nullable
   public static Integer[] toBoxedIntegerArray(ArrayData arrayData) {
-    return (Integer[]) arrayData.toArray(IntegerType,
-        ClassTag$.MODULE$.apply(java.lang.Integer.class));
+    return arrayData.toArray(IntegerType, ClassTag$.MODULE$.apply(Integer.class));
   }
 
   // long
@@ -84,7 +82,7 @@ public class ToJavaArrayUtils {
 
   // Long nullable
   public static Long[] toBoxedLongArray(ArrayData arrayData) {
-    return (Long[]) arrayData.toArray(LongType, ClassTag$.MODULE$.apply(java.lang.Long.class));
+    return arrayData.toArray(LongType, ClassTag$.MODULE$.apply(Long.class));
   }
 
   // float
@@ -95,7 +93,7 @@ public class ToJavaArrayUtils {
 
   // Float nullable
   public static Float[] toBoxedFloatArray(ArrayData arrayData) {
-    return (Float[]) arrayData.toArray(FloatType, ClassTag$.MODULE$.apply(java.lang.Float.class));
+    return arrayData.toArray(FloatType, ClassTag$.MODULE$.apply(Float.class));
   }
 
   // double
@@ -106,7 +104,6 @@ public class ToJavaArrayUtils {
 
   // Double nullable
   public static Double[] toBoxedDoubleArray(ArrayData arrayData) {
-    return (Double[]) arrayData.toArray(DoubleType,
-        ClassTag$.MODULE$.apply(java.lang.Double.class));
+    return arrayData.toArray(DoubleType, ClassTag$.MODULE$.apply(Double.class));
   }
 }
