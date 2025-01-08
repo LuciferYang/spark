@@ -122,7 +122,7 @@ object SubExprEliminationBenchmark extends SqlBasedBenchmark {
     val numIters = 3
     runBenchmark("Benchmark for performance of subexpression elimination") {
       withFromJson(100, numIters)
-      withFilter(100, numIters)
+      withFilter(10000, numIters)
     }
   }
 }
