@@ -441,7 +441,11 @@ object ParquetFileFormat extends Logging {
       conf: Configuration,
       partFiles: Seq[FileStatus],
       ignoreCorruptFiles: Boolean): Seq[Footer] = {
-    ThreadUtils.parmap(partFiles, "readingParquetFooters", 8) { currentFile =>
+    val maxThreads = {
+      val cores = Runtime.getRuntime.availableProcessors()
+      if (cores > 8) 8 else cores
+    }
+    ThreadUtils.parmap(partFiles, "readingParquetFooters", maxThreads) { currentFile =>
       try {
         // Skips row group information since we only need the schema.
         // ParquetFileReader.readFooter throws RuntimeException, instead of IOException,

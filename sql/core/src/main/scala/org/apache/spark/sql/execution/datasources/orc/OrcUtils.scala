@@ -160,7 +160,11 @@ object OrcUtils extends Logging {
    */
   def readOrcSchemasInParallel(
     files: Seq[FileStatus], conf: Configuration, ignoreCorruptFiles: Boolean): Seq[StructType] = {
-    ThreadUtils.parmap(files, "readingOrcSchemas", 8) { currentFile =>
+    val maxThreads = {
+      val cores = Runtime.getRuntime.availableProcessors()
+      if (cores > 8) 8 else cores
+    }
+    ThreadUtils.parmap(files, "readingOrcSchemas", maxThreads) { currentFile =>
       OrcUtils.readSchema(currentFile.getPath, conf, ignoreCorruptFiles).map(toCatalystSchema)
     }.flatten
   }
