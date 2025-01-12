@@ -20,16 +20,18 @@ package org.apache.spark
 import java.io.{FileDescriptor, InputStream}
 import java.lang
 import java.nio.ByteBuffer
+import java.util.{HashMap => JHashMap}
 
-import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 import org.apache.hadoop.fs._
 
 import org.apache.spark.internal.Logging
 
+
 object DebugFilesystem extends Logging {
   // Stores the set of active streams and their creation sites.
-  private val openStreams = mutable.Map.empty[FSDataInputStream, Throwable]
+  private val openStreams = new JHashMap[FSDataInputStream, Throwable].asScala
 
   def addOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
     openStreams.put(stream, new Throwable())
