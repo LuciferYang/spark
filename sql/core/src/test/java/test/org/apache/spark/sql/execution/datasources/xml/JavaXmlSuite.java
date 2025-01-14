@@ -85,7 +85,7 @@ public final class JavaXmlSuite {
         Dataset<Row> df = spark.read().options(options).xml(booksFile);
         String prefix = XmlOptions.DEFAULT_ATTRIBUTE_PREFIX();
         long result = df.select(prefix + "id").count();
-        Assertions.assertEquals(result, numBooks);
+        Assertions.assertEquals(numBooks, result);
     }
 
     @Test
@@ -94,7 +94,7 @@ public final class JavaXmlSuite {
         options.put("rowTag", booksFileTag);
         Dataset<Row> df = spark.read().options(options).xml(booksFile);
         long result = df.select("description").count();
-        Assertions.assertEquals(result, numBooks);
+        Assertions.assertEquals(numBooks, result);
     }
 
     @Test
@@ -108,7 +108,7 @@ public final class JavaXmlSuite {
 
         Dataset<Row> newDf = spark.read().options(options).xml(booksPath.toString());
         long result = newDf.select("price").count();
-        Assertions.assertEquals(result, numBooks);
+        Assertions.assertEquals(numBooks, result);
     }
 
 }

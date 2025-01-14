@@ -264,18 +264,18 @@ public class JavaAPISuite implements Serializable {
     // Default comparator
     JavaPairRDD<Integer, Integer> filteredRDD = rdd.filterByRange(3, 11);
     List<Tuple2<Integer, Integer>> filteredPairs = filteredRDD.collect();
-    assertEquals(filteredPairs.size(), 2);
-    assertEquals(filteredPairs.get(0), new Tuple2<>(3, 8));
-    assertEquals(filteredPairs.get(1), new Tuple2<>(4, 8));
+    assertEquals(2, filteredPairs.size());
+    assertEquals(new Tuple2<>(3, 8), filteredPairs.get(0));
+    assertEquals(new Tuple2<>(4, 8), filteredPairs.get(1));
 
     // Custom comparator
     filteredRDD = rdd.filterByRange(Collections.reverseOrder(), 3, -2);
     filteredPairs = filteredRDD.collect();
-    assertEquals(filteredPairs.size(), 4);
-    assertEquals(filteredPairs.get(0), new Tuple2<>(0, 5));
-    assertEquals(filteredPairs.get(1), new Tuple2<>(1, 8));
-    assertEquals(filteredPairs.get(2), new Tuple2<>(2, 6));
-    assertEquals(filteredPairs.get(3), new Tuple2<>(3, 8));
+    assertEquals(4, filteredPairs.size());
+    assertEquals(new Tuple2<>(0, 5), filteredPairs.get(0));
+    assertEquals(new Tuple2<>(1, 8), filteredPairs.get(1));
+    assertEquals(new Tuple2<>(2, 6), filteredPairs.get(2));
+    assertEquals(new Tuple2<>(3, 8), filteredPairs.get(3));
   }
 
   @Test

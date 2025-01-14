@@ -260,7 +260,7 @@ public class TransportClientFactorySuite {
       JavaUtils.closeQuietly(server);
       IOException exception = Assertions.assertThrows(IOException.class,
           () -> factory.createClient(TestUtils.getLocalHost(), unreachablePort, true));
-      assertNotEquals(exception.getCause(), null);
+      assertNotEquals(null, exception.getCause());
     }
   }
 }

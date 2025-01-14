@@ -331,7 +331,7 @@ public class JavaDataFrameSuite {
     // Validate geting same result with withColumn loop call
     Assertions.assertEquals(expected, actual);
     // Validate the col names
-    Assertions.assertArrayEquals(actual.fieldNames(), new String[] {"a", "b", "a1", "b1"});
+    Assertions.assertArrayEquals(new String[] {"a", "b", "a1", "b1"}, actual.fieldNames());
   }
 
   @Test

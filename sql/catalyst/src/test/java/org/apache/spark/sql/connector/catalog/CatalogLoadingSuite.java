@@ -80,8 +80,8 @@ public class CatalogLoadingSuite {
     SparkException exc = Assertions.assertThrows(CatalogNotFoundException.class,
         () -> Catalogs.load("missing", conf));
 
-    Assertions.assertEquals(exc.getCondition(), "CATALOG_NOT_FOUND");
-    Assertions.assertEquals(exc.getMessageParameters().get("catalogName"), "`missing`");
+    Assertions.assertEquals("CATALOG_NOT_FOUND", exc.getCondition());
+    Assertions.assertEquals("`missing`", exc.getMessageParameters().get("catalogName"));
   }
 
   @Test

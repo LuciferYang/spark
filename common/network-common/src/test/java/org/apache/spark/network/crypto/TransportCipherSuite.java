@@ -71,7 +71,7 @@ public class TransportCipherSuite {
     assertEquals(0, buffer.refCnt());
 
     Throwable expected = assertThrows(Throwable.class, () -> channel.writeInbound(buffer2));
-    assertEquals(expected.getClass(), IOException.class);
+    assertEquals(IOException.class, expected.getClass());
     assertEquals(0, buffer2.refCnt());
 
     // Simulate closing the connection

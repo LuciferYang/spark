@@ -227,7 +227,7 @@ public class SparkLauncherSuite extends BaseSuite {
 
       assertNotNull(handle.getError());
       assertTrue(handle.getError().isPresent());
-      assertSame(handle.getError().get(), DUMMY_EXCEPTION);
+      assertSame(DUMMY_EXCEPTION, handle.getError().get());
     } finally {
       if (handle != null) {
         handle.kill();

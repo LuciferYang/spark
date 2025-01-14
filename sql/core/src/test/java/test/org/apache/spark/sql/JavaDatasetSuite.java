@@ -868,7 +868,7 @@ public class JavaDatasetSuite implements Serializable {
     double[] arraySplit = {1, 2, 3};
 
     List<Dataset<String>> randomSplit =  ds.randomSplitAsList(arraySplit, 1);
-    Assertions.assertEquals(randomSplit.size(), 3, "wrong number of splits");
+    Assertions.assertEquals(3, randomSplit.size(), "wrong number of splits");
   }
 
   /**

@@ -70,10 +70,10 @@ public class CommandBuilderUtilsSuite {
 
   @Test
   public void testRedactCommandLineArgs() {
-    assertEquals(redact("secret"), "secret");
-    assertEquals(redact("-Dk=v"), "-Dk=v");
-    assertEquals(redact("-Dk=secret"), "-Dk=secret");
-    assertEquals(redact("-DsecretKey=my-secret"), "-DsecretKey=*********(redacted)");
+    assertEquals("secret", redact("secret"));
+    assertEquals("-Dk=v", redact("-Dk=v"));
+    assertEquals("-Dk=secret", redact("-Dk=secret"));
+    assertEquals("-DsecretKey=*********(redacted)", redact("-DsecretKey=my-secret"));
     assertEquals(redactCommandLineArgs(Arrays.asList("-DsecretKey=my-secret")),
       Arrays.asList("-DsecretKey=*********(redacted)"));
   }

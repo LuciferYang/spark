@@ -34,7 +34,7 @@ public class JavaParamsSuite {
     testParams.setMyIntParam(2).setMyDoubleParam(0.4).setMyStringParam("a");
     Assertions.assertEquals(0.4, testParams.getMyDoubleParam(), 0.0);
     Assertions.assertEquals("a", testParams.getMyStringParam());
-    Assertions.assertArrayEquals(testParams.getMyDoubleArrayParam(), new double[]{1.0, 2.0}, 0.0);
+    Assertions.assertArrayEquals(new double[]{1.0, 2.0}, testParams.getMyDoubleArrayParam(), 0.0);
   }
 
   @Test

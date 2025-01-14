@@ -82,7 +82,7 @@ abstract class AuthEngineSuite {
               AuthMessage.decodeMessage(ByteBuffer.wrap(Hex.decode(serverResponseHex)));
       // Verify that the client will accept an old transcript.
       client.deriveSessionCipher(clientChallenge, serverResponse);
-      assertEquals(client.sessionCipher().getKeyId(), derivedKeyId);
+      assertEquals(derivedKeyId, client.sessionCipher().getKeyId());
     }
   }
 

@@ -338,7 +338,7 @@ public class SparkSaslSuite {
     Method[] rpcHandlerMethods = RpcHandler.class.getDeclaredMethods();
     for (Method m : rpcHandlerMethods) {
       Method delegate = SaslRpcHandler.class.getMethod(m.getName(), m.getParameterTypes());
-      assertNotEquals(delegate.getDeclaringClass(), RpcHandler.class);
+      assertNotEquals(RpcHandler.class, delegate.getDeclaringClass());
     }
   }
 

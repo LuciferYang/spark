@@ -80,16 +80,16 @@ public class CalendarIntervalSuite {
   public void compareToTest() {
    CalendarInterval i = new CalendarInterval(0, 0, 0);
 
-   assertEquals(i.compareTo(new CalendarInterval(0, 0, 0)), 0);
-   assertEquals(i.compareTo(new CalendarInterval(0, 0, 1)), -1);
-   assertEquals(i.compareTo(new CalendarInterval(0, 1, 0)), -1);
-   assertEquals(i.compareTo(new CalendarInterval(0, 1, -1)), -1);
-   assertEquals(i.compareTo(new CalendarInterval(1, 0, 0)), -1);
-   assertEquals(i.compareTo(new CalendarInterval(1, 0, -1)), -1);
-   assertEquals(i.compareTo(new CalendarInterval(0, 0, -1)), 1);
-   assertEquals(i.compareTo(new CalendarInterval(0, -1, 0)), 1);
-   assertEquals(i.compareTo(new CalendarInterval(-1, 0, 0)), 1);
-   assertEquals(i.compareTo(new CalendarInterval(-1, 0, 1)), 1);
+   assertEquals(0, i.compareTo(new CalendarInterval(0, 0, 0)));
+   assertEquals(-1, i.compareTo(new CalendarInterval(0, 0, 1)));
+   assertEquals(-1, i.compareTo(new CalendarInterval(0, 1, 0)));
+   assertEquals(-1, i.compareTo(new CalendarInterval(0, 1, -1)));
+   assertEquals(-1, i.compareTo(new CalendarInterval(1, 0, 0)));
+   assertEquals(-1, i.compareTo(new CalendarInterval(1, 0, -1)));
+   assertEquals(1, i.compareTo(new CalendarInterval(0, 0, -1)));
+   assertEquals(1, i.compareTo(new CalendarInterval(0, -1, 0)));
+   assertEquals(1, i.compareTo(new CalendarInterval(-1, 0, 0)));
+   assertEquals(1, i.compareTo(new CalendarInterval(-1, 0, 1)));
   }
 
   @Test

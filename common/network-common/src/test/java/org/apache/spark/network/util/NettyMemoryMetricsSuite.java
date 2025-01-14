@@ -78,7 +78,7 @@ public class NettyMemoryMetricsSuite {
     MetricSet serverMetrics = server.getAllMetrics();
     Assertions.assertNotNull(serverMetrics);
     Assertions.assertNotNull(serverMetrics.getMetrics());
-    Assertions.assertNotEquals(serverMetrics.getMetrics().size(), 0);
+    Assertions.assertNotEquals(0, serverMetrics.getMetrics().size());
 
     Map<String, Metric> serverMetricMap = serverMetrics.getMetrics();
     serverMetricMap.forEach((name, metric) ->
@@ -88,7 +88,7 @@ public class NettyMemoryMetricsSuite {
     MetricSet clientMetrics = clientFactory.getAllMetrics();
     Assertions.assertNotNull(clientMetrics);
     Assertions.assertNotNull(clientMetrics.getMetrics());
-    Assertions.assertNotEquals(clientMetrics.getMetrics().size(), 0);
+    Assertions.assertNotEquals(0, clientMetrics.getMetrics().size());
 
     Map<String, Metric> clientMetricMap = clientMetrics.getMetrics();
     clientMetricMap.forEach((name, metrics) ->

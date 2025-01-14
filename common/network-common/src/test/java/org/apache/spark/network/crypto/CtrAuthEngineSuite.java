@@ -76,11 +76,11 @@ public class CtrAuthEngineSuite extends AuthEngineSuite {
       // Verify that the client will accept an old transcript.
       client.deriveSessionCipher(clientChallenge, serverResponse);
       TransportCipher clientCipher = client.sessionCipher();
-      assertEquals(clientCipher.getKeyId(), derivedKeyId);
+      assertEquals(derivedKeyId, clientCipher.getKeyId());
       assert(clientCipher instanceof CtrTransportCipher);
       CtrTransportCipher ctrTransportCipher = (CtrTransportCipher) clientCipher;
-      assertEquals(Hex.encode(ctrTransportCipher.getInputIv()), inputIv);
-      assertEquals(Hex.encode(ctrTransportCipher.getOutputIv()), outputIv);
+      assertEquals(inputIv, Hex.encode(ctrTransportCipher.getInputIv()));
+      assertEquals(outputIv, Hex.encode(ctrTransportCipher.getOutputIv()));
     }
   }
 
@@ -99,9 +99,9 @@ public class CtrAuthEngineSuite extends AuthEngineSuite {
       TransportCipher clientCipher = client.sessionCipher();
       assert(clientCipher instanceof CtrTransportCipher);
       CtrTransportCipher ctrTransportCipher = (CtrTransportCipher) clientCipher;
-      assertEquals(Hex.encode(ctrTransportCipher.getKey().getEncoded()), unsafeDerivedKey);
-      assertEquals(Hex.encode(ctrTransportCipher.getInputIv()), inputIv);
-      assertEquals(Hex.encode(ctrTransportCipher.getOutputIv()), outputIv);
+      assertEquals(unsafeDerivedKey, Hex.encode(ctrTransportCipher.getKey().getEncoded()));
+      assertEquals(inputIv, Hex.encode(ctrTransportCipher.getInputIv()));
+      assertEquals(outputIv, Hex.encode(ctrTransportCipher.getOutputIv()));
     }
   }
 

@@ -456,7 +456,7 @@ public class RemoteBlockPushResolverSuite {
     Path[] activeLocalDirs = createLocalDirs(1);
     registerExecutor(testApp, prepareLocalDirs(activeLocalDirs, MERGE_DIRECTORY),
       MERGE_DIRECTORY_META);
-    assertEquals(pushResolver.getMergedBlockDirs(testApp).length, 1);
+    assertEquals(1, pushResolver.getMergedBlockDirs(testApp).length);
     assertTrue(pushResolver.getMergedBlockDirs(testApp)[0].contains(
       activeLocalDirs[0].toFile().getPath()));
     // Any later executor register from the same application attempt should not change the active
@@ -464,14 +464,14 @@ public class RemoteBlockPushResolverSuite {
     Path[] updatedLocalDirs = localDirs;
     registerExecutor(testApp, prepareLocalDirs(updatedLocalDirs, MERGE_DIRECTORY),
       MERGE_DIRECTORY_META);
-    assertEquals(pushResolver.getMergedBlockDirs(testApp).length, 1);
+    assertEquals(1, pushResolver.getMergedBlockDirs(testApp).length);
     assertTrue(pushResolver.getMergedBlockDirs(testApp)[0].contains(
       activeLocalDirs[0].toFile().getPath()));
     removeApplication(testApp);
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
       () -> pushResolver.getMergedBlockDirs(testApp));
-    assertEquals(e.getMessage(),
-      "application " + testApp + " is not registered or NM was restarted.");
+    assertEquals("application " + testApp + " is not registered or NM was restarted.",
+            e.getMessage());
   }
 
   @Test
@@ -493,7 +493,7 @@ public class RemoteBlockPushResolverSuite {
     registerExecutor(testApp,
       prepareLocalDirs(attempt1LocalDirs, MERGE_DIRECTORY + "_" + ATTEMPT_ID_1),
       MERGE_DIRECTORY_META_1);
-    assertEquals(pushResolver.getMergedBlockDirs(testApp).length, 1);
+    assertEquals(1, pushResolver.getMergedBlockDirs(testApp).length);
     assertTrue(pushResolver.getMergedBlockDirs(testApp)[0].contains(
       attempt1LocalDirs[0].toFile().getPath()));
     // Any later executor register from the same application attempt should not change the active
@@ -502,7 +502,7 @@ public class RemoteBlockPushResolverSuite {
     registerExecutor(testApp,
       prepareLocalDirs(attempt1UpdatedLocalDirs, MERGE_DIRECTORY + "_" + ATTEMPT_ID_1),
       MERGE_DIRECTORY_META_1);
-    assertEquals(pushResolver.getMergedBlockDirs(testApp).length, 1);
+    assertEquals(1, pushResolver.getMergedBlockDirs(testApp).length);
     assertTrue(pushResolver.getMergedBlockDirs(testApp)[0].contains(
       attempt1LocalDirs[0].toFile().getPath()));
     // But a new attempt from the same application can change the active local dirs list
@@ -510,14 +510,14 @@ public class RemoteBlockPushResolverSuite {
     registerExecutor(testApp,
       prepareLocalDirs(attempt2LocalDirs, MERGE_DIRECTORY + "_" + ATTEMPT_ID_2),
       MERGE_DIRECTORY_META_2);
-    assertEquals(pushResolver.getMergedBlockDirs(testApp).length, 2);
+    assertEquals(2, pushResolver.getMergedBlockDirs(testApp).length);
     assertTrue(pushResolver.getMergedBlockDirs(testApp)[0].contains(
       attempt2LocalDirs[0].toFile().getPath()));
     removeApplication(testApp);
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
       () -> pushResolver.getMergedBlockDirs(testApp));
-    assertEquals(e.getMessage(),
-      "application " + testApp + " is not registered or NM was restarted.");
+    assertEquals("application " + testApp + " is not registered or NM was restarted.",
+            e.getMessage());
   }
 
   @Test
@@ -1317,7 +1317,7 @@ public class RemoteBlockPushResolverSuite {
       (BlockPushReturnCode) BlockTransferMessage.Decoder.fromByteBuffer(e0.getResponse());
     assertEquals(BlockPushNonFatalFailure.ReturnCode.TOO_LATE_BLOCK_PUSH.id(),
       errorCode0.returnCode);
-    assertEquals(errorCode0.failureBlockId, "shufflePush_1_0_0_200");
+    assertEquals("shufflePush_1_0_0_200", errorCode0.failureBlockId);
     //shufflePush_1_0_1_100 is received by the server after finalization of shuffle 1 0 which
     //should also be rejected
     StreamCallbackWithID failureCallback = pushResolver.receiveBlockDataAsStream(
@@ -1328,7 +1328,7 @@ public class RemoteBlockPushResolverSuite {
       (BlockPushReturnCode) BlockTransferMessage.Decoder.fromByteBuffer(e1.getResponse());
     assertEquals(BlockPushNonFatalFailure.ReturnCode.TOO_LATE_BLOCK_PUSH.id(),
       errorCode1.returnCode);
-    assertEquals(errorCode1.failureBlockId, "shufflePush_1_0_1_100");
+    assertEquals("shufflePush_1_0_1_100", errorCode1.failureBlockId);
     MergedBlockMeta blockMeta = pushResolver.getMergedBlockMeta(TEST_APP, 1, 0, 100);
     validateChunks(TEST_APP, 1, 0, 100, blockMeta, new int[]{4}, new int[][]{{0}});
     removeApplication(TEST_APP);

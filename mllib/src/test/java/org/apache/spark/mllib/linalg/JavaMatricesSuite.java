@@ -60,7 +60,7 @@ public class JavaMatricesSuite {
     SparseMatrix sr = SparseMatrix.speye(2);
     assertArrayEquals(r.toArray(), dr.toArray(), 0.0);
     assertArrayEquals(sr.toArray(), dr.toArray(), 0.0);
-    assertArrayEquals(r.toArray(), new double[]{1.0, 0.0, 0.0, 1.0}, 0.0);
+    assertArrayEquals(new double[]{1.0, 0.0, 0.0, 1.0}, r.toArray(), 0.0);
   }
 
   @Test
@@ -94,10 +94,10 @@ public class JavaMatricesSuite {
     DenseMatrix dz = DenseMatrix.zeros(2, 2);
     DenseMatrix done = DenseMatrix.ones(2, 2);
 
-    assertArrayEquals(z.toArray(), new double[]{0.0, 0.0, 0.0, 0.0}, 0.0);
-    assertArrayEquals(dz.toArray(), new double[]{0.0, 0.0, 0.0, 0.0}, 0.0);
-    assertArrayEquals(one.toArray(), new double[]{1.0, 1.0, 1.0, 1.0}, 0.0);
-    assertArrayEquals(done.toArray(), new double[]{1.0, 1.0, 1.0, 1.0}, 0.0);
+    assertArrayEquals(new double[]{0.0, 0.0, 0.0, 0.0}, z.toArray(), 0.0);
+    assertArrayEquals(new double[]{0.0, 0.0, 0.0, 0.0}, dz.toArray(), 0.0);
+    assertArrayEquals(new double[]{1.0, 1.0, 1.0, 1.0}, one.toArray(), 0.0);
+    assertArrayEquals(new double[]{1.0, 1.0, 1.0, 1.0}, done.toArray(), 0.0);
   }
 
   @Test

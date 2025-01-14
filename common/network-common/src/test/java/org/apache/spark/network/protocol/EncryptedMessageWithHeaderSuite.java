@@ -115,7 +115,7 @@ public class EncryptedMessageWithHeaderSuite {
       assertFalse(msg.isEndOfInput());
 
       // Validate we read data correctly
-      assertEquals(bodyResult.readableBytes(), chunkSize);
+      assertEquals(chunkSize, bodyResult.readableBytes());
       assertTrue(bodyResult.readableBytes() < (randomData.length - readIndex));
       while (bodyResult.readableBytes() > 0) {
         assertEquals(bodyResult.readByte(), randomData[readIndex++]);
@@ -128,7 +128,7 @@ public class EncryptedMessageWithHeaderSuite {
     assertTrue(msg.isEndOfInput());
 
     // Validate we read the byte properly
-    assertEquals(bodyResult.readableBytes(), 1);
+    assertEquals(1, bodyResult.readableBytes());
     assertEquals(bodyResult.readByte(), randomData[readIndex]);
 
     // Closing the message should close the input stream

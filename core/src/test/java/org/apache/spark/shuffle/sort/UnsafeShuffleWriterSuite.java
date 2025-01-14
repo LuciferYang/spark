@@ -339,7 +339,7 @@ public class UnsafeShuffleWriterSuite implements ShuffleChecksumTestHelper {
     writer1.write(dataToWrite.iterator());
     writer1.stop(true);
     assertTrue(checksumFile.exists());
-    assertEquals(checksumFile.length(), 8 * NUM_PARTITIONS);
+    assertEquals(8 * NUM_PARTITIONS, checksumFile.length());
     compareChecksums(NUM_PARTITIONS, checksumAlgorithm, checksumFile, dataFile, indexFile);
   }
 
@@ -376,7 +376,7 @@ public class UnsafeShuffleWriterSuite implements ShuffleChecksumTestHelper {
     writer1.forceSorterToSpill();
     writer1.closeAndWriteOutput();
     assertTrue(checksumFile.exists());
-    assertEquals(checksumFile.length(), 8 * NUM_PARTITIONS);
+    assertEquals(8 * NUM_PARTITIONS, checksumFile.length());
     compareChecksums(NUM_PARTITIONS, checksumAlgorithm, checksumFile, dataFile, indexFile);
   }
 
