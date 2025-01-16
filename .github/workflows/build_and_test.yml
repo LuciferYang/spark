@@ -49,6 +49,13 @@ on:
         required: false
         type: string
         default: ''
+    secrets:
+      codecov_token:
+        description: The token of codecov.
+        required: false
+        type: string
+        default: ''
+
 jobs:
   precondition:
     name: Check changes
