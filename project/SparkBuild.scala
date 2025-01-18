@@ -1057,9 +1057,14 @@ object KubernetesIntegrationTests {
  * Overrides to work around sbt's dependency resolution being different from Maven's.
  */
 object DependencyOverrides {
-  lazy val guavaVersion = sys.props.get("guava.version").getOrElse("33.3.1-jre")
+  lazy val defaultGuavaVersion = Def.setting {
+    SbtPomKeys.effectivePom.value.getProperties.get("guava.version").asInstanceOf[String]
+  }
+  lazy val guavaVersion = Def.setting {
+    sys.props.get("guava.version").getOrElse(defaultGuavaVersion.value)
+  }
   lazy val settings = Seq(
-    dependencyOverrides += "com.google.guava" % "guava" % guavaVersion,
+    dependencyOverrides += "com.google.guava" % "guava" % guavaVersion.value,
     dependencyOverrides += "jline" % "jline" % "2.14.6",
     dependencyOverrides += "org.apache.avro" % "avro" % "1.12.0")
 }
