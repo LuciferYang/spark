@@ -57,16 +57,16 @@ object BuildCommons {
       .map(ProjectRef(buildLocation, _))
 
   val allProjects@Seq(
-    core, graphx, mllib, mllibLocal, repl, networkCommon, networkShuffle, launcher, unsafe, tags, sketch, kvstore,
-    commonUtils, variant, _*
+  core, graphx, mllib, mllibLocal, repl, networkCommon, networkShuffle, launcher, unsafe, tags, sketch, kvstore,
+  commonUtils, variant, _*
   ) = Seq(
     "core", "graphx", "mllib", "mllib-local", "repl", "network-common", "network-shuffle", "launcher", "unsafe",
     "tags", "sketch", "kvstore", "common-utils", "variant"
   ).map(ProjectRef(buildLocation, _)) ++ sqlProjects ++ streamingProjects ++ connectProjects
 
   val optionallyEnabledProjects@Seq(kubernetes, yarn,
-    sparkGangliaLgpl, streamingKinesisAsl, profiler,
-    dockerIntegrationTests, hadoopCloud, kubernetesIntegrationTests) =
+  sparkGangliaLgpl, streamingKinesisAsl, profiler,
+  dockerIntegrationTests, hadoopCloud, kubernetesIntegrationTests) =
     Seq("kubernetes", "yarn",
       "ganglia-lgpl", "streaming-kinesis-asl", "profiler",
       "docker-integration-tests", "hadoop-cloud", "kubernetes-integration-tests").map(ProjectRef(buildLocation, _))
@@ -89,7 +89,10 @@ object BuildCommons {
 
   // Google Protobuf version used for generating the protobuf.
   // SPARK-41247: needs to be consistent with `protobuf.version` in `pom.xml`.
-  val protoVersion = "4.29.3"
+  val protoVersion = Def.setting {
+    SbtPomKeys.effectivePom.value.getProperties.get(
+      "protobuf.version").asInstanceOf[String]
+  }
 }
 
 object SparkBuild extends PomBuild {
@@ -348,7 +351,7 @@ object SparkBuild extends PomBuild {
 
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
-    PB.protocVersion := protoVersion,
+    PB.protocVersion := protoVersion.value,
   )
 
   def enable(settings: Seq[Setting[_]])(projectRef: ProjectRef) = {
@@ -604,12 +607,12 @@ object Core {
   lazy val settings = Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
-    PB.protocVersion := BuildCommons.protoVersion,
+    PB.protocVersion := protoVersion.value,
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
     libraryDependencies ++= {
       Seq(
-        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf"
       )
     },
     (Compile / PB.targets) := Seq(
@@ -633,7 +636,7 @@ object SparkConnectCommon {
   lazy val settings = Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
-    PB.protocVersion := BuildCommons.protoVersion,
+    PB.protocVersion := protoVersion.value,
 
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
@@ -651,7 +654,7 @@ object SparkConnectCommon {
         "io.grpc" % "protoc-gen-grpc-java" % grpcVersion asProtocPlugin(),
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.guava" % "failureaccess" % guavaFailureaccessVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf"
       )
     },
 
@@ -665,7 +668,7 @@ object SparkConnectCommon {
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.guava" % "failureaccess" % guavaFailureaccessVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value
       )
     },
 
@@ -731,7 +734,7 @@ object SparkConnect {
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.guava" % "failureaccess" % guavaFailureaccessVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf"
       )
     },
 
@@ -745,7 +748,7 @@ object SparkConnect {
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.guava" % "failureaccess" % guavaFailureaccessVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value
       )
     },
 
@@ -816,7 +819,7 @@ object SparkConnectClient {
           "connect.guava.version").asInstanceOf[String]
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf"
       )
     },
     dependencyOverrides ++= {
@@ -825,7 +828,7 @@ object SparkConnectClient {
           "connect.guava.version").asInstanceOf[String]
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
-        "com.google.protobuf" % "protobuf-java" % protoVersion
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value
       )
     },
 
@@ -885,13 +888,13 @@ object SparkProtobuf {
   lazy val settings = Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
-    PB.protocVersion := BuildCommons.protoVersion,
+    PB.protocVersion := protoVersion.value,
 
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
-    libraryDependencies += "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf",
+    libraryDependencies += "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf",
 
-    dependencyOverrides += "com.google.protobuf" % "protobuf-java" % protoVersion,
+    dependencyOverrides += "com.google.protobuf" % "protobuf-java" % protoVersion.value,
 
     (Test / PB.protoSources) += (Test / sourceDirectory).value / "resources" / "protobuf",
 
@@ -1127,9 +1130,6 @@ object OldDeps {
   }
 
   def oldDepsSettings() = Defaults.coreDefaultSettings ++ Seq(
-    // Setting version for the protobuf compiler. This has to be propagated to every sub-project
-    // even if the project is not using it.
-    PB.protocVersion := protoVersion,
     name := "old-deps",
     libraryDependencies := allPreviousArtifactKeys.value.flatten
   )
@@ -1153,12 +1153,12 @@ object SQL {
   lazy val settings = Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
-    PB.protocVersion := BuildCommons.protoVersion,
+    PB.protocVersion := protoVersion.value,
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
     libraryDependencies ++= {
       Seq(
-        "com.google.protobuf" % "protobuf-java" % protoVersion % "protobuf"
+        "com.google.protobuf" % "protobuf-java" % protoVersion.value % "protobuf"
       )
     },
     (Compile / PB.targets) := Seq(
