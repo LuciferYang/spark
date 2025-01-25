@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
-import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.cache.{CacheBuilder, CacheLoader, RemovalNotification}
 import io.grpc.ClientInterceptor
 import org.apache.arrow.memory.RootAllocator
 
@@ -676,6 +676,12 @@ object SparkSession extends SparkSessionCompanion with Logging {
     .newBuilder()
     .weakValues()
     .maximumSize(MAX_CACHED_SESSIONS)
+    .removalListener((notification: RemovalNotification[Configuration, SparkSession]) => {
+      val session = notification.getValue
+      if (session != null) {
+        session.close()
+      }
+    })
     .build(new CacheLoader[Configuration, SparkSession] {
       override def load(c: Configuration): SparkSession = create(c)
     })
