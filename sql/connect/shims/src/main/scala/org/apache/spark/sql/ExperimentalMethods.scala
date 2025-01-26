@@ -14,37 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark
 
-class SparkContext
-class SparkConf {
-  def getAll: Array[(String, String)] = Array.empty
-}
+package org.apache.spark.sql
 
-package api.java {
-  class JavaRDD[T]
-}
-
-package rdd {
-  class RDD[T]
-}
-
-package sql {
-  class ExperimentalMethods
-  class SparkSessionExtensions
-
-  package execution {
-    class QueryExecution
-    class SparkStrategy
-  }
-  package internal {
-    class SharedState
-    class SessionState
-  }
-  package util {
-    class ExecutionListenerManager
-  }
-  package sources {
-    class BaseRelation
-  }
-}
+class ExperimentalMethods
