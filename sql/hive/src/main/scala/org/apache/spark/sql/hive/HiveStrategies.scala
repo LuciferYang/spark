@@ -306,7 +306,7 @@ private[hive] trait HiveStrategies {
 
   val sparkSession: SparkSession
 
-  object HiveScripts extends Strategy {
+  object HiveScripts extends SparkStrategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ScriptTransformation(script, output, child, ioschema) =>
         val hiveIoSchema = ScriptTransformationIOSchema(ioschema)
@@ -319,7 +319,7 @@ private[hive] trait HiveStrategies {
    * Retrieves data using a HiveTableScan.  Partition pruning predicates are also detected and
    * applied.
    */
-  object HiveTableScans extends Strategy {
+  object HiveTableScans extends SparkStrategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalOperation(projectList, filters, relation: HiveTableRelation) =>
         // Filter out all predicates that only deal with partition keys, these are given to the

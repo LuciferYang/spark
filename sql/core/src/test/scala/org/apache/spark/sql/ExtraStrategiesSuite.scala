@@ -21,7 +21,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
-import org.apache.spark.sql.execution.{LeafExecNode, SparkPlan}
+import org.apache.spark.sql.execution.{LeafExecNode, SparkPlan, SparkStrategy}
 import org.apache.spark.sql.test.SharedSparkSession
 
 case class FastOperator(output: Seq[Attribute]) extends LeafExecNode {
@@ -37,7 +37,7 @@ case class FastOperator(output: Seq[Attribute]) extends LeafExecNode {
   override def producedAttributes: AttributeSet = outputSet
 }
 
-object TestStrategy extends Strategy {
+object TestStrategy extends SparkStrategy {
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case Project(Seq(attr), _) if attr.name == "a" =>
       FastOperator(attr.toAttribute :: Nil) :: Nil

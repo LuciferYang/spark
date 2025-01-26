@@ -17,7 +17,7 @@
 package org.apache.spark.sql.internal
 
 import org.apache.spark.annotation.Unstable
-import org.apache.spark.sql.{DataSourceRegistration, ExperimentalMethods, SparkSessionExtensions, Strategy, UDTFRegistration}
+import org.apache.spark.sql.{DataSourceRegistration, ExperimentalMethods, SparkSessionExtensions, UDTFRegistration}
 import org.apache.spark.sql.artifact.ArtifactManager
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, EvalSubqueriesForTimeTravel, FunctionRegistry, InvokeProcedures, ReplaceCharWithVarchar, ResolveDataSource, ResolveSessionCatalog, ResolveTranspose, TableFunctionRegistry}
 import org.apache.spark.sql.catalyst.analysis.resolver.ResolverExtension
@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.classic.{SparkSession, StreamingQueryManager, UDFRegistration}
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.execution.{ColumnarRule, CommandExecutionMode, QueryExecution, SparkOptimizer, SparkPlanner, SparkSqlParser}
+import org.apache.spark.sql.execution.{ColumnarRule, CommandExecutionMode, QueryExecution, SparkOptimizer, SparkPlanner, SparkSqlParser, SparkStrategy}
 import org.apache.spark.sql.execution.adaptive.AdaptiveRulesHolder
 import org.apache.spark.sql.execution.aggregate.{ResolveEncodersInScalaAgg, ScalaUDAF}
 import org.apache.spark.sql.execution.analysis.DetectAmbiguousSelfJoin
@@ -332,7 +332,7 @@ abstract class BaseSessionStateBuilder(
    */
   protected def planner: SparkPlanner = {
     new SparkPlanner(session, experimentalMethods) {
-      override def extraPlanningStrategies: Seq[Strategy] =
+      override def extraPlanningStrategies: Seq[SparkStrategy] =
         super.extraPlanningStrategies ++ customPlanningStrategies
     }
   }
@@ -343,7 +343,7 @@ abstract class BaseSessionStateBuilder(
    *
    * Note that this may NOT depend on the `planner` function.
    */
-  protected def customPlanningStrategies: Seq[Strategy] = {
+  protected def customPlanningStrategies: Seq[SparkStrategy] = {
     extensions.buildPlannerStrategies(session)
   }
 

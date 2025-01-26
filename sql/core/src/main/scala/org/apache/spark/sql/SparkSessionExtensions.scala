@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.ExpressionInfo
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{ColumnarRule, SparkPlan}
+import org.apache.spark.sql.execution.{ColumnarRule, SparkPlan, SparkStrategy}
 
 /**
  * :: Experimental ::
@@ -108,7 +108,7 @@ import org.apache.spark.sql.execution.{ColumnarRule, SparkPlan}
 class SparkSessionExtensions {
   type RuleBuilder = SparkSession => Rule[LogicalPlan]
   type CheckRuleBuilder = SparkSession => LogicalPlan => Unit
-  type StrategyBuilder = SparkSession => Strategy
+  type StrategyBuilder = SparkSession => SparkStrategy
   type ParserBuilder = (SparkSession, ParserInterface) => ParserInterface
   type FunctionDescription = (FunctionIdentifier, ExpressionInfo, FunctionBuilder)
   type TableFunctionDescription = (FunctionIdentifier, ExpressionInfo, TableFunctionBuilder)
@@ -325,7 +325,7 @@ class SparkSessionExtensions {
 
   private[this] val plannerStrategyBuilders = mutable.Buffer.empty[StrategyBuilder]
 
-  private[sql] def buildPlannerStrategies(session: SparkSession): Seq[Strategy] = {
+  private[sql] def buildPlannerStrategies(session: SparkSession): Seq[SparkStrategy] = {
     plannerStrategyBuilders.map(_.apply(session)).toSeq
   }
 

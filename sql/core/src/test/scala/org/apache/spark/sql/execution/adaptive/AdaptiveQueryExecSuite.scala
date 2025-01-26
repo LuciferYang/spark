@@ -28,7 +28,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent, SparkListenerJobStart}
 import org.apache.spark.shuffle.sort.SortShuffleManager
-import org.apache.spark.sql.{DataFrame, Dataset, QueryTest, Row, SparkSession, Strategy}
+import org.apache.spark.sql.{DataFrame, Dataset, QueryTest, Row, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
@@ -1279,7 +1279,7 @@ class AdaptiveQueryExecSuite
   }
 
   test("No deadlock in UI update") {
-    object TestStrategy extends Strategy {
+    object TestStrategy extends SparkStrategy {
       def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
         case _: Aggregate =>
           withSQLConf(
@@ -3130,7 +3130,7 @@ private case class SimpleShuffleSortCostEvaluator() extends CostEvaluator {
 /**
  * Helps to simulate ExchangeQueryStageExec materialization failure.
  */
-private object TestProblematicCoalesceStrategy extends Strategy {
+private object TestProblematicCoalesceStrategy extends SparkStrategy {
   private case class TestProblematicCoalesceExec(numPartitions: Int, child: SparkPlan)
     extends UnaryExecNode {
     override protected def doExecute(): RDD[InternalRow] = {

@@ -17,13 +17,12 @@
 
 package org.apache.spark.sql.execution.command.v2
 
-import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.analysis.ResolvedIdentifier
 import org.apache.spark.sql.catalyst.expressions.VariableReference
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{SparkPlan, SparkStrategy}
 
-object V2CommandStrategy extends Strategy {
+object V2CommandStrategy extends SparkStrategy {
 
   // TODO: move v2 commands to here which are not data source v2 related.
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
