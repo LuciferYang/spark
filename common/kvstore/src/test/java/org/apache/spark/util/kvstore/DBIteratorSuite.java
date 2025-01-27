@@ -488,7 +488,7 @@ public abstract class DBIteratorSuite {
     }
 
     assertEquals(expectedCount, actualCount,
-      String.format("Found %s elements: %s", message, Arrays.asList(remaining)));
+      "Found %s elements: %s".formatted(message, Arrays.asList(remaining)));
   }
 
   private KVStoreView<CustomType1> view() throws Exception {

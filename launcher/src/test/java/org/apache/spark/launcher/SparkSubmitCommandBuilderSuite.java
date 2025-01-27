@@ -184,7 +184,7 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
     List<String> cmd = buildCommand(sparkSubmitArgs, env);
     assertTrue(Arrays.asList("python", "python2", "python3").contains(cmd.get(cmd.size() - 1)));
     assertEquals(
-      String.format("\"%s\" \"foo\" \"%s\" \"bar\" \"%s\"",
+      "\"%s\" \"foo\" \"%s\" \"bar\" \"%s\"".formatted(
         parser.MASTER, parser.DEPLOY_MODE, SparkSubmitCommandBuilder.PYSPARK_SHELL_RESOURCE),
       env.get("PYSPARK_SUBMIT_ARGS"));
   }
@@ -218,8 +218,7 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
     List<String> cmd = buildCommand(sparkSubmitArgs, env);
     assertEquals("/usr/bin/R", cmd.get(cmd.size() - 1));
     assertEquals(
-      String.format(
-        "\"%s\" \"foo\" \"%s\" \"bar\" \"--conf\" \"spark.r.shell.command=/usr/bin/R\" \"%s\"",
+      "\"%s\" \"foo\" \"%s\" \"bar\" \"--conf\" \"spark.r.shell.command=/usr/bin/R\" \"%s\"".formatted(
         parser.MASTER, parser.DEPLOY_MODE, SparkSubmitCommandBuilder.SPARKR_SHELL_RESOURCE),
       env.get("SPARKR_SUBMIT_ARGS"));
   }
@@ -430,7 +429,7 @@ public class SparkSubmitCommandBuilderSuite extends BaseSuite {
         return cmd.get(i + 1);
       }
     }
-    fail(String.format("arg '%s' not found", name));
+    fail("arg '%s' not found".formatted(name));
     return null;
   }
 

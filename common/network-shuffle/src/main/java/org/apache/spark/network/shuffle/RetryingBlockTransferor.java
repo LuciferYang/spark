@@ -316,7 +316,7 @@ public class RetryingBlockTransferor {
                 MDC.of(LogKeys.NUM_RETRY$.MODULE$,retryCount));
             } else {
               logger.debug(
-                String.format("Failed to %s block %s, and will not retry (%s retries)",
+                "Failed to %s block %s, and will not retry (%s retries)".formatted(
                   listener.getTransferType(), blockId, retryCount), exception);
             }
             outstandingBlocksIds.remove(blockId);

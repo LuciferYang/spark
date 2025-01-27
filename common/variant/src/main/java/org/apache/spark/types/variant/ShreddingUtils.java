@@ -73,8 +73,7 @@ public class ShreddingUtils {
         VariantSchema.ScalarType scalar = schema.scalarSchema;
         if (scalar instanceof VariantSchema.StringType) {
           builder.appendString(row.getString(typedIdx));
-        } else if (scalar instanceof VariantSchema.IntegralType) {
-          VariantSchema.IntegralType it = (VariantSchema.IntegralType) scalar;
+        } else if (scalar instanceof VariantSchema.IntegralType it) {
           long value = 0;
           switch (it.size) {
             case BYTE:
@@ -99,8 +98,7 @@ public class ShreddingUtils {
           builder.appendBoolean(row.getBoolean(typedIdx));
         } else if (scalar instanceof VariantSchema.BinaryType) {
           builder.appendBinary(row.getBinary(typedIdx));
-        } else if (scalar instanceof VariantSchema.DecimalType) {
-          VariantSchema.DecimalType dt = (VariantSchema.DecimalType) scalar;
+        } else if (scalar instanceof VariantSchema.DecimalType dt) {
           builder.appendDecimal(row.getDecimal(typedIdx, dt.precision, dt.scale));
         } else if (scalar instanceof VariantSchema.DateType) {
           builder.appendDate(row.getInt(typedIdx));

@@ -218,7 +218,7 @@ public class TransportClientFactory implements Closeable {
       if (fastFail && System.currentTimeMillis() - clientPool.lastConnectionFailed <
         fastFailTimeWindow) {
         throw new IOException(
-          String.format("Connecting to %s failed in the last %s ms, fail this connection directly",
+          "Connecting to %s failed in the last %s ms, fail this connection directly".formatted(
             resolvedAddress, fastFailTimeWindow));
       }
       try {
@@ -293,16 +293,16 @@ public class TransportClientFactory implements Closeable {
       cf.await();
       assert cf.isDone();
       if (cf.isCancelled()) {
-        throw new IOException(String.format("Connecting to %s cancelled", address));
+        throw new IOException("Connecting to %s cancelled".formatted(address));
       } else if (!cf.isSuccess()) {
-        throw new IOException(String.format("Failed to connect to %s", address), cf.cause());
+        throw new IOException("Failed to connect to %s".formatted(address), cf.cause());
       }
     } else if (!cf.await(connCreateTimeout)) {
       throw new IOException(
-        String.format("Connecting to %s timed out (%s ms)",
+        "Connecting to %s timed out (%s ms)".formatted(
           address, connCreateTimeout));
     } else if (cf.cause() != null) {
-      throw new IOException(String.format("Failed to connect to %s", address), cf.cause());
+      throw new IOException("Failed to connect to %s".formatted(address), cf.cause());
     }
     if (context.sslEncryptionEnabled()) {
       final SslHandler sslHandler = cf.channel().pipeline().get(SslHandler.class);
@@ -322,7 +322,7 @@ public class TransportClientFactory implements Closeable {
       if (!future.await(conf.connectionTimeoutMs())) {
         cf.channel().close();
         throw new IOException(
-          String.format("Failed to connect to %s within connection timeout", address));
+          "Failed to connect to %s within connection timeout".formatted(address));
       }
     }
 

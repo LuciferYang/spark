@@ -71,7 +71,7 @@ public final class JavaLogQuery {
 
     @Override
     public String toString() {
-      return String.format("bytes=%s\tn=%s", numBytes, count);
+      return "bytes=%s\tn=%s".formatted(numBytes, count);
     }
   }
 

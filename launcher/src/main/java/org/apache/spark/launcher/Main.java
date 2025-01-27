@@ -130,7 +130,7 @@ class Main {
   private static String prepareWindowsCommand(List<String> cmd, Map<String, String> childEnv) {
     StringBuilder cmdline = new StringBuilder();
     for (Map.Entry<String, String> e : childEnv.entrySet()) {
-      cmdline.append(String.format("set %s=%s", e.getKey(), e.getValue()));
+      cmdline.append("set %s=%s".formatted(e.getKey(), e.getValue()));
       cmdline.append(" && ");
     }
     for (String arg : cmd) {
@@ -153,7 +153,7 @@ class Main {
     newCmd.add("env");
 
     for (Map.Entry<String, String> e : childEnv.entrySet()) {
-      newCmd.add(String.format("%s=%s", e.getKey(), e.getValue()));
+      newCmd.add("%s=%s".formatted(e.getKey(), e.getValue()));
     }
     newCmd.addAll(cmd);
     return newCmd;

@@ -157,8 +157,7 @@ public class TransportRequestHandler extends MessageHandler<RequestMessage> {
     } else {
       // org.apache.spark.executor.ExecutorClassLoader.STREAM_NOT_FOUND_REGEX should also be updated
       // when the following error message is changed.
-      respond(new StreamFailure(req.streamId, String.format(
-        "Stream '%s' was not found.", req.streamId)));
+      respond(new StreamFailure(req.streamId, "Stream '%s' was not found.".formatted(req.streamId)));
     }
   }
 

@@ -181,7 +181,7 @@ public final class Optional<T> implements Serializable {
 
   @Override
   public String toString() {
-    return value == null ? "Optional.empty" : String.format("Optional[%s]", value);
+    return value == null ? "Optional.empty" : "Optional[%s]".formatted(value);
   }
 
 }

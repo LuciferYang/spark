@@ -23,6 +23,6 @@ public class UDFTwoListList extends UDF {
   public String evaluate(Object o1, Object o2) {
     UDFListListInt udf = new UDFListListInt();
 
-    return String.format("%s, %s", udf.evaluate(o1), udf.evaluate(o2));
+    return "%s, %s".formatted(udf.evaluate(o1), udf.evaluate(o2));
   }
 }

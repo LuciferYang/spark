@@ -45,7 +45,7 @@ class FilteredObjectInputStream extends ObjectInputStream {
     boolean isValid = ALLOWED_PACKAGES.stream().anyMatch(p -> desc.getName().startsWith(p));
     if (!isValid) {
       throw new IllegalArgumentException(
-        String.format("Unexpected class in stream: %s", desc.getName()));
+        "Unexpected class in stream: %s".formatted(desc.getName()));
     }
     return super.resolveClass(desc);
   }

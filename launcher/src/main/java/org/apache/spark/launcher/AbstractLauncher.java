@@ -302,7 +302,7 @@ public abstract class AbstractLauncher<T extends AbstractLauncher<T>> {
     @Override
     protected boolean handle(String opt, String value) {
       if (value == null && hasValue) {
-        throw new IllegalArgumentException(String.format("'%s' expects a value.", opt));
+        throw new IllegalArgumentException("'%s' expects a value.".formatted(opt));
       }
       return true;
     }

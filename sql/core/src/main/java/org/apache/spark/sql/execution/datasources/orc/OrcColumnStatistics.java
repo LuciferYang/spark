@@ -69,7 +69,7 @@ public class OrcColumnStatistics {
   public OrcColumnStatistics get(int ordinal) {
     if (ordinal < 0 || ordinal >= children.size()) {
       throw new IndexOutOfBoundsException(
-        String.format("Ordinal %d out of bounds of statistics size %d", ordinal, children.size()));
+        "Ordinal %d out of bounds of statistics size %d".formatted(ordinal, children.size()));
     }
     return children.get(ordinal);
   }

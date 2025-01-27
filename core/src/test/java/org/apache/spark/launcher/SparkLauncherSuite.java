@@ -100,7 +100,7 @@ public class SparkLauncherSuite extends BaseSuite {
       .setMaster("local")
       .setAppResource(SparkLauncher.NO_RESOURCE)
       .addSparkArg(opts.CONF,
-        String.format("%s=-Dfoo=ShouldBeOverriddenBelow", SparkLauncher.DRIVER_EXTRA_JAVA_OPTIONS))
+        "%s=-Dfoo=ShouldBeOverriddenBelow".formatted(SparkLauncher.DRIVER_EXTRA_JAVA_OPTIONS))
       .setConf(SparkLauncher.DRIVER_EXTRA_JAVA_OPTIONS,
         "-Dfoo=bar -Dtest.appender=console")
       .setConf(SparkLauncher.DRIVER_EXTRA_CLASSPATH, System.getProperty("java.class.path"))

@@ -161,7 +161,7 @@ class SparkSubmitOptionParser {
         if (value == null) {
           if (idx == args.size() - 1) {
             throw new IllegalArgumentException(
-                String.format("Missing argument for option '%s'.", arg));
+              "Missing argument for option '%s'.".formatted(arg));
           }
           idx++;
           value = args.get(idx);

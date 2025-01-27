@@ -32,7 +32,7 @@ class NamedThreadFactory implements ThreadFactory {
 
   @Override
   public Thread newThread(Runnable r) {
-    Thread t = new Thread(r, String.format(nameFormat, threadIds.incrementAndGet()));
+    Thread t = new Thread(r, nameFormat.formatted(threadIds.incrementAndGet()));
     t.setDaemon(true);
     return t;
   }

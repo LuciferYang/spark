@@ -39,10 +39,11 @@ public final class JavaHdfsLR {
   private static final Random rand = new Random(42);
 
   static void showWarning() {
-    String warning = "WARN: This is a naive implementation of Logistic Regression " +
-            "and is given as an example!\n" +
-            "Please use org.apache.spark.ml.classification.LogisticRegression " +
-            "for more conventional use.";
+    String warning = """
+            WARN: This is a naive implementation of Logistic Regression \
+            and is given as an example!
+            Please use org.apache.spark.ml.classification.LogisticRegression \
+            for more conventional use.""";
     System.err.println(warning);
   }
 

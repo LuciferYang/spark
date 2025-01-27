@@ -547,8 +547,8 @@ public class Complex implements org.apache.thrift.TBase<Complex, Complex._Fields
     if (that == null) {
       return false;
     }
-    if (that instanceof Complex) {
-      return this.equals((Complex) that);
+    if (that instanceof Complex complex) {
+      return this.equals(complex);
     }
     return false;
   }

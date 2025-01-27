@@ -177,7 +177,7 @@ public class JavaSimpleWritableDataSource implements TestingV2Source {
             Path file = status.getPath();
             Path dest = new Path(finalPath, file.getName());
             if (!fs.rename(file, dest)) {
-              throw new IOException(String.format("failed to rename(%s, %s)", file, dest));
+              throw new IOException("failed to rename(%s, %s)".formatted(file, dest));
             }
           }
         } finally {
@@ -317,7 +317,7 @@ public class JavaSimpleWritableDataSource implements TestingV2Source {
     public DataWriter<InternalRow> createWriter(int partitionId, long taskId) {
       try {
         Path jobPath = new Path(new Path(path, "_temporary"), jobId);
-        Path filePath = new Path(jobPath, String.format("%s-%d-%d", jobId, partitionId, taskId));
+        Path filePath = new Path(jobPath, "%s-%d-%d".formatted(jobId, partitionId, taskId));
         FileSystem fs = filePath.getFileSystem(conf.value());
         return new JavaCSVDataWriter(fs, filePath);
       } catch (IOException e) {
@@ -340,7 +340,7 @@ public class JavaSimpleWritableDataSource implements TestingV2Source {
 
     @Override
     public void write(InternalRow record) throws IOException {
-      out.writeBytes(String.format("%d,%d\n", record.getInt(0), record.getInt(1)));
+      out.writeBytes("%d,%d\n".formatted(record.getInt(0), record.getInt(1)));
     }
 
     @Override

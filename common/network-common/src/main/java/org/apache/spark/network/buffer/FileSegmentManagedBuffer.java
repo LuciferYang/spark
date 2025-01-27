@@ -68,8 +68,11 @@ public final class FileSegmentManagedBuffer extends ManagedBuffer {
         channel.position(offset);
         while (buf.remaining() != 0) {
           if (channel.read(buf) == -1) {
-            throw new IOException(String.format("Reached EOF before filling buffer\n" +
-              "offset=%s\nfile=%s\nbuf.remaining=%s",
+            throw new IOException("""
+              Reached EOF before filling buffer
+              offset=%s
+              file=%s
+              buf.remaining=%s""".formatted(
               offset, file.getAbsoluteFile(), buf.remaining()));
           }
         }

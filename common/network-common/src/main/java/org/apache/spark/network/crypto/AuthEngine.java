@@ -239,8 +239,8 @@ class AuthEngine implements Closeable {
       return new GcmTransportCipher(sessionKey);
     } else {
       throw new IllegalArgumentException(
-              String.format("Unsupported cipher mode: %s. %s and %s are supported.",
-                      conf.cipherTransformation(), CIPHER_ALGORITHM, LEGACY_CIPHER_ALGORITHM));
+        "Unsupported cipher mode: %s. %s and %s are supported.".formatted(
+          conf.cipherTransformation(), CIPHER_ALGORITHM, LEGACY_CIPHER_ALGORITHM));
     }
   }
 

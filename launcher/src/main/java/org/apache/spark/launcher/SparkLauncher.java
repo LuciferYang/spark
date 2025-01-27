@@ -391,7 +391,7 @@ public class SparkLauncher extends AbstractLauncher<SparkLauncher> {
     String loggerName = getLoggerName();
     ProcessBuilder pb = createBuilder();
     if (LOG.isLoggable(Level.FINE)) {
-      LOG.fine(String.format("Launching Spark application:%n%s", join(" ", pb.command())));
+      LOG.fine("Launching Spark application:%n%s".formatted(join(" ", pb.command())));
     }
 
     boolean outputToLog = outputStream == null;
@@ -416,7 +416,7 @@ public class SparkLauncher extends AbstractLauncher<SparkLauncher> {
         appName = String.valueOf(COUNTER.incrementAndGet());
       }
       String loggerPrefix = getClass().getPackage().getName();
-      loggerName = String.format("%s.app.%s", loggerPrefix, appName);
+      loggerName = "%s.app.%s".formatted(loggerPrefix, appName);
     }
 
     if (outputToLog && errorToLog) {

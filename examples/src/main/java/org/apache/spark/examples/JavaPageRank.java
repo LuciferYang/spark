@@ -51,10 +51,11 @@ public final class JavaPageRank {
   private static final Pattern SPACES = Pattern.compile("\\s+");
 
   static void showWarning() {
-    String warning = "WARN: This is a naive implementation of PageRank " +
-            "and is given as an example! \n" +
-            "Please use the PageRank implementation found in " +
-            "org.apache.spark.graphx.lib.PageRank for more conventional use.";
+    String warning = """
+            WARN: This is a naive implementation of PageRank \
+            and is given as an example!\s
+            Please use the PageRank implementation found in \
+            org.apache.spark.graphx.lib.PageRank for more conventional use.""";
     System.err.println(warning);
   }
 

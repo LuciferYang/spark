@@ -32,7 +32,7 @@ public class EnumUtil {
       }
     }
     throw new IllegalArgumentException(
-      String.format("Illegal type='%s'. Supported type values: %s",
+      "Illegal type='%s'. Supported type values: %s".formatted(
         str, Joiner.on(", ").join(constants)));
   }
 }

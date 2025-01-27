@@ -84,8 +84,8 @@ public final class MutableColumnarRow extends InternalRow {
           row.setLong(i, getLong(i));
         } else if (dt instanceof TimestampNTZType) {
           row.setLong(i, getLong(i));
-        } else if (dt instanceof StructType) {
-          row.update(i, getStruct(i, ((StructType) dt).fields().length).copy());
+        } else if (dt instanceof StructType type) {
+          row.update(i, getStruct(i, type.fields().length).copy());
         } else if (dt instanceof ArrayType) {
           row.update(i, getArray(i).copy());
         } else if (dt instanceof MapType) {

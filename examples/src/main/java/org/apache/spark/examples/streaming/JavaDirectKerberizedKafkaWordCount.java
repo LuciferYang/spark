@@ -94,10 +94,13 @@ public final class JavaDirectKerberizedKafkaWordCount {
   public static void main(String[] args) throws Exception {
     if (args.length < 3) {
       System.err.println(
-        "Usage: JavaDirectKerberizedKafkaWordCount <brokers> <groupId> <topics>\n" +
-        "  <brokers> is a list of one or more Kafka brokers\n" +
-        "  <groupId> is a consumer group name to consume from topics\n" +
-        "  <topics> is a list of one or more kafka topics to consume from\n\n");
+        """
+        Usage: JavaDirectKerberizedKafkaWordCount <brokers> <groupId> <topics>
+          <brokers> is a list of one or more Kafka brokers
+          <groupId> is a consumer group name to consume from topics
+          <topics> is a list of one or more kafka topics to consume from
+        
+        """);
       System.exit(1);
     }
 

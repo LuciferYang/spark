@@ -289,8 +289,8 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
     @Override
     public String toString() {
-      return String.format("{ id: %d, intervals: %s, ints: %s }", id, intervals,
-              Arrays.toString(ints));
+      return "{ id: %d, intervals: %s, ints: %s }".formatted(id, intervals,
+        Arrays.toString(ints));
     }
   }
 
@@ -335,7 +335,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
     @Override
     public String toString() {
-      return String.format("{ id: %d, intervals: %s }", id, intervals);
+      return "{ id: %d, intervals: %s }".formatted(id, intervals);
     }
   }
 
@@ -380,7 +380,7 @@ public class JavaBeanDeserializationSuite implements Serializable {
 
     @Override
     public String toString() {
-      return String.format("[%d,%d]", startTime, endTime);
+      return "[%d,%d]".formatted(startTime, endTime);
     }
   }
 

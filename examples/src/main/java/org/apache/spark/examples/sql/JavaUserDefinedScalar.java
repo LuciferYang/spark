@@ -17,11 +17,14 @@
 package org.apache.spark.examples.sql;
 
 // $example on:udf_scalar$
+import java.util.concurrent.ThreadLocalRandom;
+
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.expressions.UserDefinedFunction;
 import static org.apache.spark.sql.functions.udf;
 import org.apache.spark.sql.types.DataTypes;
+
 // $example off:udf_scalar$
 
 public class JavaUserDefinedScalar {
@@ -37,7 +40,7 @@ public class JavaUserDefinedScalar {
     // Define and register a zero-argument non-deterministic UDF
     // UDF is deterministic by default, i.e. produces the same result for the same input.
     UserDefinedFunction random = udf(
-      () -> Math.random(), DataTypes.DoubleType
+      () -> ThreadLocalRandom.current().nextDouble(), DataTypes.DoubleType
     );
     random.asNondeterministic();
     spark.udf().register("random", random);

@@ -80,6 +80,11 @@
       <groupId>com.twitter</groupId>
       <artifactId>chill_${scala.binary.version}</artifactId>
     </dependency>
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+      <version>1.3.5</version>
+    </dependency>
 
     <!-- Core dependencies -->
     <dependency>

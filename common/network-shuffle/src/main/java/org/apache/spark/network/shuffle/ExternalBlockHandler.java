@@ -303,8 +303,7 @@ public class ExternalBlockHandler extends RpcHandler
 
   private void checkAuth(TransportClient client, String appId) {
     if (client.getClientId() != null && !client.getClientId().equals(appId)) {
-      throw new SecurityException(String.format(
-        "Client for %s not authorized for application %s.", client.getClientId(), appId));
+      throw new SecurityException("Client for %s not authorized for application %s.".formatted(client.getClientId(), appId));
     }
   }
 

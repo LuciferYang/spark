@@ -208,21 +208,21 @@ abstract class AbstractCommandBuilder {
           if (!shouldPrePendSparkHiveThriftServer && project.equals("sql/hive-thriftserver")) {
             continue;
           }
-          addToClassPath(cp, String.format("%s/%s/target/scala-%s/classes", sparkHome, project,
+          addToClassPath(cp, "%s/%s/target/scala-%s/classes".formatted(sparkHome, project,
             scala));
         }
       }
       if (isTesting) {
         for (String project : projects) {
-          addToClassPath(cp, String.format("%s/%s/target/scala-%s/test-classes", sparkHome,
+          addToClassPath(cp, "%s/%s/target/scala-%s/test-classes".formatted(sparkHome,
             project, scala));
         }
       }
 
       // Add this path to include jars that are shaded in the final deliverable created during
       // the maven build. These jars are copied to this directory during the build.
-      addToClassPath(cp, String.format("%s/core/target/jars/*", sparkHome));
-      addToClassPath(cp, String.format("%s/mllib/target/jars/*", sparkHome));
+      addToClassPath(cp, "%s/core/target/jars/*".formatted(sparkHome));
+      addToClassPath(cp, "%s/mllib/target/jars/*".formatted(sparkHome));
     }
 
     // Add Spark jars to the classpath. For the testing case, we rely on the test code to set and

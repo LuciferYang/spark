@@ -79,8 +79,7 @@ public class StreamInterceptor<T extends Message> implements TransportFrameDecod
     callback.onData(streamId, nioBuffer);
     bytesRead += available;
     if (bytesRead > byteCount) {
-      RuntimeException re = new IllegalStateException(String.format(
-        "Read too many bytes? Expected %d, but read %d.", byteCount, bytesRead));
+      RuntimeException re = new IllegalStateException("Read too many bytes? Expected %d, but read %d.".formatted(byteCount, bytesRead));
       callback.onFailure(streamId, re);
       deactivateStream();
       throw re;

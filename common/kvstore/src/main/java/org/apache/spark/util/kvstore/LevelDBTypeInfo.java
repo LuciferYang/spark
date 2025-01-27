@@ -485,7 +485,7 @@ class LevelDBTypeInfo {
         } else if (value instanceof Byte) {
           bytes = Byte.SIZE;
         } else {
-          throw new IllegalArgumentException(String.format("Type %s not allowed as key.",
+          throw new IllegalArgumentException("Type %s not allowed as key.".formatted(
             value.getClass().getName()));
         }
 

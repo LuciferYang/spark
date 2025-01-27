@@ -154,7 +154,7 @@ public class LevelDBTypeInfoSuite {
   }
 
   private void assertBefore(String str1, String str2) {
-    assertTrue(str1.compareTo(str2) < 0, String.format("%s < %s failed", str1, str2));
+    assertTrue(str1.compareTo(str2) < 0, "%s < %s failed".formatted(str1, str2));
   }
 
   private void assertSame(byte[] key1, byte[] key2) {

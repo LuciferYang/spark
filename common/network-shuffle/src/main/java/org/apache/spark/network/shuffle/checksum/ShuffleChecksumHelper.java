@@ -83,7 +83,7 @@ public class ShuffleChecksumHelper {
 
   public static String getChecksumFileName(String blockName, String algorithm) {
     // append the shuffle checksum algorithm as the file extension
-    return String.format("%s.%s", blockName, algorithm);
+    return "%s.%s".formatted(blockName, algorithm);
   }
 
   private static long readChecksumByReduceId(File checksumFile, int reduceId) throws IOException {

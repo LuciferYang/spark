@@ -111,7 +111,7 @@ public class CommandBuilderUtilsSuite {
 
   private static void testOpt(String opts, List<String> expected) {
     assertEquals(expected, parseOptionString(opts),
-      String.format("test string failed to parse: [[ %s ]]", opts));
+      "test string failed to parse: [[ %s ]]".formatted(opts));
   }
 
   private static void testInvalidOpt(String opts) {

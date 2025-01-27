@@ -213,7 +213,7 @@ class SparkSubmitCommandBuilder extends AbstractCommandBuilder {
 
     for (Map.Entry<String, String> e : conf.entrySet()) {
       args.add(parser.CONF);
-      args.add(String.format("%s=%s", e.getKey(), e.getValue()));
+      args.add("%s=%s".formatted(e.getKey(), e.getValue()));
     }
 
     if (propertiesFile != null) {
@@ -344,8 +344,9 @@ class SparkSubmitCommandBuilder extends AbstractCommandBuilder {
     // the pyspark command line, then run it using spark-submit.
     if (!appArgs.isEmpty() && appArgs.get(0).endsWith(".py")) {
       System.err.println(
-        "Running python applications through 'pyspark' is not supported as of Spark 2.0.\n" +
-        "Use ./bin/spark-submit <python file>");
+        """
+        Running python applications through 'pyspark' is not supported as of Spark 2.0.
+        Use ./bin/spark-submit <python file>""");
       System.exit(-1);
     }
 
@@ -396,8 +397,9 @@ class SparkSubmitCommandBuilder extends AbstractCommandBuilder {
   private List<String> buildSparkRCommand(Map<String, String> env) throws IOException {
     if (!appArgs.isEmpty() && (appArgs.get(0).endsWith(".R") || appArgs.get(0).endsWith(".r"))) {
       System.err.println(
-        "Running R applications through 'sparkR' is not supported as of Spark 2.0.\n" +
-        "Use ./bin/spark-submit <R file>");
+        """
+        Running R applications through 'sparkR' is not supported as of Spark 2.0.
+        Use ./bin/spark-submit <R file>""");
       System.exit(-1);
     }
     // When launching the SparkR shell, store the spark-submit arguments in the SPARKR_SUBMIT_ARGS
@@ -479,7 +481,7 @@ class SparkSubmitCommandBuilder extends AbstractCommandBuilder {
       jarsDir = new File(sparkHome, "examples/jars");
     } else {
       jarsDir = new File(sparkHome,
-        String.format("examples/target/scala-%s/jars", getScalaVersion()));
+        "examples/target/scala-%s/jars".formatted(getScalaVersion()));
     }
 
     boolean foundDir = jarsDir.isDirectory();

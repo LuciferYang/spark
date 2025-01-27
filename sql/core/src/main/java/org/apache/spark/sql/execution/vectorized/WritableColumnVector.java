@@ -720,11 +720,11 @@ public abstract class WritableColumnVector extends ColumnVector {
    * or Optional.empty() otherwise.
    */
   public Optional<Integer> appendObjects(int length, Object value) {
-    if (value instanceof Boolean) {
-      return Optional.of(appendBooleans(length, (Boolean) value));
+    if (value instanceof Boolean boolean1) {
+      return Optional.of(appendBooleans(length, boolean1));
     }
-    if (value instanceof Byte) {
-      return Optional.of(appendBytes(length, (Byte) value));
+    if (value instanceof Byte byte1) {
+      return Optional.of(appendBytes(length, byte1));
     }
     if (value instanceof Decimal decimal) {
       long unscaled = decimal.toUnscaledLong();
@@ -742,20 +742,20 @@ public abstract class WritableColumnVector extends ColumnVector {
         return Optional.of(result);
       }
     }
-    if (value instanceof Double) {
-      return Optional.of(appendDoubles(length, (Double) value));
+    if (value instanceof Double double1) {
+      return Optional.of(appendDoubles(length, double1));
     }
-    if (value instanceof Float) {
-      return Optional.of(appendFloats(length, (Float) value));
+    if (value instanceof Float float1) {
+      return Optional.of(appendFloats(length, float1));
     }
-    if (value instanceof Integer) {
-      return Optional.of(appendInts(length, (Integer) value));
+    if (value instanceof Integer integer) {
+      return Optional.of(appendInts(length, integer));
     }
-    if (value instanceof Long) {
-      return Optional.of(appendLongs(length, (Long) value));
+    if (value instanceof Long long1) {
+      return Optional.of(appendLongs(length, long1));
     }
-    if (value instanceof Short) {
-      return Optional.of(appendShorts(length, (Short) value));
+    if (value instanceof Short short1) {
+      return Optional.of(appendShorts(length, short1));
     }
     if (value instanceof UTF8String utf8) {
       byte[] bytes = utf8.getBytes();
@@ -965,8 +965,8 @@ public abstract class WritableColumnVector extends ColumnVector {
     if (isArray()) {
       DataType childType;
       int childCapacity = capacity;
-      if (type instanceof ArrayType) {
-        childType = ((ArrayType)type).elementType();
+      if (type instanceof ArrayType arrayType) {
+        childType = arrayType.elementType();
       } else {
         childType = DataTypes.ByteType;
         childCapacity *= DEFAULT_ARRAY_LENGTH;

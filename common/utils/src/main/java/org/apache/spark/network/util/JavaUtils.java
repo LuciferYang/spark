@@ -423,7 +423,7 @@ public class JavaUtils {
     int expected = dst.remaining();
     while (dst.hasRemaining()) {
       if (channel.read(dst) < 0) {
-        throw new EOFException(String.format("Not enough bytes in channel (expected %d).",
+        throw new EOFException("Not enough bytes in channel (expected %d).".formatted(
           expected));
       }
     }

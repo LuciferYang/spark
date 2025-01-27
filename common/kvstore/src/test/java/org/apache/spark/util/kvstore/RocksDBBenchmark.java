@@ -128,7 +128,7 @@ public class RocksDBBenchmark {
   }
 
   private static String toMs(double nanos) {
-    return String.format("%.3f", nanos / 1000 / 1000);
+    return "%.3f".formatted(nanos / 1000 / 1000);
   }
 
   @Test

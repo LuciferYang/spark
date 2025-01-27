@@ -525,7 +525,7 @@ public final class CollationSupport {
       }
     }
     public static String genCode(final String srcString) {
-      return String.format("CollationSupport.StringTrim.execBinary(%s)", srcString);
+      return "CollationSupport.StringTrim.execBinary(%s)".formatted(srcString);
     }
     public static String genCode(
         final String srcString,
@@ -587,7 +587,7 @@ public final class CollationSupport {
       }
     }
     public static String genCode(final String srcString) {
-      return String.format("CollationSupport.StringTrimLeft.execBinary(%s)", srcString);
+      return "CollationSupport.StringTrimLeft.execBinary(%s)".formatted(srcString);
     }
     public static String genCode(
         final String srcString,
@@ -644,7 +644,7 @@ public final class CollationSupport {
       }
     }
     public static String genCode(final String srcString) {
-      return String.format("CollationSupport.StringTrimRight.execBinary(%s)", srcString);
+      return "CollationSupport.StringTrimRight.execBinary(%s)".formatted(srcString);
     }
     public static String genCode(
         final String srcString,

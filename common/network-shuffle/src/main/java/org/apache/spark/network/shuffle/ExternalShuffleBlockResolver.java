@@ -194,7 +194,7 @@ public class ExternalShuffleBlockResolver {
     ExecutorShuffleInfo executor = executors.get(new AppExecId(appId, execId));
     if (executor == null) {
       throw new RuntimeException(
-        String.format("Executor is not registered (appId=%s, execId=%s)", appId, execId));
+        "Executor is not registered (appId=%s, execId=%s)".formatted(appId, execId));
     }
     return getSortBasedShuffleBlockData(executor, shuffleId, mapId, startReduceId, endReduceId);
   }
@@ -207,7 +207,7 @@ public class ExternalShuffleBlockResolver {
     ExecutorShuffleInfo executor = executors.get(new AppExecId(appId, execId));
     if (executor == null) {
       throw new RuntimeException(
-        String.format("Executor is not registered (appId=%s, execId=%s)", appId, execId));
+        "Executor is not registered (appId=%s, execId=%s)".formatted(appId, execId));
     }
     return getDiskPersistedRddBlockData(executor, rddId, splitIndex);
   }
@@ -374,7 +374,7 @@ public class ExternalShuffleBlockResolver {
     ExecutorShuffleInfo executor = executors.get(new AppExecId(appId, execId));
     if (executor == null) {
       throw new RuntimeException(
-        String.format("Executor is not registered (appId=%s, execId=%s)", appId, execId));
+        "Executor is not registered (appId=%s, execId=%s)".formatted(appId, execId));
     }
     int numRemovedBlocks = 0;
     for (String blockId : blockIds) {
@@ -396,7 +396,7 @@ public class ExternalShuffleBlockResolver {
         ExecutorShuffleInfo info = executors.get(new AppExecId(appId, exec));
         if (info == null) {
           throw new RuntimeException(
-            String.format("Executor is not registered (appId=%s, execId=%s)", appId, exec));
+            "Executor is not registered (appId=%s, execId=%s)".formatted(appId, exec));
         }
         return Pair.of(exec, info.localDirs);
       })

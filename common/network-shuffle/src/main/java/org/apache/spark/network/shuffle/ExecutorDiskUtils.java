@@ -32,7 +32,7 @@ public class ExecutorDiskUtils {
     String localDir = localDirs[hash % localDirs.length];
     int subDirId = (hash / localDirs.length) % subDirsPerLocalDir;
     final String notNormalizedPath =
-      localDir + File.separator + String.format("%02x", subDirId) + File.separator + filename;
+      localDir + File.separator + "%02x".formatted(subDirId) + File.separator + filename;
     // Interning the normalized path as according to measurements, in some scenarios such
     // duplicate strings may waste a lot of memory (~ 10% of the heap).
     // Unfortunately, we cannot just call the normalization code that java.io.File

@@ -1392,8 +1392,8 @@ public class ParquetVectorUpdaterFactory {
       super(sparkType);
       LogicalTypeAnnotation typeAnnotation =
         descriptor.getPrimitiveType().getLogicalTypeAnnotation();
-      if (typeAnnotation instanceof DecimalLogicalTypeAnnotation) {
-        this.parquetScale = ((DecimalLogicalTypeAnnotation) typeAnnotation).getScale();
+      if (typeAnnotation instanceof DecimalLogicalTypeAnnotation annotation) {
+        this.parquetScale = annotation.getScale();
       } else {
         this.parquetScale = 0;
       }
@@ -1432,8 +1432,8 @@ public class ParquetVectorUpdaterFactory {
       super(sparkType);
       LogicalTypeAnnotation typeAnnotation =
         descriptor.getPrimitiveType().getLogicalTypeAnnotation();
-      if (typeAnnotation instanceof DecimalLogicalTypeAnnotation) {
-        this.parquetScale = ((DecimalLogicalTypeAnnotation) typeAnnotation).getScale();
+      if (typeAnnotation instanceof DecimalLogicalTypeAnnotation annotation) {
+        this.parquetScale = annotation.getScale();
       } else {
         this.parquetScale = 0;
       }
@@ -1643,8 +1643,7 @@ private static class FixedLenByteArrayToDecimalUpdater extends DecimalUpdater {
   private static boolean isDecimalTypeMatched(ColumnDescriptor descriptor, DataType dt) {
     DecimalType requestedType = (DecimalType) dt;
     LogicalTypeAnnotation typeAnnotation = descriptor.getPrimitiveType().getLogicalTypeAnnotation();
-    if (typeAnnotation instanceof DecimalLogicalTypeAnnotation) {
-      DecimalLogicalTypeAnnotation parquetType = (DecimalLogicalTypeAnnotation) typeAnnotation;
+    if (typeAnnotation instanceof DecimalLogicalTypeAnnotation parquetType) {
       // If the required scale is larger than or equal to the physical decimal scale in the Parquet
       // metadata, we can upscale the value as long as the precision also increases by as much so
       // that there is no loss of precision.
@@ -1672,8 +1671,7 @@ private static class FixedLenByteArrayToDecimalUpdater extends DecimalUpdater {
   private static boolean isSameDecimalScale(ColumnDescriptor descriptor, DataType dt) {
     DecimalType d = (DecimalType) dt;
     LogicalTypeAnnotation typeAnnotation = descriptor.getPrimitiveType().getLogicalTypeAnnotation();
-    if (typeAnnotation instanceof DecimalLogicalTypeAnnotation) {
-      DecimalLogicalTypeAnnotation decimalType = (DecimalLogicalTypeAnnotation) typeAnnotation;
+    if (typeAnnotation instanceof DecimalLogicalTypeAnnotation decimalType) {
       return decimalType.getScale() == d.scale();
     } else if (typeAnnotation == null || isSignedIntAnnotation(typeAnnotation)) {
       // Consider signed integers (which may be un-annotated) as having scale 0.

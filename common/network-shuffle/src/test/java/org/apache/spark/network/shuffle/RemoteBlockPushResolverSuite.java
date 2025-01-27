@@ -29,7 +29,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -546,7 +545,7 @@ public class RemoteBlockPushResolverSuite {
     // deleted.
     deleted.acquire();
     for (String mergeDir : mergeDirs) {
-      Assertions.assertFalse(Files.exists(Paths.get(mergeDir)));
+      Assertions.assertFalse(Files.exists(Path.of(mergeDir)));
     }
   }
 

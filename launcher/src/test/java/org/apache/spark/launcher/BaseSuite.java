@@ -81,7 +81,7 @@ class BaseSuite {
         return;
       } catch (Throwable t) {
         if (System.nanoTime() >= deadline) {
-          String msg = String.format("Failed check after %d tries: %s.", count, t.getMessage());
+          String msg = "Failed check after %d tries: %s.".formatted(count, t.getMessage());
           throw new IllegalStateException(msg, t);
         }
         Thread.sleep(period.toMillis());

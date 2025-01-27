@@ -192,8 +192,8 @@ public final class ColumnarRow extends InternalRow {
       return getLong(ordinal);
     } else if (dataType instanceof ArrayType) {
       return getArray(ordinal);
-    } else if (dataType instanceof StructType) {
-      return getStruct(ordinal, ((StructType)dataType).fields().length);
+    } else if (dataType instanceof StructType type) {
+      return getStruct(ordinal, type.fields().length);
     } else if (dataType instanceof MapType) {
       return getMap(ordinal);
     } else if (dataType instanceof VariantType) {

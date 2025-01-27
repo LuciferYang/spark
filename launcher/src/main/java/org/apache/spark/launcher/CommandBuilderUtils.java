@@ -221,21 +221,21 @@ class CommandBuilderUtils {
   /** Throws IllegalArgumentException if the given object is null. */
   static void checkNotNull(Object o, String arg) {
     if (o == null) {
-      throw new IllegalArgumentException(String.format("'%s' must not be null.", arg));
+      throw new IllegalArgumentException("'%s' must not be null.".formatted(arg));
     }
   }
 
   /** Throws IllegalArgumentException with the given message if the check is false. */
   static void checkArgument(boolean check, String msg, Object... args) {
     if (!check) {
-      throw new IllegalArgumentException(String.format(msg, args));
+      throw new IllegalArgumentException(msg.formatted(args));
     }
   }
 
   /** Throws IllegalStateException with the given message if the check is false. */
   static void checkState(boolean check, String msg, Object... args) {
     if (!check) {
-      throw new IllegalStateException(String.format(msg, args));
+      throw new IllegalStateException(msg.formatted(args));
     }
   }
 
@@ -323,7 +323,7 @@ class CommandBuilderUtils {
     // TODO: change to the correct directory once the assembly build is changed.
     File libdir = new File(sparkHome, "jars");
     if (!libdir.isDirectory()) {
-      libdir = new File(sparkHome, String.format("assembly/target/scala-%s/jars", scalaVersion));
+      libdir = new File(sparkHome, "assembly/target/scala-%s/jars".formatted(scalaVersion));
       if (!libdir.isDirectory()) {
         checkState(!failIfNotFound,
           "Library directory '%s' does not exist; make sure Spark is built.",
@@ -348,7 +348,7 @@ class CommandBuilderUtils {
   static String redact(String arg) {
     Matcher m = keyValuePattern.matcher(arg);
     if (m.find() && redactPattern.matcher(m.group(1)).find()) {
-      return String.format("-D%s=%s", m.group(1), "*********(redacted)");
+      return "-D%s=%s".formatted(m.group(1), "*********(redacted)");
     } else {
       return arg;
     }

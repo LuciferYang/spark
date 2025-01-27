@@ -89,14 +89,11 @@ public class OneForOneStreamManager extends StreamManager {
   public ManagedBuffer getChunk(long streamId, int chunkIndex) {
     StreamState state = streams.get(streamId);
     if (state == null) {
-      throw new IllegalStateException(String.format(
-        "Requested chunk not available since streamId %s is closed", streamId));
+      throw new IllegalStateException("Requested chunk not available since streamId %s is closed".formatted(streamId));
     } else if (chunkIndex != state.curChunk) {
-      throw new IllegalStateException(String.format(
-        "Received out-of-order chunk index %s (expected %s)", chunkIndex, state.curChunk));
+      throw new IllegalStateException("Received out-of-order chunk index %s (expected %s)".formatted(chunkIndex, state.curChunk));
     } else if (!state.buffers.hasNext()) {
-      throw new IllegalStateException(String.format(
-        "Requested chunk index beyond end %s", chunkIndex));
+      throw new IllegalStateException("Requested chunk index beyond end %s".formatted(chunkIndex));
     }
     state.curChunk += 1;
     ManagedBuffer nextChunk = state.buffers.next();
@@ -116,7 +113,7 @@ public class OneForOneStreamManager extends StreamManager {
   }
 
   public static String genStreamChunkId(long streamId, int chunkId) {
-    return String.format("%d_%d", streamId, chunkId);
+    return "%d_%d".formatted(streamId, chunkId);
   }
 
   // Parse streamChunkId to be stream id and chunk id. This is used when fetch remote chunk as a
@@ -169,8 +166,7 @@ public class OneForOneStreamManager extends StreamManager {
       StreamState state = streams.get(streamId);
       Preconditions.checkArgument(state != null, "Unknown stream ID.");
       if (!client.getClientId().equals(state.appId)) {
-        throw new SecurityException(String.format(
-          "Client %s not authorized to read stream %d (app %s).",
+        throw new SecurityException("Client %s not authorized to read stream %d (app %s).".formatted(
           client.getClientId(),
           streamId,
           state.appId));

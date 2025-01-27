@@ -84,7 +84,7 @@ public class SparkSaslServer implements SaslEncryptionBackend {
     // Sasl.QOP is a comma-separated list of supported values. The value that allows encryption
     // is listed first since it's preferred over the non-encrypted one (if the client also
     // lists both in the request).
-    String qop = alwaysEncrypt ? QOP_AUTH_CONF : String.format("%s,%s", QOP_AUTH_CONF, QOP_AUTH);
+    String qop = alwaysEncrypt ? QOP_AUTH_CONF : "%s,%s".formatted(QOP_AUTH_CONF, QOP_AUTH);
     Map<String, String> saslProps = ImmutableMap.<String, String>builder()
       .put(Sasl.SERVER_AUTH, "true")
       .put(Sasl.QOP, qop)

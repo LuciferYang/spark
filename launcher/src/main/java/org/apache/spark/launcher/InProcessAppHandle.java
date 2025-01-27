@@ -82,7 +82,7 @@ class InProcessAppHandle extends AbstractAppHandle {
       dispose();
     });
 
-    app.setName(String.format(THREAD_NAME_FMT, THREAD_IDS.incrementAndGet(), appName));
+    app.setName(THREAD_NAME_FMT.formatted(THREAD_IDS.incrementAndGet(), appName));
     app.start();
   }
 

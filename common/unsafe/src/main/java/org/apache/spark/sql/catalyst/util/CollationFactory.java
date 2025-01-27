@@ -77,7 +77,7 @@ public final class CollationFactory {
      * only the statistics do.
      */
     public String toStringWithoutVersion() {
-      return String.format("%s.%s", provider, name);
+      return "%s.%s".formatted(provider, name);
     }
 
     public String getProvider() {
@@ -786,7 +786,7 @@ public final class CollationFactory {
       /**
        * ICU library version.
        */
-      private static final String ICU_VERSION = String.format("%d.%d",
+      private static final String ICU_VERSION = "%d.%d".formatted(
         VersionInfo.ICU_VERSION.getMajor(),
         VersionInfo.ICU_VERSION.getMinor());
 
@@ -1293,7 +1293,7 @@ public final class CollationFactory {
         Collation.CollationSpec.getDefinitionOrigin(collationId);
     // Currently only predefined collations are supported.
     assert definitionOrigin == Collation.CollationSpec.DefinitionOrigin.PREDEFINED;
-    return String.format("%s.%s.%s", CATALOG, SCHEMA,
+    return "%s.%s.%s".formatted(CATALOG, SCHEMA,
       Collation.CollationSpec.fetchCollation(collationId).collationName);
   }
 

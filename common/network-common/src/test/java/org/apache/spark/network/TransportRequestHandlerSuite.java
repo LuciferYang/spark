@@ -72,14 +72,14 @@ public class TransportRequestHandlerSuite {
     TransportRequestHandler requestHandler = new TransportRequestHandler(channel, reverseClient,
       rpcHandler, 2L, null);
 
-    RequestMessage request0 = new StreamRequest(String.format("%d_%d", streamId, 0));
+    RequestMessage request0 = new StreamRequest("%d_%d".formatted(streamId, 0));
     requestHandler.handle(request0);
     Assertions.assertEquals(1, responseAndPromisePairs.size());
     Assertions.assertTrue(responseAndPromisePairs.get(0).getLeft() instanceof StreamResponse);
     Assertions.assertEquals(managedBuffers.get(0),
       ((StreamResponse) (responseAndPromisePairs.get(0).getLeft())).body());
 
-    RequestMessage request1 = new StreamRequest(String.format("%d_%d", streamId, 1));
+    RequestMessage request1 = new StreamRequest("%d_%d".formatted(streamId, 1));
     requestHandler.handle(request1);
     Assertions.assertEquals(2, responseAndPromisePairs.size());
     Assertions.assertTrue(responseAndPromisePairs.get(1).getLeft() instanceof StreamResponse);
@@ -89,14 +89,14 @@ public class TransportRequestHandlerSuite {
     // Finish flushing the response for request0.
     responseAndPromisePairs.get(0).getRight().finish(true);
 
-    StreamRequest request2 = new StreamRequest(String.format("%d_%d", streamId, 2));
+    StreamRequest request2 = new StreamRequest("%d_%d".formatted(streamId, 2));
     requestHandler.handle(request2);
     Assertions.assertEquals(3, responseAndPromisePairs.size());
     Assertions.assertTrue(responseAndPromisePairs.get(2).getLeft() instanceof StreamFailure);
-    Assertions.assertEquals(String.format("Stream '%s' was not found.", request2.streamId),
+    Assertions.assertEquals("Stream '%s' was not found.".formatted(request2.streamId),
         ((StreamFailure) (responseAndPromisePairs.get(2).getLeft())).error);
 
-    RequestMessage request3 = new StreamRequest(String.format("%d_%d", streamId, 3));
+    RequestMessage request3 = new StreamRequest("%d_%d".formatted(streamId, 3));
     requestHandler.handle(request3);
     Assertions.assertEquals(4, responseAndPromisePairs.size());
     Assertions.assertTrue(responseAndPromisePairs.get(3).getLeft() instanceof StreamResponse);
@@ -105,7 +105,7 @@ public class TransportRequestHandlerSuite {
 
     // Request4 will trigger the close of channel, because the number of max chunks being
     // transferred is 2;
-    RequestMessage request4 = new StreamRequest(String.format("%d_%d", streamId, 4));
+    RequestMessage request4 = new StreamRequest("%d_%d".formatted(streamId, 4));
     requestHandler.handle(request4);
     verify(channel, times(1)).close();
     Assertions.assertEquals(4, responseAndPromisePairs.size());

@@ -23,6 +23,7 @@ import org.apache.spark.sql.SparkSession;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Computes an approximation to pi
@@ -48,8 +49,8 @@ public final class JavaSparkPi {
     JavaRDD<Integer> dataSet = jsc.parallelize(l, slices);
 
     int count = dataSet.map(integer -> {
-      double x = Math.random() * 2 - 1;
-      double y = Math.random() * 2 - 1;
+      double x = ThreadLocalRandom.current().nextDouble() * 2 - 1;
+      double y = ThreadLocalRandom.current().nextDouble() * 2 - 1;
       return (x * x + y * y <= 1) ? 1 : 0;
     }).reduce((integer, integer2) -> integer + integer2);
 
