@@ -98,5 +98,4 @@ class EncoderErrorMessageSuite extends SparkFunSuite {
     )
   }
 
-  private def clsName[T : ClassTag]: String = implicitly[ClassTag[T]].runtimeClass.getName
 }

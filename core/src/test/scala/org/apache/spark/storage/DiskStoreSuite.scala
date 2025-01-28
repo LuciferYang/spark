@@ -65,12 +65,6 @@ class DiskStoreSuite extends SparkFunSuite {
     assert(mapped.isInstanceOf[MappedByteBuffer],
       "Expected MappedByteBuffer for mapped read")
 
-    def arrayFromByteBuffer(in: ByteBuffer): Array[Byte] = {
-      val array = new Array[Byte](in.remaining())
-      in.get(array)
-      array
-    }
-
     assert(Arrays.equals(new ChunkedByteBuffer(mapped).toArray, bytes))
     assert(Arrays.equals(new ChunkedByteBuffer(notMapped).toArray, bytes))
   }

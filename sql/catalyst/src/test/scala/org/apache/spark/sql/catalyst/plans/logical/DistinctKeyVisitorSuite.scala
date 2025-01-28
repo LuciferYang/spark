@@ -47,9 +47,6 @@ class DistinctKeyVisitorSuite extends PlanTest {
     assert(plan.analyze.distinctKeys === distinctKeys)
   }
 
-  implicit private def productEncoder[T <: Product : TypeTag]: ExpressionEncoder[T] =
-    ExpressionEncoder[T]()
-
   test("Aggregate's distinct attributes") {
     checkDistinctAttributes(t1.groupBy($"a", $"b")($"a", $"b", 1), Set(ExpressionSet(Seq(a, b))))
     checkDistinctAttributes(t1.groupBy($"a")($"a"), Set(ExpressionSet(Seq(a))))

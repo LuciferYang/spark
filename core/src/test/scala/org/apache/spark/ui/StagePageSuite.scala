@@ -114,49 +114,4 @@ class StagePageSuite extends SparkFunSuite with LocalSparkContext {
     }
   }
 
-  /**
-   * Render a stage page started with the given conf and return the HTML.
-   * This also runs a dummy stage to populate the page with useful content.
-   */
-  private def renderStagePage(): Seq[Node] = {
-    val conf = new SparkConf(false).set(LIVE_ENTITY_UPDATE_PERIOD, 0L)
-    val statusStore = AppStatusStore.createLiveStore(conf)
-    val listener = statusStore.listener.get
-
-    try {
-      val tab = mock(classOf[StagesTab], RETURNS_SMART_NULLS)
-      when(tab.store).thenReturn(statusStore)
-
-      val request = mock(classOf[HttpServletRequest])
-      when(tab.conf).thenReturn(conf)
-      when(tab.appName).thenReturn("testing")
-      when(tab.headerTabs).thenReturn(Seq.empty)
-      when(request.getParameter("id")).thenReturn("0")
-      when(request.getParameter("attempt")).thenReturn("0")
-      val page = new StagePage(tab, statusStore)
-
-      // Simulate a stage in job progress listener
-      val stageInfo = new StageInfo(0, 0, "dummy", 1, Seq.empty, Seq.empty, "details",
-        resourceProfileId = ResourceProfile.DEFAULT_RESOURCE_PROFILE_ID)
-      // Simulate two tasks to test PEAK_EXECUTION_MEMORY correctness
-      (1 to 2).foreach {
-        taskId =>
-          val taskInfo = new TaskInfo(taskId, taskId, 0, taskId, 0,
-            "0", "localhost", TaskLocality.ANY, false)
-          listener.onStageSubmitted(SparkListenerStageSubmitted(stageInfo))
-          listener.onTaskStart(SparkListenerTaskStart(0, 0, taskInfo))
-          taskInfo.markFinished(TaskState.FINISHED, System.currentTimeMillis())
-          val taskMetrics = TaskMetrics.empty
-          val executorMetrics = new ExecutorMetrics
-          taskMetrics.incPeakExecutionMemory(peakExecutionMemory)
-          listener.onTaskEnd(SparkListenerTaskEnd(0, 0, "result", Success, taskInfo,
-            executorMetrics, taskMetrics))
-      }
-      listener.onStageCompleted(SparkListenerStageCompleted(stageInfo))
-      page.render(request)
-    } finally {
-      statusStore.close()
-    }
-  }
-
 }

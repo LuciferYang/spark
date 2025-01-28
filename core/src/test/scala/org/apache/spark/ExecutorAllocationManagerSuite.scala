@@ -1950,12 +1950,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     nmap(rp.id)
   }
 
-  private def updateAndSyncNumExecutorsTarget(
-      manager: ExecutorAllocationManager,
-      now: Long): Unit = {
-    manager invokePrivate _updateAndSyncNumExecutorsTarget(now)
-  }
-
   private def numExecutorsTargetForDefaultProfileId(manager: ExecutorAllocationManager): Int = {
     numExecutorsTarget(manager, defaultProfile.id)
   }
@@ -2033,10 +2027,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     manager invokePrivate _onSchedulerQueueEmpty()
   }
 
-  private def onSpeculativeTaskSubmitted(manager: ExecutorAllocationManager, id: String) : Unit = {
-    manager invokePrivate _onSpeculativeTaskSubmitted(id)
-  }
-
   private def localityAwareTasksForDefaultProfile(manager: ExecutorAllocationManager): Int = {
     val localMap = manager invokePrivate _localityAwareTasksPerResourceProfileId()
     localMap(defaultProfile.id)
@@ -2052,7 +2042,4 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     rpIdToHostLocal(defaultProfile.id)
   }
 
-  private def getResourceProfileIdOfExecutor(manager: ExecutorAllocationManager): Int = {
-    defaultProfile.id
-  }
 }
