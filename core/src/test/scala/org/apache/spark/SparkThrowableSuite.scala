@@ -37,8 +37,8 @@ import org.apache.spark.util.Utils
 
 /**
  * Test suite for [[SparkThrowable]].
+ * To regenerate the error class file, run:
  * {{{
- *   To regenerate the error class file, run:
  *   SPARK_GENERATE_GOLDEN_FILES=1 build/sbt \
  *     "core/testOnly *SparkThrowableSuite -- -t \"Error conditions are correctly formatted\""
  * }}}
