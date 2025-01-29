@@ -18,11 +18,9 @@
 package org.apache.spark.sql.catalyst.plans.logical
 
 import scala.collection.mutable
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExpressionSet, UnspecifiedFrame}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.types.IntegerType
