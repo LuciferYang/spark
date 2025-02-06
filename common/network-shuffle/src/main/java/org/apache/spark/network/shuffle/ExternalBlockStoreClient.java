@@ -58,6 +58,7 @@ public class ExternalBlockStoreClient extends BlockStoreClient {
   // application attempts. This variable is derived from the String typed appAttemptId. If no
   // appAttemptId is set, the default comparableAppAttemptId is -1.
   private int comparableAppAttemptId = -1;
+  private TransportContext context;
 
   /**
    * Creates an external shuffle client, with SASL optionally enabled. If SASL is not enabled,
@@ -80,7 +81,7 @@ public class ExternalBlockStoreClient extends BlockStoreClient {
    */
   public void init(String appId) {
     this.appId = appId;
-    TransportContext context = new TransportContext(
+    context = new TransportContext(
       transportConf, new NoOpRpcHandler(), true, true);
     List<TransportClientBootstrap> bootstraps = Lists.newArrayList();
     if (authEnabled) {
@@ -345,6 +346,10 @@ public class ExternalBlockStoreClient extends BlockStoreClient {
     if (clientFactory != null) {
       clientFactory.close();
       clientFactory = null;
+    }
+    if (context != null) {
+      context.close();
+      context = null;
     }
   }
 }
