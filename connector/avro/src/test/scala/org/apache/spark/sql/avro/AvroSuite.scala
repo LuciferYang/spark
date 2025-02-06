@@ -74,7 +74,7 @@ abstract class AvroSuite
     spark.conf.set(SQLConf.FILES_MAX_PARTITION_BYTES.key, 1024)
   }
 
-  def checkReloadMatchesSaved(originalFile: String, newFile: String): Unit = {
+  def checkReloadMatchesSaved(newFile: String): Unit = {
     val originalEntries = spark.read.format("avro").load(testAvro).collect()
     val newEntries = spark.read.format("avro").load(newFile)
     checkAnswer(newEntries, originalEntries)
@@ -847,7 +847,7 @@ abstract class AvroSuite
     withTempPath { dir =>
       val avroDir = s"$dir/avro"
       spark.read.format("avro").load(testAvro).write.format("avro").save(avroDir)
-      checkReloadMatchesSaved(testAvro, avroDir)
+      checkReloadMatchesSaved(avroDir)
     }
   }
 
@@ -862,7 +862,7 @@ abstract class AvroSuite
       val avroDir = s"$tempDir/namedAvro"
       spark.read.format("avro").load(testAvro)
         .write.options(parameters).format("avro").save(avroDir)
-      checkReloadMatchesSaved(testAvro, avroDir)
+      checkReloadMatchesSaved(avroDir)
 
       // Look at raw file and make sure has namespace info
       val rawSaved = spark.sparkContext.textFile(avroDir)
@@ -2250,7 +2250,6 @@ abstract class AvroSuite
         Paths.get(new URI(episodesAvro)),
         Paths.get(dir.getCanonicalPath, "episodes"))
 
-      val hadoopConf = spark.sessionState.newHadoopConf()
       withSQLConf(AvroFileFormat.IgnoreFilesWithoutExtensionProperty -> "true") {
         val newDf = spark
           .read
@@ -2289,7 +2288,7 @@ abstract class AvroSuite
     }
   }
 
-  private def checkSchemaWithRecursiveLoop(avroSchema: String, recursiveFieldMaxDepth: Int):
+  private def checkSchemaWithRecursiveLoop(avroSchema: String):
     Unit = {
     val message = intercept[IncompatibleSchemaException] {
       SchemaConverters.toSqlType(new Schema.Parser().parse(avroSchema), false, "")
@@ -2310,7 +2309,7 @@ abstract class AvroSuite
           |    {"name": "next", "type": ["null", "LongList"]} // optional next element
           |  ]
           |}
-    """.stripMargin, recursiveFieldMaxDepth)
+    """.stripMargin)
 
       checkSchemaWithRecursiveLoop(
         """
@@ -2333,7 +2332,7 @@ abstract class AvroSuite
           |    }
           |  ]
           |}
-    """.stripMargin, recursiveFieldMaxDepth)
+    """.stripMargin)
 
       checkSchemaWithRecursiveLoop(
         """
@@ -2345,7 +2344,7 @@ abstract class AvroSuite
           |    {"name": "array", "type": {"type": "array", "items": "LongList"}}
           |  ]
           |}
-    """.stripMargin, recursiveFieldMaxDepth)
+    """.stripMargin)
 
       checkSchemaWithRecursiveLoop(
         """
@@ -2357,7 +2356,7 @@ abstract class AvroSuite
           |    {"name": "map", "type": {"type": "map", "values": "LongList"}}
           |  ]
           |}
-    """.stripMargin, recursiveFieldMaxDepth)
+    """.stripMargin)
     }
   }
 
