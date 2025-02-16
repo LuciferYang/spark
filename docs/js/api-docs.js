@@ -59,8 +59,6 @@ $(document).ready(function() {
       }
     });
   };
-  script.src = ('https:' == document.location.protocol ? 'https://' : 'http://') +
-                'cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js' +
-                '?config=TeX-AMS-MML_HTMLorMML';
+  script.src = '{{ rel_path_to_root }}js/vendor/MathJax-2.7.1.js?config=TeX-AMS-MML_HTMLorMML';
   document.getElementsByTagName('head')[0].appendChild(script);
 });
