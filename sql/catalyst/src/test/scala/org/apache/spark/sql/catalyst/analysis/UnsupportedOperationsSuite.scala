@@ -773,7 +773,6 @@ class UnsupportedOperationsSuite extends SparkFunSuite with SQLHelper {
       streamRelation.groupBy("a")(count("*")).groupBy()(count("*")), outputMode = Append)
 
     Seq(Inner, LeftOuter, RightOuter).foreach { joinType =>
-      val plan = streamRelation.join(streamRelation.groupBy("a")(count("*")), joinType = joinType)
       assertPassOnGlobalWatermarkLimit(
         s"$joinType join after streaming aggregation in Append mode",
         streamRelation.join(streamRelation.groupBy("a")(count("*")), joinType = joinType),

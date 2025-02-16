@@ -1694,7 +1694,6 @@ class TypeCoercionSuite extends TypeCoercionSuiteBase {
   }
 
   test("SPARK-31761: byte, short and int should be cast to long for IntegralDivide's datatype") {
-    val rules = Seq(FunctionArgumentConversion, Division, ImplicitTypeCasts)
     // Casts Byte to Long
     ruleTest(TypeCoercion.IntegralDivision, IntegralDivide(2.toByte, 1.toByte),
       IntegralDivide(Cast(2.toByte, LongType), Cast(1.toByte, LongType)))

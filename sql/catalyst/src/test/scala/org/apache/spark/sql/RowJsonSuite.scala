@@ -47,12 +47,12 @@ class RowJsonSuite extends SparkFunSuite {
   }
 
   // Nulls
-  private def testJsonNull(dt: DataType, expected: JValue): Unit = {
+  private def testJsonNull(dt: DataType): Unit = {
     testJson(null, dt, JNull)
   }
-  testJsonNull(IntegerType, JNull)
-  testJsonNull(FloatType, JNull)
-  testJsonNull(ArrayType(DoubleType, containsNull = true), JNull)
+  testJsonNull(IntegerType)
+  testJsonNull(FloatType)
+  testJsonNull(ArrayType(DoubleType, containsNull = true))
 
   // Primitives
   testJson(true, BooleanType, JBool(true))
