@@ -149,10 +149,7 @@ private[ui] class EnvironmentPage(
   private def propertyHeader = Seq("Name", "Value")
   private def classPathHeader = Seq("Resource", "Source")
   private def headerClasses = Seq("sorttable_alpha", "sorttable_alpha")
-  private def headerClassesNoSortValues = Seq("sorttable_numeric", "sorttable_nosort")
 
-  private def jvmRowDataPre(kv: (String, String)) =
-    <tr><td>{kv._1}</td><td><pre>{kv._2}</pre></td></tr>
   private def propertyRow(kv: (String, String)) = <tr><td>{kv._1}</td><td>{kv._2}</td></tr>
   private def classPathRow(data: (String, String)) = <tr><td>{data._1}</td><td>{data._2}</td></tr>
 }

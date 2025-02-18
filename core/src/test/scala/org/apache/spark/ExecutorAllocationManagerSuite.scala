@@ -1932,8 +1932,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     PrivateMethod[mutable.HashMap[Int, Int]](Symbol("numLocalityAwareTasksPerResourceProfileId"))
   private val _rpIdToHostToLocalTaskCount =
     PrivateMethod[Map[Int, Map[String, Int]]](Symbol("rpIdToHostToLocalTaskCount"))
-  private val _onSpeculativeTaskSubmitted =
-    PrivateMethod[Unit](Symbol("onSpeculativeTaskSubmitted"))
   private val _totalRunningTasksPerResourceProfile =
     PrivateMethod[Int](Symbol("totalRunningTasksPerResourceProfile"))
 
@@ -1948,12 +1946,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
       rp: ResourceProfile): Int = {
     val nmap = manager invokePrivate _numExecutorsToAddPerResourceProfileId()
     nmap(rp.id)
-  }
-
-  private def updateAndSyncNumExecutorsTarget(
-      manager: ExecutorAllocationManager,
-      now: Long): Unit = {
-    manager invokePrivate _updateAndSyncNumExecutorsTarget(now)
   }
 
   private def numExecutorsTargetForDefaultProfileId(manager: ExecutorAllocationManager): Int = {
@@ -2033,10 +2025,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     manager invokePrivate _onSchedulerQueueEmpty()
   }
 
-  private def onSpeculativeTaskSubmitted(manager: ExecutorAllocationManager, id: String) : Unit = {
-    manager invokePrivate _onSpeculativeTaskSubmitted(id)
-  }
-
   private def localityAwareTasksForDefaultProfile(manager: ExecutorAllocationManager): Int = {
     val localMap = manager invokePrivate _localityAwareTasksPerResourceProfileId()
     localMap(defaultProfile.id)
@@ -2052,7 +2040,4 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     rpIdToHostLocal(defaultProfile.id)
   }
 
-  private def getResourceProfileIdOfExecutor(manager: ExecutorAllocationManager): Int = {
-    defaultProfile.id
-  }
 }
