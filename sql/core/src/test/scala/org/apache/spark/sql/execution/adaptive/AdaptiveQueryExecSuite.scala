@@ -936,7 +936,13 @@ class AdaptiveQueryExecSuite
             joined.collect()
           }
           assert((Seq(error) ++ Option(error.getCause) ++ error.getSuppressed()).exists(
-            e => e.getMessage() != null && e.getMessage().contains("coalesce test error")))
+            e => if (e.getMessage() != null && e.getMessage().contains("coalesce test error")) {
+              true
+            } else {
+              // scalastyle:off
+              println(s"uncaught messsage: ${e.getMessage}, stack: ${e.getStackTrace.mkString("\n")}")
+              false
+            }))
 
           val adaptivePlan = joined.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec]
 
