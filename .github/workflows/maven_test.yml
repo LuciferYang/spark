@@ -126,6 +126,7 @@ jobs:
       HIVE_PROFILE: ${{ matrix.hive }}
       SPARK_LOCAL_IP: localhost
       GITHUB_PREV_SHA: ${{ github.event.before }}
+      PYSPARK_PYTHON: python3.11
     steps:
       - name: Checkout Spark repository
         uses: actions/checkout@v4
