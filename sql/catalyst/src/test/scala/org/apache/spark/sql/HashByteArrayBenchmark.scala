@@ -48,11 +48,22 @@ object HashByteArrayBenchmark extends BenchmarkBase {
     val benchmark = new Benchmark(
       "Hash byte arrays with length " + length, iters * numArrays.toLong, output = output)
     benchmark.addCase("Murmur3_x86_32") { _: Int =>
-      var sum = 0L
+      var sum = 0
       for (_ <- 0L until iters) {
         var i = 0
         while (i < numArrays) {
           sum += Murmur3_x86_32.hashUnsafeBytes(arrays(i), Platform.BYTE_ARRAY_OFFSET, length, 42)
+          i += 1
+        }
+      }
+    }
+
+    benchmark.addCase("xxHash 32-bit") { _: Int =>
+      var sum = 0
+      for (_ <- 0L until iters) {
+        var i = 0
+        while (i < numArrays) {
+          sum += Murmur3_x86_32.hashUnsafeBytes3(arrays(i), Platform.BYTE_ARRAY_OFFSET, length, 42)
           i += 1
         }
       }

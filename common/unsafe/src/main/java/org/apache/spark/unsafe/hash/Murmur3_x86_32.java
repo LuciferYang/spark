@@ -145,4 +145,98 @@ public final class Murmur3_x86_32 {
     h1 ^= h1 >>> 16;
     return h1;
   }
+
+  private static final int PRIME32_1 = 0x9E3779B1;
+  private static final int PRIME32_2 = 0x85EBCA77;
+  private static final int PRIME32_3 = 0xC2B2AE3D;
+  private static final int PRIME32_4 = 0x27D4EB2F;
+  private static final int PRIME32_5 = 0x165667B1;
+
+  public static int hashUnsafeBytes3(Object base, long offset, int length, int seed) {
+    int h32;
+    int remaining = length;
+    long ptr = offset;
+
+    // 预取内存（提示 CPU 提前加载数据到缓存）
+    if (remaining >= 64) {
+      long end = ptr + remaining;
+      for (long p = ptr; p < end; p += 64) {
+        Platform.loadFence();
+        Platform.getInt(base, p);
+      }
+    }
+
+    if (remaining >= 16) {
+      int v1 = seed + PRIME32_1 + PRIME32_2;
+      int v2 = seed + PRIME32_2;
+      int v3 = seed;
+      int v4 = seed - PRIME32_1;
+
+      // 每次处理 32 字节（8 个 int），手动展开循环
+      while (remaining >= 32) {
+        v1 = round(v1, getInt(base, ptr));
+        v2 = round(v2, getInt(base, ptr + 4));
+        v3 = round(v3, getInt(base, ptr + 8));
+        v4 = round(v4, getInt(base, ptr + 12));
+        v1 = round(v1, getInt(base, ptr + 16));
+        v2 = round(v2, getInt(base, ptr + 20));
+        v3 = round(v3, getInt(base, ptr + 24));
+        v4 = round(v4, getInt(base, ptr + 28));
+
+        ptr += 32;
+        remaining -= 32;
+      }
+
+      h32 = round(v1, 1) + round(v2, 7) + round(v3, 12) + round(v4, 18);
+    } else {
+      h32 = seed + PRIME32_5;
+    }
+
+    h32 += length;
+
+    // 合并处理剩余 4-byte 块（消除循环分支）
+    int remainingAligned = remaining & ~3;
+    if (remainingAligned >= 4) {
+      int blocks = remainingAligned / 4;
+      long endPtr = ptr + remainingAligned;
+      do {
+        h32 += getInt(base, ptr) * PRIME32_3;
+        h32 = round(h32, 17) * PRIME32_4;
+        ptr += 4;
+      } while (ptr < endPtr);
+      remaining -= remainingAligned;
+    }
+
+    // 合并处理尾部字节（避免逐字节循环）
+    if (remaining > 0) {
+      int k = 0;
+      switch (remaining) {
+        case 3: k ^= (Platform.getByte(base, ptr + 2) & 0xFF) << 16;
+        case 2: k ^= (Platform.getByte(base, ptr + 1) & 0xFF) << 8;
+        case 1: k ^= (Platform.getByte(base, ptr) & 0xFF);
+      }
+      h32 += k * PRIME32_5;
+      h32 = round(h32, 11) * PRIME32_1;
+    }
+
+    // Final mix（合并计算步骤）
+    h32 ^= h32 >>> 15;
+    h32 *= PRIME32_2;
+    h32 ^= h32 >>> 13;
+    h32 *= PRIME32_3;
+    h32 ^= h32 >>> 16;
+
+    return h32;
+  }
+
+  private static int round(int acc, int input) {
+    acc += input * PRIME32_2;
+    acc = (acc << 13) | (acc >>> 19);
+    return acc * PRIME32_1;
+  }
+
+  private static int getInt(Object base, long offset) {
+    int value = Platform.getInt(base, offset);
+    return isBigEndian ? Integer.reverseBytes(value) : value;
+  }
 }

@@ -120,6 +120,10 @@ public final class Platform {
     return _UNSAFE.getInt(object, offset);
   }
 
+  public static void loadFence() {
+    _UNSAFE.loadFence();
+  }
+
   public static void putInt(Object object, long offset, int value) {
     _UNSAFE.putInt(object, offset, value);
   }
