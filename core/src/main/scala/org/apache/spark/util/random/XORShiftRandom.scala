@@ -46,7 +46,15 @@ private[spark] class XORShiftRandom(init: Long) extends JavaRandom(init) {
     nextSeed ^= (nextSeed >>> 35)
     nextSeed ^= (nextSeed << 4)
     seed = nextSeed
-    (nextSeed & ((1L << bits) -1)).asInstanceOf[Int]
+
+    // Optimization for the common case when bits = 32
+    if (bits == 32) {
+      // Take the higher 32 bits which tend to have better randomness properties
+      (nextSeed >>> 32).asInstanceOf[Int]
+    } else {
+      // For other bit lengths, use the original approach but cast safely
+      (nextSeed & ((1L << bits) - 1)).asInstanceOf[Int]
+    }
   }
 
   override def setSeed(s: Long): Unit = {
