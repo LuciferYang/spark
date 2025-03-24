@@ -50,10 +50,10 @@ private[spark] class XORShiftRandom(init: Long) extends JavaRandom(init) {
     // Optimization for the common case when bits = 32
     if (bits == 32) {
       // Take the higher 32 bits which tend to have better randomness properties
-      (nextSeed >>> 32).asInstanceOf[Int]
+      (nextSeed >>> 32).toInt
     } else {
       // For other bit lengths, use the original approach but cast safely
-      (nextSeed & ((1L << bits) - 1)).asInstanceOf[Int]
+      (nextSeed & ((1L << bits) - 1)).toInt
     }
   }
 
