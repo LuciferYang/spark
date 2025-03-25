@@ -212,7 +212,11 @@ trait RemoteSparkSession extends BeforeAndAfterAll { self: Suite =>
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark = createSparkSession()
+    if (!IntegrationTestUtils.isAssemblyJarsDirExists) {
+      cancel("Skipping all tests because assembly jars directory does not exist.")
+    } else {
+      spark = createSparkSession()
+    }
   }
 
   override def afterAll(): Unit = {
