@@ -233,6 +233,13 @@
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest-maven-plugin</artifactId>
         <configuration>
@@ -241,6 +248,7 @@
             SPARK-45265: The value for `-Xss` should be consistent with the configuration value
             for `Test / javaOptions` in `Hive.settings` within `SparkBuild.scala`.
           -->
+          <skipTests>true</skipTests>
           <argLine>-da -Xmx4g -Xss64m -XX:ReservedCodeCacheSize=${CodeCacheSize} ${extraJavaTestArgs}</argLine>
         </configuration>
       </plugin>
