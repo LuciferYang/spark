@@ -1119,8 +1119,11 @@ private[spark] class BlockManager(
 
     // Because all the remote blocks are registered in driver, it is not necessary to ask
     // all the storage endpoints to get block status.
+    // scalastyle:off
+    println(s"Getting remote block $blockId from $blockManagerId")
     val locationsAndStatusOption = master.getLocationsAndStatus(blockId, blockManagerId.host)
     if (locationsAndStatusOption.isEmpty) {
+      println(s"Block $blockId is unknown by block manager master")
       logDebug(s"Block $blockId is unknown by block manager master")
       None
     } else {

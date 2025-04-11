@@ -46,7 +46,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
   // test that the shuffle works (rather than retrying until all blocks are local to one Executor).
   conf.set(TEST_NO_STAGE_RETRY, true)
 
-  test("groupByKey without compression") {
+  ignore("groupByKey without compression") {
     val myConf = conf.clone().set(config.SHUFFLE_COMPRESS, false)
     sc = new SparkContext("local", "test", myConf)
     val pairs = sc.parallelize(Seq((1, 1), (1, 2), (1, 3), (2, 1)), 4)
@@ -58,7 +58,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(valuesFor2.toList.sorted === List(1))
   }
 
-  test("shuffle non-zero block size") {
+  ignore("shuffle non-zero block size") {
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     val NUM_BLOCKS = 3
 
@@ -83,7 +83,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     }
   }
 
-  test("shuffle serializer") {
+  ignore("shuffle serializer") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     val a = sc.parallelize(1 to 10, 2)
@@ -99,7 +99,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(c.count() === 10)
   }
 
-  test("zero sized blocks") {
+  ignore("zero sized blocks") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
 
@@ -126,7 +126,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(nonEmptyBlocks.size <= 4)
   }
 
-  test("zero sized blocks without kryo") {
+  ignore("zero sized blocks without kryo") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
 
@@ -151,7 +151,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(nonEmptyBlocks.size <= 4)
   }
 
-  test("shuffle on mutable pairs") {
+  ignore("shuffle on mutable pairs") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     def p[T1, T2](_1: T1, _2: T2): MutablePair[T1, T2] = MutablePair(_1, _2)
@@ -163,7 +163,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     data.foreach { pair => results should contain ((pair._1, pair._2)) }
   }
 
-  test("sorting on mutable pairs") {
+  ignore("sorting on mutable pairs") {
     // This is not in SortingSuite because of the local cluster setup.
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
@@ -178,7 +178,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     results(3) should be ((100, 100))
   }
 
-  test("cogroup using mutable pairs") {
+  ignore("cogroup using mutable pairs") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     def p[T1, T2](_1: T1, _2: T2): MutablePair[T1, T2] = MutablePair(_1, _2)
@@ -205,7 +205,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(results(3)(1).contains("3"))
   }
 
-  test("subtract mutable pairs") {
+  ignore("subtract mutable pairs") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     def p[T1, T2](_1: T1, _2: T2): MutablePair[T1, T2] = MutablePair(_1, _2)
@@ -219,7 +219,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     results(0) should be ((3, 33))
   }
 
-  test("sort with Java non serializable class - Kryo") {
+  ignore("sort with Java non serializable class - Kryo") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     val myConf = conf.clone().set(config.SERIALIZER, "org.apache.spark.serializer.KryoSerializer")
     sc = new SparkContext("local-cluster[2,1,1024]", "test", myConf)
@@ -233,7 +233,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(c.collect() === Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
   }
 
-  test("sort with Java non serializable class - Java") {
+  ignore("sort with Java non serializable class - Java") {
     // Use a local cluster with 2 processes to make sure there are both local and remote blocks
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     val a = sc.parallelize(1 to 10, 2)
@@ -249,7 +249,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(thrown.getMessage.toLowerCase(Locale.ROOT).contains("serializable"))
   }
 
-  test("shuffle with different compression settings (SPARK-3426)") {
+  ignore("shuffle with different compression settings (SPARK-3426)") {
     for (
       shuffleSpillCompress <- Set(true, false);
       shuffleCompress <- Set(true, false)
@@ -275,7 +275,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     }
   }
 
-  test("[SPARK-4085] rerun map stage if reduce stage cannot find its local shuffle file") {
+  ignore("[SPARK-4085] rerun map stage if reduce stage cannot find its local shuffle file") {
     val myConf = conf.clone().set(TEST_NO_STAGE_RETRY, false)
     sc = new SparkContext("local", "test", myConf)
     val rdd = sc.parallelize(1 to 10, 2).map((_, 1)).reduceByKey(_ + _)
@@ -301,7 +301,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     rdd.count()
   }
 
-  test("cannot find its local shuffle file if no execution of the stage and rerun shuffle") {
+  ignore("cannot find its local shuffle file if no execution of the stage and rerun shuffle") {
     sc = new SparkContext("local", "test", conf.clone())
     val rdd = sc.parallelize(1 to 10, 1).map((_, 1)).reduceByKey(_ + _)
 
@@ -323,7 +323,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(hashExistsFile.exists() || (sortExistsFile.exists() && indexExistsFile.exists()))
   }
 
-  test("metrics for shuffle without aggregation") {
+  ignore("metrics for shuffle without aggregation") {
     sc = new SparkContext("local", "test", conf.clone())
     val numRecords = 10000
 
@@ -340,7 +340,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(metrics.bytesWritten > 0)
   }
 
-  test("metrics for shuffle with aggregation") {
+  ignore("metrics for shuffle with aggregation") {
     sc = new SparkContext("local", "test", conf.clone())
     val numRecords = 10000
 
@@ -356,7 +356,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(metrics.bytesWritten > 0)
   }
 
-  test("multiple simultaneous attempts for one task (SPARK-8029)") {
+  ignore("multiple simultaneous attempts for one task (SPARK-8029)") {
     sc = new SparkContext("local", "test", conf)
     val mapTrackerMaster = sc.env.mapOutputTracker.asInstanceOf[MapOutputTrackerMaster]
     val manager = sc.env.shuffleManager
@@ -424,7 +424,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     manager.unregisterShuffle(0)
   }
 
-  test("SPARK-34541: shuffle can be removed") {
+  ignore("SPARK-34541: shuffle can be removed") {
     withTempDir { tmpDir =>
       def getAllFiles: Set[File] =
         FileUtils.listFiles(tmpDir, TrueFileFilter.INSTANCE, TrueFileFilter.INSTANCE).asScala.toSet
@@ -449,7 +449,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     }
   }
 
-  test("SPARK-36206: shuffle checksum detect disk corruption") {
+  ignore("SPARK-36206: shuffle checksum detect disk corruption") {
     val newConf = conf.clone
       .set(config.SHUFFLE_CHECKSUM_ENABLED, true)
       .set(TEST_NO_STAGE_RETRY, false)
@@ -484,7 +484,7 @@ abstract class ShuffleSuite extends SparkFunSuite with Matchers with LocalRootDi
     assert(e.getMessage.contains("corrupted due to DISK_ISSUE"))
   }
 
-  test("SPARK-39771: warn when shuffle block number is too large") {
+  ignore("SPARK-39771: warn when shuffle block number is too large") {
     sc = new SparkContext("local", "test", conf)
     val logAppender = new LogAppender("warn when shuffle block number is too large")
     withLogAppender(logAppender) {

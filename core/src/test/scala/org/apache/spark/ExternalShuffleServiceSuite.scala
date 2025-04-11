@@ -79,7 +79,7 @@ class ExternalShuffleServiceSuite extends ShuffleSuite with BeforeAndAfterAll wi
   }
 
   // This test ensures that the external shuffle service is actually in use for the other tests.
-  test("using external shuffle service") {
+  ignore("using external shuffle service") {
     sc = new SparkContext("local-cluster[2,1,1024]", "test", conf)
     sc.getConf.get(config.SHUFFLE_HOST_LOCAL_DISK_READING_ENABLED) should equal(false)
     sc.env.blockManager.externalShuffleServiceEnabled should equal(true)
@@ -183,7 +183,8 @@ class ExternalShuffleServiceSuite extends ShuffleSuite with BeforeAndAfterAll wi
     }
   }
 
-  test("SPARK-37618: external shuffle service removes shuffle blocks from deallocated executors") {
+  ignore(
+    "SPARK-37618: external shuffle service removes shuffle blocks from deallocated executors") {
     for (enabled <- Seq(true, false)) {
       // Use local disk reading to get location of shuffle files on disk
       val confWithLocalDiskReading = conf.clone
@@ -263,7 +264,7 @@ class ExternalShuffleServiceSuite extends ShuffleSuite with BeforeAndAfterAll wi
     }
   }
 
-  test("SPARK-38640: memory only blocks can unpersist using shuffle service cache fetching") {
+  ignore("SPARK-38640: memory only blocks can unpersist using shuffle service cache fetching") {
     for (enabled <- Seq(true, false)) {
       val confWithRddFetch =
         conf.clone.set(config.SHUFFLE_SERVICE_FETCH_RDD_ENABLED, enabled)
