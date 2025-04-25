@@ -48,8 +48,7 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper {
       pushDownFilters,
       pushDownAggregates,
       pushDownLimitAndOffset,
-      buildScanWithPushedAggregate,
-      pruneColumns)
+      buildScanWithPushedAggregate)
 
     pushdownRules.foldLeft(plan) { (newPlan, pushDownRule) =>
       pushDownRule(newPlan)
