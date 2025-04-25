@@ -32,10 +32,14 @@ import org.apache.spark.util.ArrayImplicits._
 object V2ScanRelationPruneColumns extends Rule[LogicalPlan] with PredicateHelper {
 
   def apply(plan: LogicalPlan): LogicalPlan = {
-    val pushdownRules = Seq[LogicalPlan => LogicalPlan] (pruneColumns)
+    plan match {
+      case Subquery(_: ScanBuilderHolder, true) => plan
+      case _ =>
+        val pushdownRules = Seq[LogicalPlan => LogicalPlan] (pruneColumns)
 
-    pushdownRules.foldLeft(plan) { (newPlan, pushDownRule) =>
-      pushDownRule(newPlan)
+        pushdownRules.foldLeft(plan) { (newPlan, pushDownRule) =>
+          pushDownRule(newPlan)
+        }
     }
   }
 
