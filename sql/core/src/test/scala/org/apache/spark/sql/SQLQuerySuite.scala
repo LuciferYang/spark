@@ -66,37 +66,35 @@ class SQLQuerySuite extends QueryTest with SharedSparkSession with AdaptiveSpark
 
   setupTestData()
 
-  test("SPARK-15555: describe function extended") {
-    test("Test Subquery with v2 plan") {
-      import org.apache.spark.sql.functions._
-      withTempPath { dir =>
-        spark.range(100)
-          .withColumn("col1", col("id") + 1)
-          .withColumn("col2", col("id") + 2)
-          .withColumn("col3", col("id") + 3)
-          .withColumn("col4", col("id") + 4)
-          .withColumn("col5", col("id") + 5)
-          .withColumn("col6", col("id") + 6)
-          .withColumn("col7", col("id") + 7)
-          .withColumn("col8", col("id") + 8)
-          .withColumn("col9", col("id") + 9)
-          .write
-          .mode("overwrite")
-          .parquet(dir.getCanonicalPath + "/t1")
-        spark.range(10).write.mode("overwrite").parquet(dir.getCanonicalPath + "/t2")
+  test("Test Subquery with v2 plan") {
+    import org.apache.spark.sql.functions._
+    withTempPath { dir =>
+      spark.range(100)
+        .withColumn("col1", col("id") + 1)
+        .withColumn("col2", col("id") + 2)
+        .withColumn("col3", col("id") + 3)
+        .withColumn("col4", col("id") + 4)
+        .withColumn("col5", col("id") + 5)
+        .withColumn("col6", col("id") + 6)
+        .withColumn("col7", col("id") + 7)
+        .withColumn("col8", col("id") + 8)
+        .withColumn("col9", col("id") + 9)
+        .write
+        .mode("overwrite")
+        .parquet(dir.getCanonicalPath + "/t1")
+      spark.range(10).write.mode("overwrite").parquet(dir.getCanonicalPath + "/t2")
 
-        Seq("parquet", "").foreach { v1SourceList =>
-          withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key-> v1SourceList) {
-            spark.read.parquet(dir.getCanonicalPath + "/t1").createOrReplaceTempView("t1")
-            spark.read.parquet(dir.getCanonicalPath + "/t2").createOrReplaceTempView("t2")
-            spark.sql(
-              """
-                |select sum(t1.id) as sum_id
-                |from t1, t2
-                |where t1.id == t2.id
-                |      and exists(select * from t1 where t1.id == t2.id)
-                |""".stripMargin).explain()
-          }
+      Seq("parquet", "").foreach { v1SourceList =>
+        withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key-> v1SourceList) {
+          spark.read.parquet(dir.getCanonicalPath + "/t1").createOrReplaceTempView("t1")
+          spark.read.parquet(dir.getCanonicalPath + "/t2").createOrReplaceTempView("t2")
+          spark.sql(
+            """
+              |select sum(t1.id) as sum_id
+              |from t1, t2
+              |where t1.id == t2.id
+              |      and exists(select * from t1 where t1.id == t2.id)
+              |""".stripMargin).explain(true)
         }
       }
     }
