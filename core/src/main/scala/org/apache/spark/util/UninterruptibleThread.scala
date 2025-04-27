@@ -52,12 +52,6 @@ private[spark] class UninterruptibleThread(
   private var shouldInterruptThread = false
 
   /**
-   * Indicates that we should wait for interrupt() call before proceeding.
-   */
-  @GuardedBy("uninterruptibleLock")
-  private var awaitInterruptThread = false
-
-  /**
    * Run `f` uninterruptibly in `this` thread. The thread won't be interrupted before returning
    * from `f`.
    *
@@ -75,32 +69,24 @@ private[spark] class UninterruptibleThread(
     }
 
     uninterruptibleLock.synchronized {
-      uninterruptible = true
-    }
-
-    while (uninterruptibleLock.synchronized {
-      // Clear the interrupted status if it's set.
       shouldInterruptThread = Thread.interrupted() || shouldInterruptThread
-      // wait for super.interrupt() to be called
-      !shouldInterruptThread && awaitInterruptThread }) {
-      try {
-        Thread.sleep(100)
-      } catch {
-        case _: InterruptedException =>
-          uninterruptibleLock.synchronized { shouldInterruptThread = true }
-      }
+      uninterruptible = true
     }
 
     try {
       f
     } finally {
+      var shouldInterrupt = false
       uninterruptibleLock.synchronized {
         uninterruptible = false
         if (shouldInterruptThread) {
-          // Recover the interrupted status
-          super.interrupt()
+          shouldInterrupt = true
           shouldInterruptThread = false
         }
+      }
+
+      if (shouldInterrupt) {
+        super.interrupt()
       }
     }
   }
@@ -110,28 +96,18 @@ private[spark] class UninterruptibleThread(
    * interrupted until it enters into the interruptible status.
    */
   override def interrupt(): Unit = {
-    if (uninterruptibleLock.synchronized {
-      shouldInterruptThread = uninterruptible
-      // as we are releasing uninterruptibleLock before calling super.interrupt() there is a
-      // possibility that runUninterruptibly() would be called after lock is released but before
-      // super.interrupt() is called. In this case to prevent runUninterruptibly() from being
-      // interrupted, we use awaitInterruptThread flag. We need to set it only if
-      // runUninterruptibly() is not yet set uninterruptible to true (!shouldInterruptThread) and
-      // there is no other threads that called interrupt (awaitInterruptThread is already true)
-      if (!shouldInterruptThread && !awaitInterruptThread) {
-        awaitInterruptThread = true
-        true
+    var shouldInterruptImmediately = false
+
+    uninterruptibleLock.synchronized {
+      if (uninterruptible) {
+        shouldInterruptThread = true
       } else {
-        false
+        shouldInterruptImmediately = true
       }
-    }) {
-      try {
-        super.interrupt()
-      } finally {
-        uninterruptibleLock.synchronized {
-          awaitInterruptThread = false
-        }
-      }
+    }
+
+    if (shouldInterruptImmediately) {
+      super.interrupt()
     }
   }
 }
