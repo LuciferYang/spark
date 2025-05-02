@@ -394,6 +394,7 @@ org.json4s:json4s-core_2.13
 org.json4s:json4s-jackson-core_2.13
 org.json4s:json4s-jackson_2.13
 org.json4s:json4s-scalap_2.13
+org.jspecify:jspecify
 org.lz4:lz4-java
 org.objenesis:objenesis
 org.roaringbitmap:RoaringBitmap
