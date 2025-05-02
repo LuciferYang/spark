@@ -296,6 +296,7 @@
               <include>com.google.j2objc:j2objc-annotations</include>
               <include>org.checkerframework:checker-qual</include>
               <include>com.google.code.gson:gson</include>
+              <include>org.jspecify:jspecify</include>
               <include>org.apache.spark:spark-connect-common_${scala.binary.version}</include>
             </includes>
           </artifactSet>
@@ -387,6 +388,10 @@
             <relocation>
               <pattern>com.google.type</pattern>
               <shadedPattern>${spark.shade.packageName}.connect.google_protos.type</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.jspecify</pattern>
+              <shadedPattern>${spark.shade.packageName}.org.jspecify</shadedPattern>
             </relocation>
           </relocations>
           <transformers>

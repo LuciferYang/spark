@@ -790,7 +790,8 @@ object SparkConnect {
       ShadeRule.rename("com.google.logging.**" -> "org.sparkproject.connect.google_protos.logging.@1").inAll,
       ShadeRule.rename("com.google.longrunning.**" -> "org.sparkproject.connect.google_protos.longrunning.@1").inAll,
       ShadeRule.rename("com.google.rpc.**" -> "org.sparkproject.connect.google_protos.rpc.@1").inAll,
-      ShadeRule.rename("com.google.type.**" -> "org.sparkproject.connect.google_protos.type.@1").inAll
+      ShadeRule.rename("com.google.type.**" -> "org.sparkproject.connect.google_protos.type.@1").inAll,
+      ShadeRule.rename("org.jspecify.**" -> "org.sparkproject.connect.org.jspecify.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {
@@ -868,7 +869,8 @@ object SparkConnectClient {
       ShadeRule.rename("javax.annotation.**" -> "org.sparkproject.connect.client.javax.annotation.@1").inAll,
       ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
       ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
-      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
+      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll,
+      ShadeRule.rename("org.jspecify.**" -> "org.sparkproject.connect.client.org.jspecify.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {

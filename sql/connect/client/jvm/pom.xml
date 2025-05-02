@@ -170,6 +170,7 @@
               <include>org.apache.arrow:*</include>
               <include>org.codehaus.mojo:*</include>
               <include>org.checkerframework:*</include>
+              <include>org.jspecify:*</include>
               <include>org.apache.spark:spark-connect-common_${scala.binary.version}</include>
               <include>org.apache.spark:spark-sql-api_${scala.binary.version}</include>
             </includes>
@@ -220,6 +221,10 @@
             <relocation>
               <pattern>org.apache.arrow</pattern>
               <shadedPattern>${spark.shade.packageName}.org.apache.arrow</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.jspecify</pattern>
+              <shadedPattern>${spark.shade.packageName}.org.jspecify</shadedPattern>
             </relocation>
             <relocation>
               <pattern>android.annotation</pattern>
