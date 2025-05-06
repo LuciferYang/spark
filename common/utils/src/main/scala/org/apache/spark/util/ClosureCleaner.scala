@@ -19,12 +19,12 @@ package org.apache.spark.util
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.lang.invoke.{MethodHandleInfo, SerializedLambda}
-import java.lang.reflect.{Field, Modifier}
 
 import scala.collection.mutable.{Map, Queue, Set, Stack}
 import scala.jdk.CollectionConverters._
 
 import org.apache.commons.lang3.ClassUtils
+import org.apache.commons.lang3.reflect.FieldUtils
 import org.apache.xbean.asm9.{ClassReader, ClassVisitor, Handle, MethodVisitor, Type}
 import org.apache.xbean.asm9.Opcodes._
 import org.apache.xbean.asm9.tree.{ClassNode, MethodNode}
@@ -425,11 +425,7 @@ private[spark] object ClosureCleaner extends Logging {
         parent = null, outerThis, capturingClass, accessedFields)
 
       val outerField = func.getClass.getDeclaredField("arg$1")
-      // SPARK-37072: When Java 17 is used and `outerField` is read-only,
-      // the content of `outerField` cannot be set by reflect api directly.
-      // But we can remove the `final` modifier of `outerField` before set value
-      // and reset the modifier after set value.
-      setFieldAndIgnoreModifiers(func, outerField, clonedOuterThis)
+      FieldUtils.writeField(outerField, func, clonedOuterThis, true)
     }
   }
 
@@ -530,7 +526,7 @@ private[spark] object ClosureCleaner extends Logging {
           field.setAccessible(true)
           field.get(ammCmdInstances(cmdClass))
         })
-        setFieldAndIgnoreModifiers(cmdClone, field, value)
+        FieldUtils.writeField(field, cmdClone, value, true)
       }
     }
 
@@ -543,7 +539,7 @@ private[spark] object ClosureCleaner extends Logging {
       for (field <- outerThis.getClass.getDeclaredFields) {
         field.setAccessible(true)
         cmdClones.get(field.getType).foreach { value =>
-          setFieldAndIgnoreModifiers(clone, field, value)
+          FieldUtils.writeField(field, clone, value, true)
         }
       }
       clone
@@ -552,36 +548,7 @@ private[spark] object ClosureCleaner extends Logging {
     }
 
     val outerField = func.getClass.getDeclaredField("arg$1")
-    // update lambda capturing class reference
-    setFieldAndIgnoreModifiers(func, outerField, outerThisClone)
-  }
-
-  private def setFieldAndIgnoreModifiers(obj: AnyRef, field: Field, value: AnyRef): Unit = {
-    val modifiersField = getFinalModifiersFieldForJava17(field)
-    modifiersField
-      .foreach(m => m.setInt(field, field.getModifiers & ~Modifier.FINAL))
-    field.setAccessible(true)
-    field.set(obj, value)
-
-    modifiersField
-      .foreach(m => m.setInt(field, field.getModifiers | Modifier.FINAL))
-  }
-
-  /**
-   * This method is used to get the final modifier field when on Java 17.
-   */
-  private def getFinalModifiersFieldForJava17(field: Field): Option[Field] = {
-    if (Modifier.isFinal(field.getModifiers)) {
-      val methodGetDeclaredFields0 = classOf[Class[_]]
-        .getDeclaredMethod("getDeclaredFields0", classOf[Boolean])
-      methodGetDeclaredFields0.setAccessible(true)
-      val fields = methodGetDeclaredFields0.invoke(classOf[Field], false.asInstanceOf[Object])
-        .asInstanceOf[Array[Field]]
-      val modifiersFieldOption = fields.find(field => "modifiers".equals(field.getName))
-      require(modifiersFieldOption.isDefined)
-      modifiersFieldOption.foreach(_.setAccessible(true))
-      modifiersFieldOption
-    } else None
+    FieldUtils.writeField(outerField, func, outerThisClone, true)
   }
 
   private def instantiateClass(cls: Class[_], enclosingObject: AnyRef): AnyRef = {
