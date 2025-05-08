@@ -20,17 +20,14 @@ import java.io.{File, IOException, OutputStream}
 import java.lang.ProcessBuilder.Redirect
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
-
 import scala.concurrent.duration.FiniteDuration
-
 import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfterAll, Suite, Tag}
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.Futures.timeout
-import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
-import org.scalatest.time.SpanSugar._ // scalastyle:ignore
-
-import org.apache.spark.SparkBuildInfo
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.time.SpanSugar._
+import org.apache.spark.{SparkBuildInfo, SparkConf}
 import org.apache.spark.sql.connect.SparkSession
 import org.apache.spark.sql.connect.client.{RetryPolicy, SparkConnectClient}
 import org.apache.spark.sql.connect.common.config.ConnectCommon
@@ -184,6 +181,7 @@ object SparkConnectServerUtils {
 
     val spark = SparkSession
       .builder()
+      .config(new SparkConf())
       .client(
         SparkConnectClient
           .builder()

@@ -23,10 +23,12 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
+import org.scalatest.PrivateMethodTester
 import org.scalatest.concurrent.Eventually._
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.StringEncoder
+import org.apache.spark.sql.connect.client.SparkConnectStubState
 import org.apache.spark.sql.connect.test.{ConnectFunSuite, RemoteSparkSession}
 import org.apache.spark.util.SparkThreadUtils.awaitResult
 
@@ -35,7 +37,10 @@ import org.apache.spark.util.SparkThreadUtils.awaitResult
  * class, whether explicit or implicit, as it will trigger a UDF deserialization error during
  * Maven build/test.
  */
-class SparkSessionE2ESuite extends ConnectFunSuite with RemoteSparkSession {
+class SparkSessionE2ESuite
+    extends ConnectFunSuite
+    with RemoteSparkSession
+    with PrivateMethodTester {
 
   test("interrupt all - background queries, foreground interrupt") {
     val session = spark
@@ -401,7 +406,7 @@ class SparkSessionE2ESuite extends ConnectFunSuite with RemoteSparkSession {
     assert(session1 eq SparkSession.getDefaultSession.get)
     assert(session1.range(3).collect().length == 3)
 
-    session1.client.hijackServerSideSessionIdForTesting("-testing")
+    hijackServerSideSessionId(session1, "-testing")
 
     val e = intercept[SparkException] {
       session1.range(3).analyze
@@ -437,7 +442,7 @@ class SparkSessionE2ESuite extends ConnectFunSuite with RemoteSparkSession {
 
     session.range(3).collect()
 
-    session.hijackServerSideSessionIdForTesting("-testing")
+    hijackServerSideSessionId(session, "-testing")
 
     // no error is thrown here.
     session.stop()
@@ -449,5 +454,14 @@ class SparkSessionE2ESuite extends ConnectFunSuite with RemoteSparkSession {
       "command",
       Map("one" -> "1", "two" -> "2"))
     assert(df.as(StringEncoder).collect().toSet == Set("one", "two"))
+  }
+
+  private def hijackServerSideSessionId(session: SparkSession, suffix: String): Unit = {
+    val stubState = PrivateMethod[SparkConnectStubState](Symbol("stubState"))
+    val serverSideSessionIdSetter = PrivateMethod[Unit](Symbol("serverSideSessionId_$eq"))
+    val validator = session.client.invokePrivate(stubState()).responseValidator
+    validator.invokePrivate(
+      serverSideSessionIdSetter(
+        Option(s"${validator.getServerSideSessionId.getOrElse("")}$suffix")))
   }
 }

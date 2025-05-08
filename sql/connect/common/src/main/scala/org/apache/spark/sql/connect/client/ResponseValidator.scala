@@ -44,14 +44,6 @@ class ResponseValidator extends Logging {
   def getServerSideSessionId: Option[String] = serverSideSessionId
 
   /**
-   * Hijacks the stored server side session ID with the given suffix. Used for testing to make
-   * sure that server is validating the session ID.
-   */
-  private[sql] def hijackServerSideSessionIdForTesting(suffix: String): Unit = {
-    serverSideSessionId = Some(serverSideSessionId.getOrElse("") + suffix)
-  }
-
-  /**
    * Returns true if the session is valid on both the client and the server.
    */
   private[sql] def isSessionValid: Boolean = {

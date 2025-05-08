@@ -95,10 +95,6 @@ class SparkSession private[sql] (
 
   private[sql] val observationRegistry = new ConcurrentHashMap[Long, Observation]()
 
-  private[sql] def hijackServerSideSessionIdForTesting(suffix: String): Unit = {
-    client.hijackServerSideSessionIdForTesting(suffix)
-  }
-
   /** @inheritdoc */
   override def sparkContext: SparkContext =
     throw ConnectClientUnsupportedErrors.sparkContext()

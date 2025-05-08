@@ -64,14 +64,6 @@ private[sql] class SparkConnectClient(
   private[sql] val sessionId: String = configuration.sessionId.getOrElse(UUID.randomUUID.toString)
 
   /**
-   * Hijacks the stored server side session ID with the given suffix. Used for testing to make
-   * sure that server is validating the session ID.
-   */
-  private[sql] def hijackServerSideSessionIdForTesting(suffix: String) = {
-    stubState.responseValidator.hijackServerSideSessionIdForTesting(suffix)
-  }
-
-  /**
    * Returns true if the session is valid on both the client and the server. A session becomes
    * invalid if the server side information about the client, e.g., session ID, does not
    * correspond to the actual client state.
