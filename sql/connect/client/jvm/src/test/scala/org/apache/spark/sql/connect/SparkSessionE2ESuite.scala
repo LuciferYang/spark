@@ -457,11 +457,11 @@ class SparkSessionE2ESuite
   }
 
   private def hijackServerSideSessionId(session: SparkSession, suffix: String): Unit = {
-    val stubState = PrivateMethod[SparkConnectStubState](Symbol("stubState"))
+    val stubStateAccessor = PrivateMethod[SparkConnectStubState](Symbol("stubState"))
     val serverSideSessionIdSetter = PrivateMethod[Unit](Symbol("serverSideSessionId_$eq"))
-    val validator = session.client.invokePrivate(stubState()).responseValidator
-    validator.invokePrivate(
+    val responseValidator = session.client.invokePrivate(stubStateAccessor()).responseValidator
+    responseValidator.invokePrivate(
       serverSideSessionIdSetter(
-        Option(s"${validator.getServerSideSessionId.getOrElse("")}$suffix")))
+        Option(s"${responseValidator.getServerSideSessionId.getOrElse("")}$suffix")))
   }
 }
