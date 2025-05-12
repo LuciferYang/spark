@@ -62,8 +62,9 @@
     <!-- Include Spark Daria for utility Dataframe write methods -->
     <dependency>
       <groupId>com.github.mrpowers</groupId>
-      <artifactId>spark-daria_${scala.binary}</artifactId>
+      <artifactId>spark-daria_2.12</artifactId>
       <version>1.2.3</version>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 
