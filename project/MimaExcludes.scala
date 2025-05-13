@@ -38,9 +38,7 @@ object MimaExcludes {
   lazy val v41excludes = defaultExcludes ++ Seq(
     // [SPARK-51261][ML][CONNECT] Introduce model size estimation to control ml cache
     ProblemFilters.exclude[ReversedMissingMethodProblem]("org.apache.spark.ml.linalg.Vector.getSizeInBytes")
-  ) ++ loggingExcludes("org.apache.spark.sql.DataFrameReader") ++
-    loggingExcludes("org.apache.spark.sql.streaming.DataStreamReader") ++
-    loggingExcludes("org.apache.spark.sql.SparkSession#Builder")
+  )
 
   // Default exclude rules
   lazy val defaultExcludes = Seq(
@@ -83,26 +81,6 @@ object MimaExcludes {
       case _ => true
     }
   )
-
-  private def loggingExcludes(fqn: String) = {
-    Seq(
-      ProblemFilters.exclude[MissingTypesProblem](fqn),
-      missingMethod(fqn, "logName"),
-      missingMethod(fqn, "log"),
-      missingMethod(fqn, "logInfo"),
-      missingMethod(fqn, "logDebug"),
-      missingMethod(fqn, "logTrace"),
-      missingMethod(fqn, "logWarning"),
-      missingMethod(fqn, "logError"),
-      missingMethod(fqn, "isTraceEnabled"),
-      missingMethod(fqn, "initializeLogIfNecessary"),
-      missingMethod(fqn, "initializeLogIfNecessary$default$2"),
-      missingMethod(fqn, "initializeForcefully"))
-  }
-
-  private def missingMethod(names: String*) = {
-    ProblemFilters.exclude[DirectMissingMethodProblem](names.mkString("."))
-  }
 
   def excludes(version: String): Seq[Problem => Boolean] = version match {
     case v if v.startsWith("4.1") => v41excludes
