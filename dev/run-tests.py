@@ -19,6 +19,7 @@
 
 import itertools
 from argparse import ArgumentParser
+import multiprocessing
 import os
 import re
 import sys
@@ -251,7 +252,8 @@ def build_spark_sbt(extra_profiles):
         "streaming-kinesis-asl-assembly/assembly",
         "connect/assembly",  # Build Spark Connect assembly
     ]
-    profiles_and_goals = build_profiles + sbt_goals
+    parallel_tasks_option =f"-Dsbt.parallel.tasks.max={max(multiprocessing.cpu_count() - 1, 1)}"
+    profiles_and_goals = [parallel_tasks_option] + build_profiles + sbt_goals
 
     print("[info] Building Spark using SBT with these arguments: ", " ".join(profiles_and_goals))
 
