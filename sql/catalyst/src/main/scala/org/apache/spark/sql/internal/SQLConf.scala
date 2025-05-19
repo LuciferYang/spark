@@ -250,6 +250,14 @@ object SQLConf {
     .booleanConf
     .createWithDefault(true)
 
+  val BLOCK_CREATE_TEMP_TABLE_USING_PROVIDER =
+    buildConf("spark.sql.legacy.blockCreateTempTableUsingProvider")
+      .doc("If enabled, we fail legacy CREATE TEMPORARY TABLE ... USING provider during parsing.")
+      .internal()
+      .version("4.1.0")
+      .booleanConf
+      .createWithDefault(false)
+
   val ANALYZER_MAX_ITERATIONS = buildConf("spark.sql.analyzer.maxIterations")
     .internal()
     .doc("The max number of iterations the analyzer runs.")
@@ -5814,14 +5822,6 @@ object SQLConf {
         "CollationTypeCasts before alias assignment. This is necessary for correct alias " +
         "generation."
       )
-      .version("4.1.0")
-      .booleanConf
-      .createWithDefault(true)
-
-  val PRETTY_ALIAS_NAME_FOR_CORRELATED_AGGREGATE_FUNCTION =
-    buildConf("spark.sql.prettyAliasNameForCorrelatedAggFunc.enabled")
-      .internal()
-      .doc("When true, use prettified name for correlated aggregate functions.")
       .version("4.1.0")
       .booleanConf
       .createWithDefault(true)
