@@ -20,6 +20,7 @@ package org.apache.spark
 import java.io.{FileDescriptor, InputStream}
 import java.lang
 import java.nio.ByteBuffer
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import scala.collection.mutable
 
@@ -31,27 +32,52 @@ object DebugFilesystem extends Logging {
   // Stores the set of active streams and their creation sites.
   private val openStreams = mutable.Map.empty[FSDataInputStream, Throwable]
 
-  def addOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
-    openStreams.put(stream, new Throwable())
+  private val (readLock, writeLock) = {
+    val rwLock = new ReentrantReadWriteLock()
+    (rwLock.readLock(), rwLock.writeLock())
   }
 
-  def clearOpenStreams(): Unit = openStreams.synchronized {
-    openStreams.clear()
+  def addOpenStream(stream: FSDataInputStream): Unit = {
+    writeLock.lock()
+    try {
+      openStreams.put(stream, new Throwable())
+    } finally {
+      writeLock.unlock()
+    }
   }
 
-  def removeOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
-    openStreams.remove(stream)
+  def clearOpenStreams(): Unit = {
+    writeLock.lock()
+    try {
+      openStreams.clear()
+    } finally {
+      writeLock.unlock()
+    }
   }
 
-  def assertNoOpenStreams(): Unit = openStreams.synchronized {
-    val numOpen = openStreams.values.size
-    if (numOpen > 0) {
-      for (exc <- openStreams.values) {
-        logWarning("Leaked filesystem connection created at:")
-        exc.printStackTrace()
+  def removeOpenStream(stream: FSDataInputStream): Unit = {
+    writeLock.lock()
+    try {
+      openStreams.remove(stream)
+    } finally {
+      writeLock.unlock()
+    }
+  }
+
+  def assertNoOpenStreams(): Unit = {
+    readLock.lock()
+    try {
+      val numOpen = openStreams.values.size
+      if (numOpen > 0) {
+        for (exc <- openStreams.values) {
+          logWarning("Leaked filesystem connection created at:")
+          exc.printStackTrace()
+        }
+        throw new IllegalStateException(s"There are $numOpen possibly leaked file streams.",
+          openStreams.values.head)
       }
-      throw new IllegalStateException(s"There are $numOpen possibly leaked file streams.",
-        openStreams.values.head)
+    } finally {
+      readLock.unlock()
     }
   }
 }
