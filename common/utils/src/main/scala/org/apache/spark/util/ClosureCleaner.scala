@@ -419,17 +419,17 @@ private[spark] object ClosureCleaner extends Logging {
     accessedFields.foreach { f => logDebug("     " + f) }
 
     if (accessedFields(capturingClass).size < capturingClass.getDeclaredFields.length) {
-      // clone and clean the enclosing `this` only when there are fields to null out
-      logDebug(s" + cloning instance of REPL class ${capturingClass.getName}")
-      val clonedOuterThis = cloneAndSetFields(
-        parent = null, outerThis, capturingClass, accessedFields)
-
-      val outerField = func.getClass.getDeclaredField("arg$1")
-      // SPARK-37072: When Java 17 is used and `outerField` is read-only,
-      // the content of `outerField` cannot be set by reflect api directly.
-      // But we can remove the `final` modifier of `outerField` before set value
-      // and reset the modifier after set value.
-      setFieldAndIgnoreModifiers(func, outerField, clonedOuterThis)
+      val fieldsToNull = capturingClass.getDeclaredFields.filterNot { field =>
+        accessedFields(capturingClass).contains(field.getName)
+      }
+      fieldsToNull.foreach(field => {
+        try {
+          field.setAccessible(true)
+          field.set(outerThis, null)
+        } catch {
+          case _: Exception =>
+        }
+      })
     }
   }
 
