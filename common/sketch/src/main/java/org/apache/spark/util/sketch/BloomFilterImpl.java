@@ -236,11 +236,11 @@ class BloomFilterImpl extends BloomFilter implements Serializable {
 
   @Override
   public void writeTo(OutputStream out) throws IOException {
-    DataOutputStream dos = new DataOutputStream(out);
-
-    dos.writeInt(Version.V1.getVersionNumber());
-    dos.writeInt(numHashFunctions);
-    bits.writeTo(dos);
+    try (DataOutputStream dos = new DataOutputStream(out)) {
+      dos.writeInt(Version.V1.getVersionNumber());
+      dos.writeInt(numHashFunctions);
+      bits.writeTo(dos);
+    }
   }
 
   private void readFrom0(InputStream in) throws IOException {
