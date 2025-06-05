@@ -1,113 +1,113 @@
 {
-  "classpathEntries" : [ ],
-  "hadoopProperties" : [ ],
-  "metricsProperties" : [ ],
+  "systemProperties" : [ ],
+  "sparkProperties" : [ ],
+  "runtime" : {
+    "scalaVersion" : "version 2.12.10",
+    "javaVersion" : "1.8.0_232 (Private Build)",
+    "javaHome" : "/usr/lib/jvm/java-8-openjdk-amd64/jre"
+  },
   "resourceProfiles" : [ {
-    "executorResources" : {
-      "cores" : {
-        "amount" : 1,
-        "discoveryScript" : "",
-        "resourceName" : "cores",
-        "vendor" : ""
-      },
+    "taskResources" : {
       "gpu" : {
-        "amount" : 1,
-        "discoveryScript" : "/home/tgraves/getGpus",
         "resourceName" : "gpu",
-        "vendor" : ""
+        "amount" : 1.0
       },
-      "memory" : {
-        "amount" : 1024,
-        "discoveryScript" : "",
-        "resourceName" : "memory",
-        "vendor" : ""
+      "cpus" : {
+        "resourceName" : "cpus",
+        "amount" : 1.0
       }
     },
     "id" : 0,
-    "taskResources" : {
-      "cpus" : {
-        "amount" : 1.0,
-        "resourceName" : "cpus"
+    "executorResources" : {
+      "memory" : {
+        "vendor" : "",
+        "resourceName" : "memory",
+        "discoveryScript" : "",
+        "amount" : 1024
       },
       "gpu" : {
-        "amount" : 1.0,
-        "resourceName" : "gpu"
+        "vendor" : "",
+        "resourceName" : "gpu",
+        "discoveryScript" : "/home/tgraves/getGpus",
+        "amount" : 1
+      },
+      "cores" : {
+        "vendor" : "",
+        "resourceName" : "cores",
+        "discoveryScript" : "",
+        "amount" : 1
       }
     }
   }, {
-    "executorResources" : {
-      "cores" : {
-        "amount" : 4,
-        "discoveryScript" : "",
-        "resourceName" : "cores",
-        "vendor" : ""
-      },
+    "taskResources" : {
       "gpu" : {
-        "amount" : 1,
-        "discoveryScript" : "./getGpus",
         "resourceName" : "gpu",
-        "vendor" : ""
+        "amount" : 1.0
+      },
+      "cpus" : {
+        "resourceName" : "cpus",
+        "amount" : 1.0
       }
     },
     "id" : 1,
-    "taskResources" : {
-      "cpus" : {
-        "amount" : 1.0,
-        "resourceName" : "cpus"
-      },
+    "executorResources" : {
       "gpu" : {
-        "amount" : 1.0,
-        "resourceName" : "gpu"
+        "vendor" : "",
+        "resourceName" : "gpu",
+        "discoveryScript" : "./getGpus",
+        "amount" : 1
+      },
+      "cores" : {
+        "vendor" : "",
+        "resourceName" : "cores",
+        "discoveryScript" : "",
+        "amount" : 4
       }
     }
   }, {
-    "executorResources" : {
-      "cores" : {
-        "amount" : 2,
-        "discoveryScript" : "",
-        "resourceName" : "cores",
-        "vendor" : ""
+    "taskResources" : {
+      "cpus" : {
+        "resourceName" : "cpus",
+        "amount" : 2.0
       }
     },
     "id" : 2,
-    "taskResources" : {
-      "cpus" : {
-        "amount" : 2.0,
-        "resourceName" : "cpus"
+    "executorResources" : {
+      "cores" : {
+        "vendor" : "",
+        "resourceName" : "cores",
+        "discoveryScript" : "",
+        "amount" : 2
       }
     }
   }, {
-    "executorResources" : {
-      "cores" : {
-        "amount" : 4,
-        "discoveryScript" : "",
-        "resourceName" : "cores",
-        "vendor" : ""
-      },
+    "taskResources" : {
       "gpu" : {
-        "amount" : 1,
-        "discoveryScript" : "./getGpus",
         "resourceName" : "gpu",
-        "vendor" : ""
+        "amount" : 1.0
+      },
+      "cpus" : {
+        "resourceName" : "cpus",
+        "amount" : 2.0
       }
     },
     "id" : 3,
-    "taskResources" : {
-      "cpus" : {
-        "amount" : 2.0,
-        "resourceName" : "cpus"
-      },
+    "executorResources" : {
       "gpu" : {
-        "amount" : 1.0,
-        "resourceName" : "gpu"
+        "vendor" : "",
+        "resourceName" : "gpu",
+        "discoveryScript" : "./getGpus",
+        "amount" : 1
+      },
+      "cores" : {
+        "vendor" : "",
+        "resourceName" : "cores",
+        "discoveryScript" : "",
+        "amount" : 4
       }
     }
   } ],
-  "runtime" : {
-    "javaHome" : "/usr/lib/jvm/java-8-openjdk-amd64/jre",
-    "javaVersion" : "1.8.0_232 (Private Build)",
-    "scalaVersion" : "version 2.12.10"
-  },
-  "sparkProperties" : [ ],
-  "systemProperties" : [ ]
+  "metricsProperties" : [ ],
+  "hadoopProperties" : [ ],
+  "classpathEntries" : [ ]
 }

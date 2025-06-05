@@ -1,46 +1,46 @@
 [ {
-  "attempts" : [ {
-    "appSparkVersion" : "3.3.0-SNAPSHOT",
-    "completed" : true,
-    "duration" : 86045,
-    "endTime" : "2022-01-13T02:05:36.564GMT",
-    "endTimeEpoch" : 1642039536564,
-    "lastUpdated" : "",
-    "lastUpdatedEpoch" : 0,
-    "sparkUser" : "lijunqing",
-    "startTime" : "2022-01-13T02:04:10.519GMT",
-    "startTimeEpoch" : 1642039450519
-  } ],
+  "name" : "Spark shell",
   "id" : "local-1642039451826",
-  "name" : "Spark shell"
-}, {
   "attempts" : [ {
-    "appSparkVersion" : "3.1.1.119",
-    "completed" : true,
-    "duration" : 274875,
-    "endTime" : "2021-08-10T23:29:30.208GMT",
-    "endTimeEpoch" : 1628638170208,
-    "lastUpdated" : "",
+    "startTimeEpoch" : 1642039450519,
+    "startTime" : "2022-01-13T02:04:10.519GMT",
+    "sparkUser" : "lijunqing",
     "lastUpdatedEpoch" : 0,
-    "sparkUser" : "john",
-    "startTime" : "2021-08-10T23:24:55.333GMT",
-    "startTimeEpoch" : 1628637895333
-  } ],
+    "lastUpdated" : "",
+    "endTimeEpoch" : 1642039536564,
+    "endTime" : "2022-01-13T02:05:36.564GMT",
+    "duration" : 86045,
+    "completed" : true,
+    "appSparkVersion" : "3.3.0-SNAPSHOT"
+  } ]
+}, {
+  "name" : "Spark shell",
   "id" : "application_1628109047826_1317105",
-  "name" : "Spark shell"
-}, {
   "attempts" : [ {
-    "appSparkVersion" : "3.1.0-SNAPSHOT",
-    "completed" : true,
-    "duration" : 363996,
-    "endTime" : "2020-07-07T03:17:04.231GMT",
-    "endTimeEpoch" : 1594091824231,
-    "lastUpdated" : "",
+    "startTimeEpoch" : 1628637895333,
+    "startTime" : "2021-08-10T23:24:55.333GMT",
+    "sparkUser" : "john",
     "lastUpdatedEpoch" : 0,
-    "sparkUser" : "terryk",
-    "startTime" : "2020-07-07T03:11:00.235GMT",
-    "startTimeEpoch" : 1594091460235
-  } ],
+    "lastUpdated" : "",
+    "endTimeEpoch" : 1628638170208,
+    "endTime" : "2021-08-10T23:29:30.208GMT",
+    "duration" : 274875,
+    "completed" : true,
+    "appSparkVersion" : "3.1.1.119"
+  } ]
+}, {
+  "name" : "Spark shell",
   "id" : "app-20200706201101-0003",
-  "name" : "Spark shell"
+  "attempts" : [ {
+    "startTimeEpoch" : 1594091460235,
+    "startTime" : "2020-07-07T03:11:00.235GMT",
+    "sparkUser" : "terryk",
+    "lastUpdatedEpoch" : 0,
+    "lastUpdated" : "",
+    "endTimeEpoch" : 1594091824231,
+    "endTime" : "2020-07-07T03:17:04.231GMT",
+    "duration" : 363996,
+    "completed" : true,
+    "appSparkVersion" : "3.1.0-SNAPSHOT"
+  } ]
 } ]

@@ -1,125 +1,125 @@
 [ {
-  "accumulatorUpdates" : [ ],
-  "attempt" : 0,
-  "duration" : 421,
-  "executorId" : "driver",
-  "executorLogs" : { },
-  "gettingResultTime" : 0,
-  "host" : "localhost",
-  "index" : 1,
-  "launchTime" : "2015-05-06T13:03:06.502GMT",
-  "partitionId" : -1,
-  "schedulerDelay" : 40,
-  "speculative" : false,
-  "status" : "SUCCESS",
-  "taskId" : 1,
-  "taskLocality" : "PROCESS_LOCAL",
   "taskMetrics" : {
-    "diskBytesSpilled" : 0,
-    "executorCpuTime" : 0,
-    "executorDeserializeCpuTime" : 0,
-    "executorDeserializeTime" : 31,
-    "executorRunTime" : 350,
-    "inputMetrics" : {
-      "bytesRead" : 60488,
-      "recordsRead" : 10000
+    "shuffleWriteMetrics" : {
+      "writeTime" : 3934399,
+      "recordsWritten" : 10,
+      "bytesWritten" : 1710
     },
-    "jvmGcTime" : 7,
-    "memoryBytesSpilled" : 0,
-    "outputMetrics" : {
-      "bytesWritten" : 0,
-      "recordsWritten" : 0
+    "shuffleReadMetrics" : {
+      "shufflePushReadMetrics" : {
+        "remoteMergedReqsDuration" : 0,
+        "remoteMergedChunksFetched" : 0,
+        "remoteMergedBytesRead" : 0,
+        "remoteMergedBlocksFetched" : 0,
+        "mergedFetchFallbackCount" : 0,
+        "localMergedChunksFetched" : 0,
+        "localMergedBytesRead" : 0,
+        "localMergedBlocksFetched" : 0,
+        "corruptMergedBlockChunks" : 0
+      },
+      "remoteReqsDuration" : 0,
+      "remoteBytesReadToDisk" : 0,
+      "remoteBytesRead" : 0,
+      "remoteBlocksFetched" : 0,
+      "recordsRead" : 0,
+      "localBytesRead" : 0,
+      "localBlocksFetched" : 0,
+      "fetchWaitTime" : 0
     },
-    "peakExecutionMemory" : 0,
+    "resultSize" : 2010,
     "resultSerializationTime" : 0,
-    "resultSize" : 2010,
-    "shuffleReadMetrics" : {
-      "fetchWaitTime" : 0,
-      "localBlocksFetched" : 0,
-      "localBytesRead" : 0,
-      "recordsRead" : 0,
-      "remoteBlocksFetched" : 0,
-      "remoteBytesRead" : 0,
-      "remoteBytesReadToDisk" : 0,
-      "remoteReqsDuration" : 0,
-      "shufflePushReadMetrics" : {
-        "corruptMergedBlockChunks" : 0,
-        "localMergedBlocksFetched" : 0,
-        "localMergedBytesRead" : 0,
-        "localMergedChunksFetched" : 0,
-        "mergedFetchFallbackCount" : 0,
-        "remoteMergedBlocksFetched" : 0,
-        "remoteMergedBytesRead" : 0,
-        "remoteMergedChunksFetched" : 0,
-        "remoteMergedReqsDuration" : 0
-      }
-    },
-    "shuffleWriteMetrics" : {
-      "bytesWritten" : 1710,
-      "recordsWritten" : 10,
-      "writeTime" : 3934399
-    }
-  }
-}, {
-  "accumulatorUpdates" : [ ],
-  "attempt" : 0,
-  "duration" : 419,
-  "executorId" : "driver",
-  "executorLogs" : { },
-  "gettingResultTime" : 0,
-  "host" : "localhost",
-  "index" : 2,
-  "launchTime" : "2015-05-06T13:03:06.503GMT",
-  "partitionId" : -1,
-  "schedulerDelay" : 37,
-  "speculative" : false,
-  "status" : "SUCCESS",
-  "taskId" : 2,
-  "taskLocality" : "PROCESS_LOCAL",
-  "taskMetrics" : {
-    "diskBytesSpilled" : 0,
-    "executorCpuTime" : 0,
-    "executorDeserializeCpuTime" : 0,
-    "executorDeserializeTime" : 32,
-    "executorRunTime" : 348,
-    "inputMetrics" : {
-      "bytesRead" : 60488,
-      "recordsRead" : 10000
-    },
-    "jvmGcTime" : 7,
-    "memoryBytesSpilled" : 0,
-    "outputMetrics" : {
-      "bytesWritten" : 0,
-      "recordsWritten" : 0
-    },
     "peakExecutionMemory" : 0,
-    "resultSerializationTime" : 2,
-    "resultSize" : 2010,
-    "shuffleReadMetrics" : {
-      "fetchWaitTime" : 0,
-      "localBlocksFetched" : 0,
-      "localBytesRead" : 0,
-      "recordsRead" : 0,
-      "remoteBlocksFetched" : 0,
-      "remoteBytesRead" : 0,
-      "remoteBytesReadToDisk" : 0,
-      "remoteReqsDuration" : 0,
-      "shufflePushReadMetrics" : {
-        "corruptMergedBlockChunks" : 0,
-        "localMergedBlocksFetched" : 0,
-        "localMergedBytesRead" : 0,
-        "localMergedChunksFetched" : 0,
-        "mergedFetchFallbackCount" : 0,
-        "remoteMergedBlocksFetched" : 0,
-        "remoteMergedBytesRead" : 0,
-        "remoteMergedChunksFetched" : 0,
-        "remoteMergedReqsDuration" : 0
-      }
+    "outputMetrics" : {
+      "recordsWritten" : 0,
+      "bytesWritten" : 0
     },
+    "memoryBytesSpilled" : 0,
+    "jvmGcTime" : 7,
+    "inputMetrics" : {
+      "recordsRead" : 10000,
+      "bytesRead" : 60488
+    },
+    "executorRunTime" : 350,
+    "executorDeserializeTime" : 31,
+    "executorDeserializeCpuTime" : 0,
+    "executorCpuTime" : 0,
+    "diskBytesSpilled" : 0
+  },
+  "taskLocality" : "PROCESS_LOCAL",
+  "taskId" : 1,
+  "status" : "SUCCESS",
+  "speculative" : false,
+  "schedulerDelay" : 40,
+  "partitionId" : -1,
+  "launchTime" : "2015-05-06T13:03:06.502GMT",
+  "index" : 1,
+  "host" : "localhost",
+  "gettingResultTime" : 0,
+  "executorLogs" : { },
+  "executorId" : "driver",
+  "duration" : 421,
+  "attempt" : 0,
+  "accumulatorUpdates" : [ ]
+}, {
+  "taskMetrics" : {
     "shuffleWriteMetrics" : {
-      "bytesWritten" : 1710,
+      "writeTime" : 89885,
       "recordsWritten" : 10,
-      "writeTime" : 89885
-    }
-  }
+      "bytesWritten" : 1710
+    },
+    "shuffleReadMetrics" : {
+      "shufflePushReadMetrics" : {
+        "remoteMergedReqsDuration" : 0,
+        "remoteMergedChunksFetched" : 0,
+        "remoteMergedBytesRead" : 0,
+        "remoteMergedBlocksFetched" : 0,
+        "mergedFetchFallbackCount" : 0,
+        "localMergedChunksFetched" : 0,
+        "localMergedBytesRead" : 0,
+        "localMergedBlocksFetched" : 0,
+        "corruptMergedBlockChunks" : 0
+      },
+      "remoteReqsDuration" : 0,
+      "remoteBytesReadToDisk" : 0,
+      "remoteBytesRead" : 0,
+      "remoteBlocksFetched" : 0,
+      "recordsRead" : 0,
+      "localBytesRead" : 0,
+      "localBlocksFetched" : 0,
+      "fetchWaitTime" : 0
+    },
+    "resultSize" : 2010,
+    "resultSerializationTime" : 2,
+    "peakExecutionMemory" : 0,
+    "outputMetrics" : {
+      "recordsWritten" : 0,
+      "bytesWritten" : 0
+    },
+    "memoryBytesSpilled" : 0,
+    "jvmGcTime" : 7,
+    "inputMetrics" : {
+      "recordsRead" : 10000,
+      "bytesRead" : 60488
+    },
+    "executorRunTime" : 348,
+    "executorDeserializeTime" : 32,
+    "executorDeserializeCpuTime" : 0,
+    "executorCpuTime" : 0,
+    "diskBytesSpilled" : 0
+  },
+  "taskLocality" : "PROCESS_LOCAL",
+  "taskId" : 2,
+  "status" : "SUCCESS",
+  "speculative" : false,
+  "schedulerDelay" : 37,
+  "partitionId" : -1,
+  "launchTime" : "2015-05-06T13:03:06.503GMT",
+  "index" : 2,
+  "host" : "localhost",
+  "gettingResultTime" : 0,
+  "executorLogs" : { },
+  "executorId" : "driver",
+  "duration" : 419,
+  "attempt" : 0,
+  "accumulatorUpdates" : [ ]
 } ]
