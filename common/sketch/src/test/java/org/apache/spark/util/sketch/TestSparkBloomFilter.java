@@ -30,8 +30,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
-
-@Disabled
 public class TestSparkBloomFilter {
 
     // the implemented fpp limit is only approximating the hard boundary,
