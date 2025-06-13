@@ -109,12 +109,7 @@ case class Sum(
     // If shouldTrackIsEmpty is true, the initial value of `sum` is 0. We need to keep `sum`
     // unchanged if the input is null, as SUM function ignores null input. The `sum` can only be
     // null if overflow happens under non-ansi mode.
-    val sumExpr = if (child.nullable) {
-      If(child.isNull, sum,
-        add(sum, KnownNotNull(child).cast(resultType)))
-    } else {
-      add(sum, child.cast(resultType))
-    }
+    val sumExpr = Add(sum, coalesce(child.cast(resultType), zero))
     // The buffer becomes non-empty after seeing the first not-null input.
     val isEmptyExpr = if (child.nullable) {
       isEmpty && child.isNull
