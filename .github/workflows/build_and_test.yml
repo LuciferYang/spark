@@ -550,6 +550,7 @@ jobs:
       HIVE_PROFILE: hive2.3
       GITHUB_PREV_SHA: ${{ github.event.before }}
       SPARK_LOCAL_IP: localhost
+      NOLINT_ON_COMPILE: true
       SKIP_UNIDOC: true
       SKIP_MIMA: true
       SKIP_PACKAGING: true
@@ -669,6 +670,7 @@ jobs:
       HIVE_PROFILE: hive2.3
       GITHUB_PREV_SHA: ${{ github.event.before }}
       SPARK_LOCAL_IP: localhost
+      NOLINT_ON_COMPILE: true
       SKIP_UNIDOC: true
       SKIP_MIMA: true
       SKIP_PACKAGING: true
@@ -1099,6 +1101,7 @@ jobs:
     timeout-minutes: 120
     env:
       SPARK_LOCAL_IP: localhost
+      NOLINT_ON_COMPILE: true
     steps:
     - name: Checkout Spark repository
       uses: actions/checkout@v4
@@ -1204,6 +1207,7 @@ jobs:
       HIVE_PROFILE: hive2.3
       GITHUB_PREV_SHA: ${{ github.event.before }}
       SPARK_LOCAL_IP: localhost
+      NOLINT_ON_COMPILE: true
       SKIP_UNIDOC: true
       SKIP_MIMA: true
       SKIP_PACKAGING: true
