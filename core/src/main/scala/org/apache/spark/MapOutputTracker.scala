@@ -1695,6 +1695,8 @@ private[spark] object MapOutputTracker extends Logging {
       // Add location for the mapper shuffle partition blocks
       for ((mapStatus, mapIndex) <- mapStatuses.iterator.zipWithIndex) {
         validateStatus(mapStatus, shuffleId, startPartition)
+        val location = mapStatus.location
+        var locationBuffer: ListBuffer[(BlockId, Long, Int)] = null
         for (partId <- startPartition until endPartition) {
           // For the "holes" in this pre-merged shuffle partition, i.e., unmerged mapper
           // shuffle partition blocks, fetch the original map produced shuffle partition blocks
@@ -1703,8 +1705,17 @@ private[spark] object MapOutputTracker extends Logging {
             !mergeStatus.tracker.contains(mapIndex)) {
             val size = mapStatus.getSizeForBlock(partId)
             if (size != 0) {
-              splitsByAddress.getOrElseUpdate(mapStatus.location, ListBuffer()) +=
-                ((ShuffleBlockId(shuffleId, mapStatus.mapId, partId), size, mapIndex))
+              val blockInfo = (ShuffleBlockId(shuffleId, mapStatus.mapId, partId), size, mapIndex)
+
+              if (locationBuffer == null) {
+                splitsByAddress.get(location) match {
+                  case Some(buffer) => locationBuffer = buffer
+                  case None =>
+                    locationBuffer = ListBuffer()
+                    splitsByAddress.put(location, locationBuffer)
+                }
+              }
+              locationBuffer += blockInfo
             }
           }
         }
@@ -1713,11 +1724,21 @@ private[spark] object MapOutputTracker extends Logging {
       val iter = mapStatuses.iterator.zipWithIndex
       for ((status, mapIndex) <- iter.slice(startMapIndex, endMapIndex)) {
         validateStatus(status, shuffleId, startPartition)
+        val location = status.location
+        var locationBuffer: ListBuffer[(BlockId, Long, Int)] = null
         for (part <- startPartition until endPartition) {
           val size = status.getSizeForBlock(part)
           if (size != 0) {
-            splitsByAddress.getOrElseUpdate(status.location, ListBuffer()) +=
-              ((ShuffleBlockId(shuffleId, status.mapId, part), size, mapIndex))
+            val blockInfo = (ShuffleBlockId(shuffleId, status.mapId, part), size, mapIndex)
+            if (locationBuffer == null) {
+              splitsByAddress.get(location) match {
+                case Some(buffer) => locationBuffer = buffer
+                case None =>
+                  locationBuffer = ListBuffer()
+                  splitsByAddress.put(location, locationBuffer)
+              }
+            }
+            locationBuffer += blockInfo
           }
         }
       }
