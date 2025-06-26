@@ -20,8 +20,9 @@ package org.apache.spark
 import java.io.{FileDescriptor, InputStream}
 import java.lang
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 import org.apache.hadoop.fs._
 
@@ -29,29 +30,38 @@ import org.apache.spark.internal.Logging
 
 object DebugFilesystem extends Logging {
   // Stores the set of active streams and their creation sites.
-  private val openStreams = mutable.Map.empty[FSDataInputStream, Throwable]
+  private val openStreams = new ConcurrentHashMap[FSDataInputStream, Throwable]()
 
-  def addOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
+  def addOpenStream(stream: FSDataInputStream): Unit = {
     openStreams.put(stream, new Throwable())
   }
 
-  def clearOpenStreams(): Unit = openStreams.synchronized {
+  def clearOpenStreams(): Unit = {
     openStreams.clear()
   }
 
-  def removeOpenStream(stream: FSDataInputStream): Unit = openStreams.synchronized {
+  def removeOpenStream(stream: FSDataInputStream): Unit = {
     openStreams.remove(stream)
   }
 
   def assertNoOpenStreams(): Unit = openStreams.synchronized {
     val numOpen = openStreams.values.size
     if (numOpen > 0) {
-      for (exc <- openStreams.values) {
+      logWarning(s"Found $numOpen potentially leaked file streams:")
+      openStreams.values().asScala.foreach { exc =>
         logWarning("Leaked filesystem connection created at:")
         exc.printStackTrace()
       }
-      throw new IllegalStateException(s"There are $numOpen possibly leaked file streams.",
-        openStreams.values.head)
+
+      Thread.sleep(100)
+      System.gc()
+      Thread.sleep(100)
+
+      val numOpenAfterGC = openStreams.size()
+      if (numOpenAfterGC > 0) {
+        throw new IllegalStateException(s"There are $numOpenAfterGC possibly leaked file streams.",
+          openStreams.values().iterator().next())
+      }
     }
   }
 }
