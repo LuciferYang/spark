@@ -387,3 +387,13 @@ object RocksDBBenchmark extends BenchmarkBase {
     entries.toSeq
   }
 }
+
+private class SimpleType {
+  @KVIndex var key: Int = _
+  var name: String = _
+}
+
+private class IndexedType {
+  @KVIndex var key: Int = _
+  @KVIndex("name") var name: String = _
+}
