@@ -53,7 +53,7 @@ import org.apache.spark.benchmark.{Benchmark, BenchmarkBase}
  */
 object RocksDBBenchmark extends BenchmarkBase {
 
-  private val COUNT = 1024
+  private val COUNT = 1024 * 1024 * 4
   private val ITERATIONS = 4
   private val IDGEN = new AtomicInteger()
 
