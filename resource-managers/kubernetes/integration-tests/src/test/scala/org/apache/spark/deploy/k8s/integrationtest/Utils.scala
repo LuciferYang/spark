@@ -17,7 +17,6 @@
 package org.apache.spark.deploy.k8s.integrationtest
 
 import java.io.{Closeable, File, FileInputStream, FileOutputStream, PrintWriter}
-import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import java.util.concurrent.CountDownLatch
 import java.util.zip.{ZipEntry, ZipOutputStream}
@@ -74,23 +73,28 @@ object Utils extends Logging {
       override def onFailure(e: Throwable, r: Response): Unit = {
       }
 
+      def waitForInputStreamToConnect(): Unit = {
+        openLatch.await()
+      }
+
       def waitForClose(): Unit = {
         closeLatch.await()
       }
     }
     val listener = new ReadyListener()
     val watch = pod
-      .redirectingInput()
+      .readingInput(System.in)
       .writingOutput(out)
       .writingError(System.err)
       .withTTY()
       .usingListener(listener)
       .exec(cmd.toArray: _*)
-    watch.getOutput.transferTo(out)
+    // under load sometimes the stdout isn't connected by the time we try to read from it.
+    listener.waitForInputStreamToConnect()
     listener.waitForClose()
     watch.close()
     out.flush()
-    val result = out.toString(StandardCharsets.UTF_8)
+    val result = out.toString()
     result
   }
 
