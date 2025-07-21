@@ -28,7 +28,7 @@ import io.fabric8.kubernetes.client.dsl.ExecListener
 import io.fabric8.kubernetes.client.dsl.ExecListener.Response
 import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
-import org.apache.commons.compress.utils.IOUtils
+import org.apache.commons.io.IOUtils
 import org.apache.commons.io.output.ByteArrayOutputStream
 
 import org.apache.spark.{SPARK_VERSION, SparkException}
