@@ -2792,7 +2792,7 @@
             </jvmArgs>
             <javacArgs>
               <javacArg>--release</javacArg>
-              <javacArg>${java.version}</javacArg>
+              <javacArg>17</javacArg>
               <javacArg>-Xlint:all,-serial,-path,-try</javacArg>
               <javacArg>-proc:full</javacArg>
             </javacArgs>
