@@ -21,7 +21,7 @@ import io.fabric8.kubernetes.api.model.apps.StatefulSet
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl._
 import org.mockito.{ArgumentCaptor, Mock, MockitoAnnotations}
-import org.mockito.ArgumentMatchers.{any, eq => meq}
+import org.mockito.ArgumentMatchers.{any, anyInt, eq => meq}
 import org.mockito.Mockito.{never, times, verify, when}
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
@@ -161,6 +161,6 @@ class StatefulSetAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     verify(podResource, never()).create()
     podsAllocatorUnderTest.setTotalExpectedExecutors(
       Map(defaultProfile -> (20)))
-    verify(editableSet, times(1)).scale(any(), any())
+    verify(editableSet, times(1)).scale(anyInt())
   }
 }
