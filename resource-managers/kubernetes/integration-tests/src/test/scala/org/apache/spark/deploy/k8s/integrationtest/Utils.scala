@@ -91,8 +91,7 @@ object Utils extends Logging {
       .exec(cmd.toArray: _*)
     // under load sometimes the stdout isn't connected by the time we try to read from it.
     listener.waitForInputStreamToConnect()
-    val output = watch.getInput
-    if (output != null) System.in.transferTo(output)
+    System.in.transferTo(watch.getInput)
     listener.waitForClose()
     watch.close()
     out.flush()
