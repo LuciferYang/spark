@@ -21,6 +21,7 @@ import java.util.UUID
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.streaming.checkpointing.{CommitLog, OffsetSeqLog}
 
 /**
  * An interface for accessing the checkpoint metadata associated with a streaming query.

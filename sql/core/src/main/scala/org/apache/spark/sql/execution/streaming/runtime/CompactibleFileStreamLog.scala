@@ -27,9 +27,10 @@ import org.apache.hadoop.fs.Path
 import org.json4s.{Formats, NoTypeHints}
 import org.json4s.jackson.Serialization
 
-import org.apache.spark.internal.{LogKeys}
+import org.apache.spark.internal.LogKeys
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.errors.QueryExecutionErrors
+import org.apache.spark.sql.execution.streaming.checkpointing.HDFSMetadataLog
 import org.apache.spark.util.Utils
 
 /**

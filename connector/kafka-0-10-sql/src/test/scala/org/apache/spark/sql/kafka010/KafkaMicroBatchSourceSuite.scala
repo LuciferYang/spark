@@ -43,6 +43,7 @@ import org.apache.spark.sql.execution.datasources.v2.StreamingDataSourceV2ScanRe
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.execution.streaming.AsyncProgressTrackingMicroBatchExecution.{ASYNC_PROGRESS_TRACKING_CHECKPOINTING_INTERVAL_MS, ASYNC_PROGRESS_TRACKING_ENABLED}
+import org.apache.spark.sql.execution.streaming.checkpointing.OffsetSeq
 import org.apache.spark.sql.execution.streaming.continuous.ContinuousExecution
 import org.apache.spark.sql.functions.{count, expr, window}
 import org.apache.spark.sql.internal.SQLConf

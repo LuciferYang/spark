@@ -24,6 +24,7 @@ import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.streaming.FileStreamSource.FileEntry
+import org.apache.spark.sql.execution.streaming.checkpointing.HDFSMetadataLog
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.ArrayImplicits._
 

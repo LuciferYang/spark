@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.streaming
 import java.util.concurrent.ThreadPoolExecutor
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.streaming.checkpointing.{AsyncCommitLog, AsyncOffsetSeqLog}
 import org.apache.spark.util.Clock
 
 /**

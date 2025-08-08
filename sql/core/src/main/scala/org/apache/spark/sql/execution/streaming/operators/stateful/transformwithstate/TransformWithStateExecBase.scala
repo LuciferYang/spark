@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, SortOrde
 import org.apache.spark.sql.catalyst.plans.logical.{EventTime, ProcessingTime}
 import org.apache.spark.sql.catalyst.plans.physical.Distribution
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.statefulprocessor.ImplicitGroupingKeyTracker
 import org.apache.spark.sql.execution.streaming.state.{OperatorStateMetadata, TransformWithStateUserFunctionException}
 import org.apache.spark.sql.streaming.{OutputMode, TimeMode}
 import org.apache.spark.sql.types.{BinaryType, StructType}

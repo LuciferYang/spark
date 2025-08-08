@@ -26,7 +26,8 @@ import org.apache.spark.{SharedSparkContext, SparkContext, SparkFunSuite}
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.classic.SparkSession
 import org.apache.spark.sql.execution.streaming.{MemoryStream, StreamingQueryWrapper}
-import org.apache.spark.sql.execution.streaming.StreamingSymmetricHashJoinHelper.{LeftSide, RightSide}
+import org.apache.spark.sql.execution.streaming.operators.stateful.join.StreamingSymmetricHashJoinHelper.{LeftSide, RightSide}
+import org.apache.spark.sql.execution.streaming.operators.stateful.join.SymmetricHashJoinStateManager
 import org.apache.spark.sql.functions.{count, expr}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.{StreamingQuery, StreamTest, Trigger}

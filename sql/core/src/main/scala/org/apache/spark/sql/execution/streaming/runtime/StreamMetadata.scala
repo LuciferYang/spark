@@ -29,7 +29,8 @@ import org.json4s.jackson.Serialization
 
 import org.apache.spark.internal.{Logging, LogKeys}
 import org.apache.spark.sql.errors.QueryExecutionErrors
-import org.apache.spark.sql.execution.streaming.CheckpointFileManager.CancellableFSDataOutputStream
+import org.apache.spark.sql.execution.streaming.checkpointing.CheckpointFileManager
+import org.apache.spark.sql.execution.streaming.checkpointing.CheckpointFileManager.CancellableFSDataOutputStream
 import org.apache.spark.util.Utils
 
 /**

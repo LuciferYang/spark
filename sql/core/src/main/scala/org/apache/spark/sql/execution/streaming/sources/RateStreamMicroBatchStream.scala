@@ -30,6 +30,7 @@ import org.apache.spark.sql.connector.read.{InputPartition, PartitionReader, Par
 import org.apache.spark.sql.connector.read.streaming.{MicroBatchStream, Offset}
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.streaming._
+import org.apache.spark.sql.execution.streaming.checkpointing.HDFSMetadataLog
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.{ManualClock, SystemClock, Utils}
 

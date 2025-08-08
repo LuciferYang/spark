@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.streaming
 import scala.collection.immutable
 
 import org.apache.spark.sql.connector.read.streaming.{Offset => OffsetV2, SparkDataStream}
+import org.apache.spark.sql.execution.streaming.checkpointing.{OffsetSeq, OffsetSeqMetadata}
 
 /**
  * A helper class that looks like a Map[Source, Offset].

@@ -20,6 +20,7 @@ package org.apache.spark.sql.kafka010
 import java.io.File
 
 import org.apache.spark.sql.execution.streaming._
+import org.apache.spark.sql.execution.streaming.checkpointing.{OffsetSeq, OffsetSeqLog}
 import org.apache.spark.sql.streaming.OffsetSuite
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.util.Utils
