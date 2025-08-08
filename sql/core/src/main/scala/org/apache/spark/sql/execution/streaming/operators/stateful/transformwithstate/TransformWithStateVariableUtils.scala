@@ -23,7 +23,7 @@ import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods.{compact, render}
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.streaming.{SchemaValidationUtils, StatefulOperatorStateInfo}
+import org.apache.spark.sql.execution.streaming.operators.stateful.{SchemaValidationUtils, StatefulOperatorStateInfo}
 import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.StateVariableType.StateVariableType
 import org.apache.spark.sql.execution.streaming.state.{OperatorInfoV1, OperatorStateMetadata, OperatorStateMetadataV2, StateStoreErrors, StateStoreId, StateStoreMetadataV2}
 import org.apache.spark.sql.streaming.{OutputMode, TimeMode}
