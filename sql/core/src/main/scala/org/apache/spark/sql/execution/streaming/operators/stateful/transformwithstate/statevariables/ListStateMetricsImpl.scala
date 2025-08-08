@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.streaming.operators.stateful.transformwit
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, UnsafeProjection, UnsafeRow}
-import org.apache.spark.sql.execution.streaming.TransformWithStateVariableUtils.getRowCounterCFName
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.TransformWithStateVariableUtils.getRowCounterCFName
 import org.apache.spark.sql.execution.streaming.state.{NoPrefixKeyStateEncoderSpec, StateStore}
 import org.apache.spark.sql.types._
 // scalastyle:on line.size.limit

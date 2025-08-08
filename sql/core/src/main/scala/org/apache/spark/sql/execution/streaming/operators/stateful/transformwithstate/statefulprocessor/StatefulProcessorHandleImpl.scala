@@ -27,9 +27,10 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder}
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.execution.streaming.{MicroBatchExecution, StateStoreColumnFamilySchemaUtils, StreamExecution, TimerKeyEncoder, TransformWithStateVariableInfo, TransformWithStateVariableUtils}
-import org.apache.spark.sql.execution.streaming.StateVariableType._
-import org.apache.spark.sql.execution.streaming.TransformWithStateKeyValueRowSchemaUtils.{getExpirationMsRowSchema, getTTLRowKeySchema}
+import org.apache.spark.sql.execution.streaming.{MicroBatchExecution, StreamExecution}
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.{StateStoreColumnFamilySchemaUtils, TimerKeyEncoder, TransformWithStateVariableInfo, TransformWithStateVariableUtils}
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.StateVariableType._
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.TransformWithStateKeyValueRowSchemaUtils.{getExpirationMsRowSchema, getTTLRowKeySchema}
 import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.statefulprocessor.StatefulProcessorHandleState.PRE_INIT
 import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.statevariables.{ListStateImpl, MapStateImpl, ValueStateImpl}
 import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.timers.{TimerStateImpl, TimerStateUtils}

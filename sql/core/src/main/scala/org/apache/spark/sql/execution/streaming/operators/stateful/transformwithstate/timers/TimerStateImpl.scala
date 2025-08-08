@@ -21,7 +21,7 @@ import org.apache.spark.internal.LogKeys.{EXPIRY_TIMESTAMP, KEY}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.execution.streaming.TimerKeyEncoder
+import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.TimerKeyEncoder
 import org.apache.spark.sql.execution.streaming.operators.stateful.transformwithstate.statefulprocessor.ImplicitGroupingKeyTracker
 import org.apache.spark.sql.execution.streaming.state._
 import org.apache.spark.sql.streaming.TimeMode
