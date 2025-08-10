@@ -18,7 +18,7 @@
 package org.apache.spark.sql.streaming.util
 
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.execution.streaming.Source
+import org.apache.spark.sql.execution.streaming.runtime.Source
 import org.apache.spark.sql.sources.StreamSourceProvider
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 

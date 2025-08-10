@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.streaming
+package org.apache.spark.sql.execution.streaming.runtime
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.LogKeys.{DELEGATE, READ_LIMIT}

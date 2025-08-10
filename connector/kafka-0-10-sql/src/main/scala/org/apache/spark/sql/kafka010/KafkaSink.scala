@@ -22,7 +22,7 @@ import java.{util => ju}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.LogKeys.BATCH_ID
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.execution.streaming.Sink
+import org.apache.spark.sql.execution.streaming.runtime.Sink
 
 private[kafka010] class KafkaSink(
     executorKafkaParams: ju.Map[String, Object],

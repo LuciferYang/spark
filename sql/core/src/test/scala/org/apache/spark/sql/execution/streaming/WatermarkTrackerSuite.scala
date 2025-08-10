@@ -23,6 +23,7 @@ import scala.collection.mutable
 
 import org.apache.spark.sql.execution.{SparkPlan, UnionExec}
 import org.apache.spark.sql.execution.streaming.operators.stateful.{EventTimeStatsAccum, EventTimeWatermarkExec}
+import org.apache.spark.sql.execution.streaming.runtime.{MemoryStream, WatermarkTracker}
 import org.apache.spark.sql.functions.timestamp_seconds
 import org.apache.spark.sql.streaming.StreamTest
 

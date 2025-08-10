@@ -35,7 +35,7 @@ import org.apache.spark.util.ArrayImplicits._
 
 class FileStreamSinkLogSuite extends SparkFunSuite with SharedSparkSession {
 
-  import CompactibleFileStreamLog._
+  import org.apache.spark.sql.execution.streaming.runtime.CompactibleFileStreamLog._
   import FileStreamSinkLog._
 
   test("shouldRetain") {
