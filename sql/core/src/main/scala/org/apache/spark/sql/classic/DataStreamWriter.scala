@@ -43,7 +43,6 @@ import org.apache.spark.sql.execution.datasources.{DataSource, DataSourceUtils}
 import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Utils, FileDataSourceV2}
 import org.apache.spark.sql.execution.datasources.v2.python.PythonDataSourceV2
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.execution.streaming.runtime.Sink
 import org.apache.spark.sql.execution.streaming.sources._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap

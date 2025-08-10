@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.streaming.runtime
 
 import org.apache.spark.SparkUnsupportedOperationException
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.execution.streaming.Offset
+import org.apache.spark.sql.execution.streaming.{Offset, Source}
 import org.apache.spark.sql.types.StructType
 
 /**

@@ -39,7 +39,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.connector.read.streaming.ReadLimit
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.execution.streaming.runtime.{CleanSourceMode, FileStreamOptions, FileStreamSource, FileStreamSourceLog, FileStreamSourceOffset, MemoryStream, SerializedOffset, Source, StreamExecution, StreamingExecutionRelation, StreamingQueryWrapper, StreamingRelation}
+import org.apache.spark.sql.execution.streaming.runtime.{CleanSourceMode, FileStreamOptions, FileStreamSource, FileStreamSourceLog, FileStreamSourceOffset, MemoryStream, SerializedOffset, StreamExecution, StreamingExecutionRelation, StreamingQueryWrapper, StreamingRelation}
 import org.apache.spark.sql.execution.streaming.runtime.FileStreamSource.{FileEntry, SeenFilesMap, SourceFileArchiver}
 import org.apache.spark.sql.execution.streaming.sinks.{FileStreamSink, FileStreamSinkLog, SinkFileStatus}
 import org.apache.spark.sql.execution.streaming.sources.MemorySink

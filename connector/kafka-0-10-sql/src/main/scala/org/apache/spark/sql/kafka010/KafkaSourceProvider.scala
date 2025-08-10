@@ -36,7 +36,7 @@ import org.apache.spark.sql.connector.metric.{CustomMetric, CustomSumMetric}
 import org.apache.spark.sql.connector.read.{Batch, Scan, ScanBuilder}
 import org.apache.spark.sql.connector.read.streaming.{ContinuousStream, MicroBatchStream}
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsTruncate, Write, WriteBuilder}
-import org.apache.spark.sql.execution.streaming.runtime.{Sink, Source}
+import org.apache.spark.sql.execution.streaming.{Sink, Source}
 import org.apache.spark.sql.internal.connector.{SimpleTableProvider, SupportsStreamingUpdateAsAppend}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode

@@ -21,7 +21,7 @@ import org.apache.spark.annotation.{Stable, Unstable}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.execution.streaming.runtime.{Sink, Source}
+import org.apache.spark.sql.execution.streaming.{Sink, Source}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 

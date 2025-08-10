@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.classic.ClassicConversions.castToImpl
 import org.apache.spark.sql.classic.Dataset.ofRows
 import org.apache.spark.sql.execution.LogicalRDD
-import org.apache.spark.sql.execution.streaming.runtime.Sink
+import org.apache.spark.sql.execution.streaming.Sink
 import org.apache.spark.sql.streaming.DataStreamWriter
 
 class ForeachBatchSink[T](batchWriter: (Dataset[T], Long) => Unit, encoder: ExpressionEncoder[T])
