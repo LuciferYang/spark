@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
@@ -70,13 +69,10 @@ public class RetryingBlockTransferorSuite {
   public void testNoFailures() throws IOException, InterruptedException {
     BlockFetchingListener listener = mock(BlockFetchingListener.class);
 
-    List<? extends Map<String, Object>> interactions = Arrays.asList(
+    List<? extends Map<String, Object>> interactions = List.of(
       // Immediately return both blocks successfully.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", block1)
-        .build()
-      );
+      Map.of("b0", block0, "b1", block1)
+    );
 
     performInteractions(interactions, listener);
 
@@ -89,12 +85,9 @@ public class RetryingBlockTransferorSuite {
   public void testUnrecoverableFailure() throws IOException, InterruptedException {
     BlockFetchingListener listener = mock(BlockFetchingListener.class);
 
-    List<? extends Map<String, Object>> interactions = Arrays.asList(
+    List<? extends Map<String, Object>> interactions = List.of(
       // b0 throws a non-IOException error, so it will be failed without retry.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", new RuntimeException("Ouch!"))
-        .put("b1", block1)
-        .build()
+      Map.of("b0", new RuntimeException("Ouch!"), "b1", block1)
     );
 
     performInteractions(interactions, listener);
@@ -111,14 +104,8 @@ public class RetryingBlockTransferorSuite {
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
       // IOException will cause a retry. Since b0 fails, we will retry both.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", new IOException("Connection failed or something"))
-        .put("b1", block1)
-        .build(),
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", block1)
-        .build()
+      Map.of("b0", new IOException("Connection failed or something"), "b1", block1),
+      Map.of("b0", block0, "b1", block1)
     );
 
     performInteractions(interactions, listener);
@@ -135,13 +122,8 @@ public class RetryingBlockTransferorSuite {
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
       // IOException will cause a retry. Since b1 fails, we will not retry b0.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", new IOException("Connection failed or something"))
-        .build(),
-      ImmutableMap.<String, Object>builder()
-        .put("b1", block1)
-        .build()
+      Map.of("b0", block0, "b1", new IOException("Connection failed or something")),
+      Map.of("b1", block1)
     );
 
     performInteractions(interactions, listener);
@@ -158,19 +140,11 @@ public class RetryingBlockTransferorSuite {
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
       // b0's IOException will trigger retry, b1's will be ignored.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", new IOException())
-        .put("b1", new IOException())
-        .build(),
+      Map.of("b0", new IOException(), "b1", new IOException()),
       // Next, b0 is successful and b1 errors again, so we just request that one.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", new IOException())
-        .build(),
+      Map.of("b0", block0, "b1", new IOException()),
       // b1 returns successfully within 2 retries.
-      ImmutableMap.<String, Object>builder()
-        .put("b1", block1)
-        .build()
+      Map.of("b1", block1)
     );
 
     performInteractions(interactions, listener);
@@ -187,23 +161,13 @@ public class RetryingBlockTransferorSuite {
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
       // b0's IOException will trigger retry, b1's will be ignored.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", new IOException())
-        .put("b1", new IOException())
-        .build(),
+      Map.of("b0", new IOException(), "b1", new IOException()),
       // Next, b0 is successful and b1 errors again, so we just request that one.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", new IOException())
-        .build(),
+      Map.of("b0", block0, "b1", new IOException()),
       // b1 errors again, but this was the last retry
-      ImmutableMap.<String, Object>builder()
-        .put("b1", new IOException())
-        .build(),
+      Map.of("b1", new IOException()),
       // This is not reached -- b1 has failed.
-      ImmutableMap.<String, Object>builder()
-        .put("b1", block1)
-        .build()
+      Map.of("b1", block1)
     );
 
     performInteractions(interactions, listener);
@@ -220,21 +184,11 @@ public class RetryingBlockTransferorSuite {
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
       // b0's IOException will trigger retry, subsequent messages will be ignored.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", new IOException())
-        .put("b1", new RuntimeException())
-        .put("b2", block2)
-        .build(),
+      Map.of("b0", new IOException(), "b1", new RuntimeException(), "b2", block2),
       // Next, b0 is successful, b1 errors unrecoverably, and b2 triggers a retry.
-      ImmutableMap.<String, Object>builder()
-        .put("b0", block0)
-        .put("b1", new RuntimeException())
-        .put("b2", new IOException())
-        .build(),
+      Map.of("b0", block0, "b1", new RuntimeException(), "b2", new IOException()),
       // b2 succeeds in its last retry.
-      ImmutableMap.<String, Object>builder()
-        .put("b2", block2)
-        .build()
+      Map.of("b2", block2)
     );
 
     performInteractions(interactions, listener);
@@ -253,12 +207,8 @@ public class RetryingBlockTransferorSuite {
     SaslTimeoutException saslTimeoutException =
         new SaslTimeoutException(timeoutException);
     List<? extends Map<String, Object>> interactions = Arrays.asList(
-        ImmutableMap.<String, Object>builder()
-            .put("b0", saslTimeoutException)
-            .build(),
-        ImmutableMap.<String, Object>builder()
-            .put("b0", block0)
-            .build()
+      Map.of("b0", saslTimeoutException),
+      Map.of("b0", block0)
     );
 
     performInteractions(interactions, listener);
@@ -273,13 +223,9 @@ public class RetryingBlockTransferorSuite {
     BlockFetchingListener listener = mock(BlockFetchingListener.class);
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
-        // SaslTimeout will cause a retry. Since b0 fails, we will retry both.
-        ImmutableMap.<String, Object>builder()
-            .put("b0", new SaslTimeoutException(new TimeoutException()))
-            .build(),
-        ImmutableMap.<String, Object>builder()
-            .put("b0", block0)
-            .build()
+      // SaslTimeout will cause a retry. Since b0 fails, we will retry both.
+      Map.of("b0", new SaslTimeoutException(new TimeoutException())),
+      Map.of("b0", block0)
     );
     configMap.put("spark.shuffle.sasl.enableRetries", "true");
     performInteractions(interactions, listener);
@@ -296,12 +242,10 @@ public class RetryingBlockTransferorSuite {
     TimeoutException timeoutException = new TimeoutException();
     SaslTimeoutException saslTimeoutException =
         new SaslTimeoutException(timeoutException);
-    List<ImmutableMap<String, Object>> interactions = new ArrayList<>();
+    List<Map<String, Object>> interactions = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       interactions.add(
-          ImmutableMap.<String, Object>builder()
-              .put("b0", saslTimeoutException)
-              .build()
+        Map.of("b0", saslTimeoutException)
       );
     }
     configMap.put("spark.shuffle.sasl.enableRetries", "true");
@@ -317,17 +261,9 @@ public class RetryingBlockTransferorSuite {
     BlockFetchingListener listener = mock(BlockFetchingListener.class);
 
     List<? extends Map<String, Object>> interactions = Arrays.asList(
-        ImmutableMap.<String, Object>builder()
-            .put("b0", new SaslTimeoutException(new TimeoutException()))
-            .put("b1", new IOException())
-            .build(),
-        ImmutableMap.<String, Object>builder()
-            .put("b0", block0)
-            .put("b1", new IOException())
-            .build(),
-        ImmutableMap.<String, Object>builder()
-          .put("b1", block1)
-          .build()
+      Map.of("b0", new SaslTimeoutException(new TimeoutException()), "b1", new IOException()),
+      Map.of("b0", block0, "b1", new IOException()),
+      Map.of("b1", block1)
     );
     configMap.put("spark.shuffle.sasl.enableRetries", "true");
     performInteractions(interactions, listener);
@@ -374,12 +310,9 @@ public class RetryingBlockTransferorSuite {
   public void testRetryInitiationFailure() throws IOException, InterruptedException {
     BlockFetchingListener listener = mock(BlockFetchingListener.class);
 
-    List<? extends Map<String, Object>> interactions = Arrays.asList(
-        // IOException will initiate a retry, but the initiation will fail
-        ImmutableMap.<String, Object>builder()
-            .put("b0", new IOException("Connection failed or something"))
-            .put("b1", block1)
-            .build()
+    List<? extends Map<String, Object>> interactions = List.of(
+      // IOException will initiate a retry, but the initiation will fail
+      Map.of("b0", new IOException("Connection failed or something"), "b1", block1)
     );
 
     configureInteractions(interactions, listener);
