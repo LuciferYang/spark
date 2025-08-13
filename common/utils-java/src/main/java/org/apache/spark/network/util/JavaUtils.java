@@ -32,8 +32,10 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -43,6 +45,8 @@ import org.apache.spark.internal.SparkLogger;
 import org.apache.spark.internal.SparkLoggerFactory;
 import org.apache.spark.internal.LogKeys;
 import org.apache.spark.internal.MDC;
+
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
  * General utilities available in the network package. Many of these are sourced from Spark's
@@ -755,6 +759,26 @@ public class JavaUtils {
   public static void checkState(boolean check, String msg, Object... args) {
     if (!check) {
       throw new IllegalStateException(String.format(msg, args));
+    }
+  }
+
+  public static void sleepUninterruptibly(long sleepFor, TimeUnit unit) {
+    boolean interrupted = Thread.interrupted();
+    try {
+      long remainingNanos = unit.toNanos(sleepFor);
+      long end = System.nanoTime() + remainingNanos;
+
+      while (remainingNanos > 0) {
+        LockSupport.parkNanos(remainingNanos);
+        if (Thread.interrupted()) {
+          interrupted = true;
+        }
+        remainingNanos = end - System.nanoTime();
+      }
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 }

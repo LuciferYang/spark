@@ -22,9 +22,8 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import scala.util.Random
 
-import com.google.common.util.concurrent.Uninterruptibles
-
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.network.util.JavaUtils
 
 class UninterruptibleThreadSuite extends SparkFunSuite {
 
@@ -66,7 +65,7 @@ class UninterruptibleThreadSuite extends SparkFunSuite {
     @volatile var interruptStatusBeforeExit = false
     val t = new UninterruptibleThread("test") {
       override def run(): Unit = {
-        Uninterruptibles.awaitUninterruptibly(interruptLatch, 10, TimeUnit.SECONDS)
+        awaitUninterruptibly(interruptLatch, 10, TimeUnit.SECONDS)
         try {
           runUninterruptibly {
           }
@@ -93,7 +92,7 @@ class UninterruptibleThreadSuite extends SparkFunSuite {
       override def run(): Unit = {
         runUninterruptibly {
           enterRunUninterruptibly.countDown()
-          Uninterruptibles.awaitUninterruptibly(interruptLatch, 10, TimeUnit.SECONDS)
+          awaitUninterruptibly(interruptLatch, 10, TimeUnit.SECONDS)
           hasInterruptedException = sleep(1)
           runUninterruptibly {
             if (sleep(1)) {
@@ -174,7 +173,7 @@ class UninterruptibleThreadSuite extends SparkFunSuite {
                 hasInterruptedException = true
               }
             }
-            Uninterruptibles.sleepUninterruptibly(Random.nextInt(10), TimeUnit.MILLISECONDS)
+            JavaUtils.sleepUninterruptibly(Random.nextInt(10), TimeUnit.MILLISECONDS)
             // 50% chance to clear the interrupted status
             if (Random.nextBoolean()) {
               Thread.interrupted()
@@ -205,5 +204,31 @@ class UninterruptibleThreadSuite extends SparkFunSuite {
     }
     t.join()
     assert(hasInterruptedException === false)
+  }
+
+  def awaitUninterruptibly(latch: CountDownLatch, timeout: Long, unit: TimeUnit): Boolean = {
+    var interrupted = false
+    try {
+      val remainingNanos = unit.toNanos(timeout)
+      val end = System.nanoTime() + remainingNanos
+
+      @scala.annotation.tailrec
+      def awaitLoop(remaining: Long): Boolean = {
+        try {
+          // CountDownLatch treats negative timeouts just like zero.
+          latch.await(remaining, TimeUnit.NANOSECONDS)
+        } catch {
+          case _: InterruptedException =>
+            interrupted = true
+            val newRemaining = end - System.nanoTime()
+            awaitLoop(newRemaining)
+        }
+      }
+      awaitLoop(remainingNanos)
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt()
+      }
+    }
   }
 }

@@ -25,7 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.Uninterruptibles;
 
 import org.apache.spark.internal.SparkLogger;
 import org.apache.spark.internal.SparkLoggerFactory;
@@ -223,7 +222,7 @@ public class RetryingBlockTransferor {
 
     try {
       executorService.execute(() -> {
-        Uninterruptibles.sleepUninterruptibly(retryWaitTime, TimeUnit.MILLISECONDS);
+        JavaUtils.sleepUninterruptibly(retryWaitTime, TimeUnit.MILLISECONDS);
         transferAllOutstanding();
       });
     } catch (Throwable t) {

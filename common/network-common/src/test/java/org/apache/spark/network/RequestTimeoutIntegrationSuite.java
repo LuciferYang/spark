@@ -17,7 +17,6 @@
 
 package org.apache.spark.network;
 
-import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.spark.network.buffer.ManagedBuffer;
 import org.apache.spark.network.buffer.NioManagedBuffer;
 import org.apache.spark.network.client.ChunkReceivedCallback;
@@ -27,6 +26,7 @@ import org.apache.spark.network.client.TransportClientFactory;
 import org.apache.spark.network.server.RpcHandler;
 import org.apache.spark.network.server.StreamManager;
 import org.apache.spark.network.server.TransportServer;
+import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.MapConfigProvider;
 import org.apache.spark.network.util.TransportConf;
 import org.junit.jupiter.api.*;
@@ -189,7 +189,7 @@ public class RequestTimeoutIntegrationSuite {
     final StreamManager manager = new StreamManager() {
       @Override
       public ManagedBuffer getChunk(long streamId, int chunkIndex) {
-        Uninterruptibles.sleepUninterruptibly(FOREVER, TimeUnit.MILLISECONDS);
+        JavaUtils.sleepUninterruptibly(FOREVER, TimeUnit.MILLISECONDS);
         return new NioManagedBuffer(ByteBuffer.wrap(response));
       }
     };
@@ -216,12 +216,12 @@ public class RequestTimeoutIntegrationSuite {
     // Send one request, which will eventually fail.
     TestCallback callback0 = new TestCallback();
     client.fetchChunk(0, 0, callback0);
-    Uninterruptibles.sleepUninterruptibly(1200, TimeUnit.MILLISECONDS);
+    JavaUtils.sleepUninterruptibly(1200, TimeUnit.MILLISECONDS);
 
     // Send a second request before the first has failed.
     TestCallback callback1 = new TestCallback();
     client.fetchChunk(0, 1, callback1);
-    Uninterruptibles.sleepUninterruptibly(1200, TimeUnit.MILLISECONDS);
+    JavaUtils.sleepUninterruptibly(1200, TimeUnit.MILLISECONDS);
 
     // not complete yet, but should complete soon
     assertEquals(-1, callback0.successLength);
