@@ -435,15 +435,6 @@ abstract class SymmetricHashJoinStateManager(
   /** Get the combined metrics of all the state stores */
   def metrics: StateStoreMetrics
 
-  /**
-   * Update number of values for a key.
-   * NOTE: this function is only intended for use in unit tests
-   * to simulate null values.
-   */
-  private[streaming] def updateNumValuesTestOnly(key: UnsafeRow, numValues: Long): Unit = {
-    keyToNumValues.put(key, numValues)
-  }
-
   /*
   =====================================================
             Private methods and inner classes

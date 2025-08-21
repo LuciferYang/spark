@@ -273,10 +273,12 @@ class SymmetricHashJoinStateManagerSuite
 
   def updateNumValues(key: Int, numValues: Long)
                      (implicit manager: SymmetricHashJoinStateManager): Unit = {
-    val keyToNumValuesGetter = PrivateMethod[AnyRef](Symbol("keyToNumValues"))
-    val putFunction = PrivateMethod[Unit](Symbol("put"))
-    manager.invokePrivate(keyToNumValuesGetter())
-      .invokePrivate(putFunction(toJoinKeyRow(key), numValues))
+    val keyToNumValuesField = manager.getClass.getSuperclass.getDeclaredField("keyToNumValues")
+    keyToNumValuesField.setAccessible(true)
+    val keyToNumValuesStore = keyToNumValuesField.get(manager)
+
+    val putMethod = PrivateMethod[Unit](Symbol("put"))
+    keyToNumValuesStore.invokePrivate(putMethod(toJoinKeyRow(key), numValues))
   }
 
   def getNumValues(key: Int)
