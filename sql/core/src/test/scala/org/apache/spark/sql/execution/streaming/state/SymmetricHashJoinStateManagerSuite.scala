@@ -21,7 +21,7 @@ import java.sql.Timestamp
 import java.util.UUID
 
 import org.apache.hadoop.conf.Configuration
-import org.scalatest.BeforeAndAfter
+import org.scalatest.{BeforeAndAfter, PrivateMethodTester}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BoundReference, Expression, GenericInternalRow, LessThanOrEqual, Literal, UnsafeProjection, UnsafeRow}
@@ -37,7 +37,8 @@ import org.apache.spark.sql.streaming.StreamTest
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
-class SymmetricHashJoinStateManagerSuite extends StreamTest with BeforeAndAfter {
+class SymmetricHashJoinStateManagerSuite
+  extends StreamTest with BeforeAndAfter with PrivateMethodTester {
 
   before {
     SparkSession.setActiveSession(spark) // set this before force initializing 'joinExec'
@@ -272,7 +273,10 @@ class SymmetricHashJoinStateManagerSuite extends StreamTest with BeforeAndAfter 
 
   def updateNumValues(key: Int, numValues: Long)
                      (implicit manager: SymmetricHashJoinStateManager): Unit = {
-    manager.updateNumValuesTestOnly(toJoinKeyRow(key), numValues)
+    val keyToNumValuesGetter = PrivateMethod[AnyRef](Symbol("keyToNumValues"))
+    val putFunction = PrivateMethod[Unit](Symbol("put"))
+    manager.invokePrivate(keyToNumValuesGetter())
+      .invokePrivate(putFunction(toJoinKeyRow(key), numValues))
   }
 
   def getNumValues(key: Int)
