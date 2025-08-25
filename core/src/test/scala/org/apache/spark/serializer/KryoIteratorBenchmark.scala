@@ -45,7 +45,7 @@ object KryoIteratorBenchmark extends BenchmarkBase {
     val name = "Benchmark of kryo asIterator on deserialization stream"
     runBenchmark(name) {
       val benchmark = new Benchmark(name, N, 10, output = output)
-      Seq(true, false).map(useIterator => run(useIterator, benchmark))
+      Seq(true, false).foreach(useIterator => run(useIterator, benchmark))
       benchmark.run()
     }
   }

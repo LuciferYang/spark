@@ -290,7 +290,7 @@ case class DescribeRelationJsonCommand(
 
     val filteredTableInfo = table.toJsonLinkedHashMap
 
-    filteredTableInfo.map { case (key, value) =>
+    filteredTableInfo.foreach { case (key, value) =>
       addKeyValueToMap(key, value, jsonMap)
     }
   }

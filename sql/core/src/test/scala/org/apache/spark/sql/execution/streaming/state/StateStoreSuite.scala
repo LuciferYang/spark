@@ -860,7 +860,7 @@ class StateStoreSuite extends StateStoreSuiteBase[HDFSBackedStateStoreProvider]
         val store = provider.getStore(0).asInstanceOf[provider.HDFSBackedStateStore]
         val values = (1 to 20)
         val keys = values.map(i => ("a" + i))
-        keys.zip(values).map{case (k, v) => put(store, k, 0, v)}
+        keys.zip(values).foreach{case (k, v) => put(store, k, 0, v)}
         // commit state store with 20 keys.
         store.commit()
         // get the state store iterator: mimic the case which the iterator is hold in the

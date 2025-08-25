@@ -365,7 +365,7 @@ class FlatMapGroupsInPandasWithStateSuite extends StateStoreMetricsTest {
     )
   }
 
-  Seq(true, false).map { ifUseDateTimeType =>
+  Seq(true, false).foreach { ifUseDateTimeType =>
     test("applyInPandasWithState - streaming w/ event time timeout + watermark " +
       s"ifUseDateTimeType=$ifUseDateTimeType") {
       assume(shouldTestPandasUDFs)

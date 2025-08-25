@@ -468,7 +468,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: key set iterator on a contiguous array of keys") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    contiguousArray.toArray.lazyZip(contiguousRows).map {
+    contiguousArray.toArray.lazyZip(contiguousRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     var keyIterator = rowMap.keys()
@@ -482,7 +482,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: key set iterator on a sparse array with equidistant keys") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    sparseArray.toArray.lazyZip(sparseRows).map {
+    sparseArray.toArray.lazyZip(sparseRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     var keyIterator = rowMap.keys()
@@ -508,7 +508,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: multiple hasNext calls before calling next() on the key iterator") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    randomArray.toArray.lazyZip(randomRows).map {
+    randomArray.toArray.lazyZip(randomRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     val buffer = new ArrayBuffer[Long]()
@@ -534,7 +534,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: no explicit hasNext calls on the key iterator") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    randomArray.toArray.lazyZip(randomRows).map {
+    randomArray.toArray.lazyZip(randomRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     val buffer = new ArrayBuffer[Long]()
@@ -564,7 +564,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: call hasNext at the end of the iterator") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    sparseArray.toArray.lazyZip(sparseRows).map {
+    sparseArray.toArray.lazyZip(sparseRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     var keyIterator = rowMap.keys()
@@ -581,7 +581,7 @@ class HashedRelationSuite extends SharedSparkSession {
 
   test("LongToUnsafeRowMap: random sequence of hasNext and next() calls on the key iterator") {
     val rowMap = new LongToUnsafeRowMap(mm, 1)
-    randomArray.toArray.lazyZip(randomRows).map {
+    randomArray.toArray.lazyZip(randomRows).foreach {
       (i, row) => rowMap.append(i, row)
     }
     val buffer = new ArrayBuffer[Long]()

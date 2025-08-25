@@ -289,7 +289,7 @@ class SortResolver(operatorResolver: Resolver, expressionResolver: ExpressionRes
     val replacedOrderExpressions = new mutable.ArrayBuffer[SortOrder]
     var currentMissingExpressions = missingExpressions
 
-    orderExpressions.map { orderExpression =>
+    orderExpressions.foreach { orderExpression =>
       val (replacedOrder, updatedMissingExpressions) =
         tryReplaceSortOrderOrHavingConditionWithAlias(
           sortOrderOrCondition = orderExpression,

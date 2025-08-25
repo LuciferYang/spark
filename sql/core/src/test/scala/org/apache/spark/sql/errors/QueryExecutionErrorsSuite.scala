@@ -959,7 +959,7 @@ class QueryExecutionErrorsSuite
             }
           // Only check if errors exist to deflake. We couldn't guarantee that
           // the above 50 runs must hit this error.
-          exceptions.flatten.map { e =>
+          exceptions.flatten.foreach { e =>
             checkError(
               e,
               condition = "CONCURRENT_QUERY",
