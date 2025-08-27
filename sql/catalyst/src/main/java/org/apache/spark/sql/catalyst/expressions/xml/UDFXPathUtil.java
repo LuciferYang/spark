@@ -59,7 +59,7 @@ public class UDFXPathUtil {
       return null;
     }
 
-    if (xml.length() == 0 || path.length() == 0) {
+    if (xml.isEmpty() || path.isEmpty()) {
       return null;
     }
 

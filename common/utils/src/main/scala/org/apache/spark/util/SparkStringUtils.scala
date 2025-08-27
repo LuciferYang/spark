@@ -38,7 +38,7 @@ private[spark] trait SparkStringUtils {
     SPACE_DELIMITED_UPPERCASE_HEX.parseHex(hex.stripPrefix("[").stripSuffix("]"))
   }
 
-  def isEmpty(str: String): Boolean = str == null || str.length() == 0
+  def isEmpty(str: String): Boolean = str == null || str.isEmpty
 
   def isNotEmpty(str: String): Boolean = !isEmpty(str)
 

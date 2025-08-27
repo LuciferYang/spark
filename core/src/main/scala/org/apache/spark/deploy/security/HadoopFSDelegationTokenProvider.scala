@@ -99,7 +99,7 @@ private[deploy] class HadoopFSDelegationTokenProvider
     }
     logDebug("Delegation token renewer is: " + tokenRenewer)
 
-    if (tokenRenewer == null || tokenRenewer.length() == 0) {
+    if (tokenRenewer == null || tokenRenewer.isEmpty) {
       val errorMessage = "Can't get Master Kerberos principal for use as renewer."
       logError(errorMessage)
       throw new SparkException(errorMessage)

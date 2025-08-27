@@ -92,7 +92,7 @@ private[r] object BisectingKMeansWrapper extends MLReadable[BisectingKMeansWrapp
       .setMinDivisibleClusterSize(minDivisibleClusterSize)
       .setFeaturesCol(rFormula.getFeaturesCol)
 
-    if (seed != null && seed.length > 0) bisectingKmeans.setSeed(seed.toInt)
+    if (seed != null && seed.nonEmpty) bisectingKmeans.setSeed(seed.toInt)
 
     val pipeline = new Pipeline()
       .setStages(Array(rFormulaModel, bisectingKmeans))
