@@ -122,4 +122,140 @@ public class ByteArraySuite {
     byte[] result4 = ByteArray.concatWS(separator, x4, y4);
     Assertions.assertArrayEquals(null, result4);
   }
+
+    @Test
+    public void testLpad() {
+        // Test basic left padding
+        byte[] input1 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad1 = new byte[]{(byte) 0};
+        byte[] result1 = ByteArray.lpad(input1, 5, pad1);
+        byte[] expected1 = new byte[]{(byte) 0, (byte) 0, (byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected1, result1);
+
+        // Test input length equals target length
+        byte[] input2 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad2 = new byte[]{(byte) 0};
+        byte[] result2 = ByteArray.lpad(input2, 3, pad2);
+        byte[] expected2 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected2, result2);
+
+        // Test input length greater than target length (truncation)
+        byte[] input3 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 4, (byte) 5};
+        byte[] pad3 = new byte[]{(byte) 0};
+        byte[] result3 = ByteArray.lpad(input3, 3, pad3);
+        byte[] expected3 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected3, result3);
+
+        // Test multi-byte padding pattern
+        byte[] input4 = new byte[]{(byte) 5, (byte) 6};
+        byte[] pad4 = new byte[]{(byte) 1, (byte) 2};
+        byte[] result4 = ByteArray.lpad(input4, 6, pad4);
+        byte[] expected4 = new byte[]{(byte) 1, (byte) 2, (byte) 1, (byte) 2, (byte) 5, (byte) 6};
+        Assertions.assertArrayEquals(expected4, result4);
+
+        // Test padding pattern cannot be fully repeated
+        byte[] input5 = new byte[]{(byte) 7};
+        byte[] pad5 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] result5 = ByteArray.lpad(input5, 5, pad5);
+        byte[] expected5 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 1, (byte) 7};
+        Assertions.assertArrayEquals(expected5, result5);
+
+        // Test target length is 0
+        byte[] input6 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad6 = new byte[]{(byte) 0};
+        byte[] result6 = ByteArray.lpad(input6, 0, pad6);
+        Assertions.assertArrayEquals(ByteArray.EMPTY_BYTE, result6);
+
+        // Test empty input array
+        byte[] input7 = new byte[0];
+        byte[] pad7 = new byte[]{(byte) 0};
+        byte[] result7 = ByteArray.lpad(input7, 3, pad7);
+        byte[] expected7 = new byte[]{(byte) 0, (byte) 0, (byte) 0};
+        Assertions.assertArrayEquals(expected7, result7);
+
+        // Test empty padding pattern
+        byte[] input8 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 4, (byte) 5};
+        byte[] pad8 = new byte[0];
+        byte[] result8 = ByteArray.lpad(input8, 3, pad8);
+        byte[] expected8 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected8, result8);
+
+        // Test null input
+        byte[] pad9 = new byte[]{(byte) 0};
+        byte[] result9 = ByteArray.lpad(null, 3, pad9);
+        Assertions.assertNull(result9);
+
+        // Test null padding pattern
+        byte[] input10 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] result10 = ByteArray.lpad(input10, 5, null);
+        Assertions.assertNull(result10);
+    }
+
+    @Test
+    public void testRpad() {
+        // Test basic right padding
+        byte[] input1 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad1 = new byte[]{(byte) 0};
+        byte[] result1 = ByteArray.rpad(input1, 5, pad1);
+        byte[] expected1 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 0, (byte) 0};
+        Assertions.assertArrayEquals(expected1, result1);
+
+        // Test input length equals target length
+        byte[] input2 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad2 = new byte[]{(byte) 0};
+        byte[] result2 = ByteArray.rpad(input2, 3, pad2);
+        byte[] expected2 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected2, result2);
+
+        // Test input length greater than target length (truncation)
+        byte[] input3 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 4, (byte) 5};
+        byte[] pad3 = new byte[]{(byte) 0};
+        byte[] result3 = ByteArray.rpad(input3, 3, pad3);
+        byte[] expected3 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected3, result3);
+
+        // Test multi-byte padding pattern
+        byte[] input4 = new byte[]{(byte) 5, (byte) 6};
+        byte[] pad4 = new byte[]{(byte) 1, (byte) 2};
+        byte[] result4 = ByteArray.rpad(input4, 6, pad4);
+        byte[] expected4 = new byte[]{(byte) 5, (byte) 6, (byte) 1, (byte) 2, (byte) 1, (byte) 2};
+        Assertions.assertArrayEquals(expected4, result4);
+
+        // Test padding pattern cannot be fully repeated
+        byte[] input5 = new byte[]{(byte) 7};
+        byte[] pad5 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] result5 = ByteArray.rpad(input5, 5, pad5);
+        byte[] expected5 = new byte[]{(byte) 7, (byte) 1, (byte) 2, (byte) 3, (byte) 1};
+        Assertions.assertArrayEquals(expected5, result5);
+
+        // Test target length is 0
+        byte[] input6 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] pad6 = new byte[]{(byte) 0};
+        byte[] result6 = ByteArray.rpad(input6, 0, pad6);
+        Assertions.assertArrayEquals(ByteArray.EMPTY_BYTE, result6);
+
+        // Test empty input array
+        byte[] input7 = new byte[0];
+        byte[] pad7 = new byte[]{(byte) 0};
+        byte[] result7 = ByteArray.rpad(input7, 3, pad7);
+        byte[] expected7 = new byte[]{(byte) 0, (byte) 0, (byte) 0};
+        Assertions.assertArrayEquals(expected7, result7);
+
+        // Test empty padding pattern
+        byte[] input8 = new byte[]{(byte) 1, (byte) 2, (byte) 3, (byte) 4, (byte) 5};
+        byte[] pad8 = new byte[0];
+        byte[] result8 = ByteArray.rpad(input8, 3, pad8);
+        byte[] expected8 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        Assertions.assertArrayEquals(expected8, result8);
+
+        // Test null input
+        byte[] pad9 = new byte[]{(byte) 0};
+        byte[] result9 = ByteArray.rpad(null, 3, pad9);
+        Assertions.assertNull(result9);
+
+        // Test null padding pattern
+        byte[] input10 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
+        byte[] result10 = ByteArray.rpad(input10, 5, null);
+        Assertions.assertNull(result10);
+    }
 }
