@@ -182,13 +182,11 @@ public class ByteArraySuite {
 
     // Test null input
     byte[] pad9 = new byte[]{(byte) 0};
-    byte[] result9 = ByteArray.lpad(null, 3, pad9);
-    Assertions.assertNull(result9);
+    Assertions.assertNull(ByteArray.lpad(null, 3, pad9));
 
     // Test null padding pattern
     byte[] input10 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
-    byte[] result10 = ByteArray.lpad(input10, 5, null);
-    Assertions.assertNull(result10);
+    Assertions.assertNull(ByteArray.lpad(input10, 5, null));
   }
 
   @Test
@@ -250,12 +248,10 @@ public class ByteArraySuite {
 
     // Test null input
     byte[] pad9 = new byte[]{(byte) 0};
-    byte[] result9 = ByteArray.rpad(null, 3, pad9);
-    Assertions.assertNull(result9);
+    Assertions.assertNull(ByteArray.rpad(null, 3, pad9));
 
     // Test null padding pattern
     byte[] input10 = new byte[]{(byte) 1, (byte) 2, (byte) 3};
-    byte[] result10 = ByteArray.rpad(input10, 5, null);
-    Assertions.assertNull(result10);
+    Assertions.assertNull(ByteArray.rpad(input10, 5, null));
   }
 }
