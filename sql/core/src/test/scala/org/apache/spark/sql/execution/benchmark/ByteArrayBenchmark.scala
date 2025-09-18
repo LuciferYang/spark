@@ -112,6 +112,90 @@ object ByteArrayBenchmark extends BenchmarkBase {
       deltaOffset: Int,
       len: Int)
 
+  def byteArrayPadding(iters: Long): Unit = {
+    val count = 16 * 1000
+
+    // Generate test data with different characteristics
+    val dataSmall = Seq.fill(count)(randomBytes(2, 8)).toArray
+    val dataMedium = Seq.fill(count)(randomBytes(8, 32)).toArray
+    val dataLarge = Seq.fill(count)(randomBytes(32, 128)).toArray
+
+    // Different padding patterns
+    val padSingle = "X".getBytes
+    val padShort = "AB".getBytes
+    val padLong = "0123456789".getBytes
+    val padEmpty = Array.empty[Byte]
+
+    def lpad(data: Array[Array[Byte]], pad: Array[Byte], targetLen: Int) = { _: Int =>
+      var result: Array[Byte] = null
+      for (_ <- 0L until iters) {
+        var i = 0
+        while (i < count) {
+          result = ByteArray.lpad(data(i), targetLen, pad)
+          i += 1
+        }
+      }
+    }
+
+    def rpad(data: Array[Array[Byte]], pad: Array[Byte], targetLen: Int) = { _: Int =>
+      var result: Array[Byte] = null
+      for (_ <- 0L until iters) {
+        var i = 0
+        while (i < count) {
+          result = ByteArray.rpad(data(i), targetLen, pad)
+          i += 1
+        }
+      }
+    }
+
+    // Benchmark 1: Test different input data sizes with consistent padding
+    val dataSizeBenchmark =
+      new Benchmark("Byte Array padding - Data Size Impact", count * iters, 25, output = output)
+    dataSizeBenchmark.addCase("lpad small data (2-8 bytes)")(lpad(dataSmall, padSingle, 50))
+    dataSizeBenchmark.addCase("lpad medium data (8-32 bytes)")(lpad(dataMedium, padSingle, 50))
+    dataSizeBenchmark.addCase("lpad large data (32-128 bytes)")(lpad(dataLarge, padSingle, 100))
+    dataSizeBenchmark.addCase("rpad small data (2-8 bytes)")(rpad(dataSmall, padSingle, 50))
+    dataSizeBenchmark.addCase("rpad medium data (8-32 bytes)")(rpad(dataMedium, padSingle, 50))
+    dataSizeBenchmark.addCase("rpad large data (32-128 bytes)")(rpad(dataLarge, padSingle, 100))
+    dataSizeBenchmark.run()
+
+    // Benchmark 2: Test different padding patterns with consistent data
+    val padPatternBenchmark =
+      new Benchmark("Byte Array padding - Padding Pattern Impact",
+        count * iters, 25, output = output)
+    padPatternBenchmark.addCase("lpad single char pad")(lpad(dataSmall, padSingle, 50))
+    padPatternBenchmark.addCase("lpad short pattern pad")(lpad(dataSmall, padShort, 50))
+    padPatternBenchmark.addCase("lpad long pattern pad")(lpad(dataSmall, padLong, 50))
+    padPatternBenchmark.addCase("lpad empty pad")(lpad(dataSmall, padEmpty, 10))
+    padPatternBenchmark.addCase("rpad single char pad")(rpad(dataSmall, padSingle, 50))
+    padPatternBenchmark.addCase("rpad short pattern pad")(rpad(dataSmall, padShort, 50))
+    padPatternBenchmark.addCase("rpad long pattern pad")(rpad(dataSmall, padLong, 50))
+    padPatternBenchmark.addCase("rpad empty pad")(rpad(dataSmall, padEmpty, 10))
+    padPatternBenchmark.run()
+
+    // Benchmark 3: Test different target lengths (truncate vs pad scenarios)
+    val targetLengthBenchmark =
+      new Benchmark("Byte Array padding - Target Length Impact", count * iters, 25, output = output)
+    targetLengthBenchmark.addCase("lpad truncate (len=5)")(lpad(dataSmall, padSingle, 5))
+    targetLengthBenchmark.addCase("lpad moderate pad (len=20)")(lpad(dataSmall, padSingle, 20))
+    targetLengthBenchmark.addCase("lpad heavy pad (len=100)")(lpad(dataSmall, padSingle, 100))
+    targetLengthBenchmark.addCase("rpad truncate (len=5)")(rpad(dataSmall, padSingle, 5))
+    targetLengthBenchmark.addCase("rpad moderate pad (len=20)")(rpad(dataSmall, padSingle, 20))
+    targetLengthBenchmark.addCase("rpad heavy pad (len=100)")(rpad(dataSmall, padSingle, 100))
+    targetLengthBenchmark.run()
+
+    // Benchmark 4: Direct comparison of lpad vs rpad
+    val lpadVsRpadBenchmark =
+      new Benchmark("Byte Array padding - lpad vs rpad", count * iters, 25, output = output)
+    lpadVsRpadBenchmark.addCase("lpad small data, single pad")(lpad(dataSmall, padSingle, 50))
+    lpadVsRpadBenchmark.addCase("rpad small data, single pad")(rpad(dataSmall, padSingle, 50))
+    lpadVsRpadBenchmark.addCase("lpad medium data, single pad")(lpad(dataMedium, padSingle, 50))
+    lpadVsRpadBenchmark.addCase("rpad medium data, single pad")(rpad(dataMedium, padSingle, 50))
+    lpadVsRpadBenchmark.addCase("lpad small data, long pad")(lpad(dataSmall, padLong, 50))
+    lpadVsRpadBenchmark.addCase("rpad small data, long pad")(rpad(dataSmall, padLong, 50))
+    lpadVsRpadBenchmark.run()
+  }
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
     runBenchmark("byte array comparisons") {
       byteArrayComparisons(1024 * 4)
@@ -119,6 +203,10 @@ object ByteArrayBenchmark extends BenchmarkBase {
 
     runBenchmark("byte array equals") {
       byteArrayEquals(1000 * 10)
+    }
+
+    runBenchmark("byte array padding") {
+      byteArrayPadding(1000 * 2)
     }
   }
 }
