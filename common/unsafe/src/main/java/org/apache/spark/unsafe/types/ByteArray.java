@@ -206,9 +206,7 @@ public final class ByteArray {
   private static void fillWithPattern(byte[] result, int firstPos, int beyondPos, byte[] pad) {
     for (int pos = firstPos; pos < beyondPos; pos += pad.length) {
       final int jMax = Math.min(pad.length, beyondPos - pos);
-      for (int j = 0; j < jMax; ++j) {
-        result[pos + j] = pad[j];
-      }
+      if (jMax >= 0) System.arraycopy(pad, 0, result, pos, jMax);
     }
   }
 
