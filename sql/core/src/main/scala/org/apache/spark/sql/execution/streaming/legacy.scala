@@ -15,25 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.connect.planner
+package org.apache.spark.sql.execution.streaming
 
-import org.apache.spark.connect.proto
-import org.apache.spark.sql.catalyst.CatalystTypeConverters
-import org.apache.spark.sql.catalyst.expressions
-import org.apache.spark.sql.connect.common.LiteralValueProtoConverter
+import scala.reflect.ClassTag
 
-object LiteralExpressionProtoConverter {
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.streaming.checkpointing.{HDFSMetadataLog => ActualHDFSMetadataLog}
+import org.apache.spark.sql.execution.streaming.runtime.{SerializedOffset => ActualSerializedOffset}
 
-  /**
-   * Transforms the protocol buffers literals into the appropriate Catalyst literal expression.
-   *
-   * @return
-   *   Expression
-   */
-  def toCatalystExpression(lit: proto.Expression.Literal): expressions.Literal = {
-    val dataType = LiteralValueProtoConverter.getDataType(lit)
-    val scalaValue = LiteralValueProtoConverter.toScalaValue(lit)
-    val convert = CatalystTypeConverters.createToCatalystConverter(dataType)
-    expressions.Literal(convert(scalaValue), dataType)
-  }
+@deprecated("use org.apache.spark.sql.execution.streaming.checkpointing.HDFSMetadataLog")
+class HDFSMetadataLog[T <: AnyRef: ClassTag](sparkSession: SparkSession, path: String)
+  extends ActualHDFSMetadataLog[T](sparkSession, path)
+
+@deprecated("use org.apache.spark.sql.execution.streaming.runtime.SerializedOffset")
+object SerializedOffset {
+  def apply(offset: String): ActualSerializedOffset = ActualSerializedOffset(offset)
 }
