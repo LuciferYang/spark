@@ -3262,12 +3262,6 @@
     },
     "sqlState" : "KD002"
   },
-  "INVALID_NAME_IN_USE_COMMAND" : {
-    "message" : [
-      "Invalid name '<name>' in <command> command. Reason: <reason>"
-    ],
-    "sqlState" : "42000"
-  },
   "INVALID_NON_DETERMINISTIC_EXPRESSIONS" : {
     "message" : [
       "The operator expects a deterministic expression, but the actual expression is <sqlExprs>."
