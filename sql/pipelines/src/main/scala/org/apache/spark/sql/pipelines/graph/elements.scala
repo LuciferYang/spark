@@ -220,16 +220,16 @@ case class VirtualTableInput(
 trait View extends GraphElement {
 
   /** Returns the unique identifier for this [[View]]. */
-  val identifier: TableIdentifier
+  def identifier: TableIdentifier
 
   /** Properties of this view */
-  val properties: Map[String, String]
+  def properties: Map[String, String]
 
   /** (SQL-specific) The raw query that defines the [[View]]. */
-  val sqlText: Option[String]
+  def sqlText: Option[String]
 
   /** User-specified comment that can be placed on the [[View]]. */
-  val comment: Option[String]
+  def comment: Option[String]
 }
 
 /**

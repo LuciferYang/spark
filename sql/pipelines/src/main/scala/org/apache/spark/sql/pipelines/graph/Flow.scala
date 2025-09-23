@@ -40,12 +40,12 @@ trait Flow extends GraphElement with Logging {
   /** The [[FlowFunction]] containing the user's query. */
   def func: FlowFunction
 
-  val identifier: TableIdentifier
+  def identifier: TableIdentifier
 
   /**
    * The dataset that this Flow represents a write to.
    */
-  val destinationIdentifier: TableIdentifier
+  def destinationIdentifier: TableIdentifier
 
   /**
    * Whether this is a ONCE flow. ONCE flows should run only once per full refresh.
