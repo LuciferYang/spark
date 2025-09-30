@@ -813,7 +813,7 @@ object SparkConnect {
       ShadeRule.rename("org.codehaus.mojo.animal_sniffer.**" -> "org.sparkproject.connect.animal_sniffer.@1").inAll,
       ShadeRule.rename("com.google.j2objc.annotations.**" -> "org.sparkproject.connect.j2objc_annotations.@1").inAll,
       ShadeRule.rename("com.google.errorprone.annotations.**" -> "org.sparkproject.connect.errorprone_annotations.@1").inAll,
-      ShadeRule.rename("org.jspecify.annotations**" -> "org.sparkproject.connect.jspecify_annotations.@1").inAll,
+      ShadeRule.rename("org.jspecify.annotations.**" -> "org.sparkproject.connect.jspecify_annotations.@1").inAll,
       ShadeRule.rename("com.google.gson.**" -> "org.sparkproject.connect.gson.@1").inAll,
       ShadeRule.rename("com.google.api.**" -> "org.sparkproject.connect.google_protos.api.@1").inAll,
       ShadeRule.rename("com.google.cloud.**" -> "org.sparkproject.connect.google_protos.cloud.@1").inAll,
