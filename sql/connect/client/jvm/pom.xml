@@ -186,7 +186,7 @@
               <include>io.perfmark:*</include>
               <include>org.apache.arrow:*</include>
               <include>org.codehaus.mojo:*</include>
-              <include>org.checkerframework:*</include>
+              <include>org.jspecify:*</include>
               <include>org.apache.spark:spark-connect-common_${scala.binary.version}</include>
               <include>org.apache.spark:spark-sql-api_${scala.binary.version}</include>
             </includes>
@@ -219,8 +219,8 @@
               <shadedPattern>${spark.shade.packageName}.io.netty</shadedPattern>
             </relocation>
             <relocation>
-              <pattern>org.checkerframework</pattern>
-              <shadedPattern>${spark.shade.packageName}.org.checkerframework</shadedPattern>
+              <pattern>org.jspecify.annotations</pattern>
+              <shadedPattern>${spark.shade.packageName}.org.jspecify.annotations</shadedPattern>
             </relocation>
             <relocation>
               <pattern>javax.annotation</pattern>

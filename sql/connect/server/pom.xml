@@ -306,7 +306,7 @@
               <include>org.codehaus.mojo:animal-sniffer-annotations</include>
               <include>com.google.errorprone:error_prone_annotations</include>
               <include>com.google.j2objc:j2objc-annotations</include>
-              <include>org.checkerframework:checker-qual</include>
+              <include>org.jspecify:jspecify</include>
               <include>com.google.code.gson:gson</include>
               <include>org.apache.spark:spark-connect-common_${scala.binary.version}</include>
             </includes>
@@ -359,8 +359,8 @@
               <shadedPattern>${spark.shade.packageName}.connect.errorprone_annotations</shadedPattern>
             </relocation>
             <relocation>
-              <pattern>org.checkerframework</pattern>
-              <shadedPattern>${spark.shade.packageName}.connect.checkerframework</shadedPattern>
+              <pattern>org.jspecify.annotations</pattern>
+              <shadedPattern>${spark.shade.packageName}.connect.jspecify_annotations</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.google.gson</pattern>
