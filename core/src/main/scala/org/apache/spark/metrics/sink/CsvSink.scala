@@ -21,7 +21,7 @@ import java.io.File
 import java.util.{Locale, Properties}
 import java.util.concurrent.TimeUnit
 
-import com.codahale.metrics.{CsvReporter, MetricRegistry}
+import io.dropwizard.metrics5.{CsvReporter, MetricRegistry}
 
 import org.apache.spark.metrics.MetricsSystem
 

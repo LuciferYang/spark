@@ -21,7 +21,7 @@ import java.util.Properties
 
 import scala.collection.mutable.ArrayBuffer
 
-import com.codahale.metrics.MetricRegistry
+import io.dropwizard.metrics5.MetricRegistry
 import org.scalatest.{BeforeAndAfter, PrivateMethodTester}
 
 import org.apache.spark.{SecurityManager, SparkConf, SparkFunSuite}

@@ -17,7 +17,7 @@
 
 package org.apache.spark.metrics.source
 
-import com.codahale.metrics.{Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Gauge, MetricRegistry}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.util.{AccumulatorV2, DoubleAccumulator, LongAccumulator}

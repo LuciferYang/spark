@@ -20,8 +20,8 @@ package org.apache.spark.metrics.sink
 import java.util.{Locale, Properties}
 import java.util.concurrent.TimeUnit
 
-import com.codahale.metrics.{Metric, MetricFilter, MetricRegistry}
-import com.codahale.metrics.graphite.{Graphite, GraphiteReporter, GraphiteUDP}
+import io.dropwizard.metrics5.{Metric, MetricFilter, MetricRegistry}
+import io.dropwizard.metrics5.graphite.{Graphite, GraphiteReporter, GraphiteUDP}
 
 import org.apache.spark.errors.SparkCoreErrors
 import org.apache.spark.metrics.MetricsSystem

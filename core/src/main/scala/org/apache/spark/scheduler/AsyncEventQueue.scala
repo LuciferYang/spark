@@ -20,7 +20,7 @@ package org.apache.spark.scheduler
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
-import com.codahale.metrics.{Gauge, Timer}
+import io.dropwizard.metrics5.{Gauge, Timer}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging

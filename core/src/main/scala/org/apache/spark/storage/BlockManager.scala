@@ -33,7 +33,7 @@ import scala.reflect.ClassTag
 import scala.util.{Failure, Random, Success, Try}
 import scala.util.control.NonFatal
 
-import com.codahale.metrics.{MetricRegistry, MetricSet}
+import io.dropwizard.metrics5.{MetricRegistry, MetricSet}
 import com.esotericsoftware.kryo.KryoException
 import com.google.common.cache.CacheBuilder
 

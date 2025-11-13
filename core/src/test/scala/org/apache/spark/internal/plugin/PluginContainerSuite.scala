@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics.Gauge
+import io.dropwizard.metrics5.Gauge
 import org.mockito.ArgumentMatchers.{any, eq => meq}
 import org.mockito.Mockito.{mock, spy, verify, when}
 import org.scalatest.concurrent.Eventually.{eventually, interval, timeout}

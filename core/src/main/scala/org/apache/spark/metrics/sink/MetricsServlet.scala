@@ -20,8 +20,8 @@ package org.apache.spark.metrics.sink
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
-import com.codahale.metrics.MetricRegistry
-import com.codahale.metrics.json.MetricsModule
+import io.dropwizard.metrics5.MetricRegistry
+import io.dropwizard.metrics5.json.MetricsModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletRequest
 import org.eclipse.jetty.servlet.ServletContextHandler

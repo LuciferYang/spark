@@ -19,7 +19,7 @@ package org.apache.spark.network.yarn;
 
 import java.util.Map;
 
-import com.codahale.metrics.*;
+import io.dropwizard.metrics5.*;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;

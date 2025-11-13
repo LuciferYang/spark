@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit._
 
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics._
+import io.dropwizard.metrics5._
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.metrics.sink.StatsdSink._

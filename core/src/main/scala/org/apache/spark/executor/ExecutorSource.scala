@@ -21,7 +21,7 @@ import java.util.concurrent.ThreadPoolExecutor
 
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics.{Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Gauge, MetricRegistry}
 import org.apache.hadoop.fs.FileSystem
 
 import org.apache.spark.metrics.source.Source

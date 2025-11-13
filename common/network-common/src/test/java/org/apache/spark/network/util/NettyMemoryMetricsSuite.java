@@ -21,10 +21,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.MetricName;
+import io.dropwizard.metrics5.Gauge;
+import io.dropwizard.metrics5.Metric;
+import io.dropwizard.metrics5.MetricRegistry;
+import io.dropwizard.metrics5.MetricSet;
 import org.apache.spark.network.TestUtils;
 import org.apache.spark.network.client.TransportClient;
 import org.junit.jupiter.api.AfterEach;
@@ -80,9 +81,9 @@ public class NettyMemoryMetricsSuite {
     Assertions.assertNotNull(serverMetrics.getMetrics());
     Assertions.assertNotEquals(serverMetrics.getMetrics().size(), 0);
 
-    Map<String, Metric> serverMetricMap = serverMetrics.getMetrics();
+    Map<MetricName, Metric> serverMetricMap = serverMetrics.getMetrics();
     serverMetricMap.forEach((name, metric) ->
-      Assertions.assertTrue(name.startsWith("shuffle-server"))
+      Assertions.assertTrue(name.getKey().startsWith("shuffle-server"))
     );
 
     MetricSet clientMetrics = clientFactory.getAllMetrics();
@@ -90,9 +91,9 @@ public class NettyMemoryMetricsSuite {
     Assertions.assertNotNull(clientMetrics.getMetrics());
     Assertions.assertNotEquals(clientMetrics.getMetrics().size(), 0);
 
-    Map<String, Metric> clientMetricMap = clientMetrics.getMetrics();
+    Map<MetricName, Metric> clientMetricMap = clientMetrics.getMetrics();
     clientMetricMap.forEach((name, metrics) ->
-      Assertions.assertTrue(name.startsWith("shuffle-client"))
+      Assertions.assertTrue(name.getKey().startsWith("shuffle-client"))
     );
 
     // Make sure general metrics existed.
@@ -131,19 +132,19 @@ public class NettyMemoryMetricsSuite {
     setUp(true);
 
     // Make sure additional metrics are added.
-    Map<String, Metric> serverMetricMap = server.getAllMetrics().getMetrics();
+    Map<MetricName, Metric> serverMetricMap = server.getAllMetrics().getMetrics();
     serverMetricMap.forEach((name, metric) -> {
-      Assertions.assertTrue(name.startsWith("shuffle-server"));
-      String metricName = name.substring(name.lastIndexOf(".") + 1);
+      Assertions.assertTrue(name.getKey().startsWith("shuffle-server"));
+      String metricName = name.getKey().substring(name.getKey().lastIndexOf(".") + 1);
       Assertions.assertTrue(metricName.equals("usedDirectMemory")
         || metricName.equals("usedHeapMemory")
         || NettyMemoryMetrics.VERBOSE_METRICS.contains(metricName));
     });
 
-    Map<String, Metric> clientMetricMap = clientFactory.getAllMetrics().getMetrics();
+    Map<MetricName, Metric> clientMetricMap = clientFactory.getAllMetrics().getMetrics();
     clientMetricMap.forEach((name, metric) -> {
-      Assertions.assertTrue(name.startsWith("shuffle-client"));
-      String metricName = name.substring(name.lastIndexOf(".") + 1);
+      Assertions.assertTrue(name.getKey().startsWith("shuffle-client"));
+      String metricName = name.getKey().substring(name.getKey().lastIndexOf(".") + 1);
       Assertions.assertTrue(metricName.equals("usedDirectMemory")
         || metricName.equals("usedHeapMemory")
         || NettyMemoryMetrics.VERBOSE_METRICS.contains(metricName));

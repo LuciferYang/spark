@@ -17,9 +17,9 @@
 
 package org.apache.spark.network.shuffle;
 
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.Metric;
+import io.dropwizard.metrics5.Counter;
+import io.dropwizard.metrics5.Meter;
+import io.dropwizard.metrics5.Metric;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;

@@ -22,7 +22,7 @@ import javax.management.{MBeanServer, ObjectName}
 
 import scala.util.control.NonFatal
 
-import com.codahale.metrics.{Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Gauge, MetricRegistry}
 
 private[spark] class JVMCPUSource extends Source {
 

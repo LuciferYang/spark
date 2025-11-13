@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.streaming.runtime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-import com.codahale.metrics.{Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Gauge, MetricRegistry}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.metrics.source.{Source => CodahaleSource}

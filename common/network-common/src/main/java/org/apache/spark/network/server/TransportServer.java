@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.Counter;
+import io.dropwizard.metrics5.MetricSet;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelFuture;

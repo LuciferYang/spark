@@ -20,7 +20,7 @@ package org.apache.spark.network.shuffle;
 import java.io.IOException;
 import java.util.Collections;
 
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.MetricSet;
 
 import org.apache.spark.annotation.Evolving;
 import org.apache.spark.network.buffer.ManagedBuffer;

@@ -50,10 +50,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.Counter;
+import io.dropwizard.metrics5.Meter;
+import io.dropwizard.metrics5.Metric;
+import io.dropwizard.metrics5.MetricName;
+import io.dropwizard.metrics5.MetricSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -2227,7 +2228,7 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
     // 2. when a request is for a duplicate block; 3. the part that ESS failed to write.
     static final String IGNORED_BLOCK_BYTES_METRIC = "ignoredBlockBytes";
 
-    private final Map<String, Metric> allMetrics;
+    private final Map<MetricName, Metric> allMetrics;
     private final Meter blockAppendCollisions;
     private final Meter lateBlockPushes;
     private final Meter blockBytesWritten;
@@ -2239,23 +2240,23 @@ public class RemoteBlockPushResolver implements MergedShuffleFileManager {
     private PushMergeMetrics() {
       allMetrics = new HashMap<>();
       blockAppendCollisions = new Meter();
-      allMetrics.put(BLOCK_APPEND_COLLISIONS_METRIC, blockAppendCollisions);
+      allMetrics.put(MetricName.build(BLOCK_APPEND_COLLISIONS_METRIC), blockAppendCollisions);
       lateBlockPushes = new Meter();
-      allMetrics.put(LATE_BLOCK_PUSHES_METRIC, lateBlockPushes);
+      allMetrics.put(MetricName.build(LATE_BLOCK_PUSHES_METRIC), lateBlockPushes);
       blockBytesWritten = new Meter();
-      allMetrics.put(BLOCK_BYTES_WRITTEN_METRIC, blockBytesWritten);
+      allMetrics.put(MetricName.build(BLOCK_BYTES_WRITTEN_METRIC), blockBytesWritten);
       deferredBlockBytes = new Counter();
-      allMetrics.put(DEFERRED_BLOCK_BYTES_METRIC, deferredBlockBytes);
+      allMetrics.put(MetricName.build(DEFERRED_BLOCK_BYTES_METRIC), deferredBlockBytes);
       deferredBlocks = new Meter();
-      allMetrics.put(DEFERRED_BLOCKS_METRIC, deferredBlocks);
+      allMetrics.put(MetricName.build(DEFERRED_BLOCKS_METRIC), deferredBlocks);
       staleBlockPushes = new Meter();
-      allMetrics.put(STALE_BLOCK_PUSHES_METRIC, staleBlockPushes);
+      allMetrics.put(MetricName.build(STALE_BLOCK_PUSHES_METRIC), staleBlockPushes);
       ignoredBlockBytes = new Meter();
-      allMetrics.put(IGNORED_BLOCK_BYTES_METRIC, ignoredBlockBytes);
+      allMetrics.put(MetricName.build(IGNORED_BLOCK_BYTES_METRIC), ignoredBlockBytes);
     }
 
     @Override
-    public Map<String, Metric> getMetrics() {
+    public Map<MetricName, Metric> getMetrics() {
       return allMetrics;
     }
   }

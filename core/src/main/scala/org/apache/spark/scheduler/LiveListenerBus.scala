@@ -26,7 +26,7 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.DynamicVariable
 
-import com.codahale.metrics.{Counter, MetricRegistry, Timer}
+import io.dropwizard.metrics5.{Counter, MetricRegistry, Timer}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.errors.SparkCoreErrors

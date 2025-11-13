@@ -29,13 +29,14 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricSet;
-import com.codahale.metrics.RatioGauge;
-import com.codahale.metrics.Timer;
-import com.codahale.metrics.Counter;
+import io.dropwizard.metrics5.Gauge;
+import io.dropwizard.metrics5.Meter;
+import io.dropwizard.metrics5.Metric;
+import io.dropwizard.metrics5.MetricName;
+import io.dropwizard.metrics5.MetricSet;
+import io.dropwizard.metrics5.RatioGauge;
+import io.dropwizard.metrics5.Timer;
+import io.dropwizard.metrics5.Counter;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.spark.internal.SparkLogger;
@@ -313,7 +314,7 @@ public class ExternalBlockHandler extends RpcHandler
    */
   @VisibleForTesting
   public class ShuffleMetrics implements MetricSet {
-    private final Map<String, Metric> allMetrics;
+    private final Map<MetricName, Metric> allMetrics;
     // Time latency for open block request in ms
     private final Timer openBlockRequestLatencyMillis =
         new TimerWithCustomTimeUnit(TimeUnit.MILLISECONDS);
@@ -343,14 +344,14 @@ public class ExternalBlockHandler extends RpcHandler
 
     public ShuffleMetrics() {
       allMetrics = new HashMap<>();
-      allMetrics.put("openBlockRequestLatencyMillis", openBlockRequestLatencyMillis);
-      allMetrics.put("registerExecutorRequestLatencyMillis", registerExecutorRequestLatencyMillis);
-      allMetrics.put("fetchMergedBlocksMetaLatencyMillis", fetchMergedBlocksMetaLatencyMillis);
-      allMetrics.put("finalizeShuffleMergeLatencyMillis", finalizeShuffleMergeLatencyMillis);
-      allMetrics.put("blockTransferRate", blockTransferRate);
-      allMetrics.put("blockTransferMessageRate", blockTransferMessageRate);
-      allMetrics.put("blockTransferRateBytes", blockTransferRateBytes);
-      allMetrics.put("blockTransferAvgSize_1min", new RatioGauge() {
+      allMetrics.put(MetricName.build("openBlockRequestLatencyMillis"), openBlockRequestLatencyMillis);
+      allMetrics.put(MetricName.build("registerExecutorRequestLatencyMillis"), registerExecutorRequestLatencyMillis);
+      allMetrics.put(MetricName.build("fetchMergedBlocksMetaLatencyMillis"), fetchMergedBlocksMetaLatencyMillis);
+      allMetrics.put(MetricName.build("finalizeShuffleMergeLatencyMillis"), finalizeShuffleMergeLatencyMillis);
+      allMetrics.put(MetricName.build("blockTransferRate"), blockTransferRate);
+      allMetrics.put(MetricName.build("blockTransferMessageRate"), blockTransferMessageRate);
+      allMetrics.put(MetricName.build("blockTransferRateBytes"), blockTransferRateBytes);
+      allMetrics.put(MetricName.build("blockTransferAvgSize_1min"), new RatioGauge() {
         @Override
         protected Ratio getRatio() {
           return Ratio.of(
@@ -361,14 +362,14 @@ public class ExternalBlockHandler extends RpcHandler
               blockTransferMessageRate.getOneMinuteRate());
         }
       });
-      allMetrics.put("registeredExecutorsSize",
+      allMetrics.put(MetricName.build("registeredExecutorsSize"),
                      (Gauge<Integer>) () -> blockManager.getRegisteredExecutorsSize());
-      allMetrics.put("numActiveConnections", activeConnections);
-      allMetrics.put("numCaughtExceptions", caughtExceptions);
+      allMetrics.put(MetricName.build("numActiveConnections"), activeConnections);
+      allMetrics.put(MetricName.build("numCaughtExceptions"), caughtExceptions);
     }
 
     @Override
-    public Map<String, Metric> getMetrics() {
+    public Map<MetricName, Metric> getMetrics() {
       return allMetrics;
     }
   }

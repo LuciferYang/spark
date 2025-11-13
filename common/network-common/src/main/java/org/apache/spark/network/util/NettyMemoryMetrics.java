@@ -21,10 +21,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.MetricName;
+import io.dropwizard.metrics5.Gauge;
+import io.dropwizard.metrics5.Metric;
+import io.dropwizard.metrics5.MetricRegistry;
+import io.dropwizard.metrics5.MetricSet;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.PoolArenaMetric;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -39,7 +40,7 @@ public class NettyMemoryMetrics implements MetricSet {
 
   private final boolean verboseMetricsEnabled;
 
-  private final Map<String, Metric> allMetrics;
+  private final Map<MetricName, Metric> allMetrics;
 
   private final String metricPrefix;
 
@@ -116,7 +117,7 @@ public class NettyMemoryMetrics implements MetricSet {
       }
 
       Class<?> returnType = m.getReturnType();
-      String metricName = MetricRegistry.name(metricPrefix, arenaName, m.getName());
+      MetricName metricName = MetricRegistry.name(metricPrefix, arenaName, m.getName());
       if (returnType.equals(int.class)) {
         allMetrics.put(metricName, (Gauge<Integer>) () -> {
           try {
@@ -139,7 +140,7 @@ public class NettyMemoryMetrics implements MetricSet {
   }
 
   @Override
-  public Map<String, Metric> getMetrics() {
+  public Map<MetricName, Metric> getMetrics() {
     return Collections.unmodifiableMap(allMetrics);
   }
 }

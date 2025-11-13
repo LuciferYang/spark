@@ -19,7 +19,7 @@ package org.apache.spark.deploy
 
 import javax.annotation.concurrent.ThreadSafe
 
-import com.codahale.metrics.{MetricRegistry, MetricSet}
+import io.dropwizard.metrics5.{MetricRegistry, MetricSet}
 
 import org.apache.spark.metrics.source.Source
 

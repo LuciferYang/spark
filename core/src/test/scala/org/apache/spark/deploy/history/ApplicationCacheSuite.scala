@@ -22,7 +22,7 @@ import java.util.concurrent.{CountDownLatch, Executors, TimeoutException, TimeUn
 
 import scala.collection.mutable
 
-import com.codahale.metrics.Counter
+import io.dropwizard.metrics5.Counter
 import jakarta.servlet.http.{HttpServletRequest, HttpServletResponse}
 import org.apache.hadoop.conf.Configuration
 import org.eclipse.jetty.servlet.ServletContextHandler

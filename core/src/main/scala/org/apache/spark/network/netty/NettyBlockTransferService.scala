@@ -26,7 +26,7 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
-import com.codahale.metrics.{Metric, MetricSet}
+import io.dropwizard.metrics5.{Metric, MetricSet}
 
 import org.apache.spark.{SecurityManager, SparkConf}
 import org.apache.spark.ExecutorDeadException

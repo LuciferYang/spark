@@ -20,7 +20,7 @@ package org.apache.spark.api.plugin;
 import java.io.IOException;
 import java.util.Map;
 
-import com.codahale.metrics.MetricRegistry;
+import io.dropwizard.metrics5.MetricRegistry;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.annotation.DeveloperApi;

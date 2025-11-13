@@ -19,7 +19,7 @@ package org.apache.spark.internal.plugin
 
 import java.util
 
-import com.codahale.metrics.MetricRegistry
+import io.dropwizard.metrics5.MetricRegistry
 
 import org.apache.spark.{SparkConf, SparkException}
 import org.apache.spark.api.plugin.PluginContext

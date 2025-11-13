@@ -21,7 +21,7 @@ import java.util.concurrent.{ConcurrentHashMap, CountDownLatch, ExecutionExcepti
 
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics.{Counter, MetricRegistry, Timer}
+import io.dropwizard.metrics5.{Counter, MetricRegistry, Timer}
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache, RemovalListener, RemovalNotification}
 import com.google.common.util.concurrent.UncheckedExecutionException
 import jakarta.servlet.{DispatcherType, Filter, FilterChain, ServletException, ServletRequest, ServletResponse}

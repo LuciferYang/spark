@@ -21,10 +21,10 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.Clock;
-import com.codahale.metrics.ExponentiallyDecayingReservoir;
-import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
+import io.dropwizard.metrics5.Clock;
+import io.dropwizard.metrics5.ExponentiallyDecayingReservoir;
+import io.dropwizard.metrics5.Snapshot;
+import io.dropwizard.metrics5.Timer;
 
 /**
  * A custom version of a {@link Timer} which allows for specifying a specific {@link TimeUnit} to

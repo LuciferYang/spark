@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.MetricSet;
 
 import org.apache.spark.internal.LogKeys;
 import org.apache.spark.internal.MDC;

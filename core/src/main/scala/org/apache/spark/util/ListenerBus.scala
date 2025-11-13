@@ -23,7 +23,7 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-import com.codahale.metrics.Timer
+import io.dropwizard.metrics5.Timer
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.{config, Logging}

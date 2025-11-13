@@ -19,8 +19,8 @@ package org.apache.spark.metrics.sink
 
 import java.util.Properties
 
-import com.codahale.metrics.MetricRegistry
-import com.codahale.metrics.jmx.JmxReporter
+import io.dropwizard.metrics5.MetricRegistry
+import io.dropwizard.metrics5.jmx.JmxReporter
 
 
 private[spark] class JmxSink(

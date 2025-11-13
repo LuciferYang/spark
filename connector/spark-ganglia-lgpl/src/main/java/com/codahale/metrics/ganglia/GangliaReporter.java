@@ -4,8 +4,8 @@
 
 package com.codahale.metrics.ganglia;
 
-import com.codahale.metrics.*;
-import com.codahale.metrics.MetricAttribute;
+import io.dropwizard.metrics5.*;
+import io.dropwizard.metrics5.MetricAttribute;
 import info.ganglia.gmetric4j.gmetric.GMetric;
 import info.ganglia.gmetric4j.gmetric.GMetricSlope;
 import info.ganglia.gmetric4j.gmetric.GMetricType;

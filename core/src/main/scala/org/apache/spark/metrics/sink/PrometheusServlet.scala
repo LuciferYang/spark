@@ -19,7 +19,7 @@ package org.apache.spark.metrics.sink
 
 import java.util.Properties
 
-import com.codahale.metrics.MetricRegistry
+import io.dropwizard.metrics5.MetricRegistry
 import jakarta.servlet.http.HttpServletRequest
 import org.eclipse.jetty.servlet.ServletContextHandler
 

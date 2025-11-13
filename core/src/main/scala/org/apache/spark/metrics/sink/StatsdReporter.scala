@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-import com.codahale.metrics._
+import io.dropwizard.metrics5._
 import org.apache.hadoop.net.NetUtils
 
 import org.apache.spark.internal.Logging

@@ -21,9 +21,9 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
-import com.codahale.metrics.Clock;
-import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
+import io.dropwizard.metrics5.Clock;
+import io.dropwizard.metrics5.Snapshot;
+import io.dropwizard.metrics5.Timer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;

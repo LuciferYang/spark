@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import com.codahale.metrics.MetricSet;
+import io.dropwizard.metrics5.MetricSet;
 
 import org.apache.spark.internal.SparkLogger;
 import org.apache.spark.internal.SparkLoggerFactory;

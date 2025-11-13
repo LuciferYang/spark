@@ -17,7 +17,7 @@
 
 package org.apache.spark.deploy.master
 
-import com.codahale.metrics.{Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Gauge, MetricRegistry}
 
 import org.apache.spark.metrics.source.Source
 

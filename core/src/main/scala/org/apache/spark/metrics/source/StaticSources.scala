@@ -17,7 +17,7 @@
 
 package org.apache.spark.metrics.source
 
-import com.codahale.metrics.MetricRegistry
+import io.dropwizard.metrics5.MetricRegistry
 
 private[spark] object StaticSources {
   /**

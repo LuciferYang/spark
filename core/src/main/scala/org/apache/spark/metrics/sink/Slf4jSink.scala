@@ -20,7 +20,7 @@ package org.apache.spark.metrics.sink
 import java.util.{Locale, Properties}
 import java.util.concurrent.TimeUnit
 
-import com.codahale.metrics.{MetricRegistry, Slf4jReporter}
+import io.dropwizard.metrics5.{MetricRegistry, Slf4jReporter}
 
 import org.apache.spark.metrics.MetricsSystem
 

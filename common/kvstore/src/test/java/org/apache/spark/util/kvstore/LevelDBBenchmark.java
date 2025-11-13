@@ -24,10 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Slf4jReporter;
-import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
+import io.dropwizard.metrics5.MetricName;
+import io.dropwizard.metrics5.MetricRegistry;
+import io.dropwizard.metrics5.Slf4jReporter;
+import io.dropwizard.metrics5.Snapshot;
+import io.dropwizard.metrics5.Timer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,8 +93,8 @@ public class LevelDBBenchmark {
     }
 
     int headingPrefix = 0;
-    for (Map.Entry<String, Timer> e : metrics.getTimers().entrySet()) {
-      headingPrefix = Math.max(e.getKey().length(), headingPrefix);
+    for (Map.Entry<MetricName, Timer> e : metrics.getTimers().entrySet()) {
+      headingPrefix = Math.max(e.getKey().getKey().length(), headingPrefix);
     }
     headingPrefix += 4;
 
@@ -108,10 +109,10 @@ public class LevelDBBenchmark {
     heading.append("\t95th");
     System.out.println(heading);
 
-    for (Map.Entry<String, Timer> e : metrics.getTimers().entrySet()) {
+    for (Map.Entry<MetricName, Timer> e : metrics.getTimers().entrySet()) {
       StringBuilder row = new StringBuilder();
       row.append(e.getKey());
-      for (int i = 0; i < headingPrefix - e.getKey().length(); i++) {
+      for (int i = 0; i < headingPrefix - e.getKey().getKey().length(); i++) {
         row.append(" ");
       }
 

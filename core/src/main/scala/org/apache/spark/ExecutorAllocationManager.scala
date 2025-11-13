@@ -24,7 +24,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-import com.codahale.metrics.{Counter, Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Counter, Gauge, MetricRegistry}
 
 import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.internal.LogKeys._

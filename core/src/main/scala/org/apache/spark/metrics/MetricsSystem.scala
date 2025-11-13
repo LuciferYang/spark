@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 
-import com.codahale.metrics.{Metric, MetricRegistry}
+import io.dropwizard.metrics5.{Metric, MetricRegistry}
 import org.eclipse.jetty.servlet.ServletContextHandler
 
 import org.apache.spark.{SecurityManager, SparkConf}

@@ -19,7 +19,7 @@ package org.apache.spark.status
 import java.util.concurrent.atomic.AtomicLong
 
 import AppStatusSource.getCounter
-import com.codahale.metrics.{Counter, Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Counter, Gauge, MetricRegistry}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.config.Status.METRICS_APP_STATUS_SOURCE_ENABLED

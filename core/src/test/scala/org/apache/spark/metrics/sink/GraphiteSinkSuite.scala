@@ -21,7 +21,7 @@ import java.util.Properties
 
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics._
+import io.dropwizard.metrics5._
 
 import org.apache.spark.{SparkException, SparkFunSuite}
 

@@ -28,7 +28,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics.MetricSet
+import io.dropwizard.metrics5.MetricSet
 import com.fasterxml.jackson.databind.ObjectMapper
 import com. fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.hadoop.fs.Path

@@ -24,9 +24,9 @@ import java.util.Map;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
 
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.Timer;
+import io.dropwizard.metrics5.Meter;
+import io.dropwizard.metrics5.Metric;
+import io.dropwizard.metrics5.Timer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

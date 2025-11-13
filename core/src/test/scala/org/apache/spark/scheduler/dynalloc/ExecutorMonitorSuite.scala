@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 
-import com.codahale.metrics.Counter
+import io.dropwizard.metrics5.Counter
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{doAnswer, mock, when}
 

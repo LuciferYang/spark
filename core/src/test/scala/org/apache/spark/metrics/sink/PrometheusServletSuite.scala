@@ -21,7 +21,7 @@ import java.util.Properties
 
 import scala.jdk.CollectionConverters._
 
-import com.codahale.metrics.{Counter, Gauge, MetricRegistry}
+import io.dropwizard.metrics5.{Counter, Gauge, MetricRegistry}
 import org.scalatest.PrivateMethodTester
 
 import org.apache.spark.SparkFunSuite

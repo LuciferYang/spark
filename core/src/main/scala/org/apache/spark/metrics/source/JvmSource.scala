@@ -19,8 +19,8 @@ package org.apache.spark.metrics.source
 
 import java.lang.management.ManagementFactory
 
-import com.codahale.metrics.MetricRegistry
-import com.codahale.metrics.jvm.{BufferPoolMetricSet, GarbageCollectorMetricSet, MemoryUsageGaugeSet}
+import io.dropwizard.metrics5.MetricRegistry
+import io.dropwizard.metrics5.jvm.{BufferPoolMetricSet, GarbageCollectorMetricSet, MemoryUsageGaugeSet}
 
 private[spark] class JvmSource extends Source {
   override val sourceName = "jvm"
