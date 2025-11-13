@@ -319,19 +319,19 @@
       <artifactId>stream</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>io.dropwizard.metrics5</groupId>
       <artifactId>metrics-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>io.dropwizard.metrics5</groupId>
       <artifactId>metrics-jvm</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>io.dropwizard.metrics5</groupId>
       <artifactId>metrics-json</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>io.dropwizard.metrics5</groupId>
       <artifactId>metrics-graphite</artifactId>
       <exclusions>
         <exclusion>
@@ -341,7 +341,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>io.dropwizard.metrics5</groupId>
       <artifactId>metrics-jmx</artifactId>
     </dependency>
     <dependency>

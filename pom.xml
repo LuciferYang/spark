@@ -156,7 +156,7 @@
     If you change codahale.metrics.version, you also need to change
     the link to metrics.dropwizard.io in docs/monitoring.md.
     -->
-    <codahale.metrics.version>4.2.33</codahale.metrics.version>
+    <codahale.metrics.version>5.0.5</codahale.metrics.version>
     <!-- Should be consistent with SparkBuild.scala and docs -->
     <avro.version>1.12.1</avro.version>
     <aws.kinesis.client.version>1.15.3</aws.kinesis.client.version>
@@ -1047,27 +1047,27 @@
         <scope>${derby.deps.scope}</scope>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>io.dropwizard.metrics5</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${codahale.metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>io.dropwizard.metrics5</groupId>
         <artifactId>metrics-jvm</artifactId>
         <version>${codahale.metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>io.dropwizard.metrics5</groupId>
         <artifactId>metrics-json</artifactId>
         <version>${codahale.metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>io.dropwizard.metrics5</groupId>
         <artifactId>metrics-graphite</artifactId>
         <version>${codahale.metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>io.dropwizard.metrics5</groupId>
         <artifactId>metrics-jmx</artifactId>
         <version>${codahale.metrics.version}</version>
       </dependency>
