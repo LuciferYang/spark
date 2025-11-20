@@ -125,8 +125,8 @@ public class OneForOneStreamManager extends StreamManager {
     String[] array = streamChunkId.split("_");
     assert array.length == 2:
       "Stream id and chunk index should be specified.";
-    long streamId = Long.valueOf(array[0]);
-    int chunkIndex = Integer.valueOf(array[1]);
+    long streamId = Long.parseLong(array[0]);
+    int chunkIndex = Integer.parseInt(array[1]);
     return Pair.of(streamId, chunkIndex);
   }
 
