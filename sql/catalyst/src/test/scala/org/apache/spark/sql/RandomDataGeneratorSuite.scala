@@ -62,7 +62,7 @@ class RandomDataGeneratorSuite extends SparkFunSuite with SQLHelper {
   for (
     dataType <- DataTypeTestUtils.atomicTypes;
     nullable <- Seq(true, false)
-    if !dataType.isInstanceOf[DecimalType]) {
+  ) {
     test(s"$dataType (nullable=$nullable)") {
       testRandomDataGeneration(dataType)
     }
@@ -84,10 +84,6 @@ class RandomDataGeneratorSuite extends SparkFunSuite with SQLHelper {
   for (
     keyType <- atomicTypesWithDataGenerators;
     valueType <- atomicTypesWithDataGenerators
-    // Scala's BigDecimal.hashCode can lead to OutOfMemoryError on Scala 2.10 (see SI-6173) and
-    // Spark can hit NumberFormatException errors when converting certain BigDecimals (SPARK-8802).
-    // For these reasons, we don't support generation of maps with decimal keys.
-    if !keyType.isInstanceOf[DecimalType]
   ) {
     val mapType = MapType(keyType, valueType)
     test(s"$mapType") {
