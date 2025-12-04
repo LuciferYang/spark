@@ -222,8 +222,8 @@ class RDDStorageInfo private[spark](
     val storageLevel: String,
     val memoryUsed: Long,
     val diskUsed: Long,
-    val dataDistribution: Option[collection.Seq[RDDDataDistribution]],
-    val partitions: Option[collection.Seq[RDDPartitionInfo]])
+    val dataDistribution: Option[Seq[RDDDataDistribution]],
+    val partitions: Option[Seq[RDDPartitionInfo]])
 
 class RDDDataDistribution private[spark](
     val address: String,

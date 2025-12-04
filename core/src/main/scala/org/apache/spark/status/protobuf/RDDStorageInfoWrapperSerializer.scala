@@ -93,10 +93,10 @@ private[protobuf] class RDDStorageInfoWrapperSerializer
         if (info.getDataDistributionList.isEmpty) {
           None
         } else {
-          Some(info.getDataDistributionList.asScala.map(deserializeRDDDataDistribution))
+          Option(listToSeq(info.getDataDistributionList)(deserializeRDDDataDistribution))
         },
       partitions =
-        Some(info.getPartitionsList.asScala.map(deserializeRDDPartitionInfo))
+        Option(listToSeq(info.getPartitionsList)(deserializeRDDPartitionInfo))
     )
   }
 
@@ -125,5 +125,22 @@ private[protobuf] class RDDStorageInfoWrapperSerializer
       diskUsed = info.getDiskUsed,
       executors = info.getExecutorsList.asScala
     )
+  }
+
+  import scala.reflect.ClassTag
+  import org.apache.spark.util.ArrayImplicits._
+  private def listToSeq[S, T: ClassTag](source: java.util.List[S])(f: S => T): Seq[T] = {
+    if (source.isEmpty) {
+      Seq.empty[T]
+    } else {
+      val array = new Array[T](source.size())
+      var i = 0
+      val iterator = source.iterator()
+      while (iterator.hasNext) {
+        array(i) = f(iterator.next())
+        i += 1
+      }
+      array.toImmutableArraySeq
+    }
   }
 }
