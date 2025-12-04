@@ -43,7 +43,7 @@ private[spark] abstract class PagedDataSource[T](val pageSize: Int) {
   /**
    * Slice a range of data.
    */
-  protected def sliceData(from: Int, to: Int): collection.Seq[T]
+  protected def sliceData(from: Int, to: Int): Seq[T]
 
   /**
    * Slice the data for this page
