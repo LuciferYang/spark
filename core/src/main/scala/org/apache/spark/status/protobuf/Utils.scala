@@ -19,6 +19,10 @@ package org.apache.spark.status.protobuf
 
 import java.util.{Map => JMap}
 
+import scala.reflect.ClassTag
+
+import org.apache.spark.util.ArrayImplicits._
+
 private[protobuf] object Utils {
   def getOptional[T](condition: Boolean, result: () => T): Option[T] = if (condition) {
     Some(result())
@@ -41,6 +45,21 @@ private[protobuf] object Utils {
   def setJMapField[K, V](input: JMap[K, V], putAllFunc: JMap[K, V] => Any): Unit = {
     if (input != null && !input.isEmpty) {
       putAllFunc(input)
+    }
+  }
+
+  def javaListToSeq[S, T: ClassTag](source: java.util.List[S])(f: S => T): Seq[T] = {
+    if (source.isEmpty) {
+      Seq.empty[T]
+    } else {
+      val array = new Array[T](source.size())
+      var i = 0
+      val iterator = source.iterator()
+      while (iterator.hasNext) {
+        array(i) = f(iterator.next())
+        i += 1
+      }
+      array.toImmutableArraySeq
     }
   }
 }
