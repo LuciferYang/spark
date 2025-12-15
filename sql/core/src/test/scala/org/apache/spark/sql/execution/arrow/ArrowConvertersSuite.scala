@@ -1893,68 +1893,69 @@ class ArrowConvertersSuite extends SharedSparkSession {
     val (outputRowIter, outputSchema) = ArrowConverters.fromIPCStream(out.toByteArray, ctx)
     Utils.tryWithResource(outputRowIter) { iter =>
       val proj = UnsafeProjection.create(schema)
-    assert(outputSchema == schema)
-    val outputRows = outputRowIter.map(proj(_).copy()).toList
-    assert(outputRows.length == inputRows.length)
+      assert(outputSchema == schema)
+      val outputRows = iter.map(proj(_).copy()).toList
+      assert(outputRows.length == inputRows.length)
 
-    outputRows.zipWithIndex.foreach { case (row, i) =>
-      assert(row.getInt(0) == i)
-      assert(row.getUTF8String(1).toString == s"test-$i")
-      if (i % 2 == 0) {
-        assert(row.isNullAt(2))
-      } else {
-        val nested = row.getStruct(2, 1)
-        assert(nested.getInt(0) == i * 3)
+      outputRows.zipWithIndex.foreach { case (row, i) =>
+        assert(row.getInt(0) == i)
+        assert(row.getUTF8String(1).toString == s"test-$i")
+        if (i % 2 == 0) {
+          assert(row.isNullAt(2))
+        } else {
+          val nested = row.getStruct(2, 1)
+          assert(nested.getInt(0) == i * 3)
+        }
+        val expectedBytes = Array(i, i + 1, i + 2).map(_.toByte)
+        assert(row.getBinary(3).sameElements(expectedBytes))
       }
-      val expectedBytes = Array(i, i + 1, i + 2).map(_.toByte)
-      assert(row.getBinary(3).sameElements(expectedBytes))
-    }
-  }
-
-  test("IPC stream partial consumption metrics validation") {
-    val inputRows = (0 until 30).map(InternalRow(_))
-    val schema = StructType(Seq(StructField("int", IntegerType, nullable = true)))
-    val ctx = TaskContext.empty()
-    val batchSize = 7
-
-    val batchIter = ArrowConverters.toBatchIterator(
-      inputRows.iterator, schema, batchSize, null, true, false, ctx)
-
-    val out = new ByteArrayOutputStream()
-    Utils.tryWithResource(new DataOutputStream(out)) { dataOut =>
-      val writer = new ArrowBatchStreamWriter(schema, dataOut, null, true, false)
-      writer.writeBatches(batchIter)
-      writer.end()
     }
 
-    val (iterator, outputSchema) = ArrowConverters.fromIPCStreamWithIterator(out.toByteArray, ctx)
-    assert(outputSchema == schema)
+    test("IPC stream partial consumption metrics validation") {
+      val inputRows = (0 until 30).map(InternalRow(_))
+      val schema = StructType(Seq(StructField("int", IntegerType, nullable = true)))
+      val ctx = TaskContext.empty()
+      val batchSize = 7
 
-    // Initially no batches loaded
-    assert(iterator.batchesLoaded == 0)
-    assert(iterator.totalRowsProcessed == 0)
+      val batchIter = ArrowConverters.toBatchIterator(
+        inputRows.iterator, schema, batchSize, null, true, false, ctx)
 
-    // Consume first 10 rows (should load 2 batches: 7 + 3)
-    val firstBatch = iterator.take(10).toList
-    assert(firstBatch.length == 10)
+      val out = new ByteArrayOutputStream()
+      Utils.tryWithResource(new DataOutputStream(out)) { dataOut =>
+        val writer = new ArrowBatchStreamWriter(schema, dataOut, null, true, false)
+        writer.writeBatches(batchIter)
+        writer.end()
+      }
 
-    // After consuming 10 rows, we should have loaded at least 2 batches
-    assert(iterator.batchesLoaded >= 2,
-      s"Expected at least 2 batches loaded after 10 rows, got ${iterator.batchesLoaded}")
-    assert(iterator.totalRowsProcessed >= 10,
-      s"Expected at least 10 rows processed, got ${iterator.totalRowsProcessed}")
+      val (iterator, outputSchema) = ArrowConverters.fromIPCStreamWithIterator(out.toByteArray, ctx)
+      assert(outputSchema == schema)
 
-    // Consume remaining rows
-    val remainingRows = iterator.toList
-    val totalConsumed = firstBatch.length + remainingRows.length
-    assert(totalConsumed == inputRows.length)
+      // Initially no batches loaded
+      assert(iterator.batchesLoaded == 0)
+      assert(iterator.totalRowsProcessed == 0)
 
-    // Final metrics should show all batches loaded
-    val expectedBatches = Math.ceil(inputRows.length.toDouble / batchSize).toInt
-    assert(iterator.batchesLoaded == expectedBatches,
-      s"Expected $expectedBatches batches loaded, got ${iterator.batchesLoaded}")
-    assert(iterator.totalRowsProcessed == inputRows.length,
-      s"Expected ${inputRows.length} rows processed, got ${iterator.totalRowsProcessed}")
+      // Consume first 10 rows (should load 2 batches: 7 + 3)
+      val firstBatch = iterator.take(10).toList
+      assert(firstBatch.length == 10)
+
+      // After consuming 10 rows, we should have loaded at least 2 batches
+      assert(iterator.batchesLoaded >= 2,
+        s"Expected at least 2 batches loaded after 10 rows, got ${iterator.batchesLoaded}")
+      assert(iterator.totalRowsProcessed >= 10,
+        s"Expected at least 10 rows processed, got ${iterator.totalRowsProcessed}")
+
+      // Consume remaining rows
+      val remainingRows = iterator.toList
+      val totalConsumed = firstBatch.length + remainingRows.length
+      assert(totalConsumed == inputRows.length)
+
+      // Final metrics should show all batches loaded
+      val expectedBatches = Math.ceil(inputRows.length.toDouble / batchSize).toInt
+      assert(iterator.batchesLoaded == expectedBatches,
+        s"Expected $expectedBatches batches loaded, got ${iterator.batchesLoaded}")
+      assert(iterator.totalRowsProcessed == inputRows.length,
+        s"Expected ${inputRows.length} rows processed, got ${iterator.totalRowsProcessed}")
+    }
   }
 
   /** Test that a converted DataFrame to Arrow record batch equals batch read from JSON file */
