@@ -1493,7 +1493,9 @@ class SparkConnectPlanner(
     if (rel.hasData) {
       val (rows, structType) =
         ArrowConverters.fromIPCStream(rel.getData.toByteArray, TaskContext.get())
-      buildLocalRelationFromRows(rows, structType, Option(schema))
+      Utils.tryWithResource(rows) { iter =>
+        buildLocalRelationFromRows(iter, structType, Option(schema))
+      }
     } else {
       if (schema == null) {
         throw InvalidInputErrors.schemaRequiredForLocalRelation()
@@ -1576,16 +1578,18 @@ class SparkConnectPlanner(
       if (batchIndex == 0) {
         structType = batchStructType
         combinedRows = batchRows
-
       } else {
         if (batchStructType != structType) {
+          batchRows.close() // Close before throwing exception
           throw InvalidInputErrors.chunkedCachedLocalRelationChunksWithDifferentSchema()
         }
         combinedRows = combinedRows ++ batchRows
       }
     }
-
-    buildLocalRelationFromRows(combinedRows, structType, Option(schema))
+    // Process all batches after they are combined
+    Utils.tryWithResource(combinedRows) { iter =>
+      buildLocalRelationFromRows(iter, structType, Option(schema))
+    }
   }
 
   private def toStructTypeOrWrap(dt: DataType): StructType = dt match {

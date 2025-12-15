@@ -1627,7 +1627,9 @@ class ArrowConvertersSuite extends SharedSparkSession {
     }
 
     val (outputRowIter, outputSchema) = ArrowConverters.fromIPCStream(out.toByteArray, ctx)
-    assert(outputSchema == schema)
+    Utils.tryWithResource(outputRowIter) { iter =>
+      assert(outputSchema == schema)
+    }
     val res = outputRowIter.zipWithIndex.map { case (row, i) =>
       assert(row.getInt(0) == i)
       i
@@ -1664,7 +1666,9 @@ class ArrowConvertersSuite extends SharedSparkSession {
     }
 
     val (outputRowIter, outputSchema) = ArrowConverters.fromIPCStream(out.toByteArray, ctx)
-    assert(outputSchema == schema)
+    Utils.tryWithResource(outputRowIter) { iter =>
+      assert(outputSchema == schema)
+    }
     val outputRows = outputRowIter.zipWithIndex.map { case (row, i) =>
       assert(row.getInt(0) == i)
       assert(row.getUTF8String(1).toString == s"str-$i")
@@ -1791,7 +1795,9 @@ class ArrowConvertersSuite extends SharedSparkSession {
     // Test with null context - should still work but won't have cleanup registration
     val proj = UnsafeProjection.create(schema)
     val (outputRowIter, outputSchema) = ArrowConverters.fromIPCStream(out.toByteArray, null)
-    assert(outputSchema == schema)
+    Utils.tryWithResource(outputRowIter) { iter =>
+      assert(outputSchema == schema)
+    }
     val outputRows = outputRowIter.map(proj(_).copy()).toList
     assert(outputRows.length == inputRows.length)
     outputRows.zipWithIndex.foreach { case (row, i) =>
@@ -1885,7 +1891,8 @@ class ArrowConvertersSuite extends SharedSparkSession {
     }
 
     val (outputRowIter, outputSchema) = ArrowConverters.fromIPCStream(out.toByteArray, ctx)
-    val proj = UnsafeProjection.create(schema)
+    Utils.tryWithResource(outputRowIter) { iter =>
+      val proj = UnsafeProjection.create(schema)
     assert(outputSchema == schema)
     val outputRows = outputRowIter.map(proj(_).copy()).toList
     assert(outputRows.length == inputRows.length)

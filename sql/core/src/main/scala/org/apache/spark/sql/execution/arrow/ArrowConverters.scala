@@ -297,7 +297,7 @@ private[sql] object ArrowConverters extends Logging {
    */
   private[sql] class InternalRowIteratorFromIPCStream(
       input: Array[Byte],
-      context: TaskContext) extends Iterator[InternalRow] {
+      context: TaskContext) extends Iterator[InternalRow] with AutoCloseable {
 
     // Keep all the resources we have opened in order, should be closed
     // in reverse order finally.
@@ -381,10 +381,23 @@ private[sql] object ArrowConverters extends Logging {
 
     override def next(): InternalRow = {
       if (!hasNext) {
+        if (context == null) {
+          // When context is null, need to clean up resources explicitly
+          closeAll(resources.toSeq.reverse: _*)
+        }
         throw new NoSuchElementException("No more elements in iterator")
       }
       _totalRowsProcessed += 1
       rowIterator.next()
+    }
+
+    /**
+     * Close all resources associated with this iterator.
+     * This should be called when the iterator is no longer needed,
+     * especially when context is null or TaskContext.empty().
+     */
+    override def close(): Unit = {
+      closeAll(resources.toSeq.reverse: _*)
     }
   }
 
@@ -395,7 +408,7 @@ private[sql] object ArrowConverters extends Logging {
   private[sql] abstract class InternalRowIterator(
       arrowBatchIter: Iterator[Array[Byte]],
       context: TaskContext)
-      extends Iterator[InternalRow] {
+      extends Iterator[InternalRow] with AutoCloseable {
     // Keep all the resources we have opened in order, should be closed in reverse order finally.
     val resources = new ArrayBuffer[AutoCloseable]()
     protected val allocator: BufferAllocator = ArrowUtils.rootAllocator.newChildAllocator(
@@ -431,6 +444,15 @@ private[sql] object ArrowConverters extends Logging {
     override def next(): InternalRow = rowIterAndSchema._1.next()
 
     def nextBatch(): (Iterator[InternalRow], StructType)
+
+    /**
+     * Close all resources associated with this iterator.
+     * This should be called when the iterator is no longer needed,
+     * especially when context is null or TaskContext.empty().
+     */
+    override def close(): Unit = {
+      closeAll(resources.toSeq.reverse: _*)
+    }
   }
 
   /**
@@ -483,13 +505,19 @@ private[sql] object ArrowConverters extends Logging {
   /**
    * Maps iterator from serialized ArrowRecordBatches to InternalRows.
    */
+  /**
+   * Maps iterator from serialized ArrowRecordBatches to InternalRows.
+   *
+   * Note: When context is null or TaskContext.empty(), the caller is responsible for
+   * calling close() on the returned iterator to ensure Arrow buffers are properly cleaned up.
+   */
   private[sql] def fromBatchIterator(
       arrowBatchIter: Iterator[Array[Byte]],
       schema: StructType,
       timeZoneId: String,
       errorOnDuplicatedFieldNames: Boolean,
       largeVarTypes: Boolean,
-      context: TaskContext): Iterator[InternalRow] = {
+      context: TaskContext): Iterator[InternalRow] with AutoCloseable = {
     new InternalRowIteratorWithoutSchema(
       arrowBatchIter, schema, timeZoneId, errorOnDuplicatedFieldNames, largeVarTypes, context
     )
@@ -499,9 +527,16 @@ private[sql] object ArrowConverters extends Logging {
    * Maps iterator from serialized ArrowRecordBatches to InternalRows. Different from
    * [[fromBatchIterator]], each input arrow batch starts with the schema.
    */
+  /**
+   * Maps iterator from serialized ArrowRecordBatches to InternalRows. Different from
+   * [[fromBatchIterator]], each input arrow batch starts with the schema.
+   *
+   * Note: When context is null or TaskContext.empty(), the caller is responsible for
+   * calling close() on the returned iterator to ensure Arrow buffers are properly cleaned up.
+   */
   private[sql] def fromBatchWithSchemaIterator(
       arrowBatchIter: Iterator[Array[Byte]],
-      context: TaskContext): (Iterator[InternalRow], StructType) = {
+      context: TaskContext): (Iterator[InternalRow] with AutoCloseable, StructType) = {
     val iterator = new InternalRowIteratorWithSchema(arrowBatchIter, context)
     (iterator, iterator.schema)
   }
@@ -511,9 +546,18 @@ private[sql] object ArrowConverters extends Logging {
    * one schema and a varying number of record batches. Returns an iterator over the
    * created InternalRow.
    */
+  /**
+   * Creates an iterator from a Byte array to deserialize an Arrow IPC stream with exactly
+   * one schema and a varying number of record batches. Returns an iterator over the
+   * created InternalRow.
+   *
+   * Note: When context is null or TaskContext.empty(), the caller is responsible for
+   * calling close() on the returned iterator to ensure Arrow buffers are properly cleaned up.
+   */
   private[sql] def fromIPCStream(input: Array[Byte], context: TaskContext):
-      (Iterator[InternalRow], StructType) = {
-    fromIPCStreamWithIterator(input, context)
+      (Iterator[InternalRow] with AutoCloseable, StructType) = {
+    val (iterator, schema) = fromIPCStreamWithIterator(input, context)
+    (iterator, schema)
   }
 
   // Overloaded method for tests to access the iterator with metrics
