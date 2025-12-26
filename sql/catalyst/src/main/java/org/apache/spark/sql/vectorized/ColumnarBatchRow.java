@@ -40,6 +40,28 @@ public final class ColumnarBatchRow extends InternalRow {
   public int rowId;
   private final ColumnVector[] columns;
 
+  private static final Map<Class<? extends DataType>, FieldGetter> GETTERS = Map.ofEntries(
+    Map.entry(BooleanType.class, ColumnarBatchRow::getBoolean),
+    Map.entry(ByteType.class, ColumnarBatchRow::getByte),
+    Map.entry(ShortType.class, ColumnarBatchRow::getShort),
+    Map.entry(IntegerType.class, ColumnarBatchRow::getInt),
+    Map.entry(YearMonthIntervalType.class, ColumnarBatchRow::getInt),
+    Map.entry(LongType.class, ColumnarBatchRow::getLong),
+    Map.entry(DayTimeIntervalType.class, ColumnarBatchRow::getLong),
+    Map.entry(FloatType.class, ColumnarBatchRow::getFloat),
+    Map.entry(DoubleType.class, ColumnarBatchRow::getDouble),
+    Map.entry(StringType.class, ColumnarBatchRow::getUTF8String),
+    Map.entry(BinaryType.class, ColumnarBatchRow::getBinary),
+    Map.entry(GeographyType.class, ColumnarBatchRow::getGeography),
+    Map.entry(GeometryType.class, ColumnarBatchRow::getGeometry),
+    Map.entry(DateType.class, ColumnarBatchRow::getInt),
+    Map.entry(TimestampType.class, ColumnarBatchRow::getLong),
+    Map.entry(TimestampNTZType.class, ColumnarBatchRow::getLong),
+    Map.entry(ArrayType.class, ColumnarBatchRow::getArray),
+    Map.entry(MapType.class, ColumnarBatchRow::getMap),
+    Map.entry(VariantType.class, ColumnarBatchRow::getVariant)
+  );
+
   public ColumnarBatchRow(ColumnVector[] columns) {
     this.columns = columns;
   }
@@ -175,48 +197,18 @@ public final class ColumnarBatchRow extends InternalRow {
 
   @Override
   public Object get(int ordinal, DataType dataType) {
-    if (dataType instanceof BooleanType) {
-      return getBoolean(ordinal);
-    } else if (dataType instanceof ByteType) {
-      return getByte(ordinal);
-    } else if (dataType instanceof ShortType) {
-      return getShort(ordinal);
-    } else if (dataType instanceof IntegerType || dataType instanceof YearMonthIntervalType) {
-      return getInt(ordinal);
-    } else if (dataType instanceof LongType || dataType instanceof DayTimeIntervalType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof FloatType) {
-      return getFloat(ordinal);
-    } else if (dataType instanceof DoubleType) {
-      return getDouble(ordinal);
-    } else if (dataType instanceof StringType) {
-      return getUTF8String(ordinal);
-    } else if (dataType instanceof BinaryType) {
-      return getBinary(ordinal);
-    } else if (dataType instanceof GeographyType) {
-      return getGeography(ordinal);
-    } else if (dataType instanceof GeometryType) {
-      return getGeometry(ordinal);
-    } else if (dataType instanceof DecimalType t) {
+    FieldGetter getter = GETTERS.get(dataType.getClass());
+    if (getter != null) {
+      return getter.get(this, ordinal);
+    }
+    if (dataType instanceof DecimalType t) {
       return getDecimal(ordinal, t.precision(), t.scale());
-    } else if (dataType instanceof DateType) {
-      return getInt(ordinal);
-    } else if (dataType instanceof TimestampType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof TimestampNTZType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof ArrayType) {
-      return getArray(ordinal);
     } else if (dataType instanceof StructType structType) {
       return getStruct(ordinal, structType.fields().length);
-    } else if (dataType instanceof MapType) {
-      return getMap(ordinal);
-    } else if (dataType instanceof VariantType) {
-      return getVariant(ordinal);
-    } else {
-      throw new SparkUnsupportedOperationException(
-        "_LEGACY_ERROR_TEMP_3152", Map.of("dataType", String.valueOf(dataType)));
     }
+    throw new SparkUnsupportedOperationException(
+      "_LEGACY_ERROR_TEMP_3152", Map.of("dataType", String.valueOf(dataType)));
+
   }
 
   @Override
@@ -227,5 +219,10 @@ public final class ColumnarBatchRow extends InternalRow {
   @Override
   public void setNullAt(int ordinal) {
     throw SparkUnsupportedOperationException.apply();
+  }
+
+  @FunctionalInterface
+  private interface FieldGetter {
+    Object get(ColumnarBatchRow row, int ordinal);
   }
 }
