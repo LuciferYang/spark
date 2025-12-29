@@ -183,43 +183,31 @@ public final class ColumnarRow extends InternalRow {
   @Override
   public Object get(int ordinal, DataType dataType) {
     if (isNullAt(ordinal)) return null;
-    if (dataType instanceof BooleanType) {
-      return getBoolean(ordinal);
-    } else if (dataType instanceof ByteType) {
-      return getByte(ordinal);
-    } else if (dataType instanceof ShortType) {
-      return getShort(ordinal);
-    } else if (dataType instanceof IntegerType || dataType instanceof YearMonthIntervalType) {
-      return getInt(ordinal);
-    } else if (dataType instanceof LongType || dataType instanceof DayTimeIntervalType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof FloatType) {
-      return getFloat(ordinal);
-    } else if (dataType instanceof DoubleType) {
-      return getDouble(ordinal);
-    } else if (dataType instanceof StringType) {
-      return getUTF8String(ordinal);
-    } else if (dataType instanceof BinaryType) {
-      return getBinary(ordinal);
-    } else if (dataType instanceof DecimalType t) {
-      return getDecimal(ordinal, t.precision(), t.scale());
-    } else if (dataType instanceof DateType) {
-      return getInt(ordinal);
-    } else if (dataType instanceof TimestampType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof TimestampNTZType) {
-      return getLong(ordinal);
-    } else if (dataType instanceof ArrayType) {
-      return getArray(ordinal);
-    } else if (dataType instanceof StructType) {
-      return getStruct(ordinal, ((StructType)dataType).fields().length);
-    } else if (dataType instanceof MapType) {
-      return getMap(ordinal);
-    } else if (dataType instanceof VariantType) {
-      return getVariant(ordinal);
-    } else {
-      throw new SparkUnsupportedOperationException("_LEGACY_ERROR_TEMP_3155");
-    }
+    return switch (dataType.typeId()) {
+      case BOOLEAN -> getBoolean(ordinal);
+      case BYTE -> getByte(ordinal);
+      case SHORT -> getShort(ordinal);
+      case INTEGER, YEAR_MONTH_INTERVAL, DATE -> getInt(ordinal);
+      case LONG, DAY_TIME_INTERVAL, TIMESTAMP, TIMESTAMP_NTZ -> getLong(ordinal);
+      case FLOAT -> getFloat(ordinal);
+      case DOUBLE -> getDouble(ordinal);
+      case STRING -> getUTF8String(ordinal);
+      case BINARY -> getBinary(ordinal);
+      case DECIMAL -> {
+        DecimalType dt = (DecimalType) dataType;
+        yield getDecimal(ordinal, dt.precision(), dt.scale());
+      }
+      case ARRAY -> getArray(ordinal);
+      case STRUCT -> {
+        StructType st = (StructType) dataType;
+        yield getStruct(ordinal, st.fields().length);
+      }
+      case MAP -> getMap(ordinal);
+      case VARIANT -> getVariant(ordinal);
+      case GEOGRAPHY -> getGeography(ordinal);
+      case GEOMETRY -> getGeometry(ordinal);
+      default -> throw new SparkUnsupportedOperationException("_LEGACY_ERROR_TEMP_3155");
+    };
   }
 
   @Override

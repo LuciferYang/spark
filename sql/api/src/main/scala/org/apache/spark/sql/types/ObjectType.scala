@@ -45,4 +45,6 @@ case class ObjectType(cls: Class[_]) extends DataType {
     case ObjectType(otherCls) => cls.isAssignableFrom(otherCls)
     case _ => false
   }
+
+  override def typeId: DataTypeId = DataTypeId.OBJECT
 }

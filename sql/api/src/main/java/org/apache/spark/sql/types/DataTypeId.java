@@ -15,32 +15,33 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.types
+package org.apache.spark.sql.types;
 
-import org.apache.spark.annotation.Stable
-
-/**
- * The data type representing `Short` values. Please use the singleton `DataTypes.ShortType`.
- *
- * @since 1.3.0
- */
-@Stable
-class ShortType private () extends IntegralType {
-
-  /**
-   * The default size of a value of the ShortType is 2 bytes.
-   */
-  override def defaultSize: Int = 2
-
-  override def simpleString: String = "smallint"
-
-  private[spark] override def asNullable: ShortType = this
-
-  override def typeId: DataTypeId = DataTypeId.SHORT
+public enum DataTypeId {
+    NULL,
+    BOOLEAN,
+    BYTE,
+    SHORT,
+    INTEGER,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    STRING,
+    BINARY,
+    DECIMAL,
+    DATE,
+    TIME,
+    TIMESTAMP,
+    TIMESTAMP_NTZ,
+    ARRAY,
+    STRUCT,
+    MAP,
+    VARIANT,
+    GEOGRAPHY,
+    GEOMETRY,
+    YEAR_MONTH_INTERVAL,
+    DAY_TIME_INTERVAL,
+    CALENDAR_INTERVAL,
+    OBJECT,
+    UDT
 }
-
-/**
- * @since 1.3.0
- */
-@Stable
-case object ShortType extends ShortType

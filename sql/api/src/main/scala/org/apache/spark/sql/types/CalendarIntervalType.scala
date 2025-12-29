@@ -40,6 +40,8 @@ class CalendarIntervalType private () extends DataType {
   override def typeName: String = "interval"
 
   private[spark] override def asNullable: CalendarIntervalType = this
+
+  override def typeId: DataTypeId = DataTypeId.CALENDAR_INTERVAL
 }
 
 /**

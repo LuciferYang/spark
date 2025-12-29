@@ -119,4 +119,6 @@ case class ArrayType(elementType: DataType, containsNull: Boolean) extends DataT
       ArrayType(elementType.transformRecursively(f), containsNull)
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.ARRAY
 }

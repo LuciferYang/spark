@@ -102,6 +102,8 @@ case class DecimalType(precision: Int, scale: Int) extends FractionalType {
   override def simpleString: String = s"decimal($precision,$scale)"
 
   private[spark] override def asNullable: DecimalType = this
+
+  override def typeId: DataTypeId = DataTypeId.DECIMAL
 }
 
 /**

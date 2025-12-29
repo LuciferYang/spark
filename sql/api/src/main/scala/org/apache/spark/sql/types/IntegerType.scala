@@ -35,6 +35,8 @@ class IntegerType private () extends IntegralType {
   override def simpleString: String = "int"
 
   private[spark] override def asNullable: IntegerType = this
+
+  override def typeId: DataTypeId = DataTypeId.INTEGER
 }
 
 /**

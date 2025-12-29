@@ -33,6 +33,8 @@ class BooleanType private () extends AtomicType {
   override def defaultSize: Int = 1
 
   private[spark] override def asNullable: BooleanType = this
+
+  override def typeId: DataTypeId = DataTypeId.BOOLEAN
 }
 
 /**

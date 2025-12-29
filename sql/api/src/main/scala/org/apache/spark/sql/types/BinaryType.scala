@@ -32,6 +32,8 @@ class BinaryType private () extends AtomicType {
   override def defaultSize: Int = 100
 
   private[spark] override def asNullable: BinaryType = this
+
+  override def typeId: DataTypeId = DataTypeId.BINARY
 }
 
 /**

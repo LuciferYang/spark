@@ -35,6 +35,8 @@ class DoubleType private () extends FractionalType {
   override def defaultSize: Int = 8
 
   private[spark] override def asNullable: DoubleType = this
+
+  override def typeId: DataTypeId = DataTypeId.DOUBLE
 }
 
 /**

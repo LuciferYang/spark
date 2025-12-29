@@ -154,6 +154,8 @@ class GeographyType private (val crs: String, val algorithm: EdgeInterpolationAl
       }
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.GEOGRAPHY
 }
 
 @Unstable

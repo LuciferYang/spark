@@ -35,6 +35,8 @@ class ByteType private () extends IntegralType {
   override def simpleString: String = "tinyint"
 
   private[spark] override def asNullable: ByteType = this
+
+  override def typeId: DataTypeId = DataTypeId.BYTE
 }
 
 /**

@@ -35,6 +35,8 @@ class FloatType private () extends FractionalType {
   override def defaultSize: Int = 4
 
   private[spark] override def asNullable: FloatType = this
+
+  override def typeId: DataTypeId = DataTypeId.FLOAT
 }
 
 /**

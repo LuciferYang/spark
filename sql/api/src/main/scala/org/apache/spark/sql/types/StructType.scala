@@ -514,6 +514,8 @@ case class StructType(fields: Array[StructField]) extends DataType with Seq[Stru
     }
     StructType(newFields)
   }
+
+  override def typeId: DataTypeId = DataTypeId.STRUCT
 }
 
 /**

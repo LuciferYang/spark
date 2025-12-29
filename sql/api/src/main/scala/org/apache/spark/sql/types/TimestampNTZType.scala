@@ -39,6 +39,8 @@ class TimestampNTZType private () extends DatetimeType {
   override def typeName: String = "timestamp_ntz"
 
   private[spark] override def asNullable: TimestampNTZType = this
+
+  override def typeId: DataTypeId = DataTypeId.TIMESTAMP_NTZ
 }
 
 /**

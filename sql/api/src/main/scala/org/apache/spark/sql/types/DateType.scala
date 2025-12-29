@@ -35,6 +35,8 @@ class DateType private () extends DatetimeType {
   override def defaultSize: Int = 4
 
   private[spark] override def asNullable: DateType = this
+
+  override def typeId: DataTypeId = DataTypeId.DATE
 }
 
 /**

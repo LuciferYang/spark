@@ -101,6 +101,8 @@ case class MapType(keyType: DataType, valueType: DataType, valueContainsNull: Bo
         valueContainsNull)
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.MAP
 }
 
 /**

@@ -110,6 +110,8 @@ abstract class UserDefinedType[UserType >: Null] extends DataType with Serializa
   def stringifyValue(obj: Any): String = {
     obj.toString
   }
+
+  override def typeId: DataTypeId = DataTypeId.UDT
 }
 
 private[spark] object UserDefinedType {

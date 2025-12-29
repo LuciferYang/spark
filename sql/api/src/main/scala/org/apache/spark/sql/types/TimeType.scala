@@ -45,6 +45,8 @@ case class TimeType(precision: Int) extends AnyTimeType {
   override def typeName: String = s"time($precision)"
 
   private[spark] override def asNullable: TimeType = this
+
+  override def typeId: DataTypeId = DataTypeId.TIME
 }
 
 object TimeType {

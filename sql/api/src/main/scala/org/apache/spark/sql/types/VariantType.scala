@@ -34,6 +34,8 @@ class VariantType private () extends AtomicType {
 
   /** This is a no-op because values with VARIANT type are always nullable. */
   private[spark] override def asNullable: VariantType = this
+
+  override def typeId: DataTypeId = DataTypeId.VARIANT
 }
 
 /**

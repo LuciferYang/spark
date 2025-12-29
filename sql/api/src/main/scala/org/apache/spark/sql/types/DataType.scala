@@ -55,6 +55,8 @@ abstract class DataType extends AbstractDataType {
    */
   def defaultSize: Int
 
+  def typeId: DataTypeId
+
   /** Name of the type used in JSON serialization. */
   def typeName: String = {
     this.getClass.getSimpleName

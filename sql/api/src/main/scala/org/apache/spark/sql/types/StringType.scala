@@ -103,6 +103,8 @@ class StringType private[sql] (
   override def defaultSize: Int = 20
 
   private[spark] override def asNullable: StringType = this
+
+  override def typeId: DataTypeId = DataTypeId.STRING
 }
 
 /**

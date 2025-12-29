@@ -62,6 +62,8 @@ case class DayTimeIntervalType(startField: Byte, endField: Byte) extends AnsiInt
       throw DataTypeErrors.invalidDayTimeIntervalType(startFieldName, endFieldName)
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.DAY_TIME_INTERVAL
 }
 
 /**

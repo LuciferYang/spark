@@ -35,6 +35,8 @@ class LongType private () extends IntegralType {
   override def simpleString: String = "bigint"
 
   private[spark] override def asNullable: LongType = this
+
+  override def typeId: DataTypeId = DataTypeId.LONG
 }
 
 /**

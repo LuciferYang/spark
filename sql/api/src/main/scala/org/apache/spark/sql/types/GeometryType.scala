@@ -151,6 +151,8 @@ class GeometryType private (val crs: String) extends AtomicType with Serializabl
       }
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.GEOMETRY
 }
 
 @Unstable

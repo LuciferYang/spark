@@ -58,6 +58,8 @@ case class YearMonthIntervalType(startField: Byte, endField: Byte) extends AnsiI
       throw DataTypeErrors.invalidDayTimeIntervalType(startFieldName, endFieldName)
     }
   }
+
+  override def typeId: DataTypeId = DataTypeId.YEAR_MONTH_INTERVAL
 }
 
 /**
