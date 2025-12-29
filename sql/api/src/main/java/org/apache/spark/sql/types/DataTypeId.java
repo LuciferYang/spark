@@ -27,6 +27,7 @@ public enum DataTypeId {
     FLOAT,
     DOUBLE,
     STRING,
+    STRING_WITH_CONTEXT,
     BINARY,
     DECIMAL,
     DATE,
@@ -43,5 +44,6 @@ public enum DataTypeId {
     DAY_TIME_INTERVAL,
     CALENDAR_INTERVAL,
     OBJECT,
-    UDT
+    UDT,
+    UUID
 }

@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Project}
 import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.catalyst.util.TypeUtils.toSQLExpr
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.types.{ArrayType, DataType, IndeterminateStringType, MapType, NullType, StringType, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, DataTypeId, IndeterminateStringType, MapType, NullType, StringType, StructType}
 import org.apache.spark.sql.util.SchemaUtils
 
 /**
@@ -515,4 +515,6 @@ private case class StringTypeWithContext(stringType: StringType, strength: Colla
   override def defaultSize: Int = stringType.defaultSize
 
   override private[spark] def asNullable: DataType = this
+
+  override def typeId: DataTypeId = DataTypeId.STRING_WITH_CONTEXT
 }

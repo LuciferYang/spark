@@ -951,6 +951,8 @@ class QueryCompilationErrorsSuite
       override def simpleString: String = "Dummy"
 
       override private[spark] def asNullable = NullType
+
+      override def typeId: DataTypeId = null
     }
     checkError(
       exception = intercept[AnalysisException] {

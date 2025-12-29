@@ -180,6 +180,7 @@ class ColumnTypeSuite extends SparkFunSuite {
         override def defaultSize: Int = 1
         override private[spark] def asNullable: DataType = this
         override def typeName: String = "invalid type name"
+        override def typeId: DataTypeId = null
     }
 
     checkError(
