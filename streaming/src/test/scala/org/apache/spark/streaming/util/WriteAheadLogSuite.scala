@@ -19,7 +19,7 @@ package org.apache.spark.streaming.util
 import java.io._
 import java.nio.ByteBuffer
 import java.util.{Iterator => JIterator}
-import java.util.concurrent.{CountDownLatch, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
+import java.util.concurrent.{CountDownLatch, LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent._
@@ -435,7 +435,7 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
   private var walBatchingExecutionContext: ExecutionContextExecutorService = _
   private val sparkConf = new SparkConf()
 
-  private val queueLength = PrivateMethod[Int](Symbol("getQueueLength"))
+  private val walWriteQueue = PrivateMethod[LinkedBlockingQueue[Record]](Symbol("walWriteQueue"))
 
   override def beforeEach(): Unit = {
     super.beforeEach()
@@ -513,7 +513,7 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
     writeAsync(batchedWal, event1, 3L)
     eventually(timeout(1.second)) {
       assert(blockingWal.isBlocked)
-      assert(batchedWal.invokePrivate(queueLength()) === 0)
+      assert(queueLength(batchedWal) === 0)
     }
     // rest of the records will be batched while it takes time for 3 to get written
     writeAsync(batchedWal, event2, 5L)
@@ -523,12 +523,12 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
     writeAsync(batchedWal, event5, 12L)
     eventually(timeout(1.second)) {
       assert(blockingWal.isBlocked)
-      assert(batchedWal.invokePrivate(queueLength()) === 3)
+      assert(queueLength(batchedWal) === 3)
     }
     writeAsync(batchedWal, event4, 10L)
     eventually(timeout(1.second)) {
       assert(walBatchingThreadPool.getActiveCount === 5)
-      assert(batchedWal.invokePrivate(queueLength()) === 4)
+      assert(queueLength(batchedWal) === 4)
     }
     blockingWal.allowWrite()
 
@@ -536,7 +536,7 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
     val queuedEvents = Set(event2, event3, event4, event5)
 
     eventually(timeout(1.second)) {
-      assert(batchedWal.invokePrivate(queueLength()) === 0)
+      assert(queueLength(batchedWal) === 0)
       verify(wal, times(1)).write(meq(buffer), meq(3L))
       // the file name should be the timestamp of the last record, as events should be naturally
       // in order of timestamp, and we need the last element.
@@ -575,7 +575,7 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
     val promise1 = writeAsync(batchedWal, event1, 3L)
     eventually(timeout(1.second)) {
       assert(blockingWal.isBlocked)
-      assert(batchedWal.invokePrivate(queueLength()) === 0)
+      assert(queueLength(batchedWal) === 0)
     }
     // rest of the records will be batched while it takes time for 3 to get written
     val promise2 = writeAsync(batchedWal, event2, 5L)
@@ -584,7 +584,7 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
     eventually(timeout(1.second)) {
       assert(walBatchingThreadPool.getActiveCount === 3)
       assert(blockingWal.isBlocked)
-      assert(batchedWal.invokePrivate(queueLength()) === 2) // event1 is being written
+      assert(queueLength(batchedWal) === 2) // event1 is being written
     }
 
     val writePromises = Seq(promise1, promise2, promise3)
@@ -594,6 +594,10 @@ class BatchedWriteAheadLogSuite extends CommonWriteAheadLogTests(
       assert(writePromises.forall(_.isCompleted))
       assert(writePromises.forall(_.future.value.get.isFailure)) // all should have failed
     }
+  }
+
+  private def queueLength(batchedWal: BatchedWriteAheadLog): Int = {
+    batchedWal.invokePrivate(walWriteQueue()).size()
   }
 }
 
