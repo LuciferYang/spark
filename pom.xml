@@ -150,6 +150,7 @@
     <javaxservlet.version>4.0.1</javaxservlet.version>
     <chill.version>0.10.0</chill.version>
     <kryo.version>4.0.3</kryo.version>
+    <fory.version>0.14.1</fory.version>
     <ivy.version>2.5.3</ivy.version>
     <oro.version>2.0.8</oro.version>
     <!--
@@ -534,6 +535,16 @@
         <groupId>org.objenesis</groupId>
         <artifactId>objenesis</artifactId>
         <version>3.4</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-core</artifactId>
+        <version>${fory.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-scala_${scala.binary.version}</artifactId>
+        <version>${fory.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>

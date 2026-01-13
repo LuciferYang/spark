@@ -421,10 +421,10 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
       case DRIVER_LIBRARY_PATH =>
         driverExtraLibraryPath = value
 
-      case PROPERTIES_FILE =>
+      case _ if value.endsWith("properties-file") || value.startsWith("--properties-file") =>
         propertiesFile = value
 
-      case EXTRA_PROPERTIES_FILE =>
+      case _ if value.endsWith("extra-properties-file") || value.startsWith("--extra-properties-file") =>
         extraPropertiesFiles :+= value
 
       case LOAD_SPARK_DEFAULTS =>
