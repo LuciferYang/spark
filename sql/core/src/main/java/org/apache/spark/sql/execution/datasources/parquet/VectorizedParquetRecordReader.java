@@ -526,16 +526,17 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
     StructField[] fields = schema.fields();
     int fieldsLength = fields.length;
     ColumnVector[] vectors = new ColumnVector[fieldsLength];
+    int regularColumnCount = fieldsLength - constantColumnLength;
     if (useOffHeap) {
-      for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
+      for (int i = 0; i < regularColumnCount; i++) {
         vectors[i] = new OffHeapColumnVector(capacity, fields[i].dataType());
       }
     } else {
-      for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
+      for (int i = 0; i < regularColumnCount; i++) {
         vectors[i] = new OnHeapColumnVector(capacity, fields[i].dataType());
       }
     }
-    for (int i = fieldsLength - constantColumnLength; i < fieldsLength; i++) {
+    for (int i = regularColumnCount; i < fieldsLength; i++) {
       vectors[i] = new ConstantColumnVector(capacity, fields[i].dataType());
     }
     return vectors;
