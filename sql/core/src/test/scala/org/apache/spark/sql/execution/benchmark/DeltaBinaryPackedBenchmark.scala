@@ -80,7 +80,8 @@ object DeltaBinaryPackedBenchmark extends BenchmarkBase {
 
   /**
    * Generates a minimal valid DELTA_BINARY_PACKED header + data for testing.
-   * Parquet Format: <block size> <miniblocks> <total count> <first value> <min delta> <bitwidths...> <data>
+   * Parquet Format:
+   * <block size> <miniblocks> <total count> <first value> <min delta> <bitwidths...> <data>
    */
   private def generateMockDeltaPage(size: Int): Array[Byte] = {
     // This is a placeholder. For a real benchmark, you'd use
