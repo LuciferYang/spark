@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.DataTypes
  * Benchmark to measure the performance of VectorizedDeltaBinaryPackedReader.
  * To run this benchmark:
  * 1. Build Spark and run:
- * SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "sql/test:runMain org.apache.spark.sql.execution.datasources.parquet.DeltaBinaryPackedBenchmark"
+ * SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "sql/test:runMain <this class>"
  */
 object DeltaBinaryPackedBenchmark extends BenchmarkBase {
 
