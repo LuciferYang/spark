@@ -283,6 +283,7 @@ final class ParquetColumnVector {
   private void assembleCollection() {
     int maxDefinitionLevel = column.definitionLevel();
     int maxElementRepetitionLevel = column.repetitionLevel();
+    int elementsAppended = definitionLevels.getElementsAppended();
 
     // There are 4 cases when calculating definition levels:
     //   1. definitionLevel == maxDefinitionLevel
@@ -297,10 +298,32 @@ final class ParquetColumnVector {
     // `i` is the index over all leaf elements of this array, while `offset` is the index over
     // all top-level elements of this array.
     int rowId = 0;
-    for (int i = 0, offset = 0; i < definitionLevels.getElementsAppended();
-         i = getNextCollectionStart(maxElementRepetitionLevel, i)) {
+    int offset = 0;
+    int i = 0;
+
+    while (i < elementsAppended) {
       vector.reserve(rowId + 1);
       int definitionLevel = definitionLevels.getInt(i);
+
+      // Look ahead to find length and next start index
+      int extraLength = 0; // Number of elements following the current one in the same collection
+      int nextI = i + 1;
+
+      // Scan through subsequent repetition levels until we find the start of the NEXT collection.
+      while (nextI < elementsAppended) {
+        int rl = repetitionLevels.getInt(nextI);
+        // If RL <= maxElementRepetitionLevel, it means a new collection (or parent struct) starts here.
+        if (rl <= maxElementRepetitionLevel) {
+          break;
+        }
+        // If RL <= maxElementRepetitionLevel + 1, it is a direct sibling element in the current collection.
+        // (Nested elements deeper in the hierarchy will have higher RLs and shouldn't increase the count)
+        if (rl <= maxElementRepetitionLevel + 1) {
+          extraLength++;
+        }
+        nextI++;
+      }
+
       if (definitionLevel <= maxDefinitionLevel) {
         // This means the value is not an array element, but a collection that is either null or
         // empty. In this case, we should increase offset to skip it when returning an array
@@ -331,14 +354,17 @@ final class ParquetColumnVector {
         vector.putArray(rowId, offset, 0);
         rowId++;
       } else if (definitionLevel > maxDefinitionLevel) {
-        // Collection is defined and non-empty: find out how many top elements are there until the
-        // start of the next array.
+        // Collection is defined and non-empty.
+        // The total length is the current element (1) + the subsequent elements found in the scan (extraLength).
+        int length = 1 + extraLength;
+
         vector.putNotNull(rowId);
-        int length = getCollectionSize(maxElementRepetitionLevel, i);
         vector.putArray(rowId, offset, length);
         offset += length;
         rowId++;
       }
+      // Move `i` to the start of the next collection found during the scan
+      i = nextI;
     }
     vector.addElementsAppended(rowId);
   }
