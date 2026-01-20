@@ -283,7 +283,11 @@ final class ParquetColumnVector {
   private void assembleCollection() {
     int maxDefinitionLevel = column.definitionLevel();
     int maxElementRepetitionLevel = column.repetitionLevel();
+    // Cache frequently accessed sizes to avoid repeated method calls
     int elementsAppended = definitionLevels.getElementsAppended();
+    int repLevelsSize = repetitionLevels.getElementsAppended();
+    // Pre-reserve vector capacity to minimize reallocation overhead
+    vector.reserve(elementsAppended);
 
     // There are 4 cases when calculating definition levels:
     //   1. definitionLevel == maxDefinitionLevel
@@ -302,15 +306,17 @@ final class ParquetColumnVector {
     int i = 0;
 
     while (i < elementsAppended) {
-      vector.reserve(rowId + 1);
       int definitionLevel = definitionLevels.getInt(i);
 
-      // Look ahead to find length and next start index
-      int extraLength = 0; // Number of elements following the current one in the same collection
+      // Look ahead to find the length of current collection and the next collection start index.
+
+      // `subsequentElements` represents the number of elements following the current
+      // one in the same collection.
+      int subsequentElements = 0;
       int nextI = i + 1;
 
       // Scan through subsequent repetition levels until we find the start of the NEXT collection.
-      while (nextI < elementsAppended) {
+      while (nextI < repLevelsSize) {
         int rl = repetitionLevels.getInt(nextI);
         // If RL <= maxElementRepetitionLevel,
         // it means a new collection (or parent struct) starts here.
@@ -320,8 +326,31 @@ final class ParquetColumnVector {
         // If RL <= maxElementRepetitionLevel + 1, it is a direct sibling element in the current
         // collection. (Nested elements deeper in the hierarchy will have higher RLs and shouldn't
         // increase the count)
+        //
+        // For instance, suppose we have the following Parquet schema:
+        //
+        // message schema {                        max rl   max dl
+        //   optional group col (LIST) {              0        1
+        //     repeated group list {                  1        2
+        //       optional group element (LIST) {      1        3
+        //         repeated group list {              2        4
+        //           required int32 element;          2        4
+        //         }
+        //       }
+        //     }
+        //   }
+        // }
+        //
+        // For a list such as: [[[0, 1], [2, 3]], [[4, 5], [6, 7]]], the repetition & definition
+        // levels would be:
+        //
+        // repetition levels: [0, 2, 1, 2, 0, 2, 1, 2]
+        // definition levels: [2, 2, 2, 2, 2, 2, 2, 2]
+        //
+        // When calculating collection size for the outer array, we should only count repetition
+        // levels whose value is <= 1 (which is the max repetition level for the inner array)
         if (rl <= maxElementRepetitionLevel + 1) {
-          extraLength++;
+          subsequentElements++;
         }
         nextI++;
       }
@@ -358,15 +387,15 @@ final class ParquetColumnVector {
       } else if (definitionLevel > maxDefinitionLevel) {
         // Collection is defined and non-empty.
         // The total length is the current element (1) + the subsequent elements
-        // found in the scan (extraLength).
-        int length = 1 + extraLength;
+        // found in the look-ahead scan.
+        int length = 1 + subsequentElements;
 
         vector.putNotNull(rowId);
         vector.putArray(rowId, offset, length);
         offset += length;
         rowId++;
       }
-      // Move `i` to the start of the next collection found during the scan
+      // Move to the start of the next collection found during the look-ahead scan
       i = nextI;
     }
     vector.addElementsAppended(rowId);
