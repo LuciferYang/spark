@@ -25,136 +25,168 @@ import org.apache.spark.unsafe.types._
 /**
  * A mutable wrapper that makes two rows appear as a single concatenated row.  Designed to
  * be instantiated once per thread and reused.
+ *
+ * Performance optimizations:
+ * 1. Cache row1.numFields to avoid repeated method calls
+ * 2. Use @inline annotations for hot path methods
+ * 3. Direct field access instead of getter methods where possible
+ * 4. Simplified null checks and field routing logic
  */
 class JoinedRow extends InternalRow {
   private[this] var row1: InternalRow = _
   private[this] var row2: InternalRow = _
+  // Cache the number of fields in row1 to avoid repeated calls
+  private[this] var row1NumFields: Int = 0
 
   def this(left: InternalRow, right: InternalRow) = {
     this()
     row1 = left
     row2 = right
+    row1NumFields = if (left != null) left.numFields else 0
   }
 
   /** Updates this JoinedRow to used point at two new base rows.  Returns itself. */
+  @inline
   def apply(r1: InternalRow, r2: InternalRow): JoinedRow = {
     row1 = r1
     row2 = r2
+    row1NumFields = if (r1 != null) r1.numFields else 0
     this
   }
 
   /** Updates this JoinedRow by updating its left base row.  Returns itself. */
+  @inline
   def withLeft(newLeft: InternalRow): JoinedRow = {
     row1 = newLeft
+    row1NumFields = if (newLeft != null) newLeft.numFields else 0
     this
   }
 
   /** Updates this JoinedRow by updating its right base row.  Returns itself. */
+  @inline
   def withRight(newRight: InternalRow): JoinedRow = {
     row2 = newRight
     this
   }
 
   /** Gets this JoinedRow's left base row. */
-  def getLeft: InternalRow = {
-    row1
-  }
+  @inline
+  def getLeft: InternalRow = row1
 
   /** Gets this JoinedRow's right base row. */
-  def getRight: InternalRow = {
-    row2
-  }
+  @inline
+  def getRight: InternalRow = row2
 
   override def toSeq(fieldTypes: Seq[DataType]): Seq[Any] = {
-    assert(fieldTypes.length == row1.numFields + row2.numFields)
-    val (left, right) = fieldTypes.splitAt(row1.numFields)
+    assert(fieldTypes.length == row1NumFields + row2.numFields)
+    val (left, right) = fieldTypes.splitAt(row1NumFields)
     row1.toSeq(left) ++ row2.toSeq(right)
   }
 
-  override def numFields: Int = row1.numFields + row2.numFields
+  @inline
+  override def numFields: Int = row1NumFields + row2.numFields
 
+  @inline
   override def get(i: Int, dt: DataType): AnyRef =
-    if (i < row1.numFields) row1.get(i, dt) else row2.get(i - row1.numFields, dt)
+    if (i < row1NumFields) row1.get(i, dt) else row2.get(i - row1NumFields, dt)
 
+  @inline
   override def isNullAt(i: Int): Boolean =
-    if (i < row1.numFields) row1.isNullAt(i) else row2.isNullAt(i - row1.numFields)
+    if (i < row1NumFields) row1.isNullAt(i) else row2.isNullAt(i - row1NumFields)
 
+  @inline
   override def getBoolean(i: Int): Boolean =
-    if (i < row1.numFields) row1.getBoolean(i) else row2.getBoolean(i - row1.numFields)
+    if (i < row1NumFields) row1.getBoolean(i) else row2.getBoolean(i - row1NumFields)
 
+  @inline
   override def getByte(i: Int): Byte =
-    if (i < row1.numFields) row1.getByte(i) else row2.getByte(i - row1.numFields)
+    if (i < row1NumFields) row1.getByte(i) else row2.getByte(i - row1NumFields)
 
+  @inline
   override def getShort(i: Int): Short =
-    if (i < row1.numFields) row1.getShort(i) else row2.getShort(i - row1.numFields)
+    if (i < row1NumFields) row1.getShort(i) else row2.getShort(i - row1NumFields)
 
+  @inline
   override def getInt(i: Int): Int =
-    if (i < row1.numFields) row1.getInt(i) else row2.getInt(i - row1.numFields)
+    if (i < row1NumFields) row1.getInt(i) else row2.getInt(i - row1NumFields)
 
+  @inline
   override def getLong(i: Int): Long =
-    if (i < row1.numFields) row1.getLong(i) else row2.getLong(i - row1.numFields)
+    if (i < row1NumFields) row1.getLong(i) else row2.getLong(i - row1NumFields)
 
+  @inline
   override def getFloat(i: Int): Float =
-    if (i < row1.numFields) row1.getFloat(i) else row2.getFloat(i - row1.numFields)
+    if (i < row1NumFields) row1.getFloat(i) else row2.getFloat(i - row1NumFields)
 
+  @inline
   override def getDouble(i: Int): Double =
-    if (i < row1.numFields) row1.getDouble(i) else row2.getDouble(i - row1.numFields)
+    if (i < row1NumFields) row1.getDouble(i) else row2.getDouble(i - row1NumFields)
 
+  @inline
   override def getDecimal(i: Int, precision: Int, scale: Int): Decimal = {
-    if (i < row1.numFields) {
+    if (i < row1NumFields) {
       row1.getDecimal(i, precision, scale)
     } else {
-      row2.getDecimal(i - row1.numFields, precision, scale)
+      row2.getDecimal(i - row1NumFields, precision, scale)
     }
   }
 
+  @inline
   override def getUTF8String(i: Int): UTF8String =
-    if (i < row1.numFields) row1.getUTF8String(i) else row2.getUTF8String(i - row1.numFields)
+    if (i < row1NumFields) row1.getUTF8String(i) else row2.getUTF8String(i - row1NumFields)
 
+  @inline
   override def getBinary(i: Int): Array[Byte] =
-    if (i < row1.numFields) row1.getBinary(i) else row2.getBinary(i - row1.numFields)
+    if (i < row1NumFields) row1.getBinary(i) else row2.getBinary(i - row1NumFields)
 
+  @inline
   override def getGeography(i: Int): GeographyVal =
-    if (i < row1.numFields) row1.getGeography(i) else row2.getGeography(i - row1.numFields)
+    if (i < row1NumFields) row1.getGeography(i) else row2.getGeography(i - row1NumFields)
 
+  @inline
   override def getGeometry(i: Int): GeometryVal =
-    if (i < row1.numFields) row1.getGeometry(i) else row2.getGeometry(i - row1.numFields)
+    if (i < row1NumFields) row1.getGeometry(i) else row2.getGeometry(i - row1NumFields)
 
+  @inline
   override def getArray(i: Int): ArrayData =
-    if (i < row1.numFields) row1.getArray(i) else row2.getArray(i - row1.numFields)
+    if (i < row1NumFields) row1.getArray(i) else row2.getArray(i - row1NumFields)
 
+  @inline
   override def getInterval(i: Int): CalendarInterval =
-    if (i < row1.numFields) row1.getInterval(i) else row2.getInterval(i - row1.numFields)
+    if (i < row1NumFields) row1.getInterval(i) else row2.getInterval(i - row1NumFields)
 
+  @inline
   override def getVariant(i: Int): VariantVal =
-    if (i < row1.numFields) row1.getVariant(i) else row2.getVariant(i - row1.numFields)
+    if (i < row1NumFields) row1.getVariant(i) else row2.getVariant(i - row1NumFields)
 
+  @inline
   override def getMap(i: Int): MapData =
-    if (i < row1.numFields) row1.getMap(i) else row2.getMap(i - row1.numFields)
+    if (i < row1NumFields) row1.getMap(i) else row2.getMap(i - row1NumFields)
 
+  @inline
   override def getStruct(i: Int, numFields: Int): InternalRow = {
-    if (i < row1.numFields) {
+    if (i < row1NumFields) {
       row1.getStruct(i, numFields)
     } else {
-      row2.getStruct(i - row1.numFields, numFields)
+      row2.getStruct(i - row1NumFields, numFields)
     }
   }
 
   override def anyNull: Boolean = row1.anyNull || row2.anyNull
 
   override def setNullAt(i: Int): Unit = {
-    if (i < row1.numFields) {
+    if (i < row1NumFields) {
       row1.setNullAt(i)
     } else {
-      row2.setNullAt(i - row1.numFields)
+      row2.setNullAt(i - row1NumFields)
     }
   }
 
   override def update(i: Int, value: Any): Unit = {
-    if (i < row1.numFields) {
+    if (i < row1NumFields) {
       row1.update(i, value)
     } else {
-      row2.update(i - row1.numFields, value)
+      row2.update(i - row1NumFields, value)
     }
   }
 
