@@ -312,12 +312,14 @@ final class ParquetColumnVector {
       // Scan through subsequent repetition levels until we find the start of the NEXT collection.
       while (nextI < elementsAppended) {
         int rl = repetitionLevels.getInt(nextI);
-        // If RL <= maxElementRepetitionLevel, it means a new collection (or parent struct) starts here.
+        // If RL <= maxElementRepetitionLevel,
+        // it means a new collection (or parent struct) starts here.
         if (rl <= maxElementRepetitionLevel) {
           break;
         }
-        // If RL <= maxElementRepetitionLevel + 1, it is a direct sibling element in the current collection.
-        // (Nested elements deeper in the hierarchy will have higher RLs and shouldn't increase the count)
+        // If RL <= maxElementRepetitionLevel + 1, it is a direct sibling element in the current
+        // collection. (Nested elements deeper in the hierarchy will have higher RLs and shouldn't
+        // increase the count)
         if (rl <= maxElementRepetitionLevel + 1) {
           extraLength++;
         }
@@ -355,7 +357,8 @@ final class ParquetColumnVector {
         rowId++;
       } else if (definitionLevel > maxDefinitionLevel) {
         // Collection is defined and non-empty.
-        // The total length is the current element (1) + the subsequent elements found in the scan (extraLength).
+        // The total length is the current element (1) + the subsequent elements
+        // found in the scan (extraLength).
         int length = 1 + extraLength;
 
         vector.putNotNull(rowId);
