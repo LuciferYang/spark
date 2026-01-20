@@ -75,8 +75,17 @@ public final class ByteArray {
   }
 
   public static int compareBinary(byte[] leftBase, byte[] rightBase) {
-    return compareBinary(leftBase, Platform.BYTE_ARRAY_OFFSET, leftBase.length,
-        rightBase, Platform.BYTE_ARRAY_OFFSET, rightBase.length);
+    int index = Arrays.mismatch(leftBase, rightBase);
+
+    // Complete match (same length and content)
+    if (index == -1) return 0;
+
+    // Prefix relationship: shorter array is a prefix of the longer one
+    if (index == leftBase.length) return -1;
+    if (index == rightBase.length) return 1;
+
+    // Content mismatch: compare as unsigned bytes
+    return Integer.compare(leftBase[index] & 0xFF, rightBase[index] & 0xFF);
   }
 
   static int compareBinary(
