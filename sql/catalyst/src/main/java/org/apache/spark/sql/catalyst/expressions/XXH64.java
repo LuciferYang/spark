@@ -30,6 +30,10 @@ import org.apache.spark.unsafe.types.UTF8String;
  * https://github.com/Cyan4973/xxHash/blob/master/xxhash.c
  * https://github.com/OpenHFT/Zero-Allocation-Hashing/blob/master/src/main/java/net/openhft/hashing/XxHash_r39.java
  * https://github.com/airlift/slice/blob/master/src/main/java/io/airlift/slice/XxHash64.java
+ *
+ * Performance optimizations:
+ * - Unified little-endian reading via getLongLE() to reduce code duplication
+ * - Extracted accumulator merging logic for better code organization
  */
 // scalastyle: on
 public final class XXH64 {
@@ -105,21 +109,10 @@ public final class XXH64 {
       offset += 4L;
     }
 
-    // Process remaining 1-3 bytes - unrolled to reduce branch misprediction
-    long remaining = end - offset;
-    if (remaining > 0) {
+    while (offset < end) {
       hash ^= (Platform.getByte(base, offset) & 0xFFL) * PRIME64_5;
       hash = Long.rotateLeft(hash, 11) * PRIME64_1;
-
-      if (remaining > 1) {
-        hash ^= (Platform.getByte(base, offset + 1) & 0xFFL) * PRIME64_5;
-        hash = Long.rotateLeft(hash, 11) * PRIME64_1;
-
-        if (remaining > 2) {
-          hash ^= (Platform.getByte(base, offset + 2) & 0xFFL) * PRIME64_5;
-          hash = Long.rotateLeft(hash, 11) * PRIME64_1;
-        }
-      }
+      offset++;
     }
     return fmix(hash);
   }
@@ -140,6 +133,7 @@ public final class XXH64 {
   private static long hashBytesByWords(Object base, long offset, int length, long seed) {
     long end = offset + length;
     long hash;
+
     if (length >= 32) {
       long limit = end - 32;
       long v1 = seed + PRIME64_1 + PRIME64_2;
@@ -148,16 +142,28 @@ public final class XXH64 {
       long v4 = seed - PRIME64_1;
 
       do {
-        // Extracted to inline-friendly method for better JIT optimization
-        v1 = round(v1, getLongLE(base, offset));
-        v2 = round(v2, getLongLE(base, offset + 8));
-        v3 = round(v3, getLongLE(base, offset + 16));
-        v4 = round(v4, getLongLE(base, offset + 24));
+        long k1 = getLongLE(base, offset);
+        long k2 = getLongLE(base, offset + 8);
+        long k3 = getLongLE(base, offset + 16);
+        long k4 = getLongLE(base, offset + 24);
+
+        v1 = Long.rotateLeft(v1 + (k1 * PRIME64_2), 31) * PRIME64_1;
+        v2 = Long.rotateLeft(v2 + (k2 * PRIME64_2), 31) * PRIME64_1;
+        v3 = Long.rotateLeft(v3 + (k3 * PRIME64_2), 31) * PRIME64_1;
+        v4 = Long.rotateLeft(v4 + (k4 * PRIME64_2), 31) * PRIME64_1;
+
         offset += 32L;
       } while (offset <= limit);
 
-      // Merge accumulators - extracted for better code organization and JIT inlining
-      hash = mergeAccumulators(v1, v2, v3, v4);
+      hash = Long.rotateLeft(v1, 1)
+              + Long.rotateLeft(v2, 7)
+              + Long.rotateLeft(v3, 12)
+              + Long.rotateLeft(v4, 18);
+
+      hash = mergeRound(hash, v1);
+      hash = mergeRound(hash, v2);
+      hash = mergeRound(hash, v3);
+      hash = mergeRound(hash, v4);
     } else {
       hash = seed + PRIME64_5;
     }
@@ -175,33 +181,7 @@ public final class XXH64 {
   }
 
   /**
-   * Single round of hashing - extracted for JIT inlining
-   */
-  private static long round(long acc, long input) {
-    acc += input * PRIME64_2;
-    acc = Long.rotateLeft(acc, 31);
-    return acc * PRIME64_1;
-  }
-
-  /**
-   * Merge four accumulators into final hash value
-   */
-  private static long mergeAccumulators(long v1, long v2, long v3, long v4) {
-    long hash = Long.rotateLeft(v1, 1)
-            + Long.rotateLeft(v2, 7)
-            + Long.rotateLeft(v3, 12)
-            + Long.rotateLeft(v4, 18);
-
-    hash = mergeRound(hash, v1);
-    hash = mergeRound(hash, v2);
-    hash = mergeRound(hash, v3);
-    hash = mergeRound(hash, v4);
-
-    return hash;
-  }
-
-  /**
-   * Single merge round - extracted for JIT inlining
+   * Single merge round - extracted for code reuse
    */
   private static long mergeRound(long hash, long v) {
     v *= PRIME64_2;
