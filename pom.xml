@@ -2807,6 +2807,8 @@
               <javacArg>${java.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path,-try</javacArg>
               <javacArg>-proc:full</javacArg>
+              <javacArg>--add-modules</javacArg>
+              <javacArg>jdk.incubator.vector</javacArg>
             </javacArgs>
           </configuration>
         </plugin>
