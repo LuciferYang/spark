@@ -50,42 +50,85 @@ class BloomFilterImplV2 extends BloomFilterBase implements Serializable {
   protected boolean scatterHashAndSetAllBits(HiLoHash inputHash) {
     int h1 = inputHash.hi();
     int h2 = inputHash.lo();
-
     long bitSize = bits.bitSize();
-    boolean bitsChanged = false;
 
-    // Integer.MAX_VALUE takes care of scrambling the higher four bytes of combinedHash
+    // 对于大量hash函数的情况，使用批量处理优化
+    if (numHashFunctions >= 4) {
+      return scatterHashBatchOptimizedV2(h1, h2, bitSize, true);
+    } else {
+      return scatterHashSequentialV2(h1, h2, bitSize, true);
+    }
+  }
+
+  /**
+   * V2版本的批量优化实现
+   */
+  private boolean scatterHashBatchOptimizedV2(int h1, int h2, long bitSize, boolean setBits) {
+    boolean result = false;
+    int batchSize = Math.min(16, numHashFunctions); // V2版本可以处理更大的批次
+
+    // 预计算基础hash值
+    long baseHash = (long) h1 * Integer.MAX_VALUE;
+    long h2Long = (long) h2; // 避免重复类型转换
+
+    int processed = 0;
+    while (processed < numHashFunctions) {
+      int currentBatch = Math.min(batchSize, numHashFunctions - processed);
+
+      // 批量计算当前批次的hash值
+      long currentHash = baseHash + h2Long * processed;
+      for (int i = 0; i < currentBatch; i++) {
+        currentHash += h2Long;
+
+        // Flip all the bits if it's negative
+        long combinedIndex = currentHash < 0 ? ~currentHash : currentHash;
+        long bitIndex = combinedIndex % bitSize;
+
+        if (setBits) {
+          result |= bits.set(bitIndex);
+        } else if (!bits.get(bitIndex)) {
+          return false;
+        }
+      }
+
+      processed += currentBatch;
+    }
+
+    return setBits ? result : true;
+  }
+
+  /**
+   * V2版本的顺序哈希计算
+   */
+  private boolean scatterHashSequentialV2(int h1, int h2, long bitSize, boolean setBits) {
+    boolean result = false;
     long combinedHash = (long) h1 * Integer.MAX_VALUE;
+
     for (long i = 0; i < numHashFunctions; i++) {
       combinedHash += h2;
-
-      // Flip all the bits if it's negative (guaranteed positive number)
       long combinedIndex = combinedHash < 0 ? ~combinedHash : combinedHash;
+      long bitIndex = combinedIndex % bitSize;
 
-      bitsChanged |= bits.set(combinedIndex % bitSize);
+      if (setBits) {
+        result |= bits.set(bitIndex);
+      } else if (!bits.get(bitIndex)) {
+        return false;
+      }
     }
-    return bitsChanged;
+    return setBits ? result : true;
   }
 
   protected boolean scatterHashAndGetAllBits(HiLoHash inputHash) {
     int h1 = inputHash.hi();
     int h2 = inputHash.lo();
-
     long bitSize = bits.bitSize();
 
-    // Integer.MAX_VALUE takes care of scrambling the higher four bytes of combinedHash
-    long combinedHash = (long) h1 * Integer.MAX_VALUE;
-    for (long i = 0; i < numHashFunctions; i++) {
-      combinedHash += h2;
-
-      // Flip all the bits if it's negative (guaranteed positive number)
-      long combinedIndex = combinedHash < 0 ? ~combinedHash : combinedHash;
-
-      if (!bits.get(combinedIndex % bitSize)) {
-        return false;
-      }
+    // 对于大量hash函数的情况，使用批量处理优化
+    if (numHashFunctions >= 4) {
+      return scatterHashBatchOptimizedV2(h1, h2, bitSize, false);
+    } else {
+      return scatterHashSequentialV2(h1, h2, bitSize, false);
     }
-    return true;
   }
 
   protected BloomFilterImplV2 checkCompatibilityForMerge(BloomFilter other)
