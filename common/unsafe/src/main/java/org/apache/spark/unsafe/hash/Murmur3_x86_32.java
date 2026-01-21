@@ -45,12 +45,10 @@ public final class Murmur3_x86_32 {
     return hashInt(input, seed);
   }
 
-  /**
-   * Hash a single integer value.
-   */
   public static int hashInt(int input, int seed) {
     int k1 = mixK1(input);
     int h1 = mixH1(seed, k1);
+
     return fmix(h1, 4);
   }
 
@@ -116,13 +114,11 @@ public final class Murmur3_x86_32 {
       h1 = mixH1(h1, mixK1(k3));
       h1 = mixH1(h1, mixK1(k4));
     }
-
     // Process remaining 4-byte chunks
     for (; i < lengthInBytes; i += 4) {
       int halfWord = getIntLE(base, offset + i);
       h1 = mixH1(h1, mixK1(halfWord));
     }
-
     return h1;
   }
 
