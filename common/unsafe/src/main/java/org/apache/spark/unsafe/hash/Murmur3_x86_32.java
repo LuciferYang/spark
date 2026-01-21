@@ -48,7 +48,6 @@ public final class Murmur3_x86_32 {
   public static int hashInt(int input, int seed) {
     int k1 = mixK1(input);
     int h1 = mixH1(seed, k1);
-
     return fmix(h1, 4);
   }
 
@@ -59,7 +58,7 @@ public final class Murmur3_x86_32 {
   public static int hashUnsafeWords(Object base, long offset, int lengthInBytes, int seed) {
     // This is based on Guava's `Murmur32_Hasher.processRemaining(ByteBuffer)` method.
     assert (lengthInBytes % 8 == 0): "lengthInBytes must be a multiple of 8 (word-aligned)";
-    int h1 = hashBytesByInt(base, offset, lengthInBytes, seed);
+    int h1 = hashBytesByIntUnrolled(base, offset, lengthInBytes, seed);
     return fmix(h1, lengthInBytes);
   }
 
@@ -67,8 +66,9 @@ public final class Murmur3_x86_32 {
     // This is not compatible with original and another implementations.
     // But remain it for backward compatibility for the components existing before 2.3.
     assert (lengthInBytes >= 0): "lengthInBytes cannot be negative";
-    int lengthAligned = lengthInBytes - lengthInBytes % 4;
-    int h1 = hashBytesByInt(base, offset, lengthAligned, seed);
+    int lengthAligned = lengthInBytes & ~3;
+    int h1 = hashBytesByIntUnrolled(base, offset, lengthAligned, seed);
+
     for (int i = lengthAligned; i < lengthInBytes; i++) {
       int halfWord = Platform.getByte(base, offset + i);
       int k1 = mixK1(halfWord);
@@ -81,27 +81,49 @@ public final class Murmur3_x86_32 {
     // This is compatible with original and another implementations.
     // Use this method for new components after Spark 2.3.
     assert (lengthInBytes >= 0): "lengthInBytes cannot be negative";
-    int lengthAligned = lengthInBytes - lengthInBytes % 4;
-    int h1 = hashBytesByInt(base, offset, lengthAligned, seed);
-    int k1 = 0;
-    for (int i = lengthAligned, shift = 0; i < lengthInBytes; i++, shift += 8) {
-      k1 ^= (Platform.getByte(base, offset + i) & 0xFF) << shift;
+    int lengthAligned = lengthInBytes & ~3;
+    int h1 = hashBytesByIntUnrolled(base, offset, lengthAligned, seed);
+
+    int remaining = lengthInBytes - lengthAligned;
+    if (remaining > 0) {
+      int k1 = 0;
+      for (int i = lengthAligned, shift = 0; i < lengthInBytes; i++, shift += 8) {
+        k1 ^= (Platform.getByte(base, offset + i) & 0xFF) << shift;
+      }
+      h1 ^= mixK1(k1);
     }
-    h1 ^= mixK1(k1);
     return fmix(h1, lengthInBytes);
   }
 
-  private static int hashBytesByInt(Object base, long offset, int lengthInBytes, int seed) {
+  private static int hashBytesByIntUnrolled(Object base, long offset, int lengthInBytes, int seed) {
     assert (lengthInBytes % 4 == 0);
     int h1 = seed;
-    for (int i = 0; i < lengthInBytes; i += 4) {
-      int halfWord = Platform.getInt(base, offset + i);
-      if (isBigEndian) {
-        halfWord = Integer.reverseBytes(halfWord);
-      }
+    int i = 0;
+
+    // Process 4 integers (16 bytes) per iteration
+    int unrollLimit = lengthInBytes - 15;
+    for (; i < unrollLimit; i += 16) {
+      int k1 = getIntLE(base, offset + i);
+      int k2 = getIntLE(base, offset + i + 4);
+      int k3 = getIntLE(base, offset + i + 8);
+      int k4 = getIntLE(base, offset + i + 12);
+
+      h1 = mixH1(h1, mixK1(k1));
+      h1 = mixH1(h1, mixK1(k2));
+      h1 = mixH1(h1, mixK1(k3));
+      h1 = mixH1(h1, mixK1(k4));
+    }
+    // Process remaining 4-byte chunks
+    for (; i < lengthInBytes; i += 4) {
+      int halfWord = getIntLE(base, offset + i);
       h1 = mixH1(h1, mixK1(halfWord));
     }
     return h1;
+  }
+
+  private static int getIntLE(Object base, long offset) {
+    int value = Platform.getInt(base, offset);
+    return isBigEndian ? Integer.reverseBytes(value) : value;
   }
 
   public int hashLong(long input) {
@@ -112,11 +134,8 @@ public final class Murmur3_x86_32 {
     int low = (int) input;
     int high = (int) (input >>> 32);
 
-    int k1 = mixK1(low);
-    int h1 = mixH1(seed, k1);
-
-    k1 = mixK1(high);
-    h1 = mixH1(h1, k1);
+    int h1 = mixH1(seed, mixK1(low));
+    h1 = mixH1(h1, mixK1(high));
 
     return fmix(h1, 8);
   }
