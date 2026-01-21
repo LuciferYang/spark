@@ -30,10 +30,6 @@ import org.apache.spark.unsafe.types.UTF8String;
  * https://github.com/Cyan4973/xxHash/blob/master/xxhash.c
  * https://github.com/OpenHFT/Zero-Allocation-Hashing/blob/master/src/main/java/net/openhft/hashing/XxHash_r39.java
  * https://github.com/airlift/slice/blob/master/src/main/java/io/airlift/slice/XxHash64.java
- *
- * Performance optimizations:
- * - Unified little-endian reading via getLongLE() to reduce code duplication
- * - Extracted accumulator merging logic for better code organization
  */
 // scalastyle: on
 public final class XXH64 {
@@ -133,7 +129,6 @@ public final class XXH64 {
   private static long hashBytesByWords(Object base, long offset, int length, long seed) {
     long end = offset + length;
     long hash;
-
     if (length >= 32) {
       long limit = end - 32;
       long v1 = seed + PRIME64_1 + PRIME64_2;
@@ -142,10 +137,17 @@ public final class XXH64 {
       long v4 = seed - PRIME64_1;
 
       do {
-        long k1 = getLongLE(base, offset);
-        long k2 = getLongLE(base, offset + 8);
-        long k3 = getLongLE(base, offset + 16);
-        long k4 = getLongLE(base, offset + 24);
+        long k1 = Platform.getLong(base, offset);
+        long k2 = Platform.getLong(base, offset + 8);
+        long k3 = Platform.getLong(base, offset + 16);
+        long k4 = Platform.getLong(base, offset + 24);
+
+        if (isBigEndian) {
+          k1 = Long.reverseBytes(k1);
+          k2 = Long.reverseBytes(k2);
+          k3 = Long.reverseBytes(k3);
+          k4 = Long.reverseBytes(k4);
+        }
 
         v1 = Long.rotateLeft(v1 + (k1 * PRIME64_2), 31) * PRIME64_1;
         v2 = Long.rotateLeft(v2 + (k2 * PRIME64_2), 31) * PRIME64_1;
@@ -160,10 +162,29 @@ public final class XXH64 {
               + Long.rotateLeft(v3, 12)
               + Long.rotateLeft(v4, 18);
 
-      hash = mergeRound(hash, v1);
-      hash = mergeRound(hash, v2);
-      hash = mergeRound(hash, v3);
-      hash = mergeRound(hash, v4);
+      v1 *= PRIME64_2;
+      v1 = Long.rotateLeft(v1, 31);
+      v1 *= PRIME64_1;
+      hash ^= v1;
+      hash = hash * PRIME64_1 + PRIME64_4;
+
+      v2 *= PRIME64_2;
+      v2 = Long.rotateLeft(v2, 31);
+      v2 *= PRIME64_1;
+      hash ^= v2;
+      hash = hash * PRIME64_1 + PRIME64_4;
+
+      v3 *= PRIME64_2;
+      v3 = Long.rotateLeft(v3, 31);
+      v3 *= PRIME64_1;
+      hash ^= v3;
+      hash = hash * PRIME64_1 + PRIME64_4;
+
+      v4 *= PRIME64_2;
+      v4 = Long.rotateLeft(v4, 31);
+      v4 *= PRIME64_1;
+      hash ^= v4;
+      hash = hash * PRIME64_1 + PRIME64_4;
     } else {
       hash = seed + PRIME64_5;
     }
@@ -172,30 +193,14 @@ public final class XXH64 {
 
     long limit = end - 8;
     while (offset <= limit) {
-      long k1 = getLongLE(base, offset);
+      long k1 = Platform.getLong(base, offset);
+      if (isBigEndian) {
+        k1 = Long.reverseBytes(k1);
+      }
       hash ^= Long.rotateLeft(k1 * PRIME64_2, 31) * PRIME64_1;
       hash = Long.rotateLeft(hash, 27) * PRIME64_1 + PRIME64_4;
       offset += 8L;
     }
     return hash;
-  }
-
-  /**
-   * Single merge round - extracted for code reuse
-   */
-  private static long mergeRound(long hash, long v) {
-    v *= PRIME64_2;
-    v = Long.rotateLeft(v, 31);
-    v *= PRIME64_1;
-    hash ^= v;
-    return hash * PRIME64_1 + PRIME64_4;
-  }
-
-  /**
-   * Read little-endian long value
-   */
-  private static long getLongLE(Object base, long offset) {
-    long value = Platform.getLong(base, offset);
-    return isBigEndian ? Long.reverseBytes(value) : value;
   }
 }
