@@ -45,9 +45,8 @@ public final class Platform {
 
   private static final boolean unaligned;
 
-  // Split java.version on non-digit chars:
-  private static final int majorVersion =
-    Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
+  // Use Runtime.version() for more reliable version detection:
+  private static final int JAVA_MAJOR_VERSION = Runtime.version().feature();
 
   // Access fields and constructors once and store them, for performance:
   private static final Constructor<?> DBB_CONSTRUCTOR;
@@ -61,7 +60,7 @@ public final class Platform {
 
     try {
       Class<?> cls = Class.forName("java.nio.DirectByteBuffer");
-      Constructor<?> constructor = (majorVersion < 21) ?
+      Constructor<?> constructor = (JAVA_MAJOR_VERSION < 21) ?
         cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE) :
         cls.getDeclaredConstructor(Long.TYPE, Long.TYPE);
       Field cleanerField = cls.getDeclaredField("cleaner");
