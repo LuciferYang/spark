@@ -2807,7 +2807,6 @@
               <javacArg>${java.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path,-try</javacArg>
               <javacArg>-proc:full</javacArg>
-              <javacArg>--enable-native-access=ALL-UNNAMED</javacArg>
               <javacArg>--enable-preview</javacArg>
             </javacArgs>
           </configuration>
