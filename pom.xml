@@ -117,7 +117,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <java.version>17</java.version>
+    <java.version>21</java.version>
     <java.minimum.version>17.0.11</java.minimum.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
     <maven.version>3.9.12</maven.version>
@@ -2765,7 +2765,7 @@
               <arg>-feature</arg>
               <arg>-explaintypes</arg>
               <arg>-release</arg>
-              <arg>17</arg>
+              <arg>21</arg>
               <arg>-Wconf:any:e</arg>
               <arg>-Wconf:cat=deprecation:wv</arg>
               <arg>-Wunused:imports</arg>
@@ -2807,6 +2807,8 @@
               <javacArg>${java.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path,-try</javacArg>
               <javacArg>-proc:full</javacArg>
+              <javacArg>--enable-native-access=ALL-UNNAMED</javacArg>
+              <javacArg>--enable-preview</javacArg>
             </javacArgs>
           </configuration>
         </plugin>

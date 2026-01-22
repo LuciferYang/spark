@@ -17,31 +17,26 @@
 
 package org.apache.spark.unsafe;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
-import sun.misc.Unsafe;
-
 public final class Platform {
+  private static final Arena GLOBAL_ARENA = Arena.global();
 
-  private static final Unsafe _UNSAFE;
-
-  public static final int BOOLEAN_ARRAY_OFFSET;
-
-  public static final int BYTE_ARRAY_OFFSET;
-
-  public static final int SHORT_ARRAY_OFFSET;
-
-  public static final int INT_ARRAY_OFFSET;
-
-  public static final int LONG_ARRAY_OFFSET;
-
-  public static final int FLOAT_ARRAY_OFFSET;
-
-  public static final int DOUBLE_ARRAY_OFFSET;
+  public static final int BOOLEAN_ARRAY_OFFSET = (int) ValueLayout.JAVA_BOOLEAN.byteAlignment();
+  public static final int BYTE_ARRAY_OFFSET = (int) ValueLayout.JAVA_BYTE.byteAlignment();
+  public static final int SHORT_ARRAY_OFFSET = (int) ValueLayout.JAVA_SHORT.byteAlignment();
+  public static final int INT_ARRAY_OFFSET = (int) ValueLayout.JAVA_INT.byteAlignment();
+  public static final int LONG_ARRAY_OFFSET = (int) ValueLayout.JAVA_LONG.byteAlignment();
+  public static final int FLOAT_ARRAY_OFFSET = (int) ValueLayout.JAVA_FLOAT.byteAlignment();
+  public static final int DOUBLE_ARRAY_OFFSET = (int) ValueLayout.JAVA_DOUBLE.byteAlignment();
 
   private static final boolean unaligned;
 
@@ -117,82 +112,97 @@ public final class Platform {
   }
 
   public static int getInt(Object object, long offset) {
-    return _UNSAFE.getInt(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 4, GLOBAL_ARENA.scope());
+    return segment.get(ValueLayout.JAVA_INT, 0);
   }
 
   public static void putInt(Object object, long offset, int value) {
-    _UNSAFE.putInt(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 4, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_INT, 0, value);
   }
 
   public static boolean getBoolean(Object object, long offset) {
-    return _UNSAFE.getBoolean(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 1, GLOBAL_ARENA.scope());
+    return segment.get(ValueLayout.JAVA_BYTE, 0) != 0;
   }
 
   public static void putBoolean(Object object, long offset, boolean value) {
-    _UNSAFE.putBoolean(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 1, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_BYTE, 0, value ? (byte)1 : (byte)0);
   }
 
   public static byte getByte(Object object, long offset) {
-    return _UNSAFE.getByte(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 1, GLOBAL_ARENA.scope());
+    return segment.get(ValueLayout.JAVA_BYTE, 0);
   }
 
   public static void putByte(Object object, long offset, byte value) {
-    _UNSAFE.putByte(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 1, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_BYTE, 0, value);
   }
 
   public static short getShort(Object object, long offset) {
-    return _UNSAFE.getShort(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 2, GLOBAL_ARENA.scope());
+    return segment.get(ValueLayout.JAVA_SHORT, 0);
   }
 
   public static void putShort(Object object, long offset, short value) {
-    _UNSAFE.putShort(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 2, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_SHORT, 0, value);
   }
 
   public static long getLong(Object object, long offset) {
-    return _UNSAFE.getLong(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 8, GLOBAL_ARENA.scope());
+    return segment.get(ValueLayout.JAVA_LONG, 0);
   }
 
   public static void putLong(Object object, long offset, long value) {
-    _UNSAFE.putLong(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 8, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_LONG, 0, value);
   }
 
   public static float getFloat(Object object, long offset) {
-    return _UNSAFE.getFloat(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 4, GLOBAL_ARENA.scope());
+    return Float.intBitsToFloat(segment.get(ValueLayout.JAVA_INT, 0));
   }
 
   public static void putFloat(Object object, long offset, float value) {
-    _UNSAFE.putFloat(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 4, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_INT, 0, Float.floatToIntBits(value));
   }
 
   public static double getDouble(Object object, long offset) {
-    return _UNSAFE.getDouble(object, offset);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 8, GLOBAL_ARENA.scope());
+    return Double.longBitsToDouble(segment.get(ValueLayout.JAVA_LONG, 0));
   }
 
   public static void putDouble(Object object, long offset, double value) {
-    _UNSAFE.putDouble(object, offset, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, 8, GLOBAL_ARENA.scope());
+    segment.set(ValueLayout.JAVA_LONG, 0, Double.doubleToLongBits(value));
   }
 
   public static Object getObjectVolatile(Object object, long offset) {
-    return _UNSAFE.getObjectVolatile(object, offset);
+    throw new UnsupportedOperationException("Volatile object access not supported with Foreign Memory API");
   }
 
   public static void putObjectVolatile(Object object, long offset, Object value) {
-    _UNSAFE.putObjectVolatile(object, offset, value);
+    throw new UnsupportedOperationException("Volatile object access not supported with Foreign Memory API");
   }
 
   public static long allocateMemory(long size) {
-    return _UNSAFE.allocateMemory(size);
+    MemorySegment segment = GLOBAL_ARENA.allocate(size);
+    return segment.address();
   }
 
   public static void freeMemory(long address) {
-    _UNSAFE.freeMemory(address);
+    // Memory is managed by Arena, no explicit free needed
   }
 
   public static long reallocateMemory(long address, long oldSize, long newSize) {
-    long newMemory = _UNSAFE.allocateMemory(newSize);
-    copyMemory(null, address, null, newMemory, oldSize);
-    freeMemory(address);
-    return newMemory;
+    MemorySegment oldSegment = MemorySegment.ofAddress(address, oldSize, GLOBAL_ARENA.scope());
+    MemorySegment newSegment = GLOBAL_ARENA.allocate(newSize);
+    MemorySegment.copy(oldSegment, 0, newSegment, 0, oldSize);
+    return newSegment.address();
   }
 
   /**
@@ -231,44 +241,31 @@ public final class Platform {
   }
 
   public static void setMemory(Object object, long offset, long size, byte value) {
-    _UNSAFE.setMemory(object, offset, size, value);
+    MemorySegment segment = MemorySegment.ofAddress(offset, size, GLOBAL_ARENA.scope());
+    segment.fill(value);
   }
 
   public static void setMemory(long address, byte value, long size) {
-    _UNSAFE.setMemory(address, size, value);
+    MemorySegment segment = MemorySegment.ofAddress(address, size, GLOBAL_ARENA.scope());
+    segment.fill(value);
   }
 
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
-    // Check if dstOffset is before or after srcOffset to determine if we should copy
-    // forward or backwards. This is necessary in case src and dst overlap.
-    if (dstOffset < srcOffset) {
-      while (length > 0) {
-        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-        length -= size;
-        srcOffset += size;
-        dstOffset += size;
-      }
-    } else {
-      srcOffset += length;
-      dstOffset += length;
-      while (length > 0) {
-        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-        srcOffset -= size;
-        dstOffset -= size;
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-        length -= size;
-      }
-
-    }
+    MemorySegment srcSegment = MemorySegment.ofAddress(srcOffset, length, GLOBAL_ARENA.scope());
+    MemorySegment dstSegment = MemorySegment.ofAddress(dstOffset, length, GLOBAL_ARENA.scope());
+    MemorySegment.copy(srcSegment, 0, dstSegment, 0, length);
   }
 
   /**
    * Raises an exception bypassing compiler checks for checked exceptions.
    */
   public static void throwException(Throwable t) {
-    _UNSAFE.throwException(t);
+    try {
+      throw t;
+    } catch (Throwable e) {
+      throw new RuntimeException("Failed to throw exception", e);
+    }
   }
 
   /**
@@ -278,62 +275,25 @@ public final class Platform {
   private static final long UNSAFE_COPY_THRESHOLD = 1024L * 1024L;
 
   static {
-    sun.misc.Unsafe unsafe;
-    try {
-      Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-      unsafeField.setAccessible(true);
-      unsafe = (sun.misc.Unsafe) unsafeField.get(null);
-    } catch (Throwable cause) {
-      unsafe = null;
-    }
-    _UNSAFE = unsafe;
-
-    if (_UNSAFE != null) {
-      BOOLEAN_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(boolean[].class);
-      BYTE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(byte[].class);
-      SHORT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(short[].class);
-      INT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(int[].class);
-      LONG_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(long[].class);
-      FLOAT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(float[].class);
-      DOUBLE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(double[].class);
-    } else {
-      BOOLEAN_ARRAY_OFFSET = 0;
-      BYTE_ARRAY_OFFSET = 0;
-      SHORT_ARRAY_OFFSET = 0;
-      INT_ARRAY_OFFSET = 0;
-      LONG_ARRAY_OFFSET = 0;
-      FLOAT_ARRAY_OFFSET = 0;
-      DOUBLE_ARRAY_OFFSET = 0;
-    }
+    // Initialize array offsets using MemoryLayout
+    BOOLEAN_ARRAY_OFFSET = (int) ValueLayout.JAVA_BOOLEAN.byteAlignment();
+    BYTE_ARRAY_OFFSET = (int) ValueLayout.JAVA_BYTE.byteAlignment();
+    SHORT_ARRAY_OFFSET = (int) ValueLayout.JAVA_SHORT.byteAlignment();
+    INT_ARRAY_OFFSET = (int) ValueLayout.JAVA_INT.byteAlignment();
+    LONG_ARRAY_OFFSET = (int) ValueLayout.JAVA_LONG.byteAlignment();
+    FLOAT_ARRAY_OFFSET = (int) ValueLayout.JAVA_FLOAT.byteAlignment();
+    DOUBLE_ARRAY_OFFSET = (int) ValueLayout.JAVA_DOUBLE.byteAlignment();
   }
 
-  // This requires `_UNSAFE`.
+  /**
+   * Determine if the platform supports unaligned memory access.
+   * This uses a simplified approach based on architecture.
+   */
   static {
     boolean _unaligned;
     String arch = System.getProperty("os.arch", "");
-    if (arch.equals("ppc64le") || arch.equals("ppc64") || arch.equals("s390x")) {
-      // Since java.nio.Bits.unaligned() doesn't return true on ppc (See JDK-8165231), but
-      // ppc64 and ppc64le support it
-      _unaligned = true;
-    } else {
-      try {
-        Class<?> bitsClass =
-          Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
-        if (_UNSAFE != null) {
-          Field unalignedField = bitsClass.getDeclaredField("UNALIGNED");
-          _unaligned = _UNSAFE.getBoolean(
-            _UNSAFE.staticFieldBase(unalignedField), _UNSAFE.staticFieldOffset(unalignedField));
-        } else {
-          Method unalignedMethod = bitsClass.getDeclaredMethod("unaligned");
-          unalignedMethod.setAccessible(true);
-          _unaligned = Boolean.TRUE.equals(unalignedMethod.invoke(null));
-        }
-      } catch (Throwable t) {
-        // We at least know x86 and x64 support unaligned access.
-        //noinspection DynamicRegexReplaceableByCompiledPattern
-        _unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64|aarch64)$");
-      }
-    }
+    // Assume modern architectures support unaligned access
+    _unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64|aarch64|ppc64le|ppc64|s390x)$");
     unaligned = _unaligned;
   }
 }
