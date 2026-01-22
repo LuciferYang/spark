@@ -2801,12 +2801,16 @@
               <jvmArg>-XX:MaxMetaspaceSize=2g</jvmArg>
               <jvmArg>-XX:ReservedCodeCacheSize=${CodeCacheSize}</jvmArg>
               <jvmArg>--enable-native-access=ALL-UNNAMED</jvmArg>
+              <jvmArg>--add-modules</jvmArg>
+              <jvmArg>jdk.incubator.vector</jvmArg>
             </jvmArgs>
             <javacArgs>
               <javacArg>--release</javacArg>
               <javacArg>${java.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path,-try</javacArg>
               <javacArg>-proc:full</javacArg>
+              <javacArg>--add-modules</javacArg>
+              <javacArg>jdk.incubator.vector</javacArg>
             </javacArgs>
           </configuration>
         </plugin>
