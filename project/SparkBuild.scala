@@ -342,13 +342,15 @@ object SparkBuild extends PomBuild {
       "-encoding", UTF_8.name(),
       "-g",
       "-proc:full",
-      "--release", javaVersion.value
+      "--release", javaVersion.value,
+      "--add-modules=jdk.incubator.vector"
     ),
     // This -target and Xlint:unchecked options cannot be set in the Compile configuration scope since
     // `javadoc` doesn't play nicely with them; see https://github.com/sbt/sbt/issues/355#issuecomment-3817629
     // for additional discussion and explanation.
     (Compile / compile / javacOptions) ++= Seq(
-      "-Xlint:unchecked"
+      "-Xlint:unchecked",
+      "--add-modules=jdk.incubator.vector"
     ),
 
     (Compile / scalacOptions) ++= Seq(
@@ -1879,7 +1881,9 @@ object TestSettings {
         "-Dio.netty.tryReflectionSetAccessible=true",
         "-Dio.netty.allocator.type=pooled",
         "-Dio.netty.handler.ssl.defaultEndpointVerificationAlgorithm=NONE",
-        "--enable-native-access=ALL-UNNAMED").mkString(" ")
+        "--enable-native-access=ALL-UNNAMED",
+        "--add-modules=jdk.incubator.vector",
+        "--add-opens=java.base/jdk.incubator.vector=ALL-UNNAMED").mkString(" ")
       s"-Xmx$heapSize -Xss4m -XX:MaxMetaspaceSize=$metaspaceSize -XX:ReservedCodeCacheSize=128m -Dfile.encoding=UTF-8 $extraTestJavaArgs"
         .split(" ").toSeq
     },
