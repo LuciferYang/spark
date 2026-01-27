@@ -25,7 +25,7 @@ import java.util.concurrent.TimeoutException
 import scala.jdk.CollectionConverters._
 
 import org.apache.kafka.clients.CommonClientConfigs
-import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord, KafkaConsumer, OffsetOutOfRangeException}
+import org.apache.kafka.clients.consumer.{Consumer, ConsumerConfig, ConsumerRecord, KafkaConsumer, OffsetOutOfRangeException}
 import org.apache.kafka.common.TopicPartition
 
 import org.apache.spark.{SparkEnv, TaskContext}
@@ -851,5 +851,15 @@ private[kafka010] object KafkaDataConsumer extends Logging {
 
   private[kafka010] def getActiveSizeInConsumerPool(groupIdPrefix: String): Int = {
     consumerPool.numActiveInGroupIdPrefix(groupIdPrefix)
+  }
+
+  private[kafka010] def awaitPartitionAssignment(
+      consumer: Consumer[_, _]): ju.Set[TopicPartition] = {
+    var partitions = consumer.assignment()
+    while (partitions.isEmpty) {
+      consumer.poll(Duration.ofMillis(100))
+      partitions = consumer.assignment()
+    }
+    partitions
   }
 }

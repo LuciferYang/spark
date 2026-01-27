@@ -17,18 +17,19 @@
 
 package org.apache.spark.streaming.kafka010
 
-import java.{ util => ju }
+import java.{util => ju}
+import java.time.Duration
 
 import org.apache.kafka.clients.consumer._
 import org.apache.kafka.common.TopicPartition
 
 import org.apache.spark.SparkContext
-import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
+import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.LogKeys.{CONFIG, GROUP_ID}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
+import org.apache.spark.streaming.api.java.{JavaInputDStream, JavaStreamingContext}
 import org.apache.spark.streaming.dstream._
 
 /**
@@ -209,6 +210,13 @@ object KafkaUtils extends Logging {
       logWarning(log"overriding ${MDC(CONFIG, ConsumerConfig.RECEIVE_BUFFER_CONFIG)} " +
         log"to 65536 see KAFKA-3135")
       kafkaParams.put(ConsumerConfig.RECEIVE_BUFFER_CONFIG, 65536: java.lang.Integer)
+    }
+  }
+
+  private[kafka010] def pollUntilRecordsReceived(consumer: Consumer[_, _]): Unit = {
+    var records = consumer.poll(Duration.ofMillis(100))
+    while (records.isEmpty) {
+      records = consumer.poll(Duration.ofMillis(100))
     }
   }
 }
