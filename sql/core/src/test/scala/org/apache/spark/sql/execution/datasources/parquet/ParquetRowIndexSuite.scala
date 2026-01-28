@@ -21,9 +21,11 @@ import java.io.File
 import scala.jdk.CollectionConverters._
 
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.HadoopReadOptions
 import org.apache.parquet.column.ParquetProperties._
 import org.apache.parquet.hadoop.{ParquetFileReader, ParquetOutputFormat}
 import org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE
+import org.apache.parquet.hadoop.util.HadoopInputFile
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.QueryTest
@@ -37,14 +39,18 @@ import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.{LongType, StringType}
 import org.apache.spark.tags.SlowSQLTest
 import org.apache.spark.util.ArrayImplicits._
+import org.apache.spark.util.Utils
 
 @SlowSQLTest
 class ParquetRowIndexSuite extends QueryTest with SharedSparkSession {
   import testImplicits._
 
   private def readRowGroupRowCounts(path: String): Seq[Long] = {
-    ParquetFileReader.readFooter(spark.sessionState.newHadoopConf(), new Path(path))
-      .getBlocks.asScala.toSeq.map(_.getRowCount)
+    val file = HadoopInputFile.fromPath(new Path(path), spark.sessionState.newHadoopConf())
+    val options = HadoopReadOptions.builder(file.getConfiguration, file.getPath).build
+    Utils.tryWithResource(file.newStream()) {in =>
+      ParquetFileReader.readFooter(file, options, in).getBlocks.asScala.toSeq.map(_.getRowCount)
+    }
   }
 
   private def readRowGroupRowCounts(dir: File): Seq[Seq[Long]] = {
