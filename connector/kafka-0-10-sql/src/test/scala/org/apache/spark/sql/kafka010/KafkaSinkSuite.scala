@@ -18,8 +18,8 @@
 package org.apache.spark.sql.kafka010
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.{Map => JMap}
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.reflect.ClassTag
 import scala.util.Try
