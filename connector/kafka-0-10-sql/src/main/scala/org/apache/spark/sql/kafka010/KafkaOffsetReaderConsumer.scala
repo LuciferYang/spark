@@ -18,6 +18,7 @@
 package org.apache.spark.sql.kafka010
 
 import java.{util => ju}
+import java.time.Duration
 
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -66,6 +67,8 @@ private[kafka010] class KafkaOffsetReaderConsumer(
    */
   private var groupId: String = null
   private var nextId = 0
+
+  private val POLL_TIMEOUT = Duration.ofMillis(100)
 
   /**
    * A KafkaConsumer used in the driver to query the latest Kafka offsets. This only queries the
@@ -133,8 +136,7 @@ private[kafka010] class KafkaOffsetReaderConsumer(
     uninterruptibleThreadRunner.runUninterruptibly {
       assert(Thread.currentThread().isInstanceOf[UninterruptibleThread])
       // Poll to get the latest assigned partitions
-      KafkaDataConsumer.awaitPartitionAssignment(consumer)
-      val partitions = consumer.assignment()
+      val partitions = awaitPartitionAssignment(consumer)
       consumer.pause(partitions)
       partitions.asScala.toSet
   }
@@ -495,7 +497,7 @@ private[kafka010] class KafkaOffsetReaderConsumer(
     : Map[TopicPartition, Long] = uninterruptibleThreadRunner.runUninterruptibly {
 
     withRetriesWithoutInterrupt {
-      val partitions = KafkaDataConsumer.awaitPartitionAssignment(consumer)
+      val partitions = awaitPartitionAssignment(consumer)
 
       if (!fetchingEarliestOffset) {
         // Call `position` to wait until the potential offset request triggered by `poll(0)` is
@@ -575,5 +577,15 @@ private[kafka010] class KafkaOffsetReaderConsumer(
   private def resetConsumer(): Unit = synchronized {
     stopConsumer()
     _consumer = null  // will automatically get reinitialized again
+  }
+
+  private[kafka010] def awaitPartitionAssignment(
+      consumer: Consumer[_, _]): ju.Set[TopicPartition] = {
+    var partitions = consumer.assignment()
+    while (partitions.isEmpty) {
+      consumer.poll(POLL_TIMEOUT)
+      partitions = consumer.assignment()
+    }
+    partitions
   }
 }

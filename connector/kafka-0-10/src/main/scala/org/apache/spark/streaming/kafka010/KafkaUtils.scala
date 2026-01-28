@@ -36,6 +36,9 @@ import org.apache.spark.streaming.dstream._
  * object for constructing Kafka streams and RDDs
  */
 object KafkaUtils extends Logging {
+
+  private val POLL_TIMEOUT = Duration.ofMillis(100)
+
   /**
    * Scala constructor for a batch-oriented interface for consuming from Kafka.
    * Starting and ending offsets are specified in advance,
@@ -215,9 +218,9 @@ object KafkaUtils extends Logging {
 
   private[kafka010] def awaitRecordsReceived(
       consumer: Consumer[_, _]): ConsumerRecords[_, _] = {
-    var records = consumer.poll(Duration.ofMillis(100))
+    var records = consumer.poll(POLL_TIMEOUT)
     while (records.isEmpty) {
-      records = consumer.poll(Duration.ofMillis(100))
+      records = consumer.poll(POLL_TIMEOUT)
     }
     records
   }
