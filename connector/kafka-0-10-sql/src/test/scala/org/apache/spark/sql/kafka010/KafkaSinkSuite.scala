@@ -19,12 +19,12 @@ package org.apache.spark.sql.kafka010
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.{Map => JMap}
 
 import scala.reflect.ClassTag
 import scala.util.Try
 
-import org.apache.kafka.clients.producer.ProducerConfig
-import org.apache.kafka.clients.producer.internals.DefaultPartitioner
+import org.apache.kafka.clients.producer.{Partitioner, ProducerConfig}
 import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.scalatest.time.SpanSugar._
@@ -594,7 +594,7 @@ class KafkaSinkBatchSuiteV2 extends KafkaSinkBatchSuiteBase {
   }
 }
 
-class TestKafkaPartitioner extends DefaultPartitioner {
+class TestKafkaPartitioner extends Partitioner {
   override def partition(
       topic: String,
       key: Any,
@@ -602,4 +602,8 @@ class TestKafkaPartitioner extends DefaultPartitioner {
       value: Any,
       valueBytes: Array[Byte],
       cluster: Cluster): Int = 0
+
+  override def close(): Unit = {}
+
+  override def configure(configs: JMap[String, _]): Unit = {}
 }
