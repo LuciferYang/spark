@@ -30,7 +30,6 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.spark.internal.LogKeys.{NUM_RETRY, OFFSETS}
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.kafka010.KafkaSourceProvider.StrategyOnNoMatchStartingOffset
-import org.apache.spark.sql.kafka010.consumer.KafkaDataConsumer
 import org.apache.spark.util.{UninterruptibleThread, UninterruptibleThreadRunner}
 import org.apache.spark.util.ArrayImplicits._
 
