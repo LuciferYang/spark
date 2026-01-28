@@ -213,10 +213,12 @@ object KafkaUtils extends Logging {
     }
   }
 
-  private[kafka010] def pollUntilRecordsReceived(consumer: Consumer[_, _]): Unit = {
+  private[kafka010] def awaitRecordsReceived(
+      consumer: Consumer[_, _]): ConsumerRecords[_, _] = {
     var records = consumer.poll(Duration.ofMillis(100))
     while (records.isEmpty) {
       records = consumer.poll(Duration.ofMillis(100))
     }
+    records
   }
 }

@@ -170,7 +170,7 @@ private[spark] class DirectKafkaInputDStream[K, V](
   private def paranoidPoll(c: Consumer[K, V]): Unit = {
     // don't actually want to consume any messages, so pause all partitions
     c.pause(c.assignment())
-    val msgs = KafkaUtils.pollUntilRecordsReceived(c)
+    val msgs = KafkaUtils.awaitRecordsReceived(c)
     if (!msgs.isEmpty) {
       // position should be minimum offset per topicpartition
       msgs.asScala.foldLeft(Map[TopicPartition, Long]()) { (acc, m) =>

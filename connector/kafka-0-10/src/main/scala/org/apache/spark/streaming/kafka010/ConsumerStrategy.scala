@@ -105,7 +105,7 @@ private case class Subscribe[K, V](
       val shouldSuppress =
         aor != null && aor.asInstanceOf[String].toUpperCase(Locale.ROOT) == "NONE"
       try {
-        KafkaUtils.pollUntilRecordsReceived(consumer)
+        KafkaUtils.awaitRecordsReceived(consumer)
       } catch {
         case x: NoOffsetForPartitionException if shouldSuppress =>
           logWarning(log"Catching NoOffsetForPartitionException since " +
@@ -159,7 +159,7 @@ private case class SubscribePattern[K, V](
       val shouldSuppress =
         aor != null && aor.asInstanceOf[String].toUpperCase(Locale.ROOT) == "NONE"
       try {
-        KafkaUtils.pollUntilRecordsReceived(consumer)
+        KafkaUtils.awaitRecordsReceived(consumer)
       } catch {
         case x: NoOffsetForPartitionException if shouldSuppress =>
           logWarning(log"Catching NoOffsetForPartitionException since " +
