@@ -579,8 +579,7 @@ private[kafka010] class KafkaOffsetReaderConsumer(
     _consumer = null  // will automatically get reinitialized again
   }
 
-  private[kafka010] def awaitPartitionAssignment(
-      consumer: Consumer[_, _]): ju.Set[TopicPartition] = {
+  private def awaitPartitionAssignment(consumer: Consumer[_, _]): ju.Set[TopicPartition] = {
     var partitions = consumer.assignment()
     while (partitions.isEmpty) {
       consumer.poll(POLL_TIMEOUT)
