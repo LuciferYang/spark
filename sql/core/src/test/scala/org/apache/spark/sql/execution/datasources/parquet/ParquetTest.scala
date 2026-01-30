@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.execution.datasources.FileBasedDataSourceTest
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.Utils
+import org.apache.spark.util.{HadoopFSUtils, Utils}
 
 /**
  * A helper trait that provides convenient facilities for Parquet testing.
@@ -138,8 +138,13 @@ private[sql] trait ParquetTest extends FileBasedDataSourceTest {
 
   protected def readAllFootersWithoutSummaryFiles(
       path: Path, configuration: Configuration): Seq[Footer] = {
-    val fs = path.getFileSystem(configuration)
-    ParquetFileReader.readAllFootersInParallel(configuration, fs.getFileStatus(path)).asScala.toSeq
+    val fileStatuses = HadoopFSUtils.listFiles(path, configuration,
+      (path: Path) => {
+        val c = path.getName.charAt(0)
+        c != '.' && c != '_'
+      }).flatMap(_._2)
+    ParquetFileFormat.readParquetFootersInParallel(
+      configuration, fileStatuses, ignoreCorruptFiles = false)
   }
 
   protected def readFooter(path: Path, configuration: Configuration): ParquetMetadata = {
