@@ -141,7 +141,7 @@ class GenericArrayData(private var data: Any) extends ArrayData {
       case arr: Array[Boolean] if value.isInstanceOf[Boolean] =>
         arr(ordinal) = value.asInstanceOf[Boolean]
       case _ =>
-        // 非基本类型或 null 值，转换为 Array[Any]
+        // Non-primitive type or null value, convert to Array[Any]
         val anyArr = ensureAnyArray()
         anyArr(ordinal) = value
     }
@@ -176,38 +176,67 @@ class GenericArrayData(private var data: Any) extends ArrayData {
       return false
     }
 
-    var i = 0
-    while (i < len) {
-      if (isNullAt(i) != other.isNullAt(i)) {
-        return false
-      }
-      if (!isNullAt(i)) {
-        val o1 = get(i, null)
-        val o2 = other.get(i, null)
-        o1 match {
-          case b1: Array[Byte] =>
-            if (!o2.isInstanceOf[Array[Byte]] ||
-              !java.util.Arrays.equals(b1, o2.asInstanceOf[Array[Byte]])) {
-              return false
-            }
-          case f1: java.lang.Float if java.lang.Float.isNaN(f1) =>
-            if (!o2.isInstanceOf[java.lang.Float] ||
-              !java.lang.Float.isNaN(o2.asInstanceOf[java.lang.Float])) {
-              return false
-            }
-          case d1: java.lang.Double if java.lang.Double.isNaN(d1) =>
-            if (!o2.isInstanceOf[java.lang.Double] ||
-              !java.lang.Double.isNaN(o2.asInstanceOf[java.lang.Double])) {
-              return false
-            }
-          case _ => if (o1.getClass != o2.getClass || o1 != o2) {
+    // Try to directly compare primitive arrays of the same type
+    (data, other.data) match {
+      case (arr1: Array[Int], arr2: Array[Int]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Long], arr2: Array[Long]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Float], arr2: Array[Float]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Double], arr2: Array[Double]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Short], arr2: Array[Short]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Byte], arr2: Array[Byte]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case (arr1: Array[Boolean], arr2: Array[Boolean]) =>
+        java.util.Arrays.equals(arr1, arr2)
+      case _ =>
+        // Fall back to general comparison logic
+        var i = 0
+        while (i < len) {
+          val isNull1 = isNullAt(i)
+          val isNull2 = other.isNullAt(i)
+          if (isNull1 != isNull2) {
             return false
           }
+          if (!isNull1) {
+            (data, other.data) match {
+              case (arr1: Array[Any], arr2: Array[Any]) =>
+                val o1 = arr1(i)
+                val o2 = arr2(i)
+                compareValues(o1, o2) match {
+                  case false => return false
+                  case _ =>
+                }
+              case _ =>
+                val o1 = get(i, null)
+                val o2 = other.get(i, null)
+                compareValues(o1, o2) match {
+                  case false => return false
+                  case _ =>
+                }
+            }
+          }
+          i += 1
         }
-      }
-      i += 1
+        true
     }
-    true
+  }
+
+  // Compare two values for equality, handling special cases like NaN
+  private def compareValues(o1: Any, o2: Any): Boolean = {
+    (o1, o2) match {
+      case (b1: Array[Byte], b2: Array[Byte]) =>
+        java.util.Arrays.equals(b1, b2)
+      case (f1: java.lang.Float, f2: java.lang.Float) =>
+        (f1 == f2) || (java.lang.Float.isNaN(f1) && java.lang.Float.isNaN(f2))
+      case (d1: java.lang.Double, d2: java.lang.Double) =>
+        (d1 == d2) || (java.lang.Double.isNaN(d1) && java.lang.Double.isNaN(d2))
+      case _ =>
+        o1.getClass == o2.getClass && o1 == o2
+    }
   }
 
   override def hashCode: Int = {
