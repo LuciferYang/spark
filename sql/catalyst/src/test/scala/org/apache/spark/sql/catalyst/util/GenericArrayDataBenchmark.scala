@@ -41,6 +41,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     val benchmark = new Benchmark("constructor", valuesPerIteration, output = output)
 
     benchmark.addCase("arrayOfAny") {
+      _ =>
       val arr: Array[Any] = new Array[Any](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -50,6 +51,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     }
 
     benchmark.addCase("arrayOfAnyAsObject") {
+      _ =>
       val arr: Object = new Array[Any](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -59,6 +61,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     }
 
     benchmark.addCase("arrayOfAnyAsSeq") {
+      _ =>
       val arr: Seq[Any] = new Array[Any](arraySize).toImmutableArraySeq
       var n = 0
       while (n < valuesPerIteration) {
@@ -68,6 +71,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     }
 
     benchmark.addCase("arrayOfInt") {
+      _ =>
       val arr: Array[Int] = new Array[Int](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -77,6 +81,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     }
 
     benchmark.addCase("arrayOfIntAsObject") {
+      _ =>
       val arr: Object = new Array[Int](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -92,10 +97,20 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
   def methodBenchmark(): Unit = {
     val valuesPerIteration: Long = 1000 * 1000 * 10
     val arraySize = 10
-    
+
+    runBasicInfoMethodsBenchmark(valuesPerIteration, arraySize)
+    runReadMethodsBenchmark(valuesPerIteration, arraySize)
+    runModificationMethodsBenchmark(valuesPerIteration, arraySize)
+    runCopyMethodsBenchmark(valuesPerIteration, arraySize)
+    runStringCompMethodsBenchmark(valuesPerIteration, arraySize)
+  }
+
+  private def runBasicInfoMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Basic info methods
-    val basicInfoBenchmark = new Benchmark("basic_info_methods", valuesPerIteration, output = output)
+    val basicInfoBenchmark = new Benchmark(
+      "basic_info_methods", valuesPerIteration, output = output)
     basicInfoBenchmark.addCase("numElements") {
+      _ =>
       val arr: Array[Int] = new Array[Int](arraySize)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -105,10 +120,13 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     basicInfoBenchmark.run()
-    
+  }
+
+  private def runReadMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Read methods
     val readBenchmark = new Benchmark("read_methods", valuesPerIteration, output = output)
     readBenchmark.addCase("getInt_arrayOfAny") {
+      _ =>
       val arr: Array[Any] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -118,6 +136,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     readBenchmark.addCase("getInt_arrayOfInt") {
+      _ =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -127,6 +146,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     readBenchmark.addCase("isNullAt_arrayOfAny") {
+      _ =>
       val arr: Array[Any] = Array(1, null, 3, null, 5)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -136,6 +156,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     readBenchmark.addCase("isNullAt_arrayOfInt") {
+      _ =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -145,10 +166,14 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     readBenchmark.run()
-    
+  }
+
+  private def runModificationMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Modification methods
-    val modificationBenchmark = new Benchmark("modification_methods", valuesPerIteration, output = output)
+    val modificationBenchmark = new Benchmark(
+      "modification_methods", valuesPerIteration, output = output)
     modificationBenchmark.addCase("setNullAt") {
+      _ =>
       val arr: Array[Any] = new Array[Any](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -158,6 +183,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     modificationBenchmark.addCase("update") {
+      _ =>
       val arr: Array[Any] = new Array[Any](arraySize)
       var n = 0
       while (n < valuesPerIteration) {
@@ -167,10 +193,13 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     modificationBenchmark.run()
-    
+  }
+
+  private def runCopyMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Copy methods
     val copyBenchmark = new Benchmark("copy_methods", valuesPerIteration, output = output)
     copyBenchmark.addCase("copy_arrayOfAny") {
+      _ =>
       val arr: Array[Any] = new Array[Any](arraySize)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -180,6 +209,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     copyBenchmark.addCase("copy_arrayOfInt") {
+      _ =>
       val arr: Array[Int] = new Array[Int](arraySize)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -189,10 +219,14 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     copyBenchmark.run()
-    
+  }
+
+  private def runStringCompMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // String and comparison methods
-    val stringCompBenchmark = new Benchmark("string_comparison_methods", valuesPerIteration, output = output)
+    val stringCompBenchmark = new Benchmark(
+      "string_comparison_methods", valuesPerIteration, output = output)
     stringCompBenchmark.addCase("toString_arrayOfAny") {
+      _ =>
       val arr: Array[Any] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -202,6 +236,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     stringCompBenchmark.addCase("toString_arrayOfInt") {
+      _ =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
       var n = 0
@@ -211,6 +246,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     stringCompBenchmark.addCase("equals") {
+      _ =>
       val arr1: Array[Int] = Array(1, 2, 3, 4, 5)
       val arr2: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad1 = new GenericArrayData(arr1)
@@ -222,6 +258,7 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
       }
     }
     stringCompBenchmark.addCase("hashCode") {
+      _ =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
       var n = 0
