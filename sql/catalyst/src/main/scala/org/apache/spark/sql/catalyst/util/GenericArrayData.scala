@@ -23,44 +23,120 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.{DataType, Decimal}
 import org.apache.spark.unsafe.types._
 
-class GenericArrayData(val array: Array[Any]) extends ArrayData {
+class GenericArrayData(private var data: Object) extends ArrayData {
 
   // Specified this as`scala.collection.Seq` because seqOrArray can be
   // `mutable.ArraySeq` in Scala 2.13
   def this(seq: scala.collection.Seq[Any]) = this(seq.toArray)
   def this(list: java.util.List[Any]) = this(list.asScala.toArray)
 
-  // TODO: This is boxing.  We should specialize.
-  def this(primitiveArray: Array[Int]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Long]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Float]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Double]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Short]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Byte]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Boolean]) = this(primitiveArray.toArray[Any])
+  // Directly store primitive arrays without boxing
+  def this(primitiveArray: Array[Int]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Long]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Float]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Double]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Short]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Byte]) = this(primitiveArray.asInstanceOf[Object])
+  def this(primitiveArray: Array[Boolean]) = this(primitiveArray.asInstanceOf[Object])
 
-  def this(seqOrArray: Any) = this(seqOrArray match {
-    // Specified this as`scala.collection.Seq` because seqOrArray can be
-    // `mutable.ArraySeq` in Scala 2.13
-    case seq: scala.collection.Seq[Any] => seq.toArray
-    case array: Array[Any] => array  // array of objects, so no need to convert
-    case array: Array[_] => array.toArray[Any] // array of primitives, so box them
-  })
+  // This constructor is removed to avoid type erasure conflict with the primary constructor
+  // Use the specific constructors for different types instead
 
-  override def copy(): ArrayData = {
-    val newValues = new Array[Any](array.length)
-    var i = 0
-    while (i < array.length) {
-      newValues(i) = InternalRow.copyValue(array(i))
-      i += 1
+  // Get the internal data as Array[Any], converting primitive arrays if necessary
+  private def ensureAnyArray(): Array[Any] = {
+    data match {
+      case arr: Array[Any] => arr
+      case arr: Array[Int] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Long] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Float] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Double] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Short] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Byte] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case arr: Array[Boolean] =>
+        val anyArr = new Array[Any](arr.length)
+        for (i <- 0 until arr.length) anyArr(i) = arr(i)
+        data = anyArr
+        anyArr
+      case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
     }
-    new GenericArrayData(newValues)
   }
 
-  override def numElements(): Int = array.length
+  // Get the internal data as Array[Any] (for backward compatibility)
+  override def array: Array[Any] = ensureAnyArray()
 
-  private def getAs[T](ordinal: Int) = array(ordinal).asInstanceOf[T]
-  override def isNullAt(ordinal: Int): Boolean = getAs[AnyRef](ordinal) eq null
+  override def copy(): ArrayData = {
+    data match {
+      case arr: Array[Any] =>
+        val newValues = new Array[Any](arr.length)
+        var i = 0
+        while (i < arr.length) {
+          newValues(i) = InternalRow.copyValue(arr(i))
+          i += 1
+        }
+        new GenericArrayData(newValues)
+      case arr: Array[Int] => new GenericArrayData(arr.clone())
+      case arr: Array[Long] => new GenericArrayData(arr.clone())
+      case arr: Array[Float] => new GenericArrayData(arr.clone())
+      case arr: Array[Double] => new GenericArrayData(arr.clone())
+      case arr: Array[Short] => new GenericArrayData(arr.clone())
+      case arr: Array[Byte] => new GenericArrayData(arr.clone())
+      case arr: Array[Boolean] => new GenericArrayData(arr.clone())
+      case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
+    }
+  }
+
+  override def numElements(): Int = {
+    data match {
+      case arr: Array[_] => arr.length
+      case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
+    }
+  }
+
+  private def getAs[T](ordinal: Int): T = {
+    data match {
+      case arr: Array[Any] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Int] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Long] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Float] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Double] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Short] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Byte] => arr(ordinal).asInstanceOf[T]
+      case arr: Array[Boolean] => arr(ordinal).asInstanceOf[T]
+      case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
+    }
+  }
+
+  override def isNullAt(ordinal: Int): Boolean = {
+    data match {
+      case arr: Array[Any] => arr(ordinal).asInstanceOf[AnyRef] eq null
+      case _: Array[_] => false  // primitive arrays can't have nulls
+    }
+  }
+
   override def get(ordinal: Int, elementType: DataType): AnyRef = getAs(ordinal)
   override def getBoolean(ordinal: Int): Boolean = getAs(ordinal)
   override def getByte(ordinal: Int): Byte = getAs(ordinal)
@@ -80,11 +156,29 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
   override def getArray(ordinal: Int): ArrayData = getAs(ordinal)
   override def getMap(ordinal: Int): MapData = getAs(ordinal)
 
-  override def setNullAt(ordinal: Int): Unit = array(ordinal) = null
+  override def setNullAt(ordinal: Int): Unit = {
+    val anyArr = ensureAnyArray()
+    anyArr(ordinal) = null
+  }
 
-  override def update(ordinal: Int, value: Any): Unit = array(ordinal) = value
+  override def update(ordinal: Int, value: Any): Unit = {
+    val anyArr = ensureAnyArray()
+    anyArr(ordinal) = value
+  }
 
-  override def toString(): String = array.mkString("[", ",", "]")
+  override def toString(): String = {
+    data match {
+      case arr: Array[Any] => arr.mkString("[", ",", "]")
+      case arr: Array[Int] => arr.mkString("[", ",", "]")
+      case arr: Array[Long] => arr.mkString("[", ",", "]")
+      case arr: Array[Float] => arr.mkString("[", ",", "]")
+      case arr: Array[Double] => arr.mkString("[", ",", "]")
+      case arr: Array[Short] => arr.mkString("[", ",", "]")
+      case arr: Array[Byte] => arr.mkString("[", ",", "]")
+      case arr: Array[Boolean] => arr.mkString("[", ",", "]")
+      case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
+    }
+  }
 
   override def equals(o: Any): Boolean = {
     if (!o.isInstanceOf[GenericArrayData]) {
@@ -107,20 +201,22 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
         return false
       }
       if (!isNullAt(i)) {
-        val o1 = array(i)
-        val o2 = other.array(i)
+        val o1 = get(i, null)
+        val o2 = other.get(i, null)
         o1 match {
           case b1: Array[Byte] =>
             if (!o2.isInstanceOf[Array[Byte]] ||
               !java.util.Arrays.equals(b1, o2.asInstanceOf[Array[Byte]])) {
               return false
             }
-          case f1: Float if java.lang.Float.isNaN(f1) =>
-            if (!o2.isInstanceOf[Float] || ! java.lang.Float.isNaN(o2.asInstanceOf[Float])) {
+          case f1: java.lang.Float if java.lang.Float.isNaN(f1) =>
+            if (!o2.isInstanceOf[java.lang.Float] ||
+              !java.lang.Float.isNaN(o2.asInstanceOf[java.lang.Float])) {
               return false
             }
-          case d1: Double if java.lang.Double.isNaN(d1) =>
-            if (!o2.isInstanceOf[Double] || ! java.lang.Double.isNaN(o2.asInstanceOf[Double])) {
+          case d1: java.lang.Double if java.lang.Double.isNaN(d1) =>
+            if (!o2.isInstanceOf[java.lang.Double] ||
+              !java.lang.Double.isNaN(o2.asInstanceOf[java.lang.Double])) {
               return false
             }
           case _ => if (o1.getClass != o2.getClass || o1 != o2) {
@@ -142,18 +238,30 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
         if (isNullAt(i)) {
           0
         } else {
-          array(i) match {
-            case b: Boolean => if (b) 0 else 1
-            case b: Byte => b.toInt
-            case s: Short => s.toInt
-            case i: Int => i
-            case l: Long => (l ^ (l >>> 32)).toInt
-            case f: Float => java.lang.Float.floatToIntBits(f)
-            case d: Double =>
-              val b = java.lang.Double.doubleToLongBits(d)
+          data match {
+            case arr: Array[Any] => arr(i) match {
+              case b: Boolean => if (b) 0 else 1
+              case b: Byte => b.toInt
+              case s: Short => s.toInt
+              case i: Int => i
+              case l: Long => (l ^ (l >>> 32)).toInt
+              case f: Float => java.lang.Float.floatToIntBits(f)
+              case d: Double =>
+                val b = java.lang.Double.doubleToLongBits(d)
+                (b ^ (b >>> 32)).toInt
+              case a: Array[Byte] => java.util.Arrays.hashCode(a)
+              case other => other.hashCode()
+            }
+            case arr: Array[Int] => arr(i)
+            case arr: Array[Long] => (arr(i) ^ (arr(i) >>> 32)).toInt
+            case arr: Array[Float] => java.lang.Float.floatToIntBits(arr(i))
+            case arr: Array[Double] =>
+              val b = java.lang.Double.doubleToLongBits(arr(i))
               (b ^ (b >>> 32)).toInt
-            case a: Array[Byte] => java.util.Arrays.hashCode(a)
-            case other => other.hashCode()
+            case arr: Array[Short] => arr(i).toInt
+            case arr: Array[Byte] => arr(i).toInt
+            case arr: Array[Boolean] => if (arr(i)) 0 else 1
+            case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
           }
         }
       result = 37 * result + update
