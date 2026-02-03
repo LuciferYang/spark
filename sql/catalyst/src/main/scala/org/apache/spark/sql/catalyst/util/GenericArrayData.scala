@@ -30,50 +30,27 @@ class GenericArrayData(private var data: Any) extends ArrayData {
   def this(seq: scala.collection.Seq[Any]) = this(seq.toArray)
   def this(list: java.util.List[Any]) = this(list.asScala.toArray)
 
-  // This constructor is removed to avoid type erasure conflict with the primary constructor
-  // Use the specific constructors for different types instead
-
   // Get the internal data as Array[Any], converting primitive arrays if necessary
   private def ensureAnyArray(): Array[Any] = {
     data match {
       case arr: Array[Any] => arr
       case arr: Array[Int] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Long] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Float] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Double] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Short] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Byte] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case arr: Array[Boolean] =>
-        val anyArr = new Array[Any](arr.length)
-        for (i <- 0 until arr.length) anyArr(i) = arr(i)
-        data = anyArr
-        anyArr
+        data = arr.toArray[Any]
       case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
     }
+    data.asInstanceOf[Array[Any]]
   }
 
   // Get the internal data as Array[Any] (for backward compatibility)
