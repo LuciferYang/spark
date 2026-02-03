@@ -109,15 +109,16 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     // Basic info methods
     val basicInfoBenchmark = new Benchmark(
       "basic_info_methods", valuesPerIteration, output = output)
-    basicInfoBenchmark.addCase("numElements") {
-      _ =>
+    basicInfoBenchmark.addTimerCase("numElements") { timer =>
       val arr: Array[Int] = new Array[Int](arraySize)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.numElements()
         n += 1
       }
+      timer.stopTiming()
     }
     basicInfoBenchmark.run()
   }
@@ -125,45 +126,49 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
   private def runReadMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Read methods
     val readBenchmark = new Benchmark("read_methods", valuesPerIteration, output = output)
-    readBenchmark.addCase("getInt_arrayOfAny") {
-      _ =>
+    readBenchmark.addTimerCase("getInt_arrayOfAny") { timer =>
       val arr: Array[Any] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.getInt(n % arraySize)
         n += 1
       }
+      timer.stopTiming()
     }
-    readBenchmark.addCase("getInt_arrayOfInt") {
-      _ =>
+    readBenchmark.addTimerCase("getInt_arrayOfInt") { timer =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.getInt(n % arraySize)
         n += 1
       }
+      timer.stopTiming()
     }
-    readBenchmark.addCase("isNullAt_arrayOfAny") {
-      _ =>
+    readBenchmark.addTimerCase("isNullAt_arrayOfAny") { timer =>
       val arr: Array[Any] = Array(1, null, 3, null, 5)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.isNullAt(n % arr.length)
         n += 1
       }
+      timer.stopTiming()
     }
-    readBenchmark.addCase("isNullAt_arrayOfInt") {
-      _ =>
+    readBenchmark.addTimerCase("isNullAt_arrayOfInt") { timer =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.isNullAt(n % arr.length)
         n += 1
       }
+      timer.stopTiming()
     }
     readBenchmark.run()
   }
@@ -172,25 +177,27 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     // Modification methods
     val modificationBenchmark = new Benchmark(
       "modification_methods", valuesPerIteration, output = output)
-    modificationBenchmark.addCase("setNullAt") {
-      _ =>
+    modificationBenchmark.addTimerCase("setNullAt") { timer =>
       val arr: Array[Any] = new Array[Any](arraySize)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         val gad = new GenericArrayData(arr.clone())
         gad.setNullAt(n % arraySize)
         n += 1
       }
+      timer.stopTiming()
     }
-    modificationBenchmark.addCase("update") {
-      _ =>
+    modificationBenchmark.addTimerCase("update") { timer =>
       val arr: Array[Any] = new Array[Any](arraySize)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         val gad = new GenericArrayData(arr.clone())
         gad.update(n % arraySize, n)
         n += 1
       }
+      timer.stopTiming()
     }
     modificationBenchmark.run()
   }
@@ -198,25 +205,27 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
   private def runCopyMethodsBenchmark(valuesPerIteration: Long, arraySize: Int): Unit = {
     // Copy methods
     val copyBenchmark = new Benchmark("copy_methods", valuesPerIteration, output = output)
-    copyBenchmark.addCase("copy_arrayOfAny") {
-      _ =>
+    copyBenchmark.addTimerCase("copy_arrayOfAny") { timer =>
       val arr: Array[Any] = new Array[Any](arraySize)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.copy()
         n += 1
       }
+      timer.stopTiming()
     }
-    copyBenchmark.addCase("copy_arrayOfInt") {
-      _ =>
+    copyBenchmark.addTimerCase("copy_arrayOfInt") { timer =>
       val arr: Array[Int] = new Array[Int](arraySize)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
         gad.copy()
         n += 1
       }
+      timer.stopTiming()
     }
     copyBenchmark.run()
   }
@@ -225,47 +234,51 @@ object GenericArrayDataBenchmark extends BenchmarkBase {
     // String and comparison methods
     val stringCompBenchmark = new Benchmark(
       "string_comparison_methods", valuesPerIteration, output = output)
-    stringCompBenchmark.addCase("toString_arrayOfAny") {
-      _ =>
+    stringCompBenchmark.addTimerCase("toString_arrayOfAny") { timer =>
       val arr: Array[Any] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
-        gad.toString()
+        val ignored = gad.toString()
         n += 1
       }
+      timer.stopTiming()
     }
-    stringCompBenchmark.addCase("toString_arrayOfInt") {
-      _ =>
+    stringCompBenchmark.addTimerCase("toString_arrayOfInt") { timer =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
-        gad.toString()
+        val ignored = gad.toString()
         n += 1
       }
+      timer.stopTiming()
     }
-    stringCompBenchmark.addCase("equals") {
-      _ =>
+    stringCompBenchmark.addTimerCase("equals") { timer =>
       val arr1: Array[Int] = Array(1, 2, 3, 4, 5)
       val arr2: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad1 = new GenericArrayData(arr1)
       val gad2 = new GenericArrayData(arr2)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
-        gad1.equals(gad2)
+        val ignored = gad1.equals(gad2)
         n += 1
       }
+      timer.stopTiming()
     }
-    stringCompBenchmark.addCase("hashCode") {
-      _ =>
+    stringCompBenchmark.addTimerCase("hashCode") { timer =>
       val arr: Array[Int] = Array(1, 2, 3, 4, 5)
       val gad = new GenericArrayData(arr)
+      timer.startTiming()
       var n = 0
       while (n < valuesPerIteration) {
-        gad.hashCode()
+        val ignored = gad.hashCode()
         n += 1
       }
+      timer.stopTiming()
     }
     stringCompBenchmark.run()
   }

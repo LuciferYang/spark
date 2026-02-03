@@ -125,7 +125,7 @@ private[sql] object ParquetCompatibilityTest {
      * the writer is deprecated and should be done through a builder. The default builders include
      * Avro - but for raw Parquet writing we must create our own builder.
      */
-    class ParquetWriterBuilder() extends
+  class ParquetWriterBuilder() extends
         ParquetWriter.Builder[RecordConsumer => Unit, ParquetWriterBuilder](new Path(path)) {
       override def getWriteSupport(conf: Configuration) = testWriteSupport
       override def self() = this
