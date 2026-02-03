@@ -610,7 +610,7 @@ object JdbcUtils extends Logging with SQLConfHelper {
 
         case ArrayType(et0, _) =>
           arrayConverter[Array[Any]] {
-            arr => new GenericArrayData(elementConversion(et0)(arr))
+            arr => new GenericArrayData(arr.asInstanceOf[Object])
           }
 
         case IntegerType => arrayConverter[Int]((i: Int) => i)
@@ -627,7 +627,7 @@ object JdbcUtils extends Logging with SQLConfHelper {
         try {
           val array = nullSafeConvert[java.sql.Array](
             input = rs.getArray(pos + 1),
-            array => new GenericArrayData(elementConversion(et)(array.getArray())))
+            array => new GenericArrayData(elementConversion(et)(array.getArray()).asInstanceOf[Object]))
           row.update(pos, array)
         } catch {
           case e: java.lang.ClassCastException =>
