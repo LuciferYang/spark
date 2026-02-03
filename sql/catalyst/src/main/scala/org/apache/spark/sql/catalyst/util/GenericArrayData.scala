@@ -123,8 +123,28 @@ class GenericArrayData(private var data: Any) extends ArrayData {
   }
 
   override def update(ordinal: Int, value: Any): Unit = {
-    val anyArr = ensureAnyArray()
-    anyArr(ordinal) = value
+    data match {
+      case arr: Array[Any] =>
+        arr(ordinal) = value
+      case arr: Array[Int] if value.isInstanceOf[Int] =>
+        arr(ordinal) = value.asInstanceOf[Int]
+      case arr: Array[Long] if value.isInstanceOf[Long] =>
+        arr(ordinal) = value.asInstanceOf[Long]
+      case arr: Array[Float] if value.isInstanceOf[Float] =>
+        arr(ordinal) = value.asInstanceOf[Float]
+      case arr: Array[Double] if value.isInstanceOf[Double] =>
+        arr(ordinal) = value.asInstanceOf[Double]
+      case arr: Array[Short] if value.isInstanceOf[Short] =>
+        arr(ordinal) = value.asInstanceOf[Short]
+      case arr: Array[Byte] if value.isInstanceOf[Byte] =>
+        arr(ordinal) = value.asInstanceOf[Byte]
+      case arr: Array[Boolean] if value.isInstanceOf[Boolean] =>
+        arr(ordinal) = value.asInstanceOf[Boolean]
+      case _ =>
+        // 非基本类型或 null 值，转换为 Array[Any]
+        val anyArr = ensureAnyArray()
+        anyArr(ordinal) = value
+    }
   }
 
   override def toString(): String = {
