@@ -33,7 +33,7 @@ class GenericArrayData(private var data: Any) extends ArrayData {
   // Get the internal data as Array[Any], converting primitive arrays if necessary
   private def ensureAnyArray(): Array[Any] = {
     data match {
-      case arr: Array[Any] => arr
+      case arr: Array[Any] => return arr
       case arr: Array[Int] =>
         data = arr.toArray[Any]
       case arr: Array[Long] =>
