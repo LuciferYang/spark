@@ -32,22 +32,15 @@ class GenericArrayData(private var data: Any) extends ArrayData {
 
   // Get the internal data as Array[Any], converting primitive arrays if necessary
   private def ensureAnyArray(): Array[Any] = {
-    data match {
-      case arr: Array[Any] => return arr
-      case arr: Array[Int] =>
-        data = arr.toArray[Any]
-      case arr: Array[Long] =>
-        data = arr.toArray[Any]
-      case arr: Array[Float] =>
-        data = arr.toArray[Any]
-      case arr: Array[Double] =>
-        data = arr.toArray[Any]
-      case arr: Array[Short] =>
-        data = arr.toArray[Any]
-      case arr: Array[Byte] =>
-        data = arr.toArray[Any]
-      case arr: Array[Boolean] =>
-        data = arr.toArray[Any]
+    data = data match {
+      case arr: Array[Any] => arr
+      case arr: Array[Int] => arr.toArray[Any]
+      case arr: Array[Long] => arr.toArray[Any]
+      case arr: Array[Float] => arr.toArray[Any]
+      case arr: Array[Double] => arr.toArray[Any]
+      case arr: Array[Short] => arr.toArray[Any]
+      case arr: Array[Byte] => arr.toArray[Any]
+      case arr: Array[Boolean] => arr.toArray[Any]
       case _ => throw new IllegalStateException(s"Unexpected data type: ${data.getClass}")
     }
     data.asInstanceOf[Array[Any]]
