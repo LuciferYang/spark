@@ -23,21 +23,12 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.{DataType, Decimal}
 import org.apache.spark.unsafe.types._
 
-class GenericArrayData(private var data: Object) extends ArrayData {
+class GenericArrayData(private var data: Any) extends ArrayData {
 
   // Specified this as`scala.collection.Seq` because seqOrArray can be
   // `mutable.ArraySeq` in Scala 2.13
   def this(seq: scala.collection.Seq[Any]) = this(seq.toArray)
   def this(list: java.util.List[Any]) = this(list.asScala.toArray)
-
-  // Directly store primitive arrays without boxing
-  def this(primitiveArray: Array[Int]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Long]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Float]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Double]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Short]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Byte]) = this(primitiveArray.asInstanceOf[Object])
-  def this(primitiveArray: Array[Boolean]) = this(primitiveArray.asInstanceOf[Object])
 
   // This constructor is removed to avoid type erasure conflict with the primary constructor
   // Use the specific constructors for different types instead

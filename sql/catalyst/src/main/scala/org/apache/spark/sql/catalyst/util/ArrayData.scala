@@ -40,7 +40,7 @@ object ArrayData {
     case list: java.util.List[_] =>
       new GenericArrayData(list.asInstanceOf[java.util.List[Any]])
     case arr: Array[Any] => new GenericArrayData(arr)
-    case other => new GenericArrayData(other.asInstanceOf[Object])
+    case other => new GenericArrayData(other: Any)
   }
 
 
