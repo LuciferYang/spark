@@ -23,28 +23,41 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.{DataType, Decimal}
 import org.apache.spark.unsafe.types._
 
-class GenericArrayData(val array: Array[Any]) extends ArrayData {
+class GenericArrayData(private val underlying: Any) extends ArrayData {
+
+  // Backing array storage
+  private lazy val array: Array[Any] = underlying match {
+    // Specified this as`scala.collection.Seq` because seqOrArray can be
+    // `mutable.ArraySeq` in Scala 2.13
+    case seq: scala.collection.Seq[Any] => seq.toArray
+    case arr: Array[Any] => arr  // array of objects, so no need to convert
+    case arr: Array[_] => arr.toArray[Any] // array of primitives, so box them
+    case _ => throw new IllegalArgumentException(s"Unexpected data type: ${underlying.getClass}")
+  }
 
   // Specified this as`scala.collection.Seq` because seqOrArray can be
   // `mutable.ArraySeq` in Scala 2.13
-  def this(seq: scala.collection.Seq[Any]) = this(seq.toArray)
+  def this(seq: scala.collection.Seq[Any]) = this(seq)
   def this(list: java.util.List[Any]) = this(list.asScala.toArray)
 
-  // TODO: This is boxing.  We should specialize.
-  def this(primitiveArray: Array[Int]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Long]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Float]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Double]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Short]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Byte]) = this(primitiveArray.toArray[Any])
-  def this(primitiveArray: Array[Boolean]) = this(primitiveArray.toArray[Any])
+  // Fast path for primitive arrays
+  def this(primitiveArray: Array[Int]) = this(primitiveArray)
+  def this(primitiveArray: Array[Long]) = this(primitiveArray)
+  def this(primitiveArray: Array[Float]) = this(primitiveArray)
+  def this(primitiveArray: Array[Double]) = this(primitiveArray)
+  def this(primitiveArray: Array[Short]) = this(primitiveArray)
+  def this(primitiveArray: Array[Byte]) = this(primitiveArray)
+  def this(primitiveArray: Array[Boolean]) = this(primitiveArray)
+
+  def this(array: Array[Any]) = this(array)
 
   def this(seqOrArray: Any) = this(seqOrArray match {
     // Specified this as`scala.collection.Seq` because seqOrArray can be
     // `mutable.ArraySeq` in Scala 2.13
-    case seq: scala.collection.Seq[Any] => seq.toArray
-    case array: Array[Any] => array  // array of objects, so no need to convert
-    case array: Array[_] => array.toArray[Any] // array of primitives, so box them
+    case seq: scala.collection.Seq[Any] => seq
+    case arr: Array[Any] => arr  // array of objects, so no need to convert
+    case arr: Array[_] => arr  // array of primitives, defer boxing to lazy val
+    case _ => throw new IllegalArgumentException(s"Unexpected data type: ${seqOrArray.getClass}")
   })
 
   override def copy(): ArrayData = {
@@ -59,7 +72,7 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
 
   override def numElements(): Int = array.length
 
-  private def getAs[T](ordinal: Int) = array(ordinal).asInstanceOf[T]
+  private def getAs[T](ordinal: Int): T = array(ordinal).asInstanceOf[T]
   override def isNullAt(ordinal: Int): Boolean = getAs[AnyRef](ordinal) eq null
   override def get(ordinal: Int, elementType: DataType): AnyRef = getAs(ordinal)
   override def getBoolean(ordinal: Int): Boolean = getAs(ordinal)
@@ -101,7 +114,62 @@ class GenericArrayData(val array: Array[Any]) extends ArrayData {
       return false
     }
 
+    // Fast path for arrays with only primitive types (boxed)
+    var allPrimitive = true
     var i = 0
+    while (i < len && allPrimitive) {
+      if (!isNullAt(i)) {
+        val elem = array(i)
+        elem match {
+          case _: Byte | _: Short | _: Int | _: Long | _: Float | _: Double | _: Boolean =>
+          case _ => allPrimitive = false
+        }
+      }
+      i += 1
+    }
+
+    // If all elements are primitive, use optimized comparison
+    if (allPrimitive) {
+      i = 0
+      while (i < len) {
+        if (isNullAt(i) != other.isNullAt(i)) {
+          return false
+        }
+        if (!isNullAt(i)) {
+          val o1 = array(i)
+          val o2 = other.array(i)
+          (o1, o2) match {
+            case (f1: Float, f2: Float) =>
+              if (java.lang.Float.isNaN(f1) != java.lang.Float.isNaN(f2)) {
+                return false
+              }
+              if (!java.lang.Float.isNaN(f1) && f1 != f2) {
+                return false
+              }
+            case (d1: Double, d2: Double) =>
+              if (java.lang.Double.isNaN(d1) != java.lang.Double.isNaN(d2)) {
+                return false
+              }
+              if (!java.lang.Double.isNaN(d1) && d1 != d2) {
+                return false
+              }
+            case (b1: Array[Byte], b2: Array[Byte]) =>
+              if (!java.util.Arrays.equals(b1, b2)) {
+                return false
+              }
+            case _ =>
+              if (o1 != o2) {
+                return false
+              }
+          }
+        }
+        i += 1
+      }
+      return true
+    }
+
+    // Default case: element-wise comparison
+    i = 0
     while (i < len) {
       if (isNullAt(i) != other.isNullAt(i)) {
         return false
