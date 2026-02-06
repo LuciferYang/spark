@@ -16,12 +16,6 @@
  */
 package org.apache.spark
 
-
-
-
-
-
-
 package sql {
   class ExperimentalMethods
   class SparkSessionExtensions
