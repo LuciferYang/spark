@@ -16,18 +16,11 @@
  */
 package org.apache.spark
 
-class SparkContext
-class SparkConf {
-  def getAll: Array[(String, String)] = Array.empty
-}
 
-package api.java {
-  class JavaRDD[T]
-}
 
-package rdd {
-  class RDD[T]
-}
+
+
+
 
 package sql {
   class ExperimentalMethods
