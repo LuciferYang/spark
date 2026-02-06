@@ -272,7 +272,7 @@
             <configuration>
               <outputDirectory>${basedir}/target/connect-repl</outputDirectory>
               <includeScope>provided</includeScope>
-              <excludeArtifactIds>scala-collection-compat_${scala.binary.version},javassist</excludeArtifactIds>
+              <excludeArtifactIds>spark-core_${scala.binary.version},scala-collection-compat_${scala.binary.version},javassist</excludeArtifactIds>
             </configuration>
           </execution>
         </executions>

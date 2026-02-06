@@ -1726,7 +1726,7 @@ object CopyDependencies {
       Def.taskDyn {
         if (moduleName.value.contains("assembly")) {
           Def.task {
-            val replClasspathes = (LocalProject("connect-client-jvm") / Compile / dependencyClasspath)
+            val replClasspathes = (LocalProject("connect-client-jvm") / Runtime / dependencyClasspath)
               .value.map(_.data).filter(_.isFile())
             val scalaBinaryVer = SbtPomKeys.effectivePom.value.getProperties.get(
               "scala.binary.version").asInstanceOf[String]
