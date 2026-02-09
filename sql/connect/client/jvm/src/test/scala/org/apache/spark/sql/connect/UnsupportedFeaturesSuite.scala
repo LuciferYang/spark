@@ -16,9 +16,11 @@
  */
 package org.apache.spark.sql.connect
 
-import org.scalatestplus.mockito.MockitoSugar
+import scala.reflect.ClassTag
 
-import org.apache.spark.SparkUnsupportedOperationException
+import org.mockito.Mockito
+
+import org.apache.spark.{Partition, SparkContext, SparkUnsupportedOperationException, TaskContext}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Encoders, Row}
@@ -29,9 +31,9 @@ import org.apache.spark.sql.types.StructType
 /**
  * Test suite that test the errors thrown when using unsupported features.
  */
-class UnsupportedFeaturesSuite extends ConnectFunSuite with MockitoSugar {
+class UnsupportedFeaturesSuite extends ConnectFunSuite {
   private def session = SparkSession.builder().getOrCreate()
-  private val mockSc = mock[org.apache.spark.SparkContext]
+  private val mockSc: SparkContext = Mockito.mock(classOf[SparkContext])
 
   private def testUnsupportedFeature(name: String, errorCode: String)(
       f: SparkSession => Any): Unit = {
@@ -114,15 +116,11 @@ class UnsupportedFeaturesSuite extends ConnectFunSuite with MockitoSugar {
   }
 }
 
-private class FakeRDD[T: scala.reflect.ClassTag](sc: org.apache.spark.SparkContext)
+private class FakeRDD[T: ClassTag](sc: SparkContext)
     extends RDD[T](sc, Nil) {
   override def compute(
-      split: org.apache.spark.Partition,
-      context: org.apache.spark.TaskContext): Iterator[T] = {
-    throw new UnsupportedOperationException
-  }
+      split: Partition,
+      context: TaskContext): Iterator[T] = Iterator.empty
 
-  override def getPartitions: Array[org.apache.spark.Partition] = {
-    throw new UnsupportedOperationException
-  }
+  override def getPartitions: Array[Partition] = Array.empty
 }
