@@ -116,11 +116,8 @@ class UnsupportedFeaturesSuite extends ConnectFunSuite {
   }
 }
 
-private class FakeRDD[T: ClassTag](sc: SparkContext)
-    extends RDD[T](sc, Nil) {
-  override def compute(
-      split: Partition,
-      context: TaskContext): Iterator[T] = Iterator.empty
+private class FakeRDD[T: ClassTag](sc: SparkContext) extends RDD[T](sc, Nil) {
+  override def compute(split: Partition, context: TaskContext): Iterator[T] = Iterator.empty
 
   override def getPartitions: Array[Partition] = Array.empty
 }
