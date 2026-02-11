@@ -798,7 +798,7 @@ object DataSourceReadBenchmark extends SqlBasedBenchmark {
       }
     }
     runBenchmark("Single Column Scan From Wide Columns") {
-      for (columnWidth <- List(10, 50, 100)) {
+      for (columnWidth <- List(10, 50, 100, 500, 1000)) {
         columnsBenchmark(1024 * 1024 * 1, columnWidth)
       }
     }
