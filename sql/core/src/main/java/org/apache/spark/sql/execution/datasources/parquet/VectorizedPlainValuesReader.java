@@ -36,6 +36,7 @@ import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
  */
 public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private ByteBufferInputStream in = null;
+  private ByteBuffer buffer = null;
 
   // Only used for booleans.
   private int bitOffset;
@@ -47,6 +48,11 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   @Override
   public void initFromPage(int valueCount, ByteBufferInputStream in) throws IOException {
     this.in = in;
+    try {
+      this.buffer = in.slice((int) in.available()).order(ByteOrder.LITTLE_ENDIAN);
+    } catch (IOException e) {
+      throw new ParquetDecodingException("Failed to read a page", e);
+    }
   }
 
   @Override
@@ -54,12 +60,15 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     throw SparkUnsupportedOperationException.apply();
   }
 
-  private void updateCurrentByte() {
-    try {
-      currentByte = (byte) in.read();
-    } catch (IOException e) {
-      throw new ParquetDecodingException("Failed to read a byte", e);
+  private void checkBufferSize(int requiredBytes) {
+    if (buffer.remaining() < requiredBytes) {
+      throw new ParquetDecodingException("Failed to read " + requiredBytes + " bytes");
     }
+  }
+
+  private void updateCurrentByte() {
+    checkBufferSize(1);
+    currentByte = buffer.get();
   }
 
   @Override
@@ -90,11 +99,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
     if (i + 7 < total) {
       int numBytesToSkip = (total - i) / 8;
-      try {
-        in.skipFully(numBytesToSkip);
-      } catch (IOException e) {
-        throw new ParquetDecodingException("Failed to skip bytes", e);
-      }
+      buffer.position(buffer.position() + numBytesToSkip);
       i += numBytesToSkip * 8;
     }
     if (i < total) {
@@ -103,22 +108,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
   }
 
-  private ByteBuffer getBuffer(int length) {
-    try {
-      return in.slice(length).order(ByteOrder.LITTLE_ENDIAN);
-    } catch (IOException e) {
-      throw new ParquetDecodingException("Failed to read " + length + " bytes", e);
-    }
-  }
-
   @Override
   public final void readIntegers(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 4);
     if (buffer.hasArray()) {
       int offset = buffer.arrayOffset() + buffer.position();
       c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
+      buffer.position(buffer.position() + total * 4);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putInt(rowId + i, buffer.getInt());
@@ -128,13 +124,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipIntegers(int total) {
-    in.skip(total * 4L);
+    checkBufferSize(total * 4);
+    buffer.position(buffer.position() + total * 4);
   }
 
   @Override
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
+    checkBufferSize(total * 4);
     for (int i = 0; i < total; i += 1) {
       c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
     }
@@ -146,8 +142,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   @Override
   public final void readIntegersWithRebase(
       int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
     boolean rebase = false;
     for (int i = 0; i < total; i += 1) {
       rebase |= buffer.getInt(buffer.position() + i * 4) < RebaseDateTime.lastSwitchJulianDay();
@@ -161,25 +155,17 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, buffer.getInt());
-        }
-      }
+      readIntegers(total, c, rowId);
     }
   }
 
   @Override
   public final void readLongs(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 8;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 8);
     if (buffer.hasArray()) {
       int offset = buffer.arrayOffset() + buffer.position();
       c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
+      buffer.position(buffer.position() + total * 8);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putLong(rowId + i, buffer.getLong());
@@ -189,13 +175,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipLongs(int total) {
-    in.skip(total * 8L);
+    checkBufferSize(total * 8);
+    buffer.position(buffer.position() + total * 8);
   }
 
   @Override
   public final void readUnsignedLongs(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 8;
-    ByteBuffer buffer = getBuffer(requiredBytes);
+    checkBufferSize(total * 8);
     for (int i = 0; i < total; i += 1) {
       c.putByteArray(
         rowId + i, new BigInteger(Long.toUnsignedString(buffer.getLong())).toByteArray());
@@ -212,8 +198,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int rowId,
       boolean failIfRebase,
       String timeZone) {
-    int requiredBytes = total * 8;
-    ByteBuffer buffer = getBuffer(requiredBytes);
     boolean rebase = false;
     for (int i = 0; i < total; i += 1) {
       rebase |= buffer.getLong(buffer.position() + i * 8) < RebaseDateTime.lastSwitchJulianTs();
@@ -229,25 +213,17 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putLong(rowId + i, buffer.getLong());
-        }
-      }
+      readLongs(total, c, rowId);
     }
   }
 
   @Override
   public final void readFloats(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 4);
     if (buffer.hasArray()) {
       int offset = buffer.arrayOffset() + buffer.position();
       c.putFloatsLittleEndian(rowId, total, buffer.array(), offset);
+      buffer.position(buffer.position() + total * 4);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putFloat(rowId + i, buffer.getFloat());
@@ -257,17 +233,17 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipFloats(int total) {
-    in.skip(total * 4L);
+    checkBufferSize(total * 4);
+    buffer.position(buffer.position() + total * 4);
   }
 
   @Override
   public final void readDoubles(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 8;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 8);
     if (buffer.hasArray()) {
       int offset = buffer.arrayOffset() + buffer.position();
       c.putDoublesLittleEndian(rowId, total, buffer.array(), offset);
+      buffer.position(buffer.position() + total * 8);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putDouble(rowId + i, buffer.getDouble());
@@ -277,16 +253,15 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipDoubles(int total) {
-    in.skip(total * 8L);
+    checkBufferSize(total * 8);
+    buffer.position(buffer.position() + total * 8);
   }
 
   @Override
   public final void readBytes(int total, WritableColumnVector c, int rowId) {
     // Bytes are stored as a 4-byte little endian int. Just read the first byte.
     // TODO: consider pushing this in ColumnVector by adding a readBytes with a stride.
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 4);
     for (int i = 0; i < total; i += 1) {
       c.putByte(rowId + i, buffer.get());
       // skip the next 3 bytes
@@ -296,14 +271,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final void skipBytes(int total) {
-    in.skip(total * 4L);
+    checkBufferSize(total * 4);
+    buffer.position(buffer.position() + total * 4);
   }
 
   @Override
   public final void readShorts(int total, WritableColumnVector c, int rowId) {
-    int requiredBytes = total * 4;
-    ByteBuffer buffer = getBuffer(requiredBytes);
-
+    checkBufferSize(total * 4);
     for (int i = 0; i < total; i += 1) {
       c.putShort(rowId + i, (short) buffer.getInt());
     }
@@ -311,7 +285,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipShorts(int total) {
-    in.skip(total * 4L);
+    checkBufferSize(total * 4);
+    buffer.position(buffer.position() + total * 4);
   }
 
   @Override
@@ -330,12 +305,14 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final int readInteger() {
-    return getBuffer(4).getInt();
+    checkBufferSize(4);
+    return buffer.getInt();
   }
 
   @Override
   public final long readLong() {
-    return getBuffer(8).getLong();
+    checkBufferSize(8);
+    return buffer.getLong();
   }
 
   @Override
@@ -344,27 +321,30 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   }
 
   @Override
-  public short readShort() {
+  public final short readShort() {
     return (short) readInteger();
   }
 
   @Override
   public final float readFloat() {
-    return getBuffer(4).getFloat();
+    checkBufferSize(4);
+    return buffer.getFloat();
   }
 
   @Override
   public final double readDouble() {
-    return getBuffer(8).getDouble();
+    checkBufferSize(8);
+    return buffer.getDouble();
   }
 
   @Override
   public final void readBinary(int total, WritableColumnVector v, int rowId) {
     for (int i = 0; i < total; i++) {
       int len = readInteger();
-      ByteBuffer buffer = getBuffer(len);
+      checkBufferSize(len);
       if (buffer.hasArray()) {
         v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+        buffer.position(buffer.position() + len);
       } else {
         byte[] bytes = new byte[len];
         buffer.get(bytes);
@@ -377,16 +357,18 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public void skipBinary(int total) {
     for (int i = 0; i < total; i++) {
       int len = readInteger();
-      in.skip(len);
+      buffer.position(buffer.position() + len);
     }
   }
 
   @Override
   public final Binary readBinary(int len) {
-    ByteBuffer buffer = getBuffer(len);
+    checkBufferSize(len);
     if (buffer.hasArray()) {
-      return Binary.fromConstantByteArray(
+      Binary result = Binary.fromConstantByteArray(
           buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+      buffer.position(buffer.position() + len);
+      return result;
     } else {
       byte[] bytes = new byte[len];
       buffer.get(bytes);
@@ -396,6 +378,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public void skipFixedLenByteArray(int total, int len) {
-    in.skip(total * (long) len);
+    checkBufferSize((int) (total * (long) len));
+    buffer.position(buffer.position() + (int) (total * (long) len));
   }
 }
