@@ -504,6 +504,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readUnsignedLongs_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
         reader.readUnsignedLongs(numValues, binaryColumn, 0);
@@ -511,6 +512,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readUnsignedLongs_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
         reader.readUnsignedLongs(numValues, binaryColumn, 0);
@@ -518,6 +520,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readUnsignedLongs_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
         reader.readUnsignedLongs(numValues, binaryColumn, 0);
@@ -525,6 +528,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readUnsignedLongs_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
         reader.readUnsignedLongs(numValues, binaryColumn, 0);
@@ -808,6 +812,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readBinaryBatch_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         reader.readBinary(numValues, binaryColumn, 0);
@@ -815,6 +820,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readBinaryBatch_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         reader.readBinary(numValues, binaryColumn, 0);
@@ -822,6 +828,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readBinaryBatch_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         reader.readBinary(numValues, binaryColumn, 0);
@@ -829,6 +836,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void readBinaryBatch_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         reader.readBinary(numValues, binaryColumn, 0);
@@ -2748,6 +2756,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // Skip 10%, Read 90%
     @Benchmark
     public void initSkip10Read90Binary_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = numValues / 10;
@@ -2758,6 +2767,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip10Read90Binary_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = numValues / 10;
@@ -2768,6 +2778,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip10Read90Binary_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = numValues / 10;
@@ -2778,6 +2789,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip10Read90Binary_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = numValues / 10;
@@ -2789,6 +2801,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // Skip 50%, Read 50%
     @Benchmark
     public void initSkip50Read50Binary_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = numValues / 2;
@@ -2799,6 +2812,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip50Read50Binary_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = numValues / 2;
@@ -2809,6 +2823,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip50Read50Binary_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = numValues / 2;
@@ -2819,6 +2834,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip50Read50Binary_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = numValues / 2;
@@ -2830,6 +2846,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // Skip 30%, Read 70%
     @Benchmark
     public void initSkip30Read70Binary_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 3) / 10;
@@ -2840,6 +2857,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip30Read70Binary_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 3) / 10;
@@ -2850,6 +2868,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip30Read70Binary_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 3) / 10;
@@ -2860,6 +2879,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip30Read70Binary_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 3) / 10;
@@ -2871,6 +2891,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // Skip 70%, Read 30%
     @Benchmark
     public void initSkip70Read30Binary_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 7) / 10;
@@ -2881,6 +2902,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip70Read30Binary_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 7) / 10;
@@ -2891,6 +2913,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip70Read30Binary_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 7) / 10;
@@ -2901,6 +2924,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip70Read30Binary_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 7) / 10;
@@ -2912,6 +2936,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // Skip 90%, Read 10%
     @Benchmark
     public void initSkip90Read10Binary_SingleBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 9) / 10;
@@ -2922,6 +2947,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip90Read10Binary_SingleBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
         int skipCount = (numValues * 9) / 10;
@@ -2932,6 +2958,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip90Read10Binary_MultiBuffer() throws IOException {
+        binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 9) / 10;
@@ -2942,6 +2969,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     @Benchmark
     public void initSkip90Read10Binary_MultiBuffer_Optimized() throws IOException {
+        binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
         int skipCount = (numValues * 9) / 10;
