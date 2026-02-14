@@ -3230,8 +3230,9 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     // ==================== Main Method ====================
 
     public static void main(String[] args) throws RunnerException {
+        String filter = args.length > 0 ? args[0] : VectorizedPlainValuesReaderDirectBufferJMHBenchmark.class.getSimpleName();
         Options opt = new OptionsBuilder()
-                .include(VectorizedPlainValuesReaderDirectBufferJMHBenchmark.class.getSimpleName())
+                .include(filter)
                 .build();
 
         new Runner(opt).run();

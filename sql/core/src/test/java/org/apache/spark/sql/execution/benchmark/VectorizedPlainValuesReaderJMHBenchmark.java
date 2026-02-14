@@ -74,7 +74,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     @Param({"100000", "1000000"})
     private int numValues;
 
-    @Param({"4096"})
+    @Param({"8192"})
     private int bufferSize;
 
     // ==================== Test Data ====================
@@ -91,6 +91,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
 
     private static final int FIXED_LEN = 16;
     private static final int BINARY_AVG_LEN = 32;
+    private static final int BATCH_SIZE = 4096;
 
     private WritableColumnVector intColumn;
     private WritableColumnVector longColumn;
@@ -117,14 +118,14 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         binaryData = generateBinaryData(numValues, random, BINARY_AVG_LEN);
         fixedLenData = generateFixedLenData(numValues, FIXED_LEN, random);
 
-        intColumn = new OnHeapColumnVector(numValues, DataTypes.IntegerType);
-        longColumn = new OnHeapColumnVector(numValues, DataTypes.LongType);
-        floatColumn = new OnHeapColumnVector(numValues, DataTypes.FloatType);
-        doubleColumn = new OnHeapColumnVector(numValues, DataTypes.DoubleType);
-        byteColumn = new OnHeapColumnVector(numValues, DataTypes.ByteType);
-        shortColumn = new OnHeapColumnVector(numValues, DataTypes.ShortType);
-        booleanColumn = new OnHeapColumnVector(numValues, DataTypes.BooleanType);
-        binaryColumn = new OnHeapColumnVector(numValues, DataTypes.BinaryType);
+        intColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.IntegerType);
+        longColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.LongType);
+        floatColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.FloatType);
+        doubleColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.DoubleType);
+        byteColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.ByteType);
+        shortColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.ShortType);
+        booleanColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.BooleanType);
+        binaryColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.BinaryType);
     }
 
     @TearDown(Level.Trial)
@@ -246,56 +247,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readBooleans_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.readBooleans(numValues, booleanColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBooleans(Math.min(BATCH_SIZE, numValues - i), booleanColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBooleans_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.readBooleans(numValues, booleanColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBooleans(Math.min(BATCH_SIZE, numValues - i), booleanColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBooleans_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.readBooleans(numValues, booleanColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBooleans(Math.min(BATCH_SIZE, numValues - i), booleanColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBooleans_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.readBooleans(numValues, booleanColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBooleans(Math.min(BATCH_SIZE, numValues - i), booleanColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipBooleans_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBooleans_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBooleans_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBooleans_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -306,56 +315,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readIntegers_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readIntegers(numValues, intColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegers(Math.min(BATCH_SIZE, numValues - i), intColumn, 0);
+        }
     }
 
     @Benchmark
     public void readIntegers_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readIntegers(numValues, intColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegers(Math.min(BATCH_SIZE, numValues - i), intColumn, 0);
+        }
     }
 
     @Benchmark
     public void readIntegers_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readIntegers(numValues, intColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegers(Math.min(BATCH_SIZE, numValues - i), intColumn, 0);
+        }
     }
 
     @Benchmark
     public void readIntegers_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readIntegers(numValues, intColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegers(Math.min(BATCH_SIZE, numValues - i), intColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipIntegers_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipIntegers_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipIntegers_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipIntegers_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -366,28 +383,36 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readUnsignedIntegers_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readUnsignedIntegers(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedIntegers_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readUnsignedIntegers(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedIntegers_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readUnsignedIntegers(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedIntegers_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readUnsignedIntegers(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     // ====================================================================================
@@ -398,28 +423,36 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readIntegersWithRebase_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readIntegersWithRebase(numValues, intColumn, 0, false);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegersWithRebase(Math.min(BATCH_SIZE, numValues - i), intColumn, 0, false);
+        }
     }
 
     @Benchmark
     public void readIntegersWithRebase_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.readIntegersWithRebase(numValues, intColumn, 0, false);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegersWithRebase(Math.min(BATCH_SIZE, numValues - i), intColumn, 0, false);
+        }
     }
 
     @Benchmark
     public void readIntegersWithRebase_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readIntegersWithRebase(numValues, intColumn, 0, false);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegersWithRebase(Math.min(BATCH_SIZE, numValues - i), intColumn, 0, false);
+        }
     }
 
     @Benchmark
     public void readIntegersWithRebase_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.readIntegersWithRebase(numValues, intColumn, 0, false);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readIntegersWithRebase(Math.min(BATCH_SIZE, numValues - i), intColumn, 0, false);
+        }
     }
 
     // ====================================================================================
@@ -430,56 +463,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readLongs_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readLongs(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongs(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readLongs_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readLongs(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongs(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readLongs_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readLongs(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongs(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void readLongs_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readLongs(numValues, longColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongs(Math.min(BATCH_SIZE, numValues - i), longColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipLongs_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipLongs_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipLongs_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipLongs_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -490,28 +531,36 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readUnsignedLongs_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readUnsignedLongs(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedLongs(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedLongs_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readUnsignedLongs(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedLongs(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedLongs_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readUnsignedLongs(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedLongs(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readUnsignedLongs_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readUnsignedLongs(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readUnsignedLongs(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     // ====================================================================================
@@ -554,56 +603,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readFloats_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        reader.readFloats(numValues, floatColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readFloats(Math.min(BATCH_SIZE, numValues - i), floatColumn, 0);
+        }
     }
 
     @Benchmark
     public void readFloats_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        reader.readFloats(numValues, floatColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readFloats(Math.min(BATCH_SIZE, numValues - i), floatColumn, 0);
+        }
     }
 
     @Benchmark
     public void readFloats_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(floatData, bufferSize));
-        reader.readFloats(numValues, floatColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readFloats(Math.min(BATCH_SIZE, numValues - i), floatColumn, 0);
+        }
     }
 
     @Benchmark
     public void readFloats_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(floatData, bufferSize));
-        reader.readFloats(numValues, floatColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readFloats(Math.min(BATCH_SIZE, numValues - i), floatColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipFloats_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        reader.skipFloats(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFloats(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipFloats_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        reader.skipFloats(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFloats(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipFloats_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(floatData, bufferSize));
-        reader.skipFloats(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFloats(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipFloats_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(floatData, bufferSize));
-        reader.skipFloats(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFloats(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -614,56 +671,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readDoubles_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.readDoubles(numValues, doubleColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readDoubles(Math.min(BATCH_SIZE, numValues - i), doubleColumn, 0);
+        }
     }
 
     @Benchmark
     public void readDoubles_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.readDoubles(numValues, doubleColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readDoubles(Math.min(BATCH_SIZE, numValues - i), doubleColumn, 0);
+        }
     }
 
     @Benchmark
     public void readDoubles_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.readDoubles(numValues, doubleColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readDoubles(Math.min(BATCH_SIZE, numValues - i), doubleColumn, 0);
+        }
     }
 
     @Benchmark
     public void readDoubles_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.readDoubles(numValues, doubleColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readDoubles(Math.min(BATCH_SIZE, numValues - i), doubleColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipDoubles_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipDoubles_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipDoubles_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipDoubles_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -674,56 +739,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readBytes_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(byteData));
-        reader.readBytes(numValues, byteColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBytes(Math.min(BATCH_SIZE, numValues - i), byteColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBytes_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(byteData));
-        reader.readBytes(numValues, byteColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBytes(Math.min(BATCH_SIZE, numValues - i), byteColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBytes_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(byteData, bufferSize));
-        reader.readBytes(numValues, byteColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBytes(Math.min(BATCH_SIZE, numValues - i), byteColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBytes_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(byteData, bufferSize));
-        reader.readBytes(numValues, byteColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readBytes(Math.min(BATCH_SIZE, numValues - i), byteColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipBytes_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(byteData));
-        reader.skipBytes(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBytes(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBytes_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(byteData));
-        reader.skipBytes(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBytes(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBytes_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(byteData, bufferSize));
-        reader.skipBytes(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBytes(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBytes_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(byteData, bufferSize));
-        reader.skipBytes(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBytes(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -734,56 +807,64 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readShorts_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(shortData));
-        reader.readShorts(numValues, shortColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readShorts(Math.min(BATCH_SIZE, numValues - i), shortColumn, 0);
+        }
     }
 
     @Benchmark
     public void readShorts_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(shortData));
-        reader.readShorts(numValues, shortColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readShorts(Math.min(BATCH_SIZE, numValues - i), shortColumn, 0);
+        }
     }
 
     @Benchmark
     public void readShorts_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(shortData, bufferSize));
-        reader.readShorts(numValues, shortColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readShorts(Math.min(BATCH_SIZE, numValues - i), shortColumn, 0);
+        }
     }
 
     @Benchmark
     public void readShorts_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(shortData, bufferSize));
-        reader.readShorts(numValues, shortColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readShorts(Math.min(BATCH_SIZE, numValues - i), shortColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipShorts_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(shortData));
-        reader.skipShorts(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipShorts(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipShorts_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(shortData));
-        reader.skipShorts(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipShorts(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipShorts_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(shortData, bufferSize));
-        reader.skipShorts(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipShorts(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipShorts_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(shortData, bufferSize));
-        reader.skipShorts(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipShorts(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -792,62 +873,74 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
 
     @Benchmark
     public void readBinaryBatch_SingleBuffer() throws IOException {
-        binaryColumn.reset();
+        // binaryColumn capacity is BATCH_SIZE
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.readBinary(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            binaryColumn.reset();
+            reader.readBinary(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBinaryBatch_SingleBuffer_Optimized() throws IOException {
-        binaryColumn.reset();
+        // binaryColumn capacity is BATCH_SIZE
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.readBinary(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            binaryColumn.reset();
+            reader.readBinary(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBinaryBatch_MultiBuffer() throws IOException {
-        binaryColumn.reset();
+        // binaryColumn capacity is BATCH_SIZE
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.readBinary(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            binaryColumn.reset();
+            reader.readBinary(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void readBinaryBatch_MultiBuffer_Optimized() throws IOException {
-        binaryColumn.reset();
+        // binaryColumn capacity is BATCH_SIZE
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.readBinary(numValues, binaryColumn, 0);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            binaryColumn.reset();
+            reader.readBinary(Math.min(BATCH_SIZE, numValues - i), binaryColumn, 0);
+        }
     }
 
     @Benchmark
     public void skipBinary_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBinary_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBinary_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void skipBinary_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -858,28 +951,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void skipFixedLenByteArray_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void skipFixedLenByteArray_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void skipFixedLenByteArray_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(fixedLenData, bufferSize));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void skipFixedLenByteArray_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(fixedLenData, bufferSize));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     // ====================================================================================
@@ -1082,28 +1175,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void initAndSkipAllIntegers_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllIntegers_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllIntegers_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllIntegers_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(intData, bufferSize));
-        reader.skipIntegers(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipIntegers(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -1114,28 +1207,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void initAndSkipAllLongs_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllLongs_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllLongs_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllLongs_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.skipLongs(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipLongs(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -1146,28 +1239,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void initAndSkipAllDoubles_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllDoubles_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllDoubles_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllDoubles_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(doubleData, bufferSize));
-        reader.skipDoubles(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipDoubles(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -1180,7 +1273,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
@@ -1189,7 +1282,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(binaryData));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
@@ -1198,7 +1291,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         binaryColumn.reset();
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
@@ -1207,7 +1300,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         binaryColumn.reset();
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(binaryData, bufferSize));
-        reader.skipBinary(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBinary(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -1218,28 +1311,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void initAndSkipAllFixedLen_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void initAndSkipAllFixedLen_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void initAndSkipAllFixedLen_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(fixedLenData, bufferSize));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     @Benchmark
     public void initAndSkipAllFixedLen_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(fixedLenData, bufferSize));
-        reader.skipFixedLenByteArray(numValues, FIXED_LEN);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipFixedLenByteArray(Math.min(BATCH_SIZE, numValues - i), FIXED_LEN); }
     }
 
     // ====================================================================================
@@ -1250,28 +1343,28 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void initAndSkipAllBooleans_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllBooleans_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllBooleans_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     @Benchmark
     public void initAndSkipAllBooleans_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(booleanData, bufferSize));
-        reader.skipBooleans(numValues);
+        for (int i = 0; i < numValues; i += BATCH_SIZE) { reader.skipBooleans(Math.min(BATCH_SIZE, numValues - i)); }
     }
 
     // ====================================================================================
@@ -1286,7 +1379,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1296,7 +1389,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1306,7 +1399,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1316,7 +1409,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -1327,7 +1420,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1337,7 +1430,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1347,7 +1440,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1357,7 +1450,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -1368,7 +1461,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1378,7 +1471,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1388,7 +1481,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1398,7 +1491,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -1409,7 +1502,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1419,7 +1512,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1429,7 +1522,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1439,7 +1532,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -1450,7 +1543,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1460,7 +1553,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1470,7 +1563,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     @Benchmark
@@ -1480,7 +1573,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipIntegers(skipCount);
-        reader.readIntegers(readCount, intColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readIntegers(Math.min(BATCH_SIZE, readCount - i), intColumn, 0); }
     }
 
     // ====================================================================================
@@ -1495,7 +1588,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1505,7 +1598,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1515,7 +1608,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1525,7 +1618,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -1536,7 +1629,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1546,7 +1639,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1556,7 +1649,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1566,7 +1659,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -1577,7 +1670,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1587,7 +1680,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1597,7 +1690,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1607,7 +1700,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -1618,7 +1711,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1628,7 +1721,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1638,7 +1731,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1648,7 +1741,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -1659,7 +1752,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1669,7 +1762,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1679,7 +1772,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     @Benchmark
@@ -1689,7 +1782,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipLongs(skipCount);
-        reader.readLongs(readCount, longColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readLongs(Math.min(BATCH_SIZE, readCount - i), longColumn, 0); }
     }
 
     // ====================================================================================
@@ -1704,7 +1797,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1714,7 +1807,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1724,7 +1817,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1734,7 +1827,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -1745,7 +1838,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1755,7 +1848,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1765,7 +1858,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1775,7 +1868,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -1786,7 +1879,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1796,7 +1889,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1806,7 +1899,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1816,7 +1909,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -1827,7 +1920,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1837,7 +1930,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1847,7 +1940,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1857,7 +1950,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -1868,7 +1961,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1878,7 +1971,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1888,7 +1981,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
     @Benchmark
@@ -1898,7 +1991,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipDoubles(skipCount);
-        reader.readDoubles(readCount, doubleColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readDoubles(Math.min(BATCH_SIZE, readCount - i), doubleColumn, 0); }
     }
 
 
@@ -1914,7 +2007,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1924,7 +2017,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1934,7 +2027,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1944,7 +2037,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -1955,7 +2048,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1965,7 +2058,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1975,7 +2068,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -1985,7 +2078,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -1996,7 +2089,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2006,7 +2099,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2016,7 +2109,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2026,7 +2119,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -2037,7 +2130,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2047,7 +2140,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2057,7 +2150,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2067,7 +2160,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -2078,7 +2171,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2088,7 +2181,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2098,7 +2191,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     @Benchmark
@@ -2108,7 +2201,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBytes(skipCount);
-        reader.readBytes(readCount, byteColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBytes(Math.min(BATCH_SIZE, readCount - i), byteColumn, 0); }
     }
 
     // ====================================================================================
@@ -2123,7 +2216,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2133,7 +2226,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2143,7 +2236,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2153,7 +2246,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -2164,7 +2257,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2174,7 +2267,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2184,7 +2277,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2194,7 +2287,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -2205,7 +2298,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2215,7 +2308,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2225,7 +2318,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2235,7 +2328,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -2246,7 +2339,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2256,7 +2349,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2266,7 +2359,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2276,7 +2369,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -2287,7 +2380,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2297,7 +2390,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2307,7 +2400,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     @Benchmark
@@ -2317,7 +2410,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipShorts(skipCount);
-        reader.readShorts(readCount, shortColumn, 0);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readShorts(Math.min(BATCH_SIZE, readCount - i), shortColumn, 0); }
     }
 
     // ====================================================================================
@@ -2332,7 +2425,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2342,7 +2435,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2352,7 +2445,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2362,7 +2455,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -2373,7 +2466,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2383,7 +2476,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2393,7 +2486,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2403,7 +2496,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -2414,7 +2507,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2424,7 +2517,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2434,7 +2527,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2444,7 +2537,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -2455,7 +2548,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2465,7 +2558,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2475,7 +2568,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2485,7 +2578,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -2496,7 +2589,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2506,7 +2599,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2516,7 +2609,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     @Benchmark
@@ -2526,7 +2619,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBooleans(skipCount);
-        reader.readBooleans(readCount, booleanColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { reader.readBooleans(Math.min(BATCH_SIZE, readCount - i), booleanColumn, 0); }
     }
 
     // ====================================================================================
@@ -2543,7 +2636,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2555,7 +2648,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2567,7 +2660,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2579,7 +2672,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     // Skip 50%, Read 50%
@@ -2592,7 +2685,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2604,7 +2697,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2616,7 +2709,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2628,7 +2721,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = numValues / 2;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     // Skip 30%, Read 70%
@@ -2641,7 +2734,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2653,7 +2746,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2665,7 +2758,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2677,7 +2770,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 3) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     // Skip 70%, Read 30%
@@ -2690,7 +2783,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2702,7 +2795,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2714,7 +2807,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2726,7 +2819,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 7) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     // Skip 90%, Read 10%
@@ -2739,7 +2832,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2751,7 +2844,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2763,7 +2856,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     @Benchmark
@@ -2775,7 +2868,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int skipCount = (numValues * 9) / 10;
         int readCount = numValues - skipCount;
         reader.skipBinary(skipCount);
-        reader.readBinary(readCount, binaryColumn, skipCount);
+        for (int i = 0; i < readCount; i += BATCH_SIZE) { binaryColumn.reset(); reader.readBinary(Math.min(BATCH_SIZE, readCount - i), binaryColumn, 0); }
     }
 
     // ====================================================================================
@@ -3030,8 +3123,9 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     // ==================== Main Method ====================
 
     public static void main(String[] args) throws RunnerException {
+        String filter = args.length > 0 ? args[0] : VectorizedPlainValuesReaderJMHBenchmark.class.getSimpleName();
         Options opt = new OptionsBuilder()
-                .include(VectorizedPlainValuesReaderJMHBenchmark.class.getSimpleName())
+                .include(filter)
                 .build();
 
         new Runner(opt).run();
