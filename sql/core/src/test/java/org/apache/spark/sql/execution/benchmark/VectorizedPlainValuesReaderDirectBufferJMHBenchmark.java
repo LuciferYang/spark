@@ -39,12 +39,16 @@ import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.DataTypes;
 
 /**
- * JMH Benchmark for comparing VectorizedPlainValuesReader and VectorizedSingleBufferPlainValuesReader.
+ * JMH Benchmark for comparing VectorizedPlainValuesReader and VectorizedSingleBufferPlainValuesReader
+ * using DirectByteBuffer (off-heap memory).
+ *
+ * This benchmark is similar to VectorizedPlainValuesReaderJMHBenchmark but uses DirectByteBuffer
+ * instead of HeapByteBuffer to test performance with off-heap memory buffers.
  *
  * Test scenarios:
- * 1. VectorizedPlainValuesReader with SingleBufferInputStream
- * 2. VectorizedPlainValuesReader with MultiBufferInputStream
- * 3. VectorizedSingleBufferPlainValuesReader with SingleBufferInputStream (optimized)
+ * 1. VectorizedPlainValuesReader with SingleBufferInputStream (DirectByteBuffer)
+ * 2. VectorizedPlainValuesReader with MultiBufferInputStream (DirectByteBuffer)
+ * 3. VectorizedSingleBufferPlainValuesReader with SingleBufferInputStream (optimized, DirectByteBuffer)
  *
  * APIs tested (all public APIs except skip() which throws SparkUnsupportedOperationException):
  * - Batch read: readBooleans, readIntegers, readLongs, readFloats, readDoubles, readBytes, readShorts
@@ -58,7 +62,7 @@ import org.apache.spark.sql.types.DataTypes;
  * To run:
  * {{{
  *   build/mvn test-compile -pl sql/core -DskipTests
- *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.benchmark.VectorizedPlainValuesReaderJMHBenchmark"
+ *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.benchmark.VectorizedPlainValuesReaderDirectBufferJMHBenchmark"
  * }}}
  */
 @BenchmarkMode(Mode.AverageTime)
@@ -67,7 +71,7 @@ import org.apache.spark.sql.types.DataTypes;
 @Fork(value = 1, jvmArgs = {"-Xms4G", "-Xmx4G"})
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 10, time = 1)
-public class VectorizedPlainValuesReaderJMHBenchmark {
+public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     // ==================== Parameters ====================
 
@@ -217,10 +221,22 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         return data;
     }
 
-    // ==================== ByteBufferInputStream Creation ====================
+    // ==================== ByteBufferInputStream Creation (DirectByteBuffer) ====================
+
+    /**
+     * Create a DirectByteBuffer from byte array data.
+     * DirectByteBuffer uses off-heap memory, which has different performance characteristics
+     * compared to HeapByteBuffer.
+     */
+    private ByteBuffer createDirectBuffer(byte[] data) {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(data.length).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.put(data);
+        buffer.flip();
+        return buffer;
+    }
 
     private ByteBufferInputStream createSingleBufferInputStream(byte[] data) {
-        ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer buffer = createDirectBuffer(data);
         return ByteBufferInputStream.wrap(buffer);
     }
 
@@ -229,7 +245,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int offset = 0;
         while (offset < data.length) {
             int length = Math.min(chunkSize, data.length - offset);
-            ByteBuffer chunk = ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer chunk = ByteBuffer.allocateDirect(length).order(ByteOrder.LITTLE_ENDIAN);
             chunk.put(data, offset, length);
             chunk.flip();
             buffers.add(chunk);
@@ -3187,7 +3203,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(VectorizedPlainValuesReaderJMHBenchmark.class.getSimpleName())
+                .include(VectorizedPlainValuesReaderDirectBufferJMHBenchmark.class.getSimpleName())
                 .build();
 
         new Runner(opt).run();
