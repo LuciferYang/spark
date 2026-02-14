@@ -75,7 +75,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     // ==================== Parameters ====================
 
-    @Param({"100000", "1000000"})
+    @Param({"1000000"})
     private int numValues;
 
     @Param({"4096"})
@@ -910,7 +910,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readBooleanSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readBoolean();
         }
@@ -920,7 +920,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readBooleanSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(booleanData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readBoolean();
         }
@@ -934,7 +934,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readIntegerSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readInteger();
         }
@@ -944,7 +944,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readIntegerSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readInteger();
         }
@@ -958,7 +958,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readLongSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readLong();
         }
@@ -968,7 +968,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readLongSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readLong();
         }
@@ -982,7 +982,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readByteSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readByte();
         }
@@ -992,7 +992,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readByteSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readByte();
         }
@@ -1006,7 +1006,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readShortSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readShort();
         }
@@ -1016,7 +1016,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readShortSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(intData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readShort();
         }
@@ -1030,7 +1030,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readFloatSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readFloat();
         }
@@ -1040,7 +1040,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readFloatSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(floatData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readFloat();
         }
@@ -1054,7 +1054,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readDoubleSingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readDouble();
         }
@@ -1064,7 +1064,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readDoubleSingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(doubleData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readDouble();
         }
@@ -1078,7 +1078,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readBinarySingle_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readBinary(FIXED_LEN);
         }
@@ -1088,7 +1088,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
     public void readBinarySingle_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(fixedLenData));
-        int count = Math.min(numValues, 10000);
+        int count = numValues;
         for (int i = 0; i < count; i++) {
             reader.readBinary(FIXED_LEN);
         }
