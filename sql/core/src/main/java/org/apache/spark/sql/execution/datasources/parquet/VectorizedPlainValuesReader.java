@@ -262,10 +262,21 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     // Bytes are stored as a 4-byte little endian int. Just read the first byte.
     // TODO: consider pushing this in ColumnVector by adding a readBytes with a stride.
     checkBufferSize(total * 4);
-    for (int i = 0; i < total; i += 1) {
-      c.putByte(rowId + i, buffer.get());
-      // skip the next 3 bytes
-      buffer.position(buffer.position() + 3);
+    if (buffer.hasArray()) {
+      // Fast path: direct array access
+      byte[] array = buffer.array();
+      int offset = buffer.arrayOffset() + buffer.position();
+      for (int i = 0; i < total; i++) {
+        c.putByte(rowId + i, array[offset + i * 4]);
+      }
+      buffer.position(buffer.position() + total * 4);
+    } else {
+      // Slow path: use ByteBuffer methods
+      for (int i = 0; i < total; i += 1) {
+        c.putByte(rowId + i, buffer.get());
+        // skip the next 3 bytes
+        buffer.position(buffer.position() + 3);
+      }
     }
   }
 
