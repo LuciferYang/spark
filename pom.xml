@@ -2319,6 +2319,19 @@
       </dependency>
 
       <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-core</artifactId>
+        <version>1.37</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-generator-reflection</artifactId>
+        <version>1.37</version>
+        <scope>test</scope>
+      </dependency>
+
+      <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-format</artifactId>
         <version>1.1.1</version>
