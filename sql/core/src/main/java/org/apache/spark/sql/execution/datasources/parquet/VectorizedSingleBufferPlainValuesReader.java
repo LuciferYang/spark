@@ -45,6 +45,8 @@ public class VectorizedSingleBufferPlainValuesReader extends ValuesReader implem
 
   @Override
   public void initFromPage(int valueCount, ByteBufferInputStream in) throws IOException {
+    assert "org.apache.parquet.bytes.SingleBufferInputStream".equals(in.getClass().getName()) :
+      "VectorizedPlainValuesReader only supports SingleBufferInputStream, but got: " + in.getClass().getName();
     try {
       this.buffer = in.slice((int) in.available()).order(ByteOrder.LITTLE_ENDIAN);
     } catch (IOException e) {

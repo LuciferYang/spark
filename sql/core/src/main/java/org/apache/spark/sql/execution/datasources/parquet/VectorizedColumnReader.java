@@ -344,7 +344,7 @@ public class VectorizedColumnReader {
       this.dataColumn = new VectorizedRleValuesReader();
       this.isCurrentPageDictionaryEncoded = true;
     } else {
-      this.dataColumn = getValuesReader(dataEncoding);
+      this.dataColumn = getValuesReader(dataEncoding, in.getClass().getName());
       this.isCurrentPageDictionaryEncoded = false;
     }
 
@@ -361,9 +361,15 @@ public class VectorizedColumnReader {
     }
   }
 
-  private ValuesReader getValuesReader(Encoding encoding) {
+  private ValuesReader getValuesReader(Encoding encoding, String inputStringName) {
     return switch (encoding) {
-      case PLAIN -> new VectorizedPlainValuesReader();
+      case PLAIN -> {
+        if ("org.apache.parquet.bytes.SingleBufferInputStream".equals(inputStringName)) {
+          yield new VectorizedSingleBufferPlainValuesReader();
+        } else {
+          yield new VectorizedPlainValuesReader();
+        }
+      }
       case DELTA_BYTE_ARRAY -> new VectorizedDeltaByteArrayReader();
       case DELTA_LENGTH_BYTE_ARRAY -> new VectorizedDeltaLengthByteArrayReader();
       case DELTA_BINARY_PACKED -> new VectorizedDeltaBinaryPackedReader();
