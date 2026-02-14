@@ -33,7 +33,8 @@ import java.nio.ByteOrder;
 /**
  * An implementation of the Parquet PLAIN decoder that supports the vectorized interface.
  */
-public class VectorizedSingleBufferPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
+public class VectorizedSingleBufferPlainValuesReader
+    extends ValuesReader implements VectorizedValuesReader {
   private ByteBuffer buffer = null;
 
   // Only used for booleans.

@@ -37,6 +37,7 @@ import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.*;
 
+// scalastyle:off
 /**
  * JMH Benchmark for VectorizedPlainValuesReader comparing:
  * 1. SingleBufferInputStream vs MultiBufferInputStream input
@@ -56,6 +57,7 @@ import org.apache.spark.sql.types.*;
  *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.benchmark.VectorizedPlainValuesReaderJMHBenchmark"
  * }}}
  */
+// scalastyle:on
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Thread)
