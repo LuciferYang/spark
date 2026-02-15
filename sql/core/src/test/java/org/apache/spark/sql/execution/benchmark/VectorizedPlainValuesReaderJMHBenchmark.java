@@ -74,7 +74,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     @Param({"1000000"})
     private int numValues;
 
-    @Param({"8192"})
+    @Param({"6144"})
     private int bufferSize;
 
     // ==================== Test Data ====================
@@ -571,28 +571,36 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readLongsWithRebase_SingleBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readLongsWithRebase(numValues, longColumn, 0, false, "UTC");
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongsWithRebase(Math.min(BATCH_SIZE, numValues - i), longColumn, 0, false, "UTC");
+        }
     }
 
     @Benchmark
     public void readLongsWithRebase_SingleBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        reader.readLongsWithRebase(numValues, longColumn, 0, false, "UTC");
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongsWithRebase(Math.min(BATCH_SIZE, numValues - i), longColumn, 0, false, "UTC");
+        }
     }
 
     @Benchmark
     public void readLongsWithRebase_MultiBuffer() throws IOException {
         VectorizedPlainValuesReader reader = new VectorizedPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readLongsWithRebase(numValues, longColumn, 0, false, "UTC");
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongsWithRebase(Math.min(BATCH_SIZE, numValues - i), longColumn, 0, false, "UTC");
+        }
     }
 
     @Benchmark
     public void readLongsWithRebase_MultiBuffer_Optimized() throws IOException {
         VectorizedSingleBufferPlainValuesReader reader = new VectorizedSingleBufferPlainValuesReader();
         reader.initFromPage(numValues, createMultiBufferInputStream(longData, bufferSize));
-        reader.readLongsWithRebase(numValues, longColumn, 0, false, "UTC");
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            reader.readLongsWithRebase(Math.min(BATCH_SIZE, numValues - i), longColumn, 0, false, "UTC");
+        }
     }
 
     // ====================================================================================
