@@ -75,7 +75,7 @@ public class VectorizedPlainValuesReaderDirectBufferJMHBenchmark {
 
     // ==================== Parameters ====================
 
-    @Param({"1000000"})
+    @Param({"10000"})
     private int numValues;
 
     @Param({"6144"})
