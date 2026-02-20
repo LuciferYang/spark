@@ -267,6 +267,12 @@ public abstract class WritableColumnVector extends ColumnVector {
   public abstract void putBytes(int rowId, int count, byte[] src, int srcIndex);
 
   /**
+   * Sets values from [src[srcIndex], src[srcIndex + count * 4]) to [rowId, rowId + count)
+   * Each 4-byte little endian int's lowest byte is extracted as a byte value.
+   */
+  public abstract void putBytesFromInts(int rowId, int count, byte[] src, int srcIndex);
+
+  /**
    * Sets `value` to the value at rowId.
    */
   public abstract void putShort(int rowId, short value);

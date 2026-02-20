@@ -203,6 +203,14 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
+  public void putBytesFromInts(int rowId, int count, byte[] src, int srcIndex) {
+    for (int i = 0; i < count; ++i) {
+      byteData[rowId + i] = src[srcIndex + i * 4];
+    }
+  }
+
+
+  @Override
   public byte getByte(int rowId) {
     if (dictionary == null) {
       return byteData[rowId];

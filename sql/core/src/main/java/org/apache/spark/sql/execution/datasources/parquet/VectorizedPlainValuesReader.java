@@ -286,16 +286,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   @Override
   public final void readBytes(int total, WritableColumnVector c, int rowId) {
     // Bytes are stored as a 4-byte little endian int. Just read the first byte.
-    // TODO: consider pushing this in ColumnVector by adding a readBytes with a stride.
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
 
     if (buffer.hasArray()) {
-      byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
-      for (int i = 0; i < total; i++) {
-        c.putByte(rowId + i, array[offset + i * 4]);
-      }
+      c.putBytesFromInts(rowId, total, buffer.array(), offset);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putByte(rowId + i, buffer.get());
