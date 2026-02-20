@@ -129,8 +129,17 @@ public class VectorizedSingleBufferPlainValuesReader
   @Override
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
     checkBufferSize(total * 4);
-    for (int i = 0; i < total; i += 1) {
-      c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+    if (buffer.hasArray()) {
+      byte[] array = buffer.array();
+      int offset = buffer.arrayOffset() + buffer.position();
+      for (int i = 0; i < total; i++) {
+        c.putLong(rowId + i, Integer.toUnsignedLong(array[offset + i * 4]));
+      }
+      buffer.position(buffer.position() + total * 4);
+    } else {
+      for (int i = 0; i < total; i += 1) {
+        c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+      }
     }
   }
 
@@ -153,7 +162,15 @@ public class VectorizedSingleBufferPlainValuesReader
         }
       }
     } else {
-      readIntegers(total, c, rowId);
+      if (buffer.hasArray()) {
+        int offset = buffer.arrayOffset() + buffer.position();
+        c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
+        buffer.position(buffer.position() + total * 4);
+      } else {
+        for (int i = 0; i < total; i += 1) {
+          c.putInt(rowId + i, buffer.getInt());
+        }
+      }
     }
   }
 
