@@ -200,8 +200,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
     for (int i = 0; i < total; i += 1) {
-      c.putByteArray(
-        rowId + i, new BigInteger(Long.toUnsignedString(buffer.getLong())).toByteArray());
+      c.putUnsignedLong(rowId + i, buffer.getLong());
     }
   }
 
