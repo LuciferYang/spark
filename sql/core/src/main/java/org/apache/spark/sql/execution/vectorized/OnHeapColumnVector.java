@@ -330,12 +330,15 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putUnsignedIntsAsLongs(int rowId, int count, byte[] src, int srcIndex) {
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
-    for (int i = 0; i < count; ++i, srcOffset += 4) {
-      int v = Platform.getInt(src, srcOffset);
-      if (bigEndianPlatform) {
-        v = Integer.reverseBytes(v);
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; ++i, srcOffset += 4) {
+        longData[rowId + i] =
+          Integer.reverseBytes(Platform.getInt(src, srcOffset)) & 0xFFFFFFFFL;
       }
-      longData[rowId + i] = v & 0xFFFFFFFFL;
+    } else {
+      for (int i = 0; i < count; ++i, srcOffset += 4) {
+        longData[rowId + i] = Platform.getInt(src, srcOffset) & 0xFFFFFFFFL;
+      }
     }
   }
 
