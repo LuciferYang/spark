@@ -408,6 +408,18 @@ public abstract class WritableColumnVector extends ColumnVector {
     return putByteArray(rowId, value, 0, value.length);
   }
 
+  /**
+   * Finds the index of the first 4-byte little endian int in src that is less than threshold,
+   * starting from srcIndex with count elements. Returns -1 if none found.
+   */
+  public abstract int findFirstIntLessThan(byte[] src, int srcIndex, int count, int threshold);
+
+  /**
+   * Finds the index of the first 8-byte little endian long in src that is less than threshold,
+   * starting from srcIndex with count elements. Returns -1 if none found.
+   */
+  public abstract int findFirstLongLessThan(byte[] src, int srcIndex, int count, long threshold);
+
   @Override
   public Decimal getDecimal(int rowId, int precision, int scale) {
     if (isNullAt(rowId)) return null;

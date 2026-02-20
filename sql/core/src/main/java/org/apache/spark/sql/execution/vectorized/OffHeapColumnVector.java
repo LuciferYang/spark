@@ -640,4 +640,34 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public OffHeapColumnVector reserveNewColumn(int capacity, DataType type) {
     return new OffHeapColumnVector(capacity, type);
   }
+
+  @Override
+  public int findFirstIntLessThan(byte[] src, int srcIndex, int count, int threshold) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        if (Integer.reverseBytes(Platform.getInt(src, srcOffset)) < threshold) return i;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        if (Platform.getInt(src, srcOffset) < threshold) return i;
+      }
+    }
+    return -1;
+  }
+
+  @Override
+  public int findFirstLongLessThan(byte[] src, int srcIndex, int count, long threshold) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        if (Long.reverseBytes(Platform.getLong(src, srcOffset)) < threshold) return i;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        if (Platform.getLong(src, srcOffset) < threshold) return i;
+      }
+    }
+    return -1;
+  }
 }

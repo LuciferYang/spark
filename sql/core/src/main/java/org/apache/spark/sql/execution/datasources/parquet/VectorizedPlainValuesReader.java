@@ -151,28 +151,50 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
           int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    boolean rebase = false;
     int switchDay = RebaseDateTime.lastSwitchJulianDay();
-    for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getInt(buffer.position() + i * 4) < switchDay;
-    }
-    if (rebase) {
-      if (failIfRebase) {
-        throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+
+    if (buffer.hasArray()) {
+      byte[] array = buffer.array();
+      int offset = buffer.arrayOffset() + buffer.position();
+
+      int rebaseFrom = c.findFirstIntLessThan(array, offset, total, switchDay);
+
+      if (rebaseFrom < 0) {
+        c.putIntsLittleEndian(rowId, total, array, offset);
       } else {
-        for (int i = 0; i < total; i += 1) {
-          int days = buffer.getInt();
+        if (failIfRebase) {
+          throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+        }
+        if (rebaseFrom > 0) {
+          c.putIntsLittleEndian(rowId, rebaseFrom, array, offset);
+        }
+        for (int i = rebaseFrom; i < total; i++) {
+          int days = buffer.getInt(buffer.position() + i * 4);
           c.putInt(rowId + i,
             days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
+        buffer.position(buffer.position() + total * 4);
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
+      int rebaseFrom = -1;
+      for (int i = 0; i < total; i++) {
+        if (buffer.getInt(buffer.position() + i * 4) < switchDay) {
+          rebaseFrom = i;
+          break;
+        }
+      }
+      if (rebaseFrom < 0) {
+        for (int i = 0; i < total; i++) {
           c.putInt(rowId + i, buffer.getInt());
+        }
+      } else {
+        if (failIfRebase) {
+          throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+        }
+        for (int i = 0; i < total; i++) {
+          int days = buffer.getInt();
+          c.putInt(rowId + i,
+            days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
       }
     }
@@ -213,35 +235,57 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // if rebase is not needed.
   @Override
   public final void readLongsWithRebase(
-          int total,
-          WritableColumnVector c,
-          int rowId,
-          boolean failIfRebase,
-          String timeZone) {
+      int total,
+      WritableColumnVector c,
+      int rowId,
+      boolean failIfRebase,
+      String timeZone) {
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    boolean rebase = false;
     long switchTs = RebaseDateTime.lastSwitchJulianTs();
-    for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getLong(buffer.position() + i * 8) < switchTs;
-    }
-    if (rebase) {
-      if (failIfRebase) {
-        throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+
+    if (buffer.hasArray()) {
+      byte[] array = buffer.array();
+      int offset = buffer.arrayOffset() + buffer.position();
+
+      int rebaseFrom = c.findFirstLongLessThan(array, offset, total, switchTs);
+
+      if (rebaseFrom < 0) {
+        c.putLongsLittleEndian(rowId, total, array, offset);
       } else {
-        for (int i = 0; i < total; i += 1) {
-          long ts = buffer.getLong();
+        if (failIfRebase) {
+          throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+        }
+        if (rebaseFrom > 0) {
+          c.putLongsLittleEndian(rowId, rebaseFrom, array, offset);
+        }
+        for (int i = rebaseFrom; i < total; i++) {
+          long ts = buffer.getLong(buffer.position() + i * 8);
           c.putLong(rowId + i,
             ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
+        buffer.position(buffer.position() + total * 8);
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
+      int rebaseFrom = -1;
+      for (int i = 0; i < total; i++) {
+        if (buffer.getLong(buffer.position() + i * 8) < switchTs) {
+          rebaseFrom = i;
+          break;
+        }
+      }
+      if (rebaseFrom < 0) {
+        for (int i = 0; i < total; i++) {
           c.putLong(rowId + i, buffer.getLong());
+        }
+      } else {
+        if (failIfRebase) {
+          throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+        }
+        for (int i = 0; i < total; i++) {
+          long ts = buffer.getLong();
+          c.putLong(rowId + i, ts < switchTs
+            ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
       }
     }
