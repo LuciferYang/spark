@@ -325,31 +325,36 @@ public abstract class WritableColumnVector extends ColumnVector {
    * This avoids intermediate byte[] allocation compared to putByteArray.
    */
   public void putUnsignedLong(int rowId, long value) {
-    // Determine the magnitude bytes in big-endian order, skipping leading zeros,
-    // but always keeping at least one byte. Prepend 0x00 sign byte if high bit is set.
-    // This matches BigInteger.toByteArray() semantics for positive values.
-    int leadingZeroBytes = Long.numberOfLeadingZeros(value) / 8;
-    // Number of magnitude bytes needed (at least 1)
-    int magBytes = 8 - leadingZeroBytes;
-    // Need a 0x00 sign byte if the highest magnitude byte has its MSB set
-    boolean needSignByte = value != 0 && ((value >>> ((magBytes - 1) * 8)) & 0x80) != 0;
-    int totalBytes = magBytes + (needSignByte ? 1 : 0);
+    final byte[] bytes;
+    if (value == 0) {
+      // BigInteger.ZERO.toByteArray() returns [0x00], must match this semantic
+      bytes = new byte[]{0};
+    } else {
+      int leadingZeroBytes = Long.numberOfLeadingZeros(value) / 8;
+      int magBytes = 8 - leadingZeroBytes;
+      // Prepend 0x00 sign byte if highest magnitude byte has MSB set,
+      // to match BigInteger.toByteArray() semantics for positive values.
+      boolean needSignByte = ((value >>> ((magBytes - 1) * 8)) & 0x80) != 0;
+      int totalBytes = magBytes + (needSignByte ? 1 : 0);
+
+      bytes = new byte[totalBytes];
+      int writePos = 0;
+      if (needSignByte) {
+        bytes[writePos++] = 0x00;
+      }
+      for (int b = magBytes - 1; b >= 0; b--) {
+        bytes[writePos++] = (byte)(value >>> (b * 8));
+      }
+    }
 
     WritableColumnVector data = arrayData();
     int offset = data.getElementsAppended();
-    data.reserve(offset + totalBytes);
-
-    int writePos = offset;
-    if (needSignByte) {
-      data.putByte(writePos++, (byte) 0x00);
+    data.reserve(offset + bytes.length);
+    for (int i = 0; i < bytes.length; i++) {
+      data.putByte(offset + i, bytes[i]);
     }
-    // Write magnitude bytes in big-endian order
-    for (int b = magBytes - 1; b >= 0; b--) {
-      data.putByte(writePos++, (byte)(value >>> (b * 8)));
-    }
-    data.addElementsAppended(totalBytes);
-
-    putArray(rowId, offset, totalBytes);
+    data.addElementsAppended(bytes.length);
+    putArray(rowId, offset, bytes.length);
   }
   /**
    * Sets value to [rowId, rowId + count).
