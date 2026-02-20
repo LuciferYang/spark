@@ -148,19 +148,22 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // if rebase is not needed.
   @Override
   public final void readIntegersWithRebase(
-      int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
+          int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
     boolean rebase = false;
+    int switchDay = RebaseDateTime.lastSwitchJulianDay();
     for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getInt(buffer.position() + i * 4) < RebaseDateTime.lastSwitchJulianDay();
+      rebase |= buffer.getInt(buffer.position() + i * 4) < switchDay;
     }
     if (rebase) {
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
         for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, RebaseDateTime.rebaseJulianToGregorianDays(buffer.getInt()));
+          int days = buffer.getInt();
+          c.putInt(rowId + i,
+            days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
       }
     } else {
@@ -210,25 +213,26 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // if rebase is not needed.
   @Override
   public final void readLongsWithRebase(
-      int total,
-      WritableColumnVector c,
-      int rowId,
-      boolean failIfRebase,
-      String timeZone) {
+          int total,
+          WritableColumnVector c,
+          int rowId,
+          boolean failIfRebase,
+          String timeZone) {
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
     boolean rebase = false;
+    long switchTs = RebaseDateTime.lastSwitchJulianTs();
     for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getLong(buffer.position() + i * 8) < RebaseDateTime.lastSwitchJulianTs();
+      rebase |= buffer.getLong(buffer.position() + i * 8) < switchTs;
     }
     if (rebase) {
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
         for (int i = 0; i < total; i += 1) {
-          c.putLong(
-            rowId + i,
-            RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, buffer.getLong()));
+          long ts = buffer.getLong();
+          c.putLong(rowId + i,
+            ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
       }
     } else {
