@@ -143,12 +143,14 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
   }
 
-  // A fork of `readIntegers` to rebase the date values. For performance reasons, this method
-  // iterates the values twice: check if we need to rebase first, then go to the optimized branch
-  // if rebase is not needed.
+  // A fork of `readIntegers` to rebase the date values. For performance, this method
+  // scans for the first value that requires rebasing and exits early if none is found,
+  // allowing the common case (no rebase needed) to take the optimized bulk-write path.
+  // When rebasing is needed, values before the first rebase boundary are bulk-written,
+  // and remaining values are written individually with per-value rebase checks.
   @Override
   public final void readIntegersWithRebase(
-          int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
+      int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
     int switchDay = RebaseDateTime.lastSwitchJulianDay();
@@ -176,6 +178,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         buffer.position(buffer.position() + total * 4);
       }
     } else {
+      // non-array path: scan for first rebase boundary using absolute get to avoid
+      // advancing buffer position, then process all values in a single sequential pass.
       int rebaseFrom = -1;
       for (int i = 0; i < total; i++) {
         if (buffer.getInt(buffer.position() + i * 4) < switchDay) {
@@ -230,9 +234,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
   }
 
-  // A fork of `readLongs` to rebase the timestamp values. For performance reasons, this method
-  // iterates the values twice: check if we need to rebase first, then go to the optimized branch
-  // if rebase is not needed.
+  // A fork of `readLongs` to rebase the timestamp values. For performance, this method
+  // scans for the first value that requires rebasing and exits early if none is found,
+  // allowing the common case (no rebase needed) to take the optimized bulk-write path.
+  // When rebasing is needed, values before the first rebase boundary are bulk-written,
+  // and remaining values are written individually with per-value rebase checks,
+  // avoiding unnecessary calls to rebaseJulianToGregorianMicros for modern timestamps.
   @Override
   public final void readLongsWithRebase(
       int total,
@@ -261,12 +268,15 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
         for (int i = rebaseFrom; i < total; i++) {
           long ts = buffer.getLong(buffer.position() + i * 8);
-          c.putLong(rowId + i,
-            ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
+          c.putLong(rowId + i, ts < switchTs
+                  ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts)
+                  : ts);
         }
         buffer.position(buffer.position() + total * 8);
       }
     } else {
+      // non-array path: scan for first rebase boundary using absolute get to avoid
+      // advancing buffer position, then process all values in a single sequential pass.
       int rebaseFrom = -1;
       for (int i = 0; i < total; i++) {
         if (buffer.getLong(buffer.position() + i * 8) < switchTs) {
