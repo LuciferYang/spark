@@ -336,6 +336,20 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
+  public void putUnsignedIntsAsLongs(int rowId, int count, byte[] src, int srcIndex) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    long dstOffset = data + rowId * 8L;
+    for (int i = 0; i < count; ++i, srcOffset += 4, dstOffset += 8) {
+      int v = Platform.getInt(src, srcOffset);
+      if (bigEndianPlatform) {
+        v = Integer.reverseBytes(v);
+      }
+      Platform.putLong(null, dstOffset, v & 0xFFFFFFFFL);
+    }
+  }
+
+
+  @Override
   public int getInt(int rowId) {
     if (dictionary == null) {
       return Platform.getInt(null, data + 4L * rowId);
