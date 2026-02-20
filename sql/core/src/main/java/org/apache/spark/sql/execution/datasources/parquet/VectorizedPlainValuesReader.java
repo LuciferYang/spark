@@ -268,9 +268,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
         for (int i = rebaseFrom; i < total; i++) {
           long ts = buffer.getLong(buffer.position() + i * 8);
-          c.putLong(rowId + i, ts < switchTs
-                  ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts)
-                  : ts);
+          c.putLong(rowId + i,
+            ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
         buffer.position(buffer.position() + total * 8);
       }
@@ -294,8 +293,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
         for (int i = 0; i < total; i++) {
           long ts = buffer.getLong();
-          c.putLong(rowId + i, ts < switchTs
-            ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
+          c.putLong(rowId + i,
+            ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
       }
     }
