@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import java.time.{LocalDateTime, LocalTime}
 import java.math.BigDecimal
+import java.time.{LocalDateTime, LocalTime}
 import java.util.Locale
 
 import scala.collection.mutable
