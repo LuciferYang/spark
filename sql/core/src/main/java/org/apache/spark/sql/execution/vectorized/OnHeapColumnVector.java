@@ -347,11 +347,11 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     if (bigEndianPlatform) {
       for (int i = 0; i < count; ++i, srcOffset += 4) {
         longData[rowId + i] =
-          Integer.reverseBytes(Platform.getInt(src, srcOffset)) & 0xFFFFFFFFL;
+          ((long) Integer.reverseBytes(Platform.getInt(src, srcOffset))) & 0xFFFFFFFFL;
       }
     } else {
       for (int i = 0; i < count; ++i, srcOffset += 4) {
-        longData[rowId + i] = Platform.getInt(src, srcOffset) & 0xFFFFFFFFL;
+        longData[rowId + i] =  ((long) Platform.getInt(src, srcOffset)) & 0xFFFFFFFFL;
       }
     }
   }

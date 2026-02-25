@@ -358,11 +358,11 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     if (bigEndianPlatform) {
       for (int i = 0; i < count; ++i, srcOffset += 4, dstOffset += 8) {
         Platform.putLong(null, dstOffset,
-          Integer.reverseBytes(Platform.getInt(src, srcOffset)) & 0xFFFFFFFFL);
+          ((long) Integer.reverseBytes(Platform.getInt(src, srcOffset))) & 0xFFFFFFFFL);
       }
     } else {
       for (int i = 0; i < count; ++i, srcOffset += 4, dstOffset += 8) {
-        Platform.putLong(null, dstOffset, Platform.getInt(src, srcOffset) & 0xFFFFFFFFL);
+        Platform.putLong(null, dstOffset, ((long) Platform.getInt(src, srcOffset)) & 0xFFFFFFFFL);
       }
     }
   }
