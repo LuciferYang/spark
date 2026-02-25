@@ -2114,7 +2114,7 @@ class ColumnarBatchSuite extends SparkFunSuite {
 
       // Single value write
       val singleBuffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
-      singleBuffer.putInt(0xDEADBEEF.toInt)
+      singleBuffer.putInt(0xDEADBEEF)
       column.putUnsignedIntsAsLongsLittleEndian(idx, 1, singleBuffer.array(), 0)
       reference += Integer.toUnsignedLong(0xDEADBEEF) // 3735928559L
       idx += 1
