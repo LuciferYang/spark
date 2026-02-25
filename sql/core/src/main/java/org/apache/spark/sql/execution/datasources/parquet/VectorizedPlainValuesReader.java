@@ -140,7 +140,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     ByteBuffer buffer = getBuffer(requiredBytes);
     if (buffer.hasArray()) {
       int offset = buffer.arrayOffset() + buffer.position();
-      c.putUnsignedIntsAsLongs(rowId, total, buffer.array(), offset);
+      c.putUnsignedIntsAsLongsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
       for (int i = 0; i < total; i += 1) {
         c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));

@@ -2071,4 +2071,58 @@ class ColumnarBatchSuite extends SparkFunSuite {
         }
       }
   }
+
+  testVector("Unsigned Ints", 1024, LongType) {
+    column =>
+      val reference = mutable.ArrayBuffer.empty[Long]
+      var idx = 0
+
+      // Normal values
+      val normalInts = Array(0, 1, 100, 32767, 32768, 65535, 65536, Int.MaxValue)
+      val count = normalInts.length
+      val normalBuffer = ByteBuffer.allocate(count * 4).order(ByteOrder.LITTLE_ENDIAN)
+      normalInts.foreach(normalBuffer.putInt)
+      column.putUnsignedIntsAsLongsLittleEndian(idx, count, normalBuffer.array(), 0)
+      normalInts.foreach(v => reference += Integer.toUnsignedLong(v))
+      idx += count
+
+      // Boundary: values where sign bit of int is set (0x80000000 to 0xFFFFFFFF)
+      // These are negative as signed int but should be treated as large positive unsigned longs
+      val boundaryInts = Array(
+        Int.MinValue,            // 0x80000000 -> 2147483648L
+        Int.MinValue + 1,        // 0x80000001 -> 2147483649L
+        -1,                      // 0xFFFFFFFF -> 4294967295L
+        -2,                      // 0xFFFFFFFE -> 4294967294L
+        Int.MaxValue + 1,        // overflows to Int.MinValue, same as above
+        0                        // zero
+      )
+      val boundaryCount = boundaryInts.length
+      val boundaryBuffer = ByteBuffer.allocate(boundaryCount * 4).order(ByteOrder.LITTLE_ENDIAN)
+      boundaryInts.foreach(boundaryBuffer.putInt)
+      column.putUnsignedIntsAsLongsLittleEndian(idx, boundaryCount, boundaryBuffer.array(), 0)
+      boundaryInts.foreach(v => reference += Integer.toUnsignedLong(v))
+      idx += boundaryCount
+
+      // srcIndex offset test: write 3 values starting from 2nd element (offset = 4)
+      val offsetInts = Array(999, 1, 2, 3, 888)
+      val offsetBuffer = ByteBuffer.allocate(offsetInts.length * 4).order(ByteOrder.LITTLE_ENDIAN)
+      offsetInts.foreach(offsetBuffer.putInt)
+      // Write 3 values starting at byte offset 4 (skipping the first int 999)
+      column.putUnsignedIntsAsLongsLittleEndian(idx, 3, offsetBuffer.array(), 4)
+      (1 to 3).foreach(v => reference += Integer.toUnsignedLong(v))
+      idx += 3
+
+      // Single value write
+      val singleBuffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+      singleBuffer.putInt(0xDEADBEEF.toInt)
+      column.putUnsignedIntsAsLongsLittleEndian(idx, 1, singleBuffer.array(), 0)
+      reference += Integer.toUnsignedLong(0xDEADBEEF) // 3735928559L
+      idx += 1
+
+      reference.zipWithIndex.foreach { case (expected, i) =>
+        assert(expected == column.getLong(i),
+          s"Mismatch at index $i: expected $expected but got ${column.getLong(i)}, " +
+            s"VectorType=${column.getClass.getSimpleName}")
+      }
+  }
 }

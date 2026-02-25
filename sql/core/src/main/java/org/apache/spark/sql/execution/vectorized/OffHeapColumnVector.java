@@ -352,7 +352,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
-  public void putUnsignedIntsAsLongs(int rowId, int count, byte[] src, int srcIndex) {
+  public void putUnsignedIntsAsLongsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
     long dstOffset = data + rowId * 8L;
     if (bigEndianPlatform) {
