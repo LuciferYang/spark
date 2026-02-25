@@ -80,18 +80,18 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
 
     @State(Scope.Thread)
     public static class OnHeapColumnVectorState {
-        public WritableColumnVector intColumn;
+        public WritableColumnVector longColumn;
         @Setup(Level.Iteration)
         public void setup() {
-            intColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.IntegerType);
+            longColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.LongType);
         }
         @TearDown(Level.Iteration)
         public void tearDown() {
-            intColumn.close();
+            longColumn.close();
         }
         @Setup(Level.Invocation)
         public void reset() {
-            intColumn.reset();
+            longColumn.reset();
         }
     }
 
@@ -146,7 +146,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     @Benchmark
     public void readUnsignedIntegers_onHeap_Old(OnHeapColumnVectorState state) throws IOException {
         for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            oldSingleBufferOnHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.intColumn, 0);
+            oldSingleBufferOnHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.longColumn, 0);
         }
     }
 
@@ -157,7 +157,7 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     @Benchmark
     public void readUnsignedIntegers_offHeap_Old(OnHeapColumnVectorState state) throws IOException {
         for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            oldSingleBufferOffHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.intColumn, 0);
+            oldSingleBufferOffHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.longColumn, 0);
         }
     }
 
