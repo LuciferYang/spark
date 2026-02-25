@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import java.math.BigDecimal
+import java.math.{BigDecimal => JBigDecimal}
 import java.time.{LocalDateTime, LocalTime}
 import java.util.Locale
 
@@ -1281,10 +1281,10 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSparkSession 
         makeRawParquetFile(path)
         readParquetFile(path.toString) { df =>
           val originalExpected = (-500 until 500).map { i =>
-            Row(BigDecimal(UnsignedLong.fromLongBits(i % 100L).bigIntegerValue()))
+            Row(new JBigDecimal(UnsignedLong.fromLongBits(i % 100L).bigIntegerValue()))
           }
           val boundaryExpected = Seq(0L, 1L, Long.MaxValue, Long.MinValue, -2L, -1L).map { v =>
-            Row(BigDecimal(UnsignedLong.fromLongBits(v).bigIntegerValue()))
+            Row(new JBigDecimal(UnsignedLong.fromLongBits(v).bigIntegerValue()))
           }
           checkAnswer(df, originalExpected ++ boundaryExpected)
         }
