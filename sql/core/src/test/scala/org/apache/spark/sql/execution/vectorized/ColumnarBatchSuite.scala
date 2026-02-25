@@ -2060,4 +2060,111 @@ class ColumnarBatchSuite extends SparkFunSuite {
         }
       }
   }
+
+  testVector("put Unsigned Long", 1024, DecimalType(20, 0)) {
+    column =>
+      // putUnsignedLong interprets a signed long's bit pattern as an unsigned 64-bit integer
+      // and writes it to arrayData() using BigInteger.toByteArray() big-endian semantics.
+      // The column must be DecimalType(20, 0) because UINT64 in Parquet maps to Decimal(20, 0),
+      // and putUnsignedLong writes into childColumns via arrayData(), which is only initialized
+      // for array/binary/decimal types -- not LongType.
+      //
+      // Critical corner case: value == 0 must write [0x00] (1 byte), NOT an empty array.
+      // An empty array would cause `new BigInteger(new byte[0])` to throw
+      // NumberFormatException: "Zero length BigInteger" when read back.
+
+      // Helper: read back the BigInteger stored at a given rowId.
+      // arrayData() holds the raw bytes written by putUnsignedLong, which follow
+      // BigInteger.toByteArray() semantics (big-endian, minimal two's-complement encoding).
+      // We reconstruct via new BigInteger(bytes) -- safe here because putUnsignedLong
+      // guarantees the encoding is identical to BigInteger.toByteArray().
+      def readBack(rowId: Int): java.math.BigInteger = {
+        val arrayData = column.arrayData()
+        val offset = column.getArrayOffset(rowId)
+        val length = column.getArrayLength(rowId)
+        val bytes = new Array[Byte](length)
+        (0 until length).foreach { i => bytes(i) = arrayData.getByte(offset + i) }
+        new java.math.BigInteger(bytes)
+      }
+
+      // Oracle: replicates the unsigned interpretation of a long bit pattern.
+      // Equivalent to the two-argument BigInteger constructor used in production code.
+      def oracle(value: Long): java.math.BigInteger = {
+        java.math.BigInteger.valueOf(value >>> 1).shiftLeft(1)
+          .add(java.math.BigInteger.valueOf(value & 1L))
+          .and(new java.math.BigInteger("FFFFFFFFFFFFFFFF", 16))
+      }
+
+      // --- corner cases ---
+
+      // rowId 0: zero -- the only value that requires special-casing in the implementation.
+      // BigInteger.toByteArray() on BigInteger.ZERO returns [0x00] (length 1),
+      // so putUnsignedLong must write exactly one zero byte, not an empty array.
+      column.putUnsignedLong(0, 0L)
+      assert(column.getArrayLength(0) == 1,
+        s"zero must be stored as 1 byte, not ${column.getArrayLength(0)}")
+      assert(readBack(0) == java.math.BigInteger.ZERO,
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // rowId 1: Long.MinValue (0x8000000000000000) -- smallest signed long,
+      // largest power-of-two unsigned value: 2^63 = 9223372036854775808.
+      // The high bit is 1, so BigInteger.toByteArray() prepends a 0x00 sign byte,
+      // making the stored length 9 bytes.
+      column.putUnsignedLong(1, Long.MinValue)
+      assert(readBack(1) == oracle(Long.MinValue),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // rowId 2: -1L (0xFFFFFFFFFFFFFFFF) -- maximum unsigned 64-bit value: 2^64 - 1.
+      // BigInteger.toByteArray() prepends a 0x00 sign byte, so stored length is 9 bytes.
+      column.putUnsignedLong(2, -1L)
+      assert(readBack(2) == oracle(-1L),
+        "VectorType=" + column.getClass.getSimpleName)
+      assert(readBack(2) == new java.math.BigInteger("18446744073709551615"),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // rowId 3: Long.MaxValue (0x7FFFFFFFFFFFFFFF) -- largest positive signed long.
+      // As unsigned: 9223372036854775807. High bit is 0, so no sign byte prepended;
+      // stored length is 8 bytes.
+      column.putUnsignedLong(3, Long.MaxValue)
+      assert(readBack(3) == oracle(Long.MaxValue),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // --- normal positive values ---
+
+      // rowId 4: 1L -- minimal non-zero positive value.
+      column.putUnsignedLong(4, 1L)
+      assert(readBack(4) == oracle(1L),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // rowId 5: 100L
+      column.putUnsignedLong(5, 100L)
+      assert(readBack(5) == oracle(100L),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // --- "negative as unsigned" values (high bit set, but not boundary) ---
+
+      // rowId 6: -2L (0xFFFFFFFFFFFFFFFE) = 2^64 - 2
+      column.putUnsignedLong(6, -2L)
+      assert(readBack(6) == oracle(-2L),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // rowId 7: 0xDEADBEEFCAFEBABEL -- arbitrary mixed-byte pattern with high bit set.
+      val deadBeef = 0xDEADBEEFCAFEBABEL
+      column.putUnsignedLong(7, deadBeef)
+      assert(readBack(7) == oracle(deadBeef),
+        "VectorType=" + column.getClass.getSimpleName)
+
+      // --- non-zero rowId offset: verify surrounding rows are not clobbered ---
+
+      // Write to rowId 512, then confirm rowId 511 and 513 are unaffected.
+      // Rows that have never been written have length 0 in arrayData (after reset).
+      val offsetRowId = 512
+      column.putUnsignedLong(offsetRowId, -1L)
+      assert(readBack(offsetRowId) == new java.math.BigInteger("18446744073709551615"),
+        "VectorType=" + column.getClass.getSimpleName)
+      // rowId 511 was never written: its array length must still be 0.
+      assert(column.getArrayLength(511) == 0,
+        s"rowId 511 should be unmodified, length=${column.getArrayLength(511)}" +
+          " VectorType=" + column.getClass.getSimpleName)
+  }
 }

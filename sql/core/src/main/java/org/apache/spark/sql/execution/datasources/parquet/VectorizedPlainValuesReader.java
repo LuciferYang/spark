@@ -199,8 +199,41 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
     for (int i = 0; i < total; i += 1) {
-      c.putUnsignedLong(rowId + i, buffer.getLong());
+      putUnsignedLong(c,rowId + i, buffer.getLong());
     }
+  }
+
+  private void putUnsignedLong(WritableColumnVector c, int rowId, long value) {
+    final byte[] bytes;
+    if (value == 0) {
+      // BigInteger.ZERO.toByteArray() returns [0x00], must match this semantic
+      bytes = new byte[]{0};
+    } else {
+      int leadingZeroBytes = Long.numberOfLeadingZeros(value) / 8;
+      int magBytes = 8 - leadingZeroBytes;
+      // Prepend 0x00 sign byte if highest magnitude byte has MSB set,
+      // to match BigInteger.toByteArray() semantics for positive values.
+      boolean needSignByte = ((value >>> ((magBytes - 1) * 8)) & 0x80) != 0;
+      int totalBytes = magBytes + (needSignByte ? 1 : 0);
+
+      bytes = new byte[totalBytes];
+      int writePos = 0;
+      if (needSignByte) {
+        bytes[writePos++] = 0x00;
+      }
+      for (int b = magBytes - 1; b >= 0; b--) {
+        bytes[writePos++] = (byte)(value >>> (b * 8));
+      }
+    }
+
+    WritableColumnVector data = c.arrayData();
+    int offset = data.getElementsAppended();
+    data.reserve(offset + bytes.length);
+    for (int i = 0; i < bytes.length; i++) {
+      data.putByte(offset + i, bytes[i]);
+    }
+    data.addElementsAppended(bytes.length);
+    c.putArray(rowId, offset, bytes.length);
   }
 
   // A fork of `readLongs` to rebase the timestamp values. For performance reasons, this method
