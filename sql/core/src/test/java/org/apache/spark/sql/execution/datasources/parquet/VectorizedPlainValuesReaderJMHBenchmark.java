@@ -77,6 +77,8 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
 
     private OldVectorizedPlainValuesReader oldSingleBufferOnHeapReader;
     private OldVectorizedPlainValuesReader oldSingleBufferOffHeapReader;
+    private VectorizedPlainValuesReader newSingleBufferOnHeapReader;
+    private VectorizedPlainValuesReader newSingleBufferOffHeapReader;
 
     @State(Scope.Thread)
     public static class OnHeapColumnVectorState {
@@ -109,6 +111,10 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         oldSingleBufferOnHeapReader.initFromPage(numValues, createSingleBufferInputStream(intData));
         oldSingleBufferOffHeapReader = new OldVectorizedPlainValuesReader();
         oldSingleBufferOffHeapReader.initFromPage(numValues, createDirectSingleBufferInputStream(intData));
+        newSingleBufferOnHeapReader = new VectorizedPlainValuesReader();
+        newSingleBufferOnHeapReader.initFromPage(numValues, createSingleBufferInputStream(intData));
+        newSingleBufferOffHeapReader = new VectorizedPlainValuesReader();
+        newSingleBufferOffHeapReader.initFromPage(numValues, createDirectSingleBufferInputStream(intData));
     }
 
     // ==================== Data Generation ====================
@@ -150,6 +156,13 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         }
     }
 
+    @Benchmark
+    public void readUnsignedIntegers_onHeap_New(OnHeapColumnVectorState state) throws IOException {
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            newSingleBufferOnHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.longColumn, 0);
+        }
+    }
+
     // ====================================================================================
     // readUnsignedIntegers offHeap
     // ====================================================================================
@@ -158,6 +171,13 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     public void readUnsignedIntegers_offHeap_Old(OnHeapColumnVectorState state) throws IOException {
         for (int i = 0; i < numValues; i += BATCH_SIZE) {
             oldSingleBufferOffHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.longColumn, 0);
+        }
+    }
+
+    @Benchmark
+    public void readUnsignedIntegers_offHeap_New(OnHeapColumnVectorState state) throws IOException {
+        for (int i = 0; i < numValues; i += BATCH_SIZE) {
+            newSingleBufferOffHeapReader.readUnsignedIntegers(Math.min(BATCH_SIZE, numValues - i), state.longColumn, 0);
         }
     }
 
