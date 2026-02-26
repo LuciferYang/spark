@@ -332,12 +332,13 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putIntsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
+    if (!bigEndianPlatform) {
+      putInts(rowId, count, src, srcIndex);
+      return;
+    }
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
     for (int i = 0; i < count; ++i, srcOffset += 4) {
-      intData[i + rowId] = Platform.getInt(src, srcOffset);
-      if (bigEndianPlatform) {
-        intData[i + rowId] = java.lang.Integer.reverseBytes(intData[i + rowId]);
-      }
+      intData[i + rowId] = java.lang.Integer.reverseBytes(Platform.getInt(src, srcOffset));
     }
   }
 
@@ -406,12 +407,13 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putLongsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
+    if (!bigEndianPlatform) {
+      putLongs(rowId, count, src, srcIndex);
+      return;
+    }
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
     for (int i = 0; i < count; ++i, srcOffset += 8) {
-      longData[i + rowId] = Platform.getLong(src, srcOffset);
-      if (bigEndianPlatform) {
-        longData[i + rowId] = java.lang.Long.reverseBytes(longData[i + rowId]);
-      }
+      longData[i + rowId] = java.lang.Long.reverseBytes(Platform.getLong(src, srcOffset));
     }
   }
 
@@ -467,9 +469,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     if (!bigEndianPlatform) {
       putFloats(rowId, count, src, srcIndex);
     } else {
-      ByteBuffer bb = ByteBuffer.wrap(src).order(ByteOrder.LITTLE_ENDIAN);
-      for (int i = 0; i < count; ++i) {
-        floatData[i + rowId] = bb.getFloat(srcIndex + (4 * i));
+      int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+      for (int i = 0; i < count; ++i, srcOffset += 4) {
+        floatData[i + rowId] = Float.intBitsToFloat(
+          java.lang.Integer.reverseBytes(Platform.getInt(src, srcOffset)));
       }
     }
   }
@@ -528,9 +531,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     if (!bigEndianPlatform) {
       putDoubles(rowId, count, src, srcIndex);
     } else {
-      ByteBuffer bb = ByteBuffer.wrap(src).order(ByteOrder.LITTLE_ENDIAN);
-      for (int i = 0; i < count; ++i) {
-        doubleData[i + rowId] = bb.getDouble(srcIndex + (8 * i));
+      int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+      for (int i = 0; i < count; ++i, srcOffset += 8) {
+        doubleData[i + rowId] = Double.longBitsToDouble(
+          java.lang.Long.reverseBytes(Platform.getLong(src, srcOffset)));
       }
     }
   }
