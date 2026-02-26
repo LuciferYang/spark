@@ -61,7 +61,7 @@ import org.apache.spark.sql.types.DataTypes;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Thread)
 @Fork(value = 1, jvmArgs = {"-Xms4G", "-Xmx4G"})
-@Warmup(iterations = 5, time = 1)
+@Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 public class VectorizedPlainValuesReaderJMHBenchmark {
 
