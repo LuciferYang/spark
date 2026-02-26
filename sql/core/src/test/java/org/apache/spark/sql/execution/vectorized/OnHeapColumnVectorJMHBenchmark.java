@@ -19,6 +19,11 @@ package org.apache.spark.sql.execution.vectorized;
 import java.util.concurrent.TimeUnit;
 
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+
 import org.apache.spark.sql.types.DataTypes;
 
 /**
@@ -99,4 +104,15 @@ public class OnHeapColumnVectorJMHBenchmark {
       oldOnHeapVectorLong.putLongsLittleEndian(0, count, inputBytesLong, 0);
     }
   }
+
+    public static void main(String[] args) throws RunnerException {
+        String filter = args.length > 0 ?
+                args[0] : OnHeapColumnVectorJMHBenchmark.class.getSimpleName();
+        Options opt = new OptionsBuilder()
+                .include(filter)
+                .build();
+
+
+        new Runner(opt).run();
+    }
 }
