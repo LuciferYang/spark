@@ -16,37 +16,19 @@
  */
 package org.apache.spark.sql.execution.vectorized;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-
 import org.openjdk.jmh.annotations.*;
-import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
-import org.openjdk.jmh.runner.options.OptionsBuilder;
-
-
-import org.apache.parquet.bytes.ByteBufferInputStream;
-
-
 import org.apache.spark.sql.types.DataTypes;
 
-
 /**
- * JMH Benchmark for comparing VectorizedPlainValuesReader readUnsignedLongs performance.
- *
- * UINT64 in Parquet is mapped to DecimalType(20, 0) in Spark.
- * The column vector must be created with DecimalType(20, 0), not LongType,
- * because readUnsignedLongs writes BigInteger bytes into childColumns via arrayData().
+ * JMH Benchmark for comparing OnHeapColumnVector and OldOnHeapColumnVector
+ * putIntsLittleEndian and putLongsLittleEndian performance.
  *
  * To run:
  * {{{
  *   build/mvn test-compile -pl sql/core -DskipTests
- *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.benchmark.OnHeapColumnVectorJMHBenchmark"
+ *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.vectorized.OnHeapColumnVectorJMHBenchmark"
  * }}}
  */
 @BenchmarkMode(Mode.AverageTime)
@@ -57,174 +39,64 @@ import org.apache.spark.sql.types.DataTypes;
 @Measurement(iterations = 10, time = 1)
 public class OnHeapColumnVectorJMHBenchmark {
 
+  @Param({"4096"})
+  public int count;
 
-    // ==================== Parameters ====================
+  @Param({"65536"})
+  public int i;
 
+  private OnHeapColumnVector onHeapVectorInt;
+  private OnHeapColumnVector onHeapVectorLong;
+  private OldOnHeapColumnVector oldOnHeapVectorInt;
+  private OldOnHeapColumnVector oldOnHeapVectorLong;
 
-    @Param({"10000000"})
-    private int numValues;
+  private byte[] inputBytesInt;
+  private byte[] inputBytesLong;
 
+  @Setup
+  public void setup() {
+    onHeapVectorInt = new OnHeapColumnVector(count, DataTypes.IntegerType);
+    onHeapVectorLong = new OnHeapColumnVector(count, DataTypes.LongType);
+    oldOnHeapVectorInt = new OldOnHeapColumnVector(count, DataTypes.IntegerType);
+    oldOnHeapVectorLong = new OldOnHeapColumnVector(count, DataTypes.LongType);
 
-    // ==================== Test Data ====================
+    inputBytesInt = new byte[count * 4];
+    inputBytesLong = new byte[count * 8];
+  }
 
+  @TearDown
+  public void tearDown() {
+    onHeapVectorInt.close();
+    onHeapVectorLong.close();
+    oldOnHeapVectorInt.close();
+    oldOnHeapVectorLong.close();
+  }
 
-    private byte[] longData;
-    private static final int BATCH_SIZE = 4096;
-
-
-    private OldVectorizedPlainValuesReader oldSingleBufferOnHeapReader;
-    private OldVectorizedPlainValuesReader oldSingleBufferOffHeapReader;
-    private VectorizedPlainValuesReader newSingleBufferOnHeapReader;
-    private VectorizedPlainValuesReader newSingleBufferOffHeapReader;
-
-
-    // ==================== State Classes ====================
-
-
-    /**
-     * Column vector state using DecimalType(20, 0), which is the correct type for UINT64.
-     * Parquet UINT_64 logical type is mapped to DecimalType(20, 0) in Spark.
-     * Using LongType would cause NullPointerException because readUnsignedLongs
-     * calls arrayData() which requires childColumns, only initialized for DecimalType.
-     */
-    @State(Scope.Thread)
-    public static class DecimalColumnVectorState {
-        public WritableColumnVector decimalColumn;
-
-
-        @Setup(Level.Iteration)
-        public void setup() {
-            // UINT64 -> DecimalType(20, 0): precision=20, scale=0
-            decimalColumn = new OnHeapColumnVector(BATCH_SIZE, DataTypes.createDecimalType(20, 0));
-        }
-
-
-        @TearDown(Level.Iteration)
-        public void tearDown() {
-            decimalColumn.close();
-        }
-
-
-        @Setup(Level.Invocation)
-        public void reset() {
-            decimalColumn.reset();
-        }
+  @Benchmark
+  public void onHeapPutIntsLittleEndian() {
+    for (int n = 0; n < i; n++) {
+      onHeapVectorInt.putIntsLittleEndian(0, count, inputBytesInt, 0);
     }
+  }
 
-
-    // ==================== Setup ====================
-
-
-    @Setup(Level.Trial)
-    public void setupTrial() {
-        Random random = new Random(42);
-        longData = generateLongData(numValues, random);
+  @Benchmark
+  public void oldOnHeapPutIntsLittleEndian() {
+    for (int n = 0; n < i; n++) {
+      oldOnHeapVectorInt.putIntsLittleEndian(0, count, inputBytesInt, 0);
     }
+  }
 
-
-    @Setup(Level.Invocation)
-    public void setupInvocation() throws IOException {
-        oldSingleBufferOnHeapReader = new OldVectorizedPlainValuesReader();
-        oldSingleBufferOnHeapReader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        oldSingleBufferOffHeapReader = new OldVectorizedPlainValuesReader();
-        oldSingleBufferOffHeapReader.initFromPage(numValues, createDirectSingleBufferInputStream(longData));
-        newSingleBufferOnHeapReader = new VectorizedPlainValuesReader();
-        newSingleBufferOnHeapReader.initFromPage(numValues, createSingleBufferInputStream(longData));
-        newSingleBufferOffHeapReader = new VectorizedPlainValuesReader();
-        newSingleBufferOffHeapReader.initFromPage(numValues, createDirectSingleBufferInputStream(longData));
+  @Benchmark
+  public void onHeapPutLongsLittleEndian() {
+    for (int n = 0; n < i; n++) {
+      onHeapVectorLong.putLongsLittleEndian(0, count, inputBytesLong, 0);
     }
+  }
 
-
-    // ==================== Data Generation ====================
-
-
-    private byte[] generateLongData(int count, Random random) {
-        ByteBuffer buffer = ByteBuffer.allocate(count * 8).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < count; i++) {
-            buffer.putLong(random.nextLong()); // full unsigned long range
-        }
-        return buffer.array();
+  @Benchmark
+  public void oldOnHeapPutLongsLittleEndian() {
+    for (int n = 0; n < i; n++) {
+      oldOnHeapVectorLong.putLongsLittleEndian(0, count, inputBytesLong, 0);
     }
-
-
-    // ==================== ByteBufferInputStream Creation ====================
-
-
-    private ByteBufferInputStream createSingleBufferInputStream(byte[] data) {
-        ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        return ByteBufferInputStream.wrap(buffer);
-    }
-
-
-    private ByteBuffer createDirectBuffer(byte[] data) {
-        ByteBuffer buffer = ByteBuffer.allocateDirect(data.length).order(ByteOrder.LITTLE_ENDIAN);
-        buffer.put(data);
-        buffer.flip();
-        return buffer;
-    }
-
-
-    private ByteBufferInputStream createDirectSingleBufferInputStream(byte[] data) {
-        ByteBuffer buffer = createDirectBuffer(data);
-        return ByteBufferInputStream.wrap(buffer);
-    }
-
-
-    // ====================================================================================
-    // readUnsignedLongs onHeap
-    // ====================================================================================
-
-
-    @Benchmark
-    public void readUnsignedLongs_onHeap_Old(DecimalColumnVectorState state) throws IOException {
-        for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            oldSingleBufferOnHeapReader.readUnsignedLongs(
-                    Math.min(BATCH_SIZE, numValues - i), state.decimalColumn, 0);
-        }
-    }
-
-
-    @Benchmark
-    public void readUnsignedLongs_onHeap_New(DecimalColumnVectorState state) throws IOException {
-        for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            newSingleBufferOnHeapReader.readUnsignedLongs(
-                    Math.min(BATCH_SIZE, numValues - i), state.decimalColumn, 0);
-        }
-    }
-
-    // ====================================================================================
-    // readUnsignedLongs offHeap
-    // ====================================================================================
-
-
-    @Benchmark
-    public void readUnsignedLongs_offHeap_Old(DecimalColumnVectorState state) throws IOException {
-        for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            oldSingleBufferOffHeapReader.readUnsignedLongs(
-                    Math.min(BATCH_SIZE, numValues - i), state.decimalColumn, 0);
-        }
-    }
-
-
-    @Benchmark
-    public void readUnsignedLongs_offHeap_New(DecimalColumnVectorState state) throws IOException {
-        for (int i = 0; i < numValues; i += BATCH_SIZE) {
-            newSingleBufferOffHeapReader.readUnsignedLongs(
-                    Math.min(BATCH_SIZE, numValues - i), state.decimalColumn, 0);
-        }
-    }
-
-    // ==================== Main Method ====================
-
-
-    public static void main(String[] args) throws RunnerException {
-        String filter = args.length > 0 ?
-                args[0] : OnHeapColumnVectorJMHBenchmark.class.getSimpleName();
-        Options opt = new OptionsBuilder()
-                .include(filter)
-                .build();
-
-
-        new Runner(opt).run();
-    }
+  }
 }
