@@ -126,7 +126,9 @@ object SparkBuild extends PomBuild {
     (Test / compile) := ((Test / compile) dependsOn checkJavaVersion).value
   )
 
-  val projectsMap: Map[String, Seq[Setting[_]]] = Map.empty
+  val projectsMap: Map[String, Seq[Setting[_]]] = Map(
+    "network-common" -> NetworkCommon.settings
+  )
 
   override val profiles = {
     val profiles = Properties.envOrNone("SBT_MAVEN_PROFILES")
@@ -632,6 +634,48 @@ object CommonUtils {
       val propsFile = baseDirectory.value / "target" / "extra-resources" / "spark-version-info.properties"
       Seq(propsFile)
     }.taskValue
+  )
+}
+
+object NetworkCommon {
+  import sbtassembly.AssemblyPlugin.autoImport._
+  import java.util.Locale
+
+  lazy val settings = Seq(
+    // Configure assembly to shade Guava
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false,
+
+    // Include only Guava, Unused, and JPMML in the shaded jar.
+    // Exclude everything else (except project's own classes which are always included).
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        val name = v.data.getName
+        val isGuava = name.startsWith("guava-") || name.startsWith("failureaccess-")
+        val isUnused = name.startsWith("unused-")
+        val isJpmml = name.startsWith("pmml-model-") || name.startsWith("pmml-schema-")
+
+        !(isGuava || isUnused || isJpmml)
+      }
+    },
+
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    ),
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    },
+
+    // Replace the default package task with assembly
+    Compile / packageBin := (assembly).value
   )
 }
 
