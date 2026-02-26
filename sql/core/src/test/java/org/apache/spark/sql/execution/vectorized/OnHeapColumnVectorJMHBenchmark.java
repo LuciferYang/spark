@@ -33,7 +33,8 @@ import org.apache.spark.sql.types.DataTypes;
  * To run:
  * {{{
  *   build/mvn test-compile -pl sql/core -DskipTests
- *   build/sbt "sql/Test/runMain org.apache.spark.sql.execution.vectorized.OnHeapColumnVectorJMHBenchmark"
+ *   build/sbt "sql/Test/runMain
+ *     org.apache.spark.sql.execution.vectorized.OnHeapColumnVectorJMHBenchmark"
  * }}}
  */
 @BenchmarkMode(Mode.AverageTime)
