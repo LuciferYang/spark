@@ -17,8 +17,6 @@
 
 package org.apache.spark.unsafe;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -27,7 +25,7 @@ import java.nio.ByteBuffer;
 
 import sun.misc.Unsafe;
 
-public final class Platform {
+public final class OldPlatform {
 
   private static final Unsafe _UNSAFE;
 
@@ -52,9 +50,9 @@ public final class Platform {
     Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
 
   // Access fields and constructors once and store them, for performance:
-  private static final MethodHandle DBB_CONSTRUCTOR;
+  private static final Constructor<?> DBB_CONSTRUCTOR;
   private static final Field DBB_CLEANER_FIELD;
-  private static final MethodHandle CLEANER_CREATE_METHOD;
+  private static final Method CLEANER_CREATE_METHOD;
 
   static {
     // At the end of this block, CLEANER_CREATE_METHOD should be non-null iff it's possible to use
@@ -74,11 +72,7 @@ public final class Platform {
         cleanerField = null;
       }
       // Have to set these values no matter what:
-      if (constructor != null) {
-        DBB_CONSTRUCTOR = MethodHandles.lookup().unreflectConstructor(constructor);
-      } else {
-        DBB_CONSTRUCTOR = null;
-      }
+      DBB_CONSTRUCTOR = constructor;
       DBB_CLEANER_FIELD = cleanerField;
 
       // no point continuing if the above failed:
@@ -97,19 +91,15 @@ public final class Platform {
           // Don't throw an exception, but can't log here?
           createMethod = null;
         }
-        if (createMethod != null) {
-          CLEANER_CREATE_METHOD = MethodHandles.lookup().unreflect(createMethod);
-        } else {
-          CLEANER_CREATE_METHOD = null;
-        }
+        CLEANER_CREATE_METHOD = createMethod;
       } else {
         CLEANER_CREATE_METHOD = null;
       }
     } catch (ClassNotFoundException | NoSuchMethodException | NoSuchFieldException e) {
       // These are all fatal in any Java version - rethrow (have to wrap as this is a static block)
       throw new IllegalStateException(e);
-    } catch (IllegalAccessException | InvocationTargetException ite) {
-      throw new IllegalStateException(ite);
+    } catch (InvocationTargetException ite) {
+      throw new IllegalStateException(ite.getCause());
     }
   }
 
@@ -225,16 +215,16 @@ public final class Platform {
       // MaxDirectMemorySize limit (the default limit is too low and we do not want to
       // require users to increase it).
       long memory = allocateMemory(size);
-      ByteBuffer buffer = (ByteBuffer) DBB_CONSTRUCTOR.invoke(memory, size);
+      ByteBuffer buffer = (ByteBuffer) DBB_CONSTRUCTOR.newInstance(memory, size);
       try {
         DBB_CLEANER_FIELD.set(buffer,
-            CLEANER_CREATE_METHOD.invoke(buffer, (Runnable) () -> freeMemory(memory)));
-      } catch (Throwable e) {
+            CLEANER_CREATE_METHOD.invoke(null, buffer, (Runnable) () -> freeMemory(memory)));
+      } catch (IllegalAccessException | InvocationTargetException e) {
         freeMemory(memory);
         throw new IllegalStateException(e);
       }
       return buffer;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       throwException(e);
     }
     throw new IllegalStateException("unreachable");
@@ -253,10 +243,6 @@ public final class Platform {
     // Check if dstOffset is before or after srcOffset to determine if we should copy
     // forward or backwards. This is necessary in case src and dst overlap.
     if (dstOffset < srcOffset) {
-      if (length < UNSAFE_COPY_THRESHOLD) {
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
-        return;
-      }
       while (length > 0) {
         long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
         _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
@@ -265,10 +251,6 @@ public final class Platform {
         dstOffset += size;
       }
     } else {
-      if (length < UNSAFE_COPY_THRESHOLD) {
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
-        return;
-      }
       srcOffset += length;
       dstOffset += length;
       while (length > 0) {
