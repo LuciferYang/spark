@@ -19,6 +19,7 @@ package org.apache.spark.unsafe;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -53,7 +54,7 @@ public final class Platform {
 
   // Access fields and constructors once and store them, for performance:
   private static final MethodHandle DBB_CONSTRUCTOR;
-  private static final Field DBB_CLEANER_FIELD;
+  private static final VarHandle DBB_CLEANER_VH;
   private static final MethodHandle CLEANER_CREATE_METHOD;
 
   static {
@@ -79,10 +80,16 @@ public final class Platform {
       } else {
         DBB_CONSTRUCTOR = null;
       }
-      DBB_CLEANER_FIELD = cleanerField;
+      
+      if (cleanerField != null) {
+        DBB_CLEANER_VH = MethodHandles.privateLookupIn(cls, MethodHandles.lookup())
+            .unreflectVarHandle(cleanerField);
+      } else {
+        DBB_CLEANER_VH = null;
+      }
 
       // no point continuing if the above failed:
-      if (DBB_CONSTRUCTOR != null && DBB_CLEANER_FIELD != null) {
+      if (DBB_CONSTRUCTOR != null && DBB_CLEANER_VH != null) {
         Class<?> cleanerClass = Class.forName("jdk.internal.ref.Cleaner");
         Method createMethod = cleanerClass.getMethod("create", Object.class, Runnable.class);
         // Accessing jdk.internal.ref.Cleaner should actually fail by default in JDK 9+,
@@ -199,10 +206,7 @@ public final class Platform {
   }
 
   public static long reallocateMemory(long address, long oldSize, long newSize) {
-    long newMemory = _UNSAFE.allocateMemory(newSize);
-    copyMemory(null, address, null, newMemory, oldSize);
-    freeMemory(address);
-    return newMemory;
+    return _UNSAFE.reallocateMemory(address, newSize);
   }
 
   /**
@@ -227,7 +231,7 @@ public final class Platform {
       long memory = allocateMemory(size);
       ByteBuffer buffer = (ByteBuffer) DBB_CONSTRUCTOR.invoke(memory, size);
       try {
-        DBB_CLEANER_FIELD.set(buffer,
+        DBB_CLEANER_VH.set(buffer,
             CLEANER_CREATE_METHOD.invoke(buffer, (Runnable) () -> freeMemory(memory)));
       } catch (Throwable e) {
         freeMemory(memory);
@@ -250,13 +254,29 @@ public final class Platform {
 
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
+    
+    // Fast path for small copies (most frequent case) - avoids loop and direction check overhead
+    if (length < UNSAFE_COPY_THRESHOLD) {
+      _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
+      return;
+    }
+
+    // Large copy logic
+    if (src != dst) {
+      // Non-overlapping objects: always copy forward (or whatever, direction doesn't matter, just loop)
+      while (length > 0) {
+        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
+        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
+        length -= size;
+        srcOffset += size;
+        dstOffset += size;
+      }
+      return;
+    }
+
     // Check if dstOffset is before or after srcOffset to determine if we should copy
     // forward or backwards. This is necessary in case src and dst overlap.
     if (dstOffset < srcOffset) {
-      if (length < UNSAFE_COPY_THRESHOLD) {
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
-        return;
-      }
       while (length > 0) {
         long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
         _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
@@ -265,10 +285,6 @@ public final class Platform {
         dstOffset += size;
       }
     } else {
-      if (length < UNSAFE_COPY_THRESHOLD) {
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
-        return;
-      }
       srcOffset += length;
       dstOffset += length;
       while (length > 0) {
@@ -293,7 +309,8 @@ public final class Platform {
    * Limits the number of bytes to copy per {@link Unsafe#copyMemory(long, long, long)} to
    * allow safepoint polling during a large copy.
    */
-  private static final long UNSAFE_COPY_THRESHOLD = 1024L * 1024L;
+  private static final long UNSAFE_COPY_THRESHOLD =
+    majorVersion >= 17 ? 4L * 1024 * 1024 : 1024L * 1024L;
 
   static {
     sun.misc.Unsafe unsafe;
