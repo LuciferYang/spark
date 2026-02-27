@@ -67,7 +67,9 @@ public class OnHeapColumnVectorJMHBenchmark {
     oldOnHeapVectorLong = new OldOnHeapColumnVector(count, DataTypes.LongType);
 
     inputBytesInt = new byte[count * 4];
+    new java.util.Random().nextBytes(inputBytesInt);
     inputBytesLong = new byte[count * 8];
+    new java.util.Random().nextBytes(inputBytesLong);
   }
 
   @TearDown
