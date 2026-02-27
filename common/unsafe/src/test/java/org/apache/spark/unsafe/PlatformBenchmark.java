@@ -22,10 +22,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
-import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
-import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
  * JMH benchmarks comparing {@link OldPlatform} (original) against {@link Platform} (optimised).
@@ -65,28 +61,66 @@ public class PlatformBenchmark {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 10, time = 1)
+  @Warmup(iterations = 5, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(value = 2, jvmArgsPrepend = {
-      "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-      "--add-opens", "java.base/jdk.internal.ref=ALL-UNNAMED"
+          "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+          "--add-opens", "java.base/jdk.internal.ref=ALL-UNNAMED"
   })
   public static class AllocateDirectBufferBenchmark {
 
     private static final int BUFFER_SIZE = 4 * 1024; // 4 KiB
 
+    // The buffer allocated in each iteration is stashed here so that @TearDown(Invocation)
+    // can free the underlying native memory after JMH stops the timer.  This keeps the
+    // cleanup cost completely outside the measurement window and prevents native-memory
+    // pressure from accumulating across iterations (which caused latency to grow over time).
+    private ByteBuffer oldBuf;
+    private ByteBuffer newBuf;
+
+    // Cleaner.clean() resolved once at trial setup; used in teardown to free native memory.
+    private java.lang.reflect.Method cleanMethod;
+    private java.lang.reflect.Field  cleanerField;
+
+    @Setup(Level.Trial)
+    public void setup() throws Exception {
+      try {
+        cleanMethod = Class.forName("jdk.internal.ref.Cleaner").getMethod("clean");
+      } catch (ClassNotFoundException e) {
+        cleanMethod = Class.forName("sun.misc.Cleaner").getMethod("clean");
+      }
+      cleanMethod.setAccessible(true);
+      cleanerField = Class.forName("java.nio.DirectByteBuffer").getDeclaredField("cleaner");
+      cleanerField.setAccessible(true);
+    }
+
+    private void freeBuffer(ByteBuffer buf) throws Exception {
+      if (buf == null) return;
+      Object cleaner = cleanerField.get(buf);
+      if (cleaner != null) cleanMethod.invoke(cleaner);
+    }
+
+    // TearDown runs after JMH stops timing; native memory is freed here, not inside @Benchmark.
+    @TearDown(Level.Invocation)
+    public void teardown() throws Exception {
+      freeBuffer(oldBuf);
+      freeBuffer(newBuf);
+      oldBuf = null;
+      newBuf = null;
+    }
+
     @Benchmark
     public ByteBuffer old_reflection(Blackhole bh) {
-      ByteBuffer buf = OldPlatform.allocateDirectBuffer(BUFFER_SIZE);
-      bh.consume(buf);
-      return buf;
+      oldBuf = OldPlatform.allocateDirectBuffer(BUFFER_SIZE);
+      bh.consume(oldBuf);
+      return oldBuf;
     }
 
     @Benchmark
     public ByteBuffer new_methodhandle(Blackhole bh) {
-      ByteBuffer buf = Platform.allocateDirectBuffer(BUFFER_SIZE);
-      bh.consume(buf);
-      return buf;
+      newBuf = Platform.allocateDirectBuffer(BUFFER_SIZE);
+      bh.consume(newBuf);
+      return newBuf;
     }
   }
 
@@ -105,7 +139,7 @@ public class PlatformBenchmark {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 10, time = 1)
+  @Warmup(iterations = 5, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(2)
   public static class ReallocateMemoryBenchmark {
@@ -176,7 +210,7 @@ public class PlatformBenchmark {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 10, time = 1)
+  @Warmup(iterations = 5, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(2)
   public static class CopyMemoryBenchmark {
@@ -213,18 +247,18 @@ public class PlatformBenchmark {
     @Benchmark
     public void old_disjoint_arrays(Blackhole bh) {
       OldPlatform.copyMemory(
-          srcArray, Platform.BYTE_ARRAY_OFFSET,
-          dstArray, Platform.BYTE_ARRAY_OFFSET,
-          srcArray.length);
+              srcArray, Platform.BYTE_ARRAY_OFFSET,
+              dstArray, Platform.BYTE_ARRAY_OFFSET,
+              srcArray.length);
       bh.consume(dstArray);
     }
 
     @Benchmark
     public void new_disjoint_arrays(Blackhole bh) {
       Platform.copyMemory(
-          srcArray, Platform.BYTE_ARRAY_OFFSET,
-          dstArray, Platform.BYTE_ARRAY_OFFSET,
-          srcArray.length);
+              srcArray, Platform.BYTE_ARRAY_OFFSET,
+              dstArray, Platform.BYTE_ARRAY_OFFSET,
+              srcArray.length);
       bh.consume(dstArray);
     }
 
@@ -235,9 +269,9 @@ public class PlatformBenchmark {
       // src=[base, base+256), dst=[base+512, base+768) – no overlap, but dstOffset > srcOffset
       // OldPlatform takes the reverse loop unconditionally
       OldPlatform.copyMemory(
-          srcArray, Platform.BYTE_ARRAY_OFFSET,
-          srcArray, Platform.BYTE_ARRAY_OFFSET + 512,
-          256);
+              srcArray, Platform.BYTE_ARRAY_OFFSET,
+              srcArray, Platform.BYTE_ARRAY_OFFSET + 512,
+              256);
       bh.consume(srcArray);
     }
 
@@ -245,9 +279,9 @@ public class PlatformBenchmark {
     public void new_same_no_overlap(Blackhole bh) {
       // Platform detects no overlap and uses the forward loop
       Platform.copyMemory(
-          srcArray, Platform.BYTE_ARRAY_OFFSET,
-          srcArray, Platform.BYTE_ARRAY_OFFSET + 512,
-          256);
+              srcArray, Platform.BYTE_ARRAY_OFFSET,
+              srcArray, Platform.BYTE_ARRAY_OFFSET + 512,
+              256);
       bh.consume(srcArray);
     }
 
@@ -266,16 +300,5 @@ public class PlatformBenchmark {
       Platform.copyMemory(null, nativeSrc, null, nativeDst, LARGE_SIZE);
       bh.consume(nativeDst);
     }
-  }
-
-  public static void main(String[] args) throws RunnerException {
-    String filter = args.length > 0 ?
-            args[0] : PlatformBenchmark.class.getSimpleName();
-    Options opt = new OptionsBuilder()
-            .include(filter)
-            .build();
-
-
-    new Runner(opt).run();
   }
 }
