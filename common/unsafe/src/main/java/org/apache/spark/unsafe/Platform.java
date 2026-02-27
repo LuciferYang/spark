@@ -241,7 +241,7 @@ public final class Platform {
         // VarHandle.set() is intrinsified by HotSpot; CLEANER_CREATE_MH.invoke() avoids
         // the per-call overhead of Method.invoke() and can be inlined by the JIT.
         DBB_CLEANER_VH.set(buffer,
-                CLEANER_CREATE_MH.invoke(null, buffer, (Runnable) () -> freeMemory(memory)));
+                CLEANER_CREATE_MH.invoke((Object) null, buffer, (Runnable) () -> freeMemory(memory)));
       } catch (IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
         freeMemory(memory);
         throw new IllegalStateException(e);
