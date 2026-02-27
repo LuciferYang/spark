@@ -19,7 +19,6 @@ package org.apache.spark.unsafe;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -50,11 +49,11 @@ public final class Platform {
   private static final int majorVersion =
           Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
 
-  // Access MethodHandles and VarHandle once and store them, for performance:
-  // MethodHandle / VarHandle replace the original Constructor / Field / Method fields so that
+  // Access MethodHandles once and store them, for performance:
+  // MethodHandle replaces the original Constructor / Field / Method fields so that
   // the JIT can inline the call sites in allocateDirectBuffer() as if they were direct calls.
   private static final MethodHandle DBB_CONSTRUCTOR_MH;
-  private static final VarHandle    DBB_CLEANER_VH;
+  private static final MethodHandle DBB_CLEANER_SET_MH;
   private static final MethodHandle CLEANER_CREATE_MH;
 
   static {
@@ -63,7 +62,7 @@ public final class Platform {
     // Code below can test for null to see whether to use it.
 
     MethodHandle constructorMH = null;
-    VarHandle    cleanerVH     = null;
+    MethodHandle cleanerSetMH  = null;
     MethodHandle cleanerCreate = null;
 
     try {
@@ -84,12 +83,13 @@ public final class Platform {
       if (cleanerField.trySetAccessible()) {
         MethodHandles.Lookup lookup =
                 MethodHandles.privateLookupIn(cls, MethodHandles.lookup());
-        // VarHandle.set() is intrinsified by HotSpot; faster than Field.set().
-        cleanerVH = lookup.unreflectVarHandle(cleanerField);
+        // unreflectSetter produces a (receiver, value)->void MethodHandle that the JIT
+        // can inline, avoiding the per-call overhead of Field.set().
+        cleanerSetMH = lookup.unreflectSetter(cleanerField);
       }
 
       // no point continuing if the above failed:
-      if (constructorMH != null && cleanerVH != null) {
+      if (constructorMH != null && cleanerSetMH != null) {
         Class<?> cleanerClass = Class.forName("jdk.internal.ref.Cleaner");
         Method createMethod = cleanerClass.getMethod("create", Object.class, Runnable.class);
         // Accessing jdk.internal.ref.Cleaner should actually fail by default in JDK 9+,
@@ -117,7 +117,7 @@ public final class Platform {
     }
 
     DBB_CONSTRUCTOR_MH = constructorMH;
-    DBB_CLEANER_VH     = cleanerVH;
+    DBB_CLEANER_SET_MH = cleanerSetMH;
     CLEANER_CREATE_MH  = cleanerCreate;
   }
 
@@ -241,11 +241,12 @@ public final class Platform {
         // Cleaner.create(Object referent, Runnable action):
         //   referent = buffer  (the object whose GC triggers the cleanup action)
         //   action   = lambda that calls freeMemory(memory)
-        // MethodHandle.invoke() is a polymorphic-signature method, so each argument's static
-        // type is encoded into the call-site descriptor.  Cast buffer to Object explicitly to
-        // match the declared (Object, Runnable) signature and avoid WrongMethodTypeException.
-        DBB_CLEANER_VH.set(buffer,
-                CLEANER_CREATE_MH.invoke((Object) buffer, (Runnable) () -> freeMemory(memory)));
+        // MethodHandle.invoke() is polymorphic-signature: cast each argument to its declared
+        // type so the compiler encodes the correct call-site descriptor and avoids
+        // WrongMethodTypeException at runtime.
+        Object cleaner = CLEANER_CREATE_MH.invoke(
+                (Object) buffer, (Runnable) () -> freeMemory(memory));
+        DBB_CLEANER_SET_MH.invoke(buffer, cleaner);
       } catch (IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
         freeMemory(memory);
         throw new IllegalStateException(e);
