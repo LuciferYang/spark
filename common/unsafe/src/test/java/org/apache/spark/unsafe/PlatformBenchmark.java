@@ -65,7 +65,7 @@ public class PlatformBenchmark {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 5, time = 1)
+  @Warmup(iterations = 10, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(value = 2, jvmArgsPrepend = {
       "--add-opens", "java.base/java.nio=ALL-UNNAMED",
@@ -103,9 +103,9 @@ public class PlatformBenchmark {
   //    consecutive reallocations don't accidentally reuse the same address.
   // ---------------------------------------------------------------------------
   @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+  @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 5, time = 1)
+  @Warmup(iterations = 10, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(2)
   public static class ReallocateMemoryBenchmark {
@@ -174,9 +174,9 @@ public class PlatformBenchmark {
   //       Platform:    UNSAFE_COPY_THRESHOLD = 4 MiB → 16 loop iterations.
   // ---------------------------------------------------------------------------
   @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+  @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
-  @Warmup(iterations = 5, time = 1)
+  @Warmup(iterations = 10, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(2)
   public static class CopyMemoryBenchmark {
