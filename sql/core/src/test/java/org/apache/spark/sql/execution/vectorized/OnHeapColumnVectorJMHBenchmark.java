@@ -86,7 +86,7 @@ public class OnHeapColumnVectorJMHBenchmark {
   }
 
   @Benchmark
-  public void oldOnHeapPutIntsLittleEndian() {
+  public void OnHeapPutIntsLittleEndian_old() {
     for (int n = 0; n < i; n++) {
       oldOnHeapVectorInt.putIntsLittleEndian(0, count, inputBytesInt, 0);
     }
@@ -100,7 +100,7 @@ public class OnHeapColumnVectorJMHBenchmark {
   }
 
   @Benchmark
-  public void oldOnHeapPutLongsLittleEndian() {
+  public void OnHeapPutLongsLittleEndian_old() {
     for (int n = 0; n < i; n++) {
       oldOnHeapVectorLong.putLongsLittleEndian(0, count, inputBytesLong, 0);
     }
