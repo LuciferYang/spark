@@ -22,6 +22,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
  * JMH benchmarks comparing {@link OldPlatform} (original) against {@link Platform} (optimised).
@@ -300,5 +304,16 @@ public class PlatformBenchmark {
       Platform.copyMemory(null, nativeSrc, null, nativeDst, LARGE_SIZE);
       bh.consume(nativeDst);
     }
+  }
+
+  public static void main(String[] args) throws RunnerException {
+    String filter = args.length > 0 ?
+            args[0] : AllocateDirectBufferBenchmark.class.getSimpleName();
+    Options opt = new OptionsBuilder()
+            .include(filter)
+            .build();
+
+
+    new Runner(opt).run();
   }
 }
