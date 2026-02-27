@@ -238,10 +238,14 @@ public final class Platform {
               ? (ByteBuffer) DBB_CONSTRUCTOR_MH.invoke(memory, size)
               : (ByteBuffer) DBB_CONSTRUCTOR_MH.invoke(memory, (long) size);
       try {
-        // VarHandle.set() is intrinsified by HotSpot; CLEANER_CREATE_MH.invoke() avoids
-        // the per-call overhead of Method.invoke() and can be inlined by the JIT.
+        // Cleaner.create(Object referent, Runnable action):
+        //   referent = buffer  (the object whose GC triggers the cleanup action)
+        //   action   = lambda that calls freeMemory(memory)
+        // MethodHandle.invoke() is a polymorphic-signature method, so each argument's static
+        // type is encoded into the call-site descriptor.  Cast buffer to Object explicitly to
+        // match the declared (Object, Runnable) signature and avoid WrongMethodTypeException.
         DBB_CLEANER_VH.set(buffer,
-                CLEANER_CREATE_MH.invoke((Object) null, buffer, (Runnable) () -> freeMemory(memory)));
+                CLEANER_CREATE_MH.invoke((Object) buffer, (Runnable) () -> freeMemory(memory)));
       } catch (IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
         freeMemory(memory);
         throw new IllegalStateException(e);
