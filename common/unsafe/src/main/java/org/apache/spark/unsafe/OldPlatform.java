@@ -17,16 +17,15 @@
 
 package org.apache.spark.unsafe;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import sun.misc.Unsafe;
+
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
-import sun.misc.Unsafe;
-
-public final class Platform {
+public final class OldPlatform {
 
   private static final Unsafe _UNSAFE;
 
@@ -48,48 +47,36 @@ public final class Platform {
 
   // Split java.version on non-digit chars:
   private static final int majorVersion =
-          Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
+    Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
 
-  // Access MethodHandles and VarHandle once and store them, for performance:
-  // MethodHandle / VarHandle replace the original Constructor / Field / Method fields so that
-  // the JIT can inline the call sites in allocateDirectBuffer() as if they were direct calls.
-  private static final MethodHandle DBB_CONSTRUCTOR_MH;
-  private static final VarHandle    DBB_CLEANER_VH;
-  private static final MethodHandle CLEANER_CREATE_MH;
+  // Access fields and constructors once and store them, for performance:
+  private static final Constructor<?> DBB_CONSTRUCTOR;
+  private static final Field DBB_CLEANER_FIELD;
+  private static final Method CLEANER_CREATE_METHOD;
 
   static {
-    // At the end of this block, CLEANER_CREATE_MH should be non-null iff it's possible to use
-    // MethodHandles to invoke it, which is not necessarily possible by default in Java 9+.
+    // At the end of this block, CLEANER_CREATE_METHOD should be non-null iff it's possible to use
+    // reflection to invoke it, which is not necessarily possible by default in Java 9+.
     // Code below can test for null to see whether to use it.
-
-    MethodHandle constructorMH = null;
-    VarHandle    cleanerVH     = null;
-    MethodHandle cleanerCreate = null;
 
     try {
       Class<?> cls = Class.forName("java.nio.DirectByteBuffer");
-      java.lang.reflect.Constructor<?> constructor = (majorVersion < 21) ?
-              cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE) :
-              cls.getDeclaredConstructor(Long.TYPE, Long.TYPE);
+      Constructor<?> constructor = (majorVersion < 21) ?
+        cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE) :
+        cls.getDeclaredConstructor(Long.TYPE, Long.TYPE);
       Field cleanerField = cls.getDeclaredField("cleaner");
-
-      if (constructor.trySetAccessible()) {
-        // privateLookupIn provides full access to the non-public class so the
-        // resulting MethodHandle can be invoked without IllegalAccessException.
-        MethodHandles.Lookup lookup =
-                MethodHandles.privateLookupIn(cls, MethodHandles.lookup());
-        constructorMH = lookup.unreflectConstructor(constructor);
+      if (!constructor.trySetAccessible()) {
+        constructor = null;
       }
-
-      if (cleanerField.trySetAccessible()) {
-        MethodHandles.Lookup lookup =
-                MethodHandles.privateLookupIn(cls, MethodHandles.lookup());
-        // VarHandle.set() is intrinsified by HotSpot; faster than Field.set().
-        cleanerVH = lookup.unreflectVarHandle(cleanerField);
+      if (!cleanerField.trySetAccessible()) {
+        cleanerField = null;
       }
+      // Have to set these values no matter what:
+      DBB_CONSTRUCTOR = constructor;
+      DBB_CLEANER_FIELD = cleanerField;
 
       // no point continuing if the above failed:
-      if (constructorMH != null && cleanerVH != null) {
+      if (DBB_CONSTRUCTOR != null && DBB_CLEANER_FIELD != null) {
         Class<?> cleanerClass = Class.forName("jdk.internal.ref.Cleaner");
         Method createMethod = cleanerClass.getMethod("create", Object.class, Runnable.class);
         // Accessing jdk.internal.ref.Cleaner should actually fail by default in JDK 9+,
@@ -100,30 +87,25 @@ public final class Platform {
         // available:
         try {
           createMethod.invoke(null, null, null);
-          MethodHandles.Lookup cleanerLookup =
-                  MethodHandles.privateLookupIn(cleanerClass, MethodHandles.lookup());
-          cleanerCreate = cleanerLookup.unreflect(createMethod);
         } catch (IllegalAccessException e) {
           // Don't throw an exception, but can't log here?
-          cleanerCreate = null;
+          createMethod = null;
         }
+        CLEANER_CREATE_METHOD = createMethod;
+      } else {
+        CLEANER_CREATE_METHOD = null;
       }
-    } catch (ClassNotFoundException | NoSuchMethodException | NoSuchFieldException |
-             IllegalAccessException e) {
+    } catch (ClassNotFoundException | NoSuchMethodException | NoSuchFieldException e) {
       // These are all fatal in any Java version - rethrow (have to wrap as this is a static block)
       throw new IllegalStateException(e);
-    } catch (java.lang.reflect.InvocationTargetException ite) {
+    } catch (InvocationTargetException ite) {
       throw new IllegalStateException(ite.getCause());
     }
-
-    DBB_CONSTRUCTOR_MH = constructorMH;
-    DBB_CLEANER_VH     = cleanerVH;
-    CLEANER_CREATE_MH  = cleanerCreate;
   }
 
   // Visible for testing
   public static boolean cleanerCreateMethodIsDefined() {
-    return CLEANER_CREATE_MH != null;
+    return CLEANER_CREATE_METHOD != null;
   }
 
   /**
@@ -207,10 +189,10 @@ public final class Platform {
   }
 
   public static long reallocateMemory(long address, long oldSize, long newSize) {
-    // Delegate to Unsafe.reallocateMemory (maps to realloc(3)) so the allocator can resize
-    // in-place when possible, avoiding the unconditional alloc + copy + free of the original.
-    // oldSize is retained in the signature for source compatibility with existing call sites.
-    return _UNSAFE.reallocateMemory(address, newSize);
+    long newMemory = _UNSAFE.allocateMemory(newSize);
+    copyMemory(null, address, null, newMemory, oldSize);
+    freeMemory(address);
+    return newMemory;
   }
 
   /**
@@ -218,14 +200,14 @@ public final class Platform {
    */
   public static ByteBuffer allocateDirectBuffer(int size) {
     try {
-      if (CLEANER_CREATE_MH == null) {
+      if (CLEANER_CREATE_METHOD == null) {
         // Can't set a Cleaner (see comments on field), so need to allocate via normal Java APIs
         try {
           return ByteBuffer.allocateDirect(size);
         } catch (OutOfMemoryError oome) {
           // checkstyle.off: RegexpSinglelineJava
           throw new OutOfMemoryError("Failed to allocate direct buffer (" + oome.getMessage() +
-                  "); try increasing -XX:MaxDirectMemorySize=... to, for example, your heap size");
+              "); try increasing -XX:MaxDirectMemorySize=... to, for example, your heap size");
           // checkstyle.on: RegexpSinglelineJava
         }
       }
@@ -233,21 +215,16 @@ public final class Platform {
       // MaxDirectMemorySize limit (the default limit is too low and we do not want to
       // require users to increase it).
       long memory = allocateMemory(size);
-      // Invoke via MethodHandle; JIT-inlinable, ~3-5x faster than Constructor.newInstance().
-      ByteBuffer buffer = (majorVersion < 21)
-              ? (ByteBuffer) DBB_CONSTRUCTOR_MH.invoke(memory, size)
-              : (ByteBuffer) DBB_CONSTRUCTOR_MH.invoke(memory, (long) size);
+      ByteBuffer buffer = (ByteBuffer) DBB_CONSTRUCTOR.newInstance(memory, size);
       try {
-        // VarHandle.set() is intrinsified by HotSpot; CLEANER_CREATE_MH.invoke() avoids
-        // the per-call overhead of Method.invoke() and can be inlined by the JIT.
-        DBB_CLEANER_VH.set(buffer,
-                CLEANER_CREATE_MH.invoke(null, buffer, (Runnable) () -> freeMemory(memory)));
-      } catch (IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
+        DBB_CLEANER_FIELD.set(buffer,
+            CLEANER_CREATE_METHOD.invoke(null, buffer, (Runnable) () -> freeMemory(memory)));
+      } catch (IllegalAccessException | InvocationTargetException e) {
         freeMemory(memory);
         throw new IllegalStateException(e);
       }
       return buffer;
-    } catch (Throwable e) {
+    } catch (Exception e) {
       throwException(e);
     }
     throw new IllegalStateException("unreachable");
@@ -262,9 +239,10 @@ public final class Platform {
   }
 
   public static void copyMemory(
-          Object src, long srcOffset, Object dst, long dstOffset, long length) {
-    if (src != dst) {
-      // Different objects are always disjoint: unconditional forward copy, no direction check.
+    Object src, long srcOffset, Object dst, long dstOffset, long length) {
+    // Check if dstOffset is before or after srcOffset to determine if we should copy
+    // forward or backwards. This is necessary in case src and dst overlap.
+    if (dstOffset < srcOffset) {
       while (length > 0) {
         long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
         _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
@@ -273,29 +251,16 @@ public final class Platform {
         dstOffset += size;
       }
     } else {
-      // Same object (or both null = raw addresses): only reverse when ranges truly overlap
-      // and dst falls inside the source region ahead of srcOffset.
-      if (dstOffset <= srcOffset || srcOffset + length <= dstOffset) {
-        // No overlap, or dst is entirely past src+length: safe forward copy.
-        while (length > 0) {
-          long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-          _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-          length -= size;
-          srcOffset += size;
-          dstOffset += size;
-        }
-      } else {
-        // Overlapping, dst > src: must copy backwards to avoid clobbering unread bytes.
-        srcOffset += length;
-        dstOffset += length;
-        while (length > 0) {
-          long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-          srcOffset -= size;
-          dstOffset -= size;
-          _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-          length -= size;
-        }
+      srcOffset += length;
+      dstOffset += length;
+      while (length > 0) {
+        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
+        srcOffset -= size;
+        dstOffset -= size;
+        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
+        length -= size;
       }
+
     }
   }
 
@@ -309,19 +274,15 @@ public final class Platform {
   /**
    * Limits the number of bytes to copy per {@link Unsafe#copyMemory(long, long, long)} to
    * allow safepoint polling during a large copy.
-   * On Java 17+ the JVM inserts safepoint polls at loop back-edges automatically, so a larger
-   * threshold reduces loop overhead for big copies (e.g. Spark shuffle) without sacrificing GC
-   * responsiveness.
    */
-  private static final long UNSAFE_COPY_THRESHOLD =
-          (majorVersion >= 17) ? 4L * 1024L * 1024L : 1024L * 1024L;
+  private static final long UNSAFE_COPY_THRESHOLD = 1024L * 1024L;
 
   static {
-    sun.misc.Unsafe unsafe;
+    Unsafe unsafe;
     try {
       Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
       unsafeField.setAccessible(true);
-      unsafe = (sun.misc.Unsafe) unsafeField.get(null);
+      unsafe = (Unsafe) unsafeField.get(null);
     } catch (Throwable cause) {
       unsafe = null;
     }
@@ -357,11 +318,11 @@ public final class Platform {
     } else {
       try {
         Class<?> bitsClass =
-                Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
+          Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
         if (_UNSAFE != null) {
           Field unalignedField = bitsClass.getDeclaredField("UNALIGNED");
           _unaligned = _UNSAFE.getBoolean(
-                  _UNSAFE.staticFieldBase(unalignedField), _UNSAFE.staticFieldOffset(unalignedField));
+            _UNSAFE.staticFieldBase(unalignedField), _UNSAFE.staticFieldOffset(unalignedField));
         } else {
           Method unalignedMethod = bitsClass.getDeclaredMethod("unaligned");
           unalignedMethod.setAccessible(true);
