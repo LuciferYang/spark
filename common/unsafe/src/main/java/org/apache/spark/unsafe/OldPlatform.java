@@ -190,7 +190,9 @@ public final class OldPlatform {
 
   public static long reallocateMemory(long address, long oldSize, long newSize) {
     long newMemory = _UNSAFE.allocateMemory(newSize);
-    copyMemory(null, address, null, newMemory, oldSize);
+    // Copy only min(oldSize, newSize) bytes: copying oldSize when shrinking would write
+    // beyond the end of the newly allocated block, silently corrupting adjacent memory.
+    copyMemory(null, address, null, newMemory, Math.min(oldSize, newSize));
     freeMemory(address);
     return newMemory;
   }
