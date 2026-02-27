@@ -338,7 +338,8 @@ public final class OnHeapColumnVector extends WritableColumnVector {
         intData[i + rowId] = java.lang.Integer.reverseBytes(Platform.getInt(src, srcOffset));
       }
     } else {
-      putInts(rowId, count, src, srcIndex);
+      Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, intData,
+        Platform.INT_ARRAY_OFFSET + rowId * 4L, count * 4L);
     }
   }
 
@@ -413,7 +414,8 @@ public final class OnHeapColumnVector extends WritableColumnVector {
         longData[i + rowId] = java.lang.Long.reverseBytes(Platform.getLong(src, srcOffset));
       }
     } else {
-      putLongs(rowId, count, src, srcIndex);
+      Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, longData,
+        Platform.LONG_ARRAY_OFFSET + rowId * 8L, count * 8L);
     }
   }
 
