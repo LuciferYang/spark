@@ -38,7 +38,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  * <p>Three benchmark classes:
  * <ol>
  *   <li>{@link AllocateDirectBufferBenchmark} – reflection vs MethodHandle / VarHandle</li>
- *   <li>{@link ReallocateMemoryBenchmark}      – alloc+copy+free vs Unsafe.reallocateMemory</li>
+ *   <li>{@link ReallocateMemoryGrowBenchmark}   – grow: alloc+copy+free vs Unsafe.reallocateMemory</li>
+ *   <li>{@link ReallocateMemoryShrinkBenchmark} – shrink: copies oldSize vs in-place realloc</li>
  *   <li>{@link CopyMemoryBenchmark}            – direction logic + UNSAFE_COPY_THRESHOLD</li>
  * </ol>
  *
@@ -56,7 +57,7 @@ public class PlatformBenchmark {
   // 1. allocateDirectBuffer
   //
   //    OldPlatform uses Constructor.newInstance + Method.invoke + Field.set.
-  //    Platform     uses MethodHandle.invoke    + MethodHandle.invoke + VarHandle.set.
+  //    Platform     uses MethodHandle.invoke    + MethodHandle.invoke + MethodHandle.invoke (setter).
   //
   //    Both allocate a 4 KiB DirectByteBuffer backed by native memory and register
   //    a Cleaner.  The native allocation cost is identical; only the dispatch
@@ -75,14 +76,15 @@ public class PlatformBenchmark {
 
     private static final int BUFFER_SIZE = 4 * 1024; // 4 KiB
 
-    // The buffer allocated in each iteration is stashed here so that @TearDown(Invocation)
-    // can free the underlying native memory after JMH stops the timer.  This keeps the
-    // cleanup cost completely outside the measurement window and prevents native-memory
-    // pressure from accumulating across iterations (which caused latency to grow over time).
-    private ByteBuffer oldBuf;
-    private ByteBuffer newBuf;
+    // lastBuf holds the buffer produced by the current invocation.
+    // @TearDown(Invocation) frees its native memory after JMH stops the timer,
+    // keeping cleanup cost outside the measurement window.
+    // A single field is safe because Scope.Thread guarantees old_reflection and
+    // new_methodhandle are never executed concurrently within the same State instance.
+    private ByteBuffer lastBuf;
 
-    // Cleaner.clean() resolved once at trial setup; used in teardown to free native memory.
+    // Cleaner.clean() and the DirectByteBuffer.cleaner field are resolved once at
+    // trial setup so that teardown has zero class-loading or field-lookup overhead.
     private java.lang.reflect.Method cleanMethod;
     private java.lang.reflect.Field  cleanerField;
 
@@ -104,27 +106,25 @@ public class PlatformBenchmark {
       if (cleaner != null) cleanMethod.invoke(cleaner);
     }
 
-    // TearDown runs after JMH stops timing; native memory is freed here, not inside @Benchmark.
+    // Runs after JMH stops timing for each invocation; native memory is freed here.
     @TearDown(Level.Invocation)
     public void teardown() throws Exception {
-      freeBuffer(oldBuf);
-      freeBuffer(newBuf);
-      oldBuf = null;
-      newBuf = null;
+      freeBuffer(lastBuf);
+      lastBuf = null;
     }
 
     @Benchmark
     public ByteBuffer old_reflection(Blackhole bh) {
-      oldBuf = OldPlatform.allocateDirectBuffer(BUFFER_SIZE);
-      bh.consume(oldBuf);
-      return oldBuf;
+      lastBuf = OldPlatform.allocateDirectBuffer(BUFFER_SIZE);
+      bh.consume(lastBuf);
+      return lastBuf;
     }
 
     @Benchmark
     public ByteBuffer new_methodhandle(Blackhole bh) {
-      newBuf = Platform.allocateDirectBuffer(BUFFER_SIZE);
-      bh.consume(newBuf);
-      return newBuf;
+      lastBuf = Platform.allocateDirectBuffer(BUFFER_SIZE);
+      bh.consume(lastBuf);
+      return lastBuf;
     }
   }
 
@@ -140,55 +140,107 @@ public class PlatformBenchmark {
   //    @Setup(Level.Invocation) re-allocates a fresh block before every call so
   //    consecutive reallocations don't accidentally reuse the same address.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // 2a. ReallocateMemoryGrowBenchmark  (1 MiB → 2 MiB)
+  //
+  //    Grow and shrink are split into separate @State classes because JMH only
+  //    honours one @Setup(Level.Invocation) per class; having two in the same
+  //    class means only the last-declared one is ever called, leaving the other
+  //    benchmark methods operating on address=0 and producing corrupt results.
+  // ---------------------------------------------------------------------------
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.NANOSECONDS)
   @State(Scope.Thread)
   @Warmup(iterations = 5, time = 1)
   @Measurement(iterations = 10, time = 1)
   @Fork(2)
-  public static class ReallocateMemoryBenchmark {
+  public static class ReallocateMemoryGrowBenchmark {
 
     private static final long SIZE_SMALL = 1L * 1024 * 1024; // 1 MiB
     private static final long SIZE_LARGE = 2L * 1024 * 1024; // 2 MiB
 
-    // grow: start from a 1 MiB block
-    private long growAddress;
+    private long address;
 
+    // Allocate a fresh 1 MiB block before every invocation so that each call
+    // starts from the same state and consecutive reallocations cannot reuse the
+    // same address (which would make in-place success artificially likely).
     @Setup(Level.Invocation)
-    public void setupGrow() {
-      growAddress = Platform.allocateMemory(SIZE_SMALL);
+    public void setup() {
+      address = Platform.allocateMemory(SIZE_SMALL);
+    }
+
+    // No @TearDown needed: both benchmark methods consume the returned address
+    // (the reallocated block) and the memory is implicitly owned after the call.
+    // To avoid leaking on failure paths we free whatever address holds at the end.
+    @TearDown(Level.Invocation)
+    public void teardown() {
+      if (address != 0) {
+        Platform.freeMemory(address);
+        address = 0;
+      }
     }
 
     @Benchmark
     public long old_grow() {
-      growAddress = OldPlatform.reallocateMemory(growAddress, SIZE_SMALL, SIZE_LARGE);
-      return growAddress;
+      // OldPlatform: allocate(2 MiB) + copyMemory(1 MiB) + free(old)
+      address = OldPlatform.reallocateMemory(address, SIZE_SMALL, SIZE_LARGE);
+      return address;
     }
 
     @Benchmark
     public long new_grow() {
-      growAddress = Platform.reallocateMemory(growAddress, SIZE_SMALL, SIZE_LARGE);
-      return growAddress;
+      // Platform: Unsafe.reallocateMemory → realloc(3), may extend in-place
+      address = Platform.reallocateMemory(address, SIZE_SMALL, SIZE_LARGE);
+      return address;
     }
+  }
 
-    // shrink: start from a 2 MiB block
-    private long shrinkAddress;
+  // ---------------------------------------------------------------------------
+  // 2b. ReallocateMemoryShrinkBenchmark  (2 MiB → 1 MiB)
+  //
+  //    OldPlatform copies oldSize (2 MiB) even when shrinking – a bug that
+  //    copies twice as many bytes as necessary.
+  //    Platform delegates to realloc(3) which is always in-place for shrinks
+  //    on glibc / jemalloc / libmalloc (macOS).
+  // ---------------------------------------------------------------------------
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.NANOSECONDS)
+  @State(Scope.Thread)
+  @Warmup(iterations = 5, time = 1)
+  @Measurement(iterations = 10, time = 1)
+  @Fork(2)
+  public static class ReallocateMemoryShrinkBenchmark {
+
+    private static final long SIZE_SMALL = 1L * 1024 * 1024; // 1 MiB
+    private static final long SIZE_LARGE = 2L * 1024 * 1024; // 2 MiB
+
+    private long address;
 
     @Setup(Level.Invocation)
-    public void setupShrink() {
-      shrinkAddress = Platform.allocateMemory(SIZE_LARGE);
+    public void setup() {
+      address = Platform.allocateMemory(SIZE_LARGE);
+    }
+
+    @TearDown(Level.Invocation)
+    public void teardown() {
+      if (address != 0) {
+        Platform.freeMemory(address);
+        address = 0;
+      }
     }
 
     @Benchmark
     public long old_shrink() {
-      shrinkAddress = OldPlatform.reallocateMemory(shrinkAddress, SIZE_LARGE, SIZE_SMALL);
-      return shrinkAddress;
+      // OldPlatform: allocate(1 MiB) + copyMemory(2 MiB – copies oldSize, not newSize) + free
+      address = OldPlatform.reallocateMemory(address, SIZE_LARGE, SIZE_SMALL);
+      return address;
     }
 
     @Benchmark
     public long new_shrink() {
-      shrinkAddress = Platform.reallocateMemory(shrinkAddress, SIZE_LARGE, SIZE_SMALL);
-      return shrinkAddress;
+      // Platform: realloc(3) – shrink is always in-place, zero bytes copied
+      address = Platform.reallocateMemory(address, SIZE_LARGE, SIZE_SMALL);
+      return address;
     }
   }
 
