@@ -308,7 +308,7 @@ public class PlatformBenchmark {
 
   public static void main(String[] args) throws RunnerException {
     String filter = args.length > 0 ?
-            args[0] : AllocateDirectBufferBenchmark.class.getSimpleName();
+            args[0] : PlatformBenchmark.class.getSimpleName();
     Options opt = new OptionsBuilder()
             .include(filter)
             .build();
