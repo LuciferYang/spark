@@ -45,7 +45,7 @@ import org.apache.spark.sql.types.DataTypes;
 @Measurement(iterations = 10, time = 1)
 public class OnHeapColumnVectorJMHBenchmark {
 
-  @Param({"4096"})
+  @Param({"512", "1024", "4096", "8192", "16384"})
   public int count;
 
   @Param({"65536"})
