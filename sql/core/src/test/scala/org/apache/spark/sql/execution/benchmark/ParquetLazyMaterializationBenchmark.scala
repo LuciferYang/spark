@@ -141,6 +141,17 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      // Scenario 4: Adaptive Fallback Test
+      // Simulate a scenario where Lazy starts but should fallback to Eager because selectivity is low.
+      // We reuse the low selectivity filter (100% match) which is the worst case for Lazy.
+      benchmark.addCase("Adaptive Fallback (Low Selectivity) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          // This should trigger the adaptive fallback after a few batches
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $lowSelectivityFilter").noop()
+        }
+      }
+
       benchmark.run()
     }
   }

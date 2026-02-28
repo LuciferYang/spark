@@ -153,6 +153,16 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
   private final MemoryMode MEMORY_MODE;
 
   private boolean isLazyMaterializationEnabled;
+  
+  // Adaptive Lazy Materialization counters
+  private long totalBatches = 0;
+  private long loadedBatches = 0;
+  // Threshold to disable lazy materialization: if loaded/total > 0.8, switch to eager
+  private static final double ADAPTIVE_LAZY_THRESHOLD = 0.8;
+  // Minimum batches before checking threshold to allow warmup
+  private static final int ADAPTIVE_CHECK_WINDOW = 10;
+  // Flag to indicate if we have permanently switched to eager mode
+  private boolean adaptiveFallbackToEager = false;
 
   public VectorizedParquetRecordReader(
       ZoneId convertTz,
@@ -404,8 +414,21 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
     checkEndOfRowGroup();
 
     int num = (int) Math.min(capacity, totalCountLoadedSoFar - rowsReturned);
+    
+    // Check if we should fallback to eager mode
+    if (isLazyMaterializationEnabled && !adaptiveFallbackToEager && totalBatches > ADAPTIVE_CHECK_WINDOW) {
+      if ((double) loadedBatches / totalBatches > ADAPTIVE_LAZY_THRESHOLD) {
+        adaptiveFallbackToEager = true;
+      }
+    }
+    
+    // If we haven't fallen back, increment total batch count
+    if (isLazyMaterializationEnabled && !adaptiveFallbackToEager) {
+      totalBatches++;
+    }
+
     for (ParquetColumnVector cv : columnVectors) {
-      if (isLazyMaterializationEnabled) {
+      if (isLazyMaterializationEnabled && !adaptiveFallbackToEager) {
         ColumnVector vector = cv.getValueVector();
         Runnable loadTask = () -> {
           try {
@@ -421,11 +444,18 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
             throw new RuntimeException(e);
           }
         };
+        
+        // Callback to track actual loading
+        Runnable onLoadCallback = () -> {
+          loadedBatches++;
+        };
 
         if (vector instanceof LazyOnHeapColumnVector) {
           ((LazyOnHeapColumnVector) vector).setLoadTask(loadTask);
+          ((LazyOnHeapColumnVector) vector).setOnLoadCallback(onLoadCallback);
         } else if (vector instanceof LazyOffHeapColumnVector) {
           ((LazyOffHeapColumnVector) vector).setLoadTask(loadTask);
+          ((LazyOffHeapColumnVector) vector).setOnLoadCallback(onLoadCallback);
         } else {
           loadTask.run();
         }

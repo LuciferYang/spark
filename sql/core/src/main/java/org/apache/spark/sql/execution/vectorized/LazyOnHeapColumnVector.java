@@ -35,6 +35,7 @@ public class LazyOnHeapColumnVector extends OnHeapColumnVector {
   private final OnHeapColumnVector vector;
   private Runnable loadTask;
   private boolean isLoaded;
+  private Runnable onLoadCallback;
 
   public LazyOnHeapColumnVector(OnHeapColumnVector vector) {
     // We pass 0 as capacity because we don't want the super class to allocate any memory.
@@ -48,11 +49,18 @@ public class LazyOnHeapColumnVector extends OnHeapColumnVector {
     this.loadTask = loadTask;
     this.isLoaded = false;
   }
+  
+  public void setOnLoadCallback(Runnable onLoadCallback) {
+    this.onLoadCallback = onLoadCallback;
+  }
 
   private void ensureLoaded() {
     if (!isLoaded) {
       if (loadTask != null) {
         loadTask.run();
+      }
+      if (onLoadCallback != null) {
+        onLoadCallback.run();
       }
       isLoaded = true;
     }
@@ -65,6 +73,7 @@ public class LazyOnHeapColumnVector extends OnHeapColumnVector {
     }
     isLoaded = false;
     loadTask = null;
+    onLoadCallback = null;
   }
 
   @Override
