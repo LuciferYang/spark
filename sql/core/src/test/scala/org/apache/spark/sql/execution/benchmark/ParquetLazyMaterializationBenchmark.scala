@@ -93,6 +93,38 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      val veryHighSelectivityFilter = "id < 1000000" // Approx 0.1%
+
+      benchmark.addCase("Clustered Data - Very High Selectivity (0.1%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $veryHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Clustered Data - Very High Selectivity (0.1%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $veryHighSelectivityFilter").noop()
+        }
+      }
+
+      val ultraHighSelectivityFilter = "id < 100000" // Approx 0.01%
+
+      benchmark.addCase("Clustered Data - Ultra High Selectivity (0.01%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $ultraHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Clustered Data - Ultra High Selectivity (0.01%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $ultraHighSelectivityFilter").noop()
+        }
+      }
+
       // Scenario 2: Random Data - High Selectivity (Filter keeps 1% rows)
       // We filter on `id` which is the first column.
       // If lazy materialization works, c1...cWidth should not be decoded for 99% rows.
@@ -141,6 +173,7 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      // scalastyle:off
       // Scenario 4: Adaptive Fallback Test
       // Simulate a scenario where Lazy starts but should fallback to Eager because selectivity is low.
       // We reuse the low selectivity filter (100% match) which is the worst case for Lazy.
