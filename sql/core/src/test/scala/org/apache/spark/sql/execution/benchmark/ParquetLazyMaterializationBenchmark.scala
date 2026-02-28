@@ -142,6 +142,34 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      benchmark.addCase("Random Data - Very High Selectivity (0.1%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $veryHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Random Data - Very High Selectivity (0.1%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $veryHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Random Data - Ultra High Selectivity (0.01%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $ultraHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Random Data - Ultra High Selectivity (0.01%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $ultraHighSelectivityFilter").noop()
+        }
+      }
+
       // Scenario 3: Medium Selectivity (Filter keeps 50% rows)
       val mediumSelectivityFilter = "id < 500000000" // 50%
 
