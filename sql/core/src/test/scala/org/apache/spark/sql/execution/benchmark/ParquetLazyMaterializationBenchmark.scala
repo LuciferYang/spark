@@ -52,6 +52,7 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
     sparkSession
   }
 
+  // scalastyle:off
   def lazyMaterializationBenchmark(values: Int, width: Int): Unit = {
     val benchmark = new Benchmark(s"Parquet Lazy Materialization (rows=$values, width=$width)",
       values, output = output)
@@ -125,6 +126,22 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      val extremeHighSelectivityFilter = "id < 10000" // Approx 0.001%
+
+      benchmark.addCase("Clustered Data - Extreme High Selectivity (0.001%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $extremeHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Clustered Data - Extreme High Selectivity (0.001%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $extremeHighSelectivityFilter").noop()
+        }
+      }
+
       // Scenario 2: Random Data - High Selectivity (Filter keeps 1% rows)
       // We filter on `id` which is the first column.
       // If lazy materialization works, c1...cWidth should not be decoded for 99% rows.
@@ -170,6 +187,20 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
+      benchmark.addCase("Random Data - Extreme High Selectivity (0.001%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $extremeHighSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Random Data - Extreme High Selectivity (0.001%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1 WHERE $extremeHighSelectivityFilter").noop()
+        }
+      }
+
       // Scenario 3: Medium Selectivity (Filter keeps 50% rows)
       val mediumSelectivityFilter = "id < 500000000" // 50%
 
@@ -201,7 +232,6 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
         }
       }
 
-      // scalastyle:off
       // Scenario 4: Adaptive Fallback Test
       // Simulate a scenario where Lazy starts but should fallback to Eager because selectivity is low.
       // We reuse the low selectivity filter (100% match) which is the worst case for Lazy.
