@@ -1,0 +1,132 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.spark.sql.execution.benchmark
+
+import org.apache.spark.SparkConf
+import org.apache.spark.benchmark.Benchmark
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.internal.SQLConf
+
+/**
+ * Benchmark to measure Parquet lazy materialization performance.
+ * To run this benchmark:
+ * {{{
+ *   1. without sbt: bin/spark-submit --class <this class>
+ *        --jars <spark core test jar>,<spark catalyst test jar> <spark sql test jar>
+ *   2. build/sbt "sql/Test/runMain <this class>"
+ *   3. generate result: SPARK_GENERATE_BENCHMARK_FILES=1 build/sbt "sql/Test/runMain <this class>"
+ *      Results will be written to "benchmarks/ParquetLazyMaterializationBenchmark-results.txt".
+ * }}}
+ */
+object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
+
+  override def getSparkSession: SparkSession = {
+    val conf = new SparkConf()
+      .setAppName("ParquetLazyMaterializationBenchmark")
+      .set("spark.master", "local[1]")
+      .setIfMissing("spark.driver.memory", "3g")
+      .setIfMissing("spark.executor.memory", "3g")
+
+    val sparkSession = SparkSession.builder().config(conf).getOrCreate()
+
+    // Enable Parquet vectorized reader and WholeStageCodegen by default
+    sparkSession.conf.set(SQLConf.PARQUET_VECTORIZED_READER_ENABLED.key, "true")
+    sparkSession.conf.set(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "true")
+
+    sparkSession
+  }
+
+  def lazyMaterializationBenchmark(values: Int, width: Int): Unit = {
+    val benchmark = new Benchmark(s"Parquet Lazy Materialization (rows=$values, width=$width)",
+      values, output = output)
+
+    withTempPath { dir =>
+      // Prepare data
+      val middle = width / 2
+      val selectExpr = (1 to width).map(i => s"cast(id as string) as c$i")
+      // Add an ID column for filtering
+      val allExpr = Seq("id") ++ selectExpr
+
+      spark.range(values)
+        .withColumn("id", (rand() * 1000000000).cast("long"))
+        .selectExpr(allExpr: _*)
+        .write.parquet(dir.getCanonicalPath)
+
+      spark.read.parquet(dir.getCanonicalPath).createOrReplaceTempView("t1")
+
+      // Scenario 1: High Selectivity (Filter keeps 1% rows)
+      // We filter on `id` which is the first column.
+      // If lazy materialization works, c1...cWidth should not be decoded for 99% rows.
+      val highSelectivityFilter = "id < 10000000" // Approx 1% of 1B range
+
+      benchmark.addCase("High Selectivity (1%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $highSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("High Selectivity (1%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $highSelectivityFilter").noop()
+        }
+      }
+
+      // Scenario 2: Medium Selectivity (Filter keeps 50% rows)
+      val mediumSelectivityFilter = "id < 500000000" // 50%
+
+      benchmark.addCase("Medium Selectivity (50%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $mediumSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Medium Selectivity (50%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $mediumSelectivityFilter").noop()
+        }
+      }
+
+      // Scenario 3: Low Selectivity (Filter keeps 100% rows)
+      // This tests the overhead of the Lazy wrapper.
+      val lowSelectivityFilter = "id is not null"
+
+      benchmark.addCase("Low Selectivity (100%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $lowSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Low Selectivity (100%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $lowSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.run()
+    }
+  }
+
+  override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
+    // Run with 5 million rows and 20 string columns
+    // This should create enough IO/CPU pressure to make the difference visible.
+    runBenchmark("Parquet Lazy Materialization Benchmark") {
+      lazyMaterializationBenchmark(1024 * 1024 * 5, 20)
+    }
+  }
+}

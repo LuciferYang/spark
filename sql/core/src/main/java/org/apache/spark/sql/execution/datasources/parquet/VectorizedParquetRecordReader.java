@@ -444,7 +444,7 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
   }
 
   private void initializeInternal() throws IOException, UnsupportedOperationException {
-    isLazyMaterializationEnabled = SQLConf.get().parquetVectorizedReaderLazyMaterializationEnabled();
+    isLazyMaterializationEnabled = SQLConf$.MODULE$.get().parquetVectorizedReaderLazyMaterializationEnabled();
     missingColumns = new HashSet<>();
     for (ParquetColumn column : CollectionConverters.asJava(parquetColumn.children())) {
       checkColumn(column);

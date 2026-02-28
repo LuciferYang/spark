@@ -35,20 +35,20 @@ class ParquetLazyMaterializationSuite extends QueryTest with SharedSparkSession 
         // Filter that keeps some rows
         checkAnswer(df.filter("a > 50").select("b", "c"),
           data.filter(_._1 > 50).map(r => Row(r._2, r._3)))
-          
+
         // Filter that drops all rows
         checkAnswer(df.filter("a > 1000").select("b"), Seq.empty)
       }
     }
   }
-  
+
   test("Lazy materialization with nested types") {
     withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true",
       SQLConf.PARQUET_VECTORIZED_READER_ENABLED.key -> "true") {
       withTempPath { path =>
         val data = (0 until 10).map(i => (i, (i, s"val$i")))
         data.toDF("a", "b").write.parquet(path.toString)
-        
+
         val df = spark.read.parquet(path.toString)
         checkAnswer(df.filter("a = 5").select("b"),
           data.filter(_._1 == 5).map(r => Row(Row(r._2._1, r._2._2))))
