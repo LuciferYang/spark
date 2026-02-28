@@ -58,15 +58,30 @@
 2.  上层算子（如 `FilterExec`）请求排在前面的过滤列数据。
 3.  `LazyColumnVector` 拦截请求，触发该过滤列的解码任务。
 4.  `FilterExec` 根据数据计算过滤条件。
-5.  如果整行被过滤，后续的列（Projection Columns）将永远不会被访问，从而完全跳过了这些列的解码和物化过程。
+### 2.3 自适应延迟物化 (Adaptive Lazy Materialization)
 
-**优势**:
-*   **性能提升**: 对于高选择性（High Selectivity）查询，即过滤掉大部分数据的查询，性能提升尤为明显。
-*   **资源节省**: 减少了不必要的内存写入和 CPU 解码指令。
+为了解决全表扫描或低选择性场景下的性能回退问题（Wrapper Overhead），我们在 `VectorizedParquetRecordReader` 中实现了自适应机制。
+
+*   **监控指标**: 引入 `totalBatches`（总批次数）和 `loadedBatches`（实际触发加载的批次数）。
+*   **回调机制**: `Lazy...ColumnVector` 在 `loadTask` 执行时，通过 `onLoadCallback` 回调 Reader，增加 `loadedBatches` 计数。
+*   **阈值判断**:
+    *   **检查窗口**: 每处理 `ADAPTIVE_CHECK_WINDOW`（默认 10）个批次后进行检查。
+    *   **阈值**: 如果 `loadedBatches / totalBatches > ADAPTIVE_LAZY_THRESHOLD`（默认 0.8），说明绝大多数数据都被访问了，Lazy 机制失效且带来了额外开销。
+*   **动态切换**:
+    *   一旦触发阈值，设置 `adaptiveFallbackToEager = true`。
+    *   后续的所有批次读取将不再使用 `Lazy...ColumnVector` 包装，而是直接使用原始向量并立即执行 `readBatch`（Eager 模式）。
+    *   这确保了在 Worst Case 下，性能仅在初期有轻微损耗，随后迅速恢复到 Eager 水平。
+
+## 3. 性能预期与局限性
+
+**预期收益**:
+*   **Clustered Data (High Selectivity)**: 在数据按过滤列排序且过滤率高（如 1%）的场景下，性能提升约 **1.1x**。
+*   **Random Data (High Selectivity)**: 在数据随机分布场景下，性能与 Eager 模式持平。
+*   **Low Selectivity / Full Scan**: 得益于自适应机制，性能回退被消除，与 Eager 模式持平。
 
 **局限性**:
 *   **Batch-Level Granularity**: 目前的实现是基于 Batch 的延迟。如果一个 Batch 中有一行被访问，整个 Batch 的该列数据都会被解码。
-*   **Wrapper Overhead**: 装饰器模式引入了一定的虚方法调用和状态检查开销，在低选择性（全表扫描）场景下可能会有轻微性能回退。
+*   **Wrapper Overhead**: 虽然自适应机制解决了长时间运行的回退，但在前 10 个 Batch 内仍存在微小的 Wrapper 开销。
 
 ## 4. 验证与效果
 
@@ -76,6 +91,12 @@
 *   验证了在 `get` 操作时**正确触发**加载，并且只加载一次（Idempotent）。
 *   验证了 `reset` 操作能重置加载状态，支持向量复用。
 *   验证了嵌套类型（Struct）的子列访问也能触发父列的加载。
+
+### 4.2 基准测试
+**文件**: `sql/core/src/test/scala/org/apache/spark/sql/execution/benchmark/ParquetLazyMaterializationBenchmark.scala`
+*   包含聚簇数据（Clustered Data）和随机数据（Random Data）场景。
+*   包含自适应回退测试（Adaptive Fallback），验证在低选择性场景下性能是否恢复正常。
+
 
 ### 4.2 集成测试
 **文件**: `sql/core/src/test/scala/org/apache/spark/sql/execution/datasources/parquet/ParquetLazyMaterializationSuite.scala`
