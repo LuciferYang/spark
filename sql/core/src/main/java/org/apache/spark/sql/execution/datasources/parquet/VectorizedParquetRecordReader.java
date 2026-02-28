@@ -45,7 +45,8 @@ import org.apache.spark.sql.catalyst.util.ResolveDefaultColumns;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.ConstantColumnVector;
-import org.apache.spark.sql.execution.vectorized.LazyColumnVector;
+import org.apache.spark.sql.execution.vectorized.LazyOffHeapColumnVector;
+import org.apache.spark.sql.execution.vectorized.LazyOnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
@@ -404,9 +405,9 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
 
     int num = (int) Math.min(capacity, totalCountLoadedSoFar - rowsReturned);
     for (ParquetColumnVector cv : columnVectors) {
-      if (isLazyMaterializationEnabled && cv.getValueVector() instanceof LazyColumnVector) {
-        LazyColumnVector lazyVector = (LazyColumnVector) cv.getValueVector();
-        lazyVector.setLoadTask(() -> {
+      if (isLazyMaterializationEnabled) {
+        ColumnVector vector = cv.getValueVector();
+        Runnable loadTask = () -> {
           try {
             for (ParquetColumnVector leafCv : cv.getLeaves()) {
               VectorizedColumnReader columnReader = leafCv.getColumnReader();
@@ -419,7 +420,15 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
-        });
+        };
+
+        if (vector instanceof LazyOnHeapColumnVector) {
+          ((LazyOnHeapColumnVector) vector).setLoadTask(loadTask);
+        } else if (vector instanceof LazyOffHeapColumnVector) {
+          ((LazyOffHeapColumnVector) vector).setLoadTask(loadTask);
+        } else {
+          loadTask.run();
+        }
       } else {
         for (ParquetColumnVector leafCv : cv.getLeaves()) {
           VectorizedColumnReader columnReader = leafCv.getColumnReader();
@@ -551,16 +560,20 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
     ColumnVector[] vectors = new ColumnVector[fieldsLength];
     if (useOffHeap) {
       for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
-        vectors[i] = new OffHeapColumnVector(capacity, fields[i].dataType());
+        OffHeapColumnVector offHeapVector = new OffHeapColumnVector(capacity, fields[i].dataType());
         if (isLazyMaterializationEnabled) {
-          vectors[i] = new LazyColumnVector((WritableColumnVector) vectors[i]);
+          vectors[i] = new LazyOffHeapColumnVector(offHeapVector);
+        } else {
+          vectors[i] = offHeapVector;
         }
       }
     } else {
       for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
-        vectors[i] = new OnHeapColumnVector(capacity, fields[i].dataType());
+        OnHeapColumnVector onHeapVector = new OnHeapColumnVector(capacity, fields[i].dataType());
         if (isLazyMaterializationEnabled) {
-          vectors[i] = new LazyColumnVector((WritableColumnVector) vectors[i]);
+          vectors[i] = new LazyOnHeapColumnVector(onHeapVector);
+        } else {
+          vectors[i] = onHeapVector;
         }
       }
     }

@@ -29,7 +29,7 @@ public class LazyColumnVectorSuite {
   @Test
   public void testLazyLoading() {
     OnHeapColumnVector underlying = new OnHeapColumnVector(10, DataTypes.IntegerType);
-    LazyColumnVector lazy = new LazyColumnVector(underlying);
+    LazyOnHeapColumnVector lazy = new LazyOnHeapColumnVector(underlying);
     AtomicBoolean loaded = new AtomicBoolean(false);
 
     lazy.setLoadTask(() -> {
@@ -73,7 +73,7 @@ public class LazyColumnVectorSuite {
         .add("b", DataTypes.IntegerType);
     
     OnHeapColumnVector underlying = new OnHeapColumnVector(10, structType);
-    LazyColumnVector lazy = new LazyColumnVector(underlying);
+    LazyOnHeapColumnVector lazy = new LazyOnHeapColumnVector(underlying);
     AtomicBoolean loaded = new AtomicBoolean(false);
 
     lazy.setLoadTask(() -> {

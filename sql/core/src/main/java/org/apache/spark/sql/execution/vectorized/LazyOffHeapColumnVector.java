@@ -19,22 +19,24 @@ package org.apache.spark.sql.execution.vectorized;
 
 import java.nio.ByteBuffer;
 
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnarArray;
 import org.apache.spark.sql.vectorized.ColumnarMap;
 import org.apache.spark.unsafe.types.UTF8String;
 
 /**
- * A wrapper around a WritableColumnVector that supports lazy materialization.
+ * A wrapper around an OffHeapColumnVector that supports lazy materialization.
  * The underlying vector is not populated until the first time a read method is called.
  */
-public class LazyColumnVector extends WritableColumnVector {
+public class LazyOffHeapColumnVector extends OffHeapColumnVector {
 
-  private final WritableColumnVector vector;
+  private final OffHeapColumnVector vector;
   private Runnable loadTask;
   private boolean isLoaded;
 
-  public LazyColumnVector(WritableColumnVector vector) {
+  public LazyOffHeapColumnVector(OffHeapColumnVector vector) {
     // We pass 0 as capacity because we don't want the super class to allocate any memory.
     // We delegate everything to the wrapped vector.
     super(0, vector.dataType());
@@ -58,7 +60,9 @@ public class LazyColumnVector extends WritableColumnVector {
 
   @Override
   public void reset() {
-    vector.reset();
+    if (vector != null) {
+      vector.reset();
+    }
     isLoaded = false;
     loadTask = null;
   }
@@ -66,7 +70,6 @@ public class LazyColumnVector extends WritableColumnVector {
   @Override
   public void close() {
     vector.close();
-    super.close();
   }
 
   @Override
@@ -129,9 +132,6 @@ public class LazyColumnVector extends WritableColumnVector {
     return vector.getDouble(rowId);
   }
 
-  // getArray and getMap are final in WritableColumnVector, so we cannot override them.
-  // Instead, we override the methods they rely on: arrayData(), getArrayOffset, getArrayLength, getChild.
-
   @Override
   public WritableColumnVector arrayData() {
     ensureLoaded();
@@ -159,10 +159,6 @@ public class LazyColumnVector extends WritableColumnVector {
   @Override
   protected UTF8String getBytesAsUTF8String(int rowId, int count) {
     ensureLoaded();
-    // This is protected in WritableColumnVector.
-    // We cannot access protected method of 'vector' if it's not in the same package.
-    // LazyColumnVector is in org.apache.spark.sql.execution.vectorized, same as WritableColumnVector.
-    // So we can access it.
     return vector.getBytesAsUTF8String(rowId, count);
   }
 
@@ -378,17 +374,16 @@ public class LazyColumnVector extends WritableColumnVector {
   }
 
   @Override
-  public WritableColumnVector reserveNewColumn(int capacity, DataType type) {
-    return vector.reserveNewColumn(capacity, type);
+  public OffHeapColumnVector reserveNewColumn(int capacity, DataType type) {
+    if (vector == null) {
+      return null;
+    }
+    OffHeapColumnVector newVector = (OffHeapColumnVector) vector.reserveNewColumn(capacity, type);
+    return new LazyOffHeapColumnVector(newVector);
   }
 
   @Override
   protected void reserveInternal(int capacity) {
-    // This is called by reserve().
-    // We should delegate to vector.reserve() but reserveInternal is protected.
-    // However, WritableColumnVector.reserve calls reserveInternal.
-    // If we call vector.reserve(), it will call vector.reserveInternal().
-    // But we override reserve().
   }
 
   @Override
@@ -398,10 +393,6 @@ public class LazyColumnVector extends WritableColumnVector {
   
   @Override
   protected void releaseMemory() {
-    // handled by vector.close() or explicit release if we exposed it.
-    // WritableColumnVector.close() calls releaseMemory().
-    // We delegated close(), so vector will release memory.
-    // This method is called by WritableColumnVector logic which we largely bypass/delegate.
   }
 
   @Override

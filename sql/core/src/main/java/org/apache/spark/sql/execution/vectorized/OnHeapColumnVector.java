@@ -28,7 +28,7 @@ import org.apache.spark.unsafe.types.UTF8String;
  * A column backed by an in memory JVM array. This stores the NULLs as a byte per value
  * and a java array for the values.
  */
-public final class OnHeapColumnVector extends WritableColumnVector {
+public class OnHeapColumnVector extends WritableColumnVector {
 
   private static final boolean bigEndianPlatform =
     ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
