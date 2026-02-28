@@ -55,15 +55,14 @@ public class LazyOnHeapColumnVector extends OnHeapColumnVector {
   }
 
   private void ensureLoaded() {
-    if (!isLoaded) {
-      if (loadTask != null) {
-        loadTask.run();
-      }
-      if (onLoadCallback != null) {
-        onLoadCallback.run();
-      }
-      isLoaded = true;
+    if (isLoaded) return;
+    if (loadTask != null) {
+      loadTask.run();
     }
+    if (onLoadCallback != null) {
+      onLoadCallback.run();
+    }
+    isLoaded = true;
   }
 
   @Override
