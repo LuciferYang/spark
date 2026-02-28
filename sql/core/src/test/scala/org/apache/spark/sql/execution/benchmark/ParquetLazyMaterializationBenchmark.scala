@@ -70,24 +70,47 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
 
       spark.read.parquet(dir.getCanonicalPath).createOrReplaceTempView("t1")
 
-      // Scenario 1: High Selectivity (Filter keeps 1% rows)
+      // Scenario 1: Clustered Data (Sorted by ID) - Best case for Lazy Materialization
+      // When data is sorted, filtering on ID will skip entire row groups
+      // or large consecutive batches.
+      val sortedDir = s"${dir.getCanonicalPath}_sorted"
+      spark.read.parquet(dir.getCanonicalPath).sort("id").write.parquet(sortedDir)
+      spark.read.parquet(sortedDir).createOrReplaceTempView("t1_sorted")
+
+      val highSelectivityFilter = "id < 10000000" // Approx 1%
+
+      benchmark.addCase("Clustered Data - High Selectivity (1%) - Eager") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $highSelectivityFilter").noop()
+        }
+      }
+
+      benchmark.addCase("Clustered Data - High Selectivity (1%) - Lazy") { _ =>
+        withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
+          spark.sql(
+            s"SELECT sum(length(c$middle)) FROM t1_sorted WHERE $highSelectivityFilter").noop()
+        }
+      }
+
+      // Scenario 2: Random Data - High Selectivity (Filter keeps 1% rows)
       // We filter on `id` which is the first column.
       // If lazy materialization works, c1...cWidth should not be decoded for 99% rows.
-      val highSelectivityFilter = "id < 10000000" // Approx 1% of 1B range
-
-      benchmark.addCase("High Selectivity (1%) - Eager") { _ =>
+      // However, due to batch-level granularity, if one row in a batch matches,
+      // the whole batch is decoded. Random distribution makes this scenario challenging.
+      benchmark.addCase("Random Data - High Selectivity (1%) - Eager") { _ =>
         withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "false") {
           spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $highSelectivityFilter").noop()
         }
       }
 
-      benchmark.addCase("High Selectivity (1%) - Lazy") { _ =>
+      benchmark.addCase("Random Data - High Selectivity (1%) - Lazy") { _ =>
         withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED.key -> "true") {
           spark.sql(s"SELECT sum(length(c$middle)) FROM t1 WHERE $highSelectivityFilter").noop()
         }
       }
 
-      // Scenario 2: Medium Selectivity (Filter keeps 50% rows)
+      // Scenario 3: Medium Selectivity (Filter keeps 50% rows)
       val mediumSelectivityFilter = "id < 500000000" // 50%
 
       benchmark.addCase("Medium Selectivity (50%) - Eager") { _ =>
@@ -123,10 +146,10 @@ object ParquetLazyMaterializationBenchmark extends SqlBasedBenchmark {
   }
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
-    // Run with 5 million rows and 20 string columns
+    // Run with 20 million rows and 20 string columns
     // This should create enough IO/CPU pressure to make the difference visible.
     runBenchmark("Parquet Lazy Materialization Benchmark") {
-      lazyMaterializationBenchmark(1024 * 1024 * 5, 20)
+      lazyMaterializationBenchmark(1024 * 1024 * 20, 20)
     }
   }
 }

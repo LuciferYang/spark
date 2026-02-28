@@ -1,0 +1,18 @@
+================================================================================================
+Parquet Lazy Materialization Benchmark
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Mac OS X 15.7.3
+Apple M3
+Parquet Lazy Materialization (rows=20971520, width=20):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+--------------------------------------------------------------------------------------------------------------------------------------
+Clustered Data - High Selectivity (1%) - Eager                     83            143          60        253.5           3.9       1.0X
+Clustered Data - High Selectivity (1%) - Lazy                      78            135          50        268.5           3.7       1.1X
+Random Data - High Selectivity (1%) - Eager                       784            862          67         26.7          37.4       0.1X
+Random Data - High Selectivity (1%) - Lazy                        774            788          12         27.1          36.9       0.1X
+Medium Selectivity (50%) - Eager                                  988           1013          35         21.2          47.1       0.1X
+Medium Selectivity (50%) - Lazy                                  1219           1250          44         17.2          58.1       0.1X
+Low Selectivity (100%) - Eager                                   1102           1119          23         19.0          52.6       0.1X
+Low Selectivity (100%) - Lazy                                    1356           1399          62         15.5          64.6       0.1X
+
+
