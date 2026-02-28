@@ -45,9 +45,11 @@ import org.apache.spark.sql.catalyst.util.ResolveDefaultColumns;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.ConstantColumnVector;
+import org.apache.spark.sql.execution.vectorized.LazyColumnVector;
 import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.internal.SQLConf$;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.vectorized.ColumnVector;
@@ -148,6 +150,8 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
    * The memory mode of the columnarBatch
    */
   private final MemoryMode MEMORY_MODE;
+
+  private boolean isLazyMaterializationEnabled;
 
   public VectorizedParquetRecordReader(
       ZoneId convertTz,
@@ -400,14 +404,32 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
 
     int num = (int) Math.min(capacity, totalCountLoadedSoFar - rowsReturned);
     for (ParquetColumnVector cv : columnVectors) {
-      for (ParquetColumnVector leafCv : cv.getLeaves()) {
-        VectorizedColumnReader columnReader = leafCv.getColumnReader();
-        if (columnReader != null) {
-          columnReader.readBatch(num, leafCv.getValueVector(),
-            leafCv.getRepetitionLevelVector(), leafCv.getDefinitionLevelVector());
+      if (isLazyMaterializationEnabled && cv.getValueVector() instanceof LazyColumnVector) {
+        LazyColumnVector lazyVector = (LazyColumnVector) cv.getValueVector();
+        lazyVector.setLoadTask(() -> {
+          try {
+            for (ParquetColumnVector leafCv : cv.getLeaves()) {
+              VectorizedColumnReader columnReader = leafCv.getColumnReader();
+              if (columnReader != null) {
+                columnReader.readBatch(num, leafCv.getValueVector(),
+                  leafCv.getRepetitionLevelVector(), leafCv.getDefinitionLevelVector());
+              }
+            }
+            cv.assemble();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
+      } else {
+        for (ParquetColumnVector leafCv : cv.getLeaves()) {
+          VectorizedColumnReader columnReader = leafCv.getColumnReader();
+          if (columnReader != null) {
+            columnReader.readBatch(num, leafCv.getValueVector(),
+              leafCv.getRepetitionLevelVector(), leafCv.getDefinitionLevelVector());
+          }
         }
+        cv.assemble();
       }
-      cv.assemble();
     }
     // If needed, compute row indexes within a file.
     if (rowIndexGenerator != null) {
@@ -422,6 +444,7 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
   }
 
   private void initializeInternal() throws IOException, UnsupportedOperationException {
+    isLazyMaterializationEnabled = SQLConf.get().parquetVectorizedReaderLazyMaterializationEnabled();
     missingColumns = new HashSet<>();
     for (ParquetColumn column : CollectionConverters.asJava(parquetColumn.children())) {
       checkColumn(column);
@@ -529,10 +552,16 @@ public class VectorizedParquetRecordReader extends SpecificParquetRecordReaderBa
     if (useOffHeap) {
       for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
         vectors[i] = new OffHeapColumnVector(capacity, fields[i].dataType());
+        if (isLazyMaterializationEnabled) {
+          vectors[i] = new LazyColumnVector((WritableColumnVector) vectors[i]);
+        }
       }
     } else {
       for (int i = 0; i < fieldsLength - constantColumnLength; i++) {
         vectors[i] = new OnHeapColumnVector(capacity, fields[i].dataType());
+        if (isLazyMaterializationEnabled) {
+          vectors[i] = new LazyColumnVector((WritableColumnVector) vectors[i]);
+        }
       }
     }
     for (int i = fieldsLength - constantColumnLength; i < fieldsLength; i++) {

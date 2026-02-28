@@ -1567,6 +1567,16 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
+  val PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED =
+    buildConf("spark.sql.parquet.enableLazyMaterialization")
+      .doc("Enables lazy materialization for the vectorized Parquet reader. " +
+        "When enabled, the reader defers the reading and decoding of column data until " +
+        "it is accessed. This can improve performance by skipping the decoding of columns " +
+        "for rows that are filtered out by predicates on other columns.")
+      .version("4.1.0")
+      .booleanConf
+      .createWithDefault(false)
+
   val PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED =
     buildConf("spark.sql.parquet.enableNestedColumnVectorizedReader")
       .doc("Enables vectorized Parquet decoding for nested columns (e.g., struct, list, map). " +
@@ -7245,6 +7255,9 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
   def parquetCompressionCodec: String = getConf(PARQUET_COMPRESSION)
 
   def parquetVectorizedReaderEnabled: Boolean = getConf(PARQUET_VECTORIZED_READER_ENABLED)
+
+  def parquetVectorizedReaderLazyMaterializationEnabled: Boolean =
+    getConf(PARQUET_VECTORIZED_READER_LAZY_MATERIALIZATION_ENABLED)
 
   def parquetVectorizedReaderNestedColumnEnabled: Boolean =
     getConf(PARQUET_VECTORIZED_READER_NESTED_COLUMN_ENABLED)
