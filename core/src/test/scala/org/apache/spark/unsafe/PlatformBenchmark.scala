@@ -491,13 +491,8 @@ object PlatformBenchmark extends BenchmarkBase {
         benchmark.addCase("manual: Heap -> Heap") { _ =>
           var i = 0L
           while (i < 10) {
-            var j = 0
-            var offset = Platform.INT_ARRAY_OFFSET
-            while (j < count) {
-              dstArray(j) = Platform.getInt(srcArray, offset)
-              offset += 4
-              j += 1
-            }
+            PlatformBenchmarkTestUtils.copyToIntArrayManual(
+              srcArray, Platform.INT_ARRAY_OFFSET, dstArray, count.toInt)
             i += 1
           }
         }
@@ -505,13 +500,8 @@ object PlatformBenchmark extends BenchmarkBase {
         benchmark.addCase("manual: Off-heap -> Heap") { _ =>
           var i = 0L
           while (i < 10) {
-            var j = 0
-            var addr = address
-            while (j < count) {
-              dstArray(j) = Platform.getInt(null, addr)
-              addr += 4
-              j += 1
-            }
+            PlatformBenchmarkTestUtils.copyToIntArrayManual(
+              null, address, dstArray, count.toInt)
             i += 1
           }
         }
