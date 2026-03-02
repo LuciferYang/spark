@@ -19,6 +19,16 @@ package org.apache.spark.unsafe;
 
 public class PlatformBenchmarkTestUtils {
   
+  /**
+   * Copies memory from the source (either on-heap or off-heap) to the destination integer array
+   * using a manual loop. This method mimics the implementation of manual memory copying found
+   * in {@link org.apache.spark.sql.execution.vectorized.OnHeapColumnVector}.
+   *
+   * @param src The source object (null for off-heap memory).
+   * @param srcOffset The initial offset in the source memory.
+   * @param dst The destination integer array.
+   * @param count The number of integers to copy.
+   */
   public static void copyToIntArrayManual(Object src, long srcOffset, int[] dst, int count) {
     for (int i = 0; i < count; ++i, srcOffset += 4) {
       dst[i] = Platform.getInt(src, srcOffset);
