@@ -18,7 +18,7 @@
 package org.apache.spark.unsafe;
 
 public class PlatformBenchmarkTestUtils {
-  
+
   /**
    * Copies memory from the source (either on-heap or off-heap) to the destination integer array
    * using a manual loop. This method mimics the implementation of manual memory copying found
