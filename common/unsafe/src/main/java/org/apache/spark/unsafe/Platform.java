@@ -188,11 +188,21 @@ public final class Platform {
     _UNSAFE.freeMemory(address);
   }
 
+  /**
+   * Reallocates a block of off-heap memory. The contents of the old block are preserved up to
+   * {@code Math.min(oldSize, newSize)} bytes. The extended portion (if any) is NOT zero-initialized.
+   *
+   * <p>The {@code oldSize} parameter is retained for binary compatibility but is no longer used
+   * internally. The underlying {@code Unsafe.reallocateMemory} may extend the block in-place,
+   * avoiding an expensive copy when the OS allocator can grow the region contiguously.</p>
+   *
+   * @param address the address of the existing off-heap memory block
+   * @param oldSize the size of the existing block (unused, retained for binary compatibility)
+   * @param newSize the requested new size
+   * @return the address of the reallocated block (may differ from {@code address})
+   */
   public static long reallocateMemory(long address, long oldSize, long newSize) {
-    long newMemory = _UNSAFE.allocateMemory(newSize);
-    copyMemory(null, address, null, newMemory, oldSize);
-    freeMemory(address);
-    return newMemory;
+    return _UNSAFE.reallocateMemory(address, newSize);
   }
 
   /**
@@ -240,6 +250,12 @@ public final class Platform {
 
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
+    // Fast path: small copies (the common case) go directly to Unsafe without loop overhead.
+    if (length <= UNSAFE_COPY_THRESHOLD) {
+      _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
+      return;
+    }
+    // For large copies, chunk into UNSAFE_COPY_THRESHOLD pieces to allow safepoint polling.
     // Check if dstOffset is before or after srcOffset to determine if we should copy
     // forward or backwards. This is necessary in case src and dst overlap.
     if (dstOffset < srcOffset) {
