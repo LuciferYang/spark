@@ -250,7 +250,16 @@ public final class Platform {
 
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
-    // Fast path: small copies (the common case) go directly to Unsafe without loop overhead.
+    // Fast path: small copies (<= 1MB, the common case) bypass the chunked loop entirely,
+    // eliminating loop overhead, Math.min calls, and branch-prediction pressure.
+    //
+    // There is no need to check `dstOffset < srcOffset` (overlap direction) here because
+    // the single Unsafe.copyMemory call delegates to the JVM's native memory copy, which
+    // internally uses memmove (or equivalent) that already handles overlapping regions
+    // correctly regardless of copy direction. The overlap-aware forward/backward logic
+    // below is only required when we *split* a large copy into multiple chunks — without
+    // it, an intermediate chunk could overwrite source data that a later chunk still needs.
+    // A single, non-chunked call has no such problem.
     if (length <= UNSAFE_COPY_THRESHOLD) {
       _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, length);
       return;
