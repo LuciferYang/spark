@@ -51,6 +51,10 @@ on:
         description: 'Number of job splits'
         required: true
         default: '1'
+      threshold:
+        description: 'Unsafe Copy Threshold (bytes)'
+        required: false
+        default: '1048576' # Default 1MB
       create-commit:
         type: boolean
         description: 'Commit the benchmark results to the current branch'
@@ -195,6 +199,7 @@ jobs:
         sed -i 's/rootLogger.level = info/rootLogger.level = warn/g' conf/log4j2.properties
         # In benchmark, we use local as master so set driver memory only. Note that GitHub Actions has 7 GB memory limit.
         bin/spark-submit \
+          --driver-java-options "-Dspark.unsafe.copyMemory.threshold=${{ inputs.threshold }}" \
           --driver-memory 6g --class org.apache.spark.benchmark.Benchmarks \
           --jars "`find . -name '*-SNAPSHOT-tests.jar' -o -name '*avro*-SNAPSHOT.jar' | paste -sd ',' -`,`find ~/.cache/coursier -name 'curator-test-*.jar'`" \
           "`find . -name 'spark-core*-SNAPSHOT-tests.jar'`" \
