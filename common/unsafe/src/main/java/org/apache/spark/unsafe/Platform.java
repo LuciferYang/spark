@@ -275,7 +275,20 @@ public final class Platform {
    * Limits the number of bytes to copy per {@link Unsafe#copyMemory(long, long, long)} to
    * allow safepoint polling during a large copy.
    */
-  private static final long UNSAFE_COPY_THRESHOLD = 1024L * 1024L;
+  private static final long UNSAFE_COPY_THRESHOLD;
+
+  static {
+    long threshold = 1024L * 1024L;
+    try {
+      String value = System.getProperty("spark.unsafe.copyMemory.threshold");
+      if (value != null) {
+        threshold = Long.parseLong(value);
+      }
+    } catch (Throwable e) {
+      // Uses the default value if any error occurs.
+    }
+    UNSAFE_COPY_THRESHOLD = threshold;
+  }
 
   static {
     sun.misc.Unsafe unsafe;
