@@ -196,32 +196,32 @@ public final class Platform {
    * internally. The underlying {@code Unsafe.reallocateMemory} may extend the block in-place,
    * avoiding an expensive copy when the OS allocator can grow the region contiguously.</p>
    *
-   * <p><b>Why no {@code UNSAFE_COPY_THRESHOLD} chunking here (unlike {@link #copyMemory})?</b></p>
-   * <p>In {@code copyMemory}, large copies are split into 1 MB chunks so that the JVM can reach
-   * a safepoint between chunks (e.g. for GC). That chunking is necessary because
-   * {@code Unsafe.copyMemory} is a pure memory-copy operation that runs entirely in user space
-   * and will not hit a safepoint on its own.</p>
-   *
-   * <p>{@code Unsafe.reallocateMemory}, on the other hand, delegates to the native C library's
-   * {@code realloc()} via JNI/VM runtime. {@code realloc()} is a system call / library call that
-   * may involve kernel interaction (e.g. {@code mremap}, {@code mmap}, page-table updates).
-   * The JVM thread transitions to <em>native</em> state during this call, and a thread in
-   * native state is considered to be at a safepoint — the GC does not need to wait for it.
-   * Therefore, even for very large reallocations, there is no risk of delaying safepoint
-   * operations, and no chunking is required.</p>
-   *
-   * <p>Furthermore, when {@code realloc()} does need to copy data internally (because in-place
-   * expansion is not possible), the copy is performed by the OS/C-runtime using optimized,
-   * architecture-specific routines (e.g. {@code memcpy} with SIMD/ERMS). Splitting this work
-   * into Java-level chunks would only add overhead and prevent the OS from using the most
-   * efficient strategy.</p>
-   *
    * @param address the address of the existing off-heap memory block
    * @param oldSize the size of the existing block (unused, retained for binary compatibility)
    * @param newSize the requested new size
    * @return the address of the reallocated block (may differ from {@code address})
    */
   public static long reallocateMemory(long address, long oldSize, long newSize) {
+    // Why no UNSAFE_COPY_THRESHOLD chunking here (unlike copyMemory)?
+    //
+    // In copyMemory, large copies are split into 1 MB chunks so that the JVM can reach a
+    // safepoint between chunks (e.g. for GC). That chunking is necessary because
+    // Unsafe.copyMemory is a pure memory-copy operation that runs entirely in user space
+    // and will not hit a safepoint on its own.
+    //
+    // Unsafe.reallocateMemory, on the other hand, delegates to the native C library's
+    // realloc() via JNI/VM runtime. realloc() is a system call / library call that may
+    // involve kernel interaction (e.g. mremap, mmap, page-table updates). The JVM thread
+    // transitions to *native* state during this call, and a thread in native state is
+    // considered to be at a safepoint — the GC does not need to wait for it. Therefore,
+    // even for very large reallocations, there is no risk of delaying safepoint operations,
+    // and no chunking is required.
+    //
+    // Furthermore, when realloc() does need to copy data internally (because in-place
+    // expansion is not possible), the copy is performed by the OS/C-runtime using optimized,
+    // architecture-specific routines (e.g. memcpy with SIMD/ERMS). Splitting this work into
+    // Java-level chunks would only add overhead and prevent the OS from using the most
+    // efficient strategy.
     return _UNSAFE.reallocateMemory(address, newSize);
   }
 
