@@ -84,6 +84,24 @@ public class ParquetRebaseUtils {
     return -1;
   }
 
+  /**
+   * Reads a 4-byte little-endian int from the byte array at the given index using Unsafe,
+   * handling endianness automatically.
+   */
+  static int readIntLittleEndian(byte[] src, int srcIndex) {
+    int raw = Platform.getInt(src, srcIndex + Platform.BYTE_ARRAY_OFFSET);
+    return BIG_ENDIAN_PLATFORM ? Integer.reverseBytes(raw) : raw;
+  }
+
+  /**
+   * Reads an 8-byte little-endian long from the byte array at the given index using Unsafe,
+   * handling endianness automatically.
+   */
+  static long readLongLittleEndian(byte[] src, int srcIndex) {
+    long raw = Platform.getLong(src, srcIndex + Platform.BYTE_ARRAY_OFFSET);
+    return BIG_ENDIAN_PLATFORM ? Long.reverseBytes(raw) : raw;
+  }
+
   // Private constructor to prevent instantiation
   private ParquetRebaseUtils() {
   }

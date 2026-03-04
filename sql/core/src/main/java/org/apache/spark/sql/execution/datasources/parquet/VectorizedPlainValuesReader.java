@@ -169,13 +169,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         if (rebaseFrom > 0) {
           c.putIntsLittleEndian(rowId, rebaseFrom, array, offset);
         }
-        int pos = buffer.position() + rebaseFrom * 4;
-        for (int i = rebaseFrom; i < total; i++, pos += 4) {
-          int days = buffer.getInt(pos);
+        int arrPos = offset + rebaseFrom * 4;
+        for (int i = rebaseFrom; i < total; i++, arrPos += 4) {
+          int days = ParquetRebaseUtils.readIntLittleEndian(array, arrPos);
           c.putInt(rowId + i,
             days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
-        buffer.position(buffer.position() + total * 4);
       }
     } else {
       // non-array path: scan for first rebase boundary using absolute get to avoid
@@ -189,14 +188,17 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
       if (rebaseFrom < 0) {
-        byte[] tmp = new byte[requiredBytes];
-        buffer.get(tmp);
-        c.putIntsLittleEndian(rowId, total, tmp, 0);
+        for (int i = 0; i < total; i++) {
+          c.putInt(rowId + i, buffer.getInt());
+        }
       } else {
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
-        for (int i = 0; i < total; i++) {
+        for (int i = 0; i < rebaseFrom; i++) {
+          c.putInt(rowId + i, buffer.getInt());
+        }
+        for (int i = rebaseFrom; i < total; i++) {
           int days = buffer.getInt();
           c.putInt(rowId + i,
             days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
@@ -347,13 +349,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         if (rebaseFrom > 0) {
           c.putLongsLittleEndian(rowId, rebaseFrom, array, offset);
         }
-        int pos = buffer.position() + rebaseFrom * 8;
-        for (int i = rebaseFrom; i < total; i++, pos += 8) {
-          long ts = buffer.getLong(pos);
+        int arrPos = offset + rebaseFrom * 8;
+        for (int i = rebaseFrom; i < total; i++, arrPos += 8) {
+          long ts = ParquetRebaseUtils.readLongLittleEndian(array, arrPos);
           c.putLong(rowId + i,
             ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
-        buffer.position(buffer.position() + total * 8);
       }
     } else {
       // non-array path: scan for first rebase boundary using absolute get to avoid
@@ -367,14 +368,17 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
       if (rebaseFrom < 0) {
-        byte[] tmp = new byte[requiredBytes];
-        buffer.get(tmp);
-        c.putLongsLittleEndian(rowId, total, tmp, 0);
+        for (int i = 0; i < total; i++) {
+          c.putLong(rowId + i, buffer.getLong());
+        }
       } else {
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
-        for (int i = 0; i < total; i++) {
+        for (int i = 0; i < rebaseFrom; i++) {
+          c.putLong(rowId + i, buffer.getLong());
+        }
+        for (int i = rebaseFrom; i < total; i++) {
           long ts = buffer.getLong();
           c.putLong(rowId + i,
             ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
