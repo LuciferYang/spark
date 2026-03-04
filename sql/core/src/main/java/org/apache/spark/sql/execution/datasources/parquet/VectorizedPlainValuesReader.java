@@ -158,7 +158,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
 
-      int rebaseFrom = c.findFirstIntLessThan(array, offset, total, switchDay);
+      int rebaseFrom = ParquetRebaseUtils.findFirstIntLessThan(array, offset, total, switchDay);
 
       if (rebaseFrom < 0) {
         c.putIntsLittleEndian(rowId, total, array, offset);
@@ -336,7 +336,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
 
-      int rebaseFrom = c.findFirstLongLessThan(array, offset, total, switchTs);
+      int rebaseFrom = ParquetRebaseUtils.findFirstLongLessThan(array, offset, total, switchTs);
 
       if (rebaseFrom < 0) {
         c.putLongsLittleEndian(rowId, total, array, offset);
