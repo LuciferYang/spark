@@ -173,7 +173,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         for (int i = rebaseFrom; i < total; i++, pos += 4) {
           int days = buffer.getInt(pos);
           c.putInt(rowId + i,
-                  days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
+            days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
         buffer.position(buffer.position() + total * 4);
       }
@@ -199,7 +199,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         for (int i = 0; i < total; i++) {
           int days = buffer.getInt();
           c.putInt(rowId + i,
-                  days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
+            days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
       }
     }
@@ -351,7 +351,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         for (int i = rebaseFrom; i < total; i++, pos += 8) {
           long ts = buffer.getLong(pos);
           c.putLong(rowId + i,
-                  ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
+            ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }
         buffer.position(buffer.position() + total * 8);
       }
