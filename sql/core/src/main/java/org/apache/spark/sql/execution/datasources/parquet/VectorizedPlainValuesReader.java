@@ -149,7 +149,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // and remaining values are written individually with per-value rebase checks.
   @Override
   public final void readIntegersWithRebase(
-    int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
+      int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
     int switchDay = RebaseDateTime.lastSwitchJulianDay();
@@ -276,7 +276,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
    *                after this call are undefined
    */
   private static void putLittleEndianBytesAsBigInteger(
-      WritableColumnVector c, int rowId, byte[] src, int offset, byte[] scratch) {
+     WritableColumnVector c, int rowId, byte[] src, int offset, byte[] scratch) {
     // src is little-endian; the most significant byte is at src[offset + 7].
     // Scan from the most significant end to find the first non-zero byte,
     // which determines the minimal number of bytes needed for encoding.
@@ -542,7 +542,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     ByteBuffer buffer = getBuffer(len);
     if (buffer.hasArray()) {
       return Binary.fromConstantByteArray(
-        buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+          buffer.array(), buffer.arrayOffset() + buffer.position(), len);
     } else {
       byte[] bytes = new byte[len];
       buffer.get(bytes);
