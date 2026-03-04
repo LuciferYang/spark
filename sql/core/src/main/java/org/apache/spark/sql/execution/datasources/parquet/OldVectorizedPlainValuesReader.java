@@ -16,15 +16,10 @@
  */
 package org.apache.spark.sql.execution.datasources.parquet;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-
 import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.apache.parquet.column.values.ValuesReader;
-import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.ParquetDecodingException;
-
+import org.apache.parquet.io.api.Binary;
 import org.apache.spark.SparkUnsupportedOperationException;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.execution.datasources.DataSourceUtils;
@@ -33,17 +28,21 @@ import org.apache.spark.sql.types.GeographyType;
 import org.apache.spark.sql.types.GeometryType;
 import org.apache.spark.util.ByteBufferOutputStream;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 /**
  * An implementation of the Parquet PLAIN decoder that supports the vectorized interface.
  */
-public class VectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
+public class OldVectorizedPlainValuesReader extends ValuesReader implements VectorizedValuesReader {
   private ByteBufferInputStream in = null;
 
   // Only used for booleans.
   private int bitOffset;
   private byte currentByte = 0;
 
-  public VectorizedPlainValuesReader() {
+  public OldVectorizedPlainValuesReader() {
   }
 
   @Override
