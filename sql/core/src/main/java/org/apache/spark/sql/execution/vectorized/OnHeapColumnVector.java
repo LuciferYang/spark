@@ -594,7 +594,6 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     return result;
   }
 
-
   // Spilt this function out since it is the slow path.
   @Override
   protected void reserveInternal(int newCapacity) {

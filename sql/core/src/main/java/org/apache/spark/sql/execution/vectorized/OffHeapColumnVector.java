@@ -618,7 +618,6 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     return result;
   }
 
-
   // Split out the slow path.
   @Override
   protected void reserveInternal(int newCapacity) {
