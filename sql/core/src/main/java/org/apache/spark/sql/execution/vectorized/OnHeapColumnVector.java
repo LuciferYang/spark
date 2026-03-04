@@ -594,6 +594,36 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     return result;
   }
 
+  @Override
+  public int findFirstIntLessThan(byte[] src, int srcIndex, int count, int threshold) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        if (Integer.reverseBytes(Platform.getInt(src, srcOffset)) < threshold) return i;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        if (Platform.getInt(src, srcOffset) < threshold) return i;
+      }
+    }
+    return -1;
+  }
+
+  @Override
+  public int findFirstLongLessThan(byte[] src, int srcIndex, int count, long threshold) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        if (Long.reverseBytes(Platform.getLong(src, srcOffset)) < threshold) return i;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        if (Platform.getLong(src, srcOffset) < threshold) return i;
+      }
+    }
+    return -1;
+  }
+
   // Spilt this function out since it is the slow path.
   @Override
   protected void reserveInternal(int newCapacity) {
