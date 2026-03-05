@@ -177,28 +177,34 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      // non-array path: scan for first rebase boundary using absolute get to avoid
-      // advancing buffer position, then process all values in a single sequential pass.
-      int rebaseFrom = -1;
-      int pos = buffer.position();
-      for (int i = 0; i < total; i++, pos += 4) {
-        if (buffer.getInt(pos) < switchDay) {
-          rebaseFrom = i;
+      // non-array path: for direct buffers, we can't efficiently scan with absolute positions
+      // due to ByteBuffer.getInt(pos) overhead. Instead, we use sequential reads with early
+      // exit for the common allModern case.
+      int firstRebaseIdx = -1;
+      int startPos = buffer.position();
+
+      // Scan to find if any rebase is needed
+      for (int i = 0; i < total; i++) {
+        if (buffer.getInt() < switchDay) {
+          firstRebaseIdx = i;
           break;
         }
       }
-      if (rebaseFrom < 0) {
+
+      // Reset position based on scan result
+      buffer.position(startPos);
+
+      if (firstRebaseIdx < 0) {
+        // allModern: direct sequential write without any conditional checks
         for (int i = 0; i < total; i++) {
           c.putInt(rowId + i, buffer.getInt());
         }
       } else {
+        // Has rebase: process all values with conditional rebase check
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
-        for (int i = 0; i < rebaseFrom; i++) {
-          c.putInt(rowId + i, buffer.getInt());
-        }
-        for (int i = rebaseFrom; i < total; i++) {
+        for (int i = 0; i < total; i++) {
           int days = buffer.getInt();
           c.putInt(rowId + i,
             days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
@@ -357,28 +363,34 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      // non-array path: scan for first rebase boundary using absolute get to avoid
-      // advancing buffer position, then process all values in a single sequential pass.
-      int rebaseFrom = -1;
-      int pos = buffer.position();
-      for (int i = 0; i < total; i++, pos += 8) {
-        if (buffer.getLong(pos) < switchTs) {
-          rebaseFrom = i;
+      // non-array path: for direct buffers, we can't efficiently scan with absolute positions
+      // due to ByteBuffer.getLong(pos) overhead. Instead, we use sequential reads with early
+      // exit for the common allModern case.
+      int firstRebaseIdx = -1;
+      int startPos = buffer.position();
+
+      // Scan to find if any rebase is needed
+      for (int i = 0; i < total; i++) {
+        if (buffer.getLong() < switchTs) {
+          firstRebaseIdx = i;
           break;
         }
       }
-      if (rebaseFrom < 0) {
+
+      // Reset position based on scan result
+      buffer.position(startPos);
+
+      if (firstRebaseIdx < 0) {
+        // allModern: direct sequential write without any conditional checks
         for (int i = 0; i < total; i++) {
           c.putLong(rowId + i, buffer.getLong());
         }
       } else {
+        // Has rebase: process all values with conditional rebase check
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
-        for (int i = 0; i < rebaseFrom; i++) {
-          c.putLong(rowId + i, buffer.getLong());
-        }
-        for (int i = rebaseFrom; i < total; i++) {
+        for (int i = 0; i < total; i++) {
           long ts = buffer.getLong();
           c.putLong(rowId + i,
             ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
