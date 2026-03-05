@@ -158,7 +158,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
 
-      int rebaseFrom = ParquetRebaseUtils.findFirstIntLessThan(array, offset, total, switchDay);
+      int rebaseFrom = ByteArrayUtils.findFirstIntLessThan(array, offset, total, switchDay);
 
       if (rebaseFrom < 0) {
         c.putIntsLittleEndian(rowId, total, array, offset);
@@ -171,7 +171,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
         int arrPos = offset + rebaseFrom * 4;
         for (int i = rebaseFrom; i < total; i++, arrPos += 4) {
-          int days = ParquetRebaseUtils.readIntLittleEndian(array, arrPos);
+          int days = ByteArrayUtils.readIntLittleEndian(array, arrPos);
           c.putInt(rowId + i,
             days < switchDay ? RebaseDateTime.rebaseJulianToGregorianDays(days) : days);
         }
@@ -344,7 +344,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
 
-      int rebaseFrom = ParquetRebaseUtils.findFirstLongLessThan(array, offset, total, switchTs);
+      int rebaseFrom = ByteArrayUtils.findFirstLongLessThan(array, offset, total, switchTs);
 
       if (rebaseFrom < 0) {
         c.putLongsLittleEndian(rowId, total, array, offset);
@@ -357,7 +357,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
         int arrPos = offset + rebaseFrom * 8;
         for (int i = rebaseFrom; i < total; i++, arrPos += 8) {
-          long ts = ParquetRebaseUtils.readLongLittleEndian(array, arrPos);
+          long ts = ByteArrayUtils.readLongLittleEndian(array, arrPos);
           c.putLong(rowId + i,
             ts < switchTs ? RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, ts) : ts);
         }

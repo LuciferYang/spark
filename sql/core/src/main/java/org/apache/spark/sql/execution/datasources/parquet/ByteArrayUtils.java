@@ -21,11 +21,10 @@ import java.nio.ByteOrder;
 import org.apache.spark.unsafe.Platform;
 
 /**
- * Utility class for Parquet datetime rebase operations.
- * Provides methods to scan byte arrays for rebase boundaries to optimize
- * the common case where most/all values don't require rebasing.
+ * Utility class for Parquet data operations including datetime rebase and byte-level access.
+ * Provides efficient methods to scan byte arrays and read values with proper endianness handling.
  */
-public class ParquetRebaseUtils {
+public class ByteArrayUtils {
 
   private static final boolean BIG_ENDIAN_PLATFORM =
     ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -100,10 +99,6 @@ public class ParquetRebaseUtils {
   static long readLongLittleEndian(byte[] src, int srcIndex) {
     long raw = Platform.getLong(src, srcIndex + Platform.BYTE_ARRAY_OFFSET);
     return BIG_ENDIAN_PLATFORM ? Long.reverseBytes(raw) : raw;
-  }
-
-  // Private constructor to prevent instantiation
-  private ParquetRebaseUtils() {
   }
 }
 
