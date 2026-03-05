@@ -16,19 +16,36 @@
  */
 package org.apache.spark.sql.execution.vectorized;
 
+import org.apache.spark.sql.types.BooleanType;
+import org.apache.spark.sql.types.ByteType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DateType;
+import org.apache.spark.sql.types.DayTimeIntervalType;
+import org.apache.spark.sql.types.DecimalType;
+import org.apache.spark.sql.types.DoubleType;
+import org.apache.spark.sql.types.FloatType;
+import org.apache.spark.sql.types.IntegerType;
+import org.apache.spark.sql.types.LongType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.ShortType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimeType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
+import org.apache.spark.sql.types.YearMonthIntervalType;
+import org.apache.spark.unsafe.Platform;
+import org.apache.spark.unsafe.types.UTF8String;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-
-import org.apache.spark.sql.types.*;
-import org.apache.spark.unsafe.Platform;
-import org.apache.spark.unsafe.types.UTF8String;
 
 /**
  * A column backed by an in memory JVM array. This stores the NULLs as a byte per value
  * and a java array for the values.
  */
-public final class OnHeapColumnVector extends WritableColumnVector {
+public final class OldOnHeapColumnVector extends WritableColumnVector {
 
   private static final boolean bigEndianPlatform =
     ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -38,7 +55,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OnHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
+  public static OldOnHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
     return allocateColumns(capacity, schema.fields());
   }
 
@@ -47,10 +64,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OnHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
-    OnHeapColumnVector[] vectors = new OnHeapColumnVector[fields.length];
+  public static OldOnHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
+    OldOnHeapColumnVector[] vectors = new OldOnHeapColumnVector[fields.length];
     for (int i = 0; i < fields.length; i++) {
-      vectors[i] = new OnHeapColumnVector(capacity, fields[i].dataType());
+      vectors[i] = new OldOnHeapColumnVector(capacity, fields[i].dataType());
     }
     return vectors;
   }
@@ -73,7 +90,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   private int[] arrayLengths;
   private int[] arrayOffsets;
 
-  public OnHeapColumnVector(int capacity, DataType type) {
+  public OldOnHeapColumnVector(int capacity, DataType type) {
     super(capacity, type);
 
     reserveInternal(capacity);
@@ -116,14 +133,18 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putNulls(int rowId, int count) {
     if (isAllNull()) return; // Skip writing nulls to all-null vector.
-    Arrays.fill(nulls, rowId, rowId + count, (byte) 1);
+    for (int i = 0; i < count; ++i) {
+      nulls[rowId + i] = (byte)1;
+    }
     numNulls += count;
   }
 
   @Override
   public void putNotNulls(int rowId, int count) {
     if (!hasNull()) return;
-    Arrays.fill(nulls, rowId, rowId + count, (byte) 0);
+    for (int i = 0; i < count; ++i) {
+      nulls[rowId + i] = (byte)0;
+    }
   }
 
   @Override
@@ -143,7 +164,9 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putBooleans(int rowId, int count, boolean value) {
     byte v = (byte)((value) ? 1 : 0);
-    Arrays.fill(byteData, rowId, rowId + count, v);
+    for (int i = 0; i < count; ++i) {
+      byteData[i + rowId] = v;
+    }
   }
 
   @Override
@@ -186,7 +209,9 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putBytes(int rowId, int count, byte value) {
-    Arrays.fill(byteData, rowId, rowId + count, value);
+    for (int i = 0; i < count; ++i) {
+      byteData[i + rowId] = value;
+    }
   }
 
   @Override
@@ -240,7 +265,9 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putShorts(int rowId, int count, short value) {
-    Arrays.fill(shortData, rowId, rowId + count, value);
+    for (int i = 0; i < count; ++i) {
+      shortData[i + rowId] = value;
+    }
   }
 
   @Override
@@ -304,7 +331,9 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putInts(int rowId, int count, int value) {
-    Arrays.fill(intData, rowId, rowId + count, value);
+    for (int i = 0; i < count; ++i) {
+      intData[i + rowId] = value;
+    }
   }
 
   @Override
@@ -323,7 +352,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     if (bigEndianPlatform) {
       int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
       for (int i = 0; i < count; ++i, srcOffset += 4) {
-        intData[i + rowId] = java.lang.Integer.reverseBytes(Platform.getInt(src, srcOffset));
+        intData[i + rowId] = Integer.reverseBytes(Platform.getInt(src, srcOffset));
       }
     } else {
       Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, intData,
@@ -378,7 +407,9 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putLongs(int rowId, int count, long value) {
-    Arrays.fill(longData, rowId, rowId + count, value);
+    for (int i = 0; i < count; ++i) {
+      longData[i + rowId] = value;
+    }
   }
 
   @Override
@@ -397,7 +428,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     if (bigEndianPlatform) {
       int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
       for (int i = 0; i < count; ++i, srcOffset += 8) {
-        longData[i + rowId] = java.lang.Long.reverseBytes(Platform.getLong(src, srcOffset));
+        longData[i + rowId] = Long.reverseBytes(Platform.getLong(src, srcOffset));
       }
     } else {
       Platform.copyMemory(src, Platform.BYTE_ARRAY_OFFSET + srcIndex, longData,
@@ -654,7 +685,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
-  public OnHeapColumnVector reserveNewColumn(int capacity, DataType type) {
-    return new OnHeapColumnVector(capacity, type);
+  public OldOnHeapColumnVector reserveNewColumn(int capacity, DataType type) {
+    return new OldOnHeapColumnVector(capacity, type);
   }
 }
