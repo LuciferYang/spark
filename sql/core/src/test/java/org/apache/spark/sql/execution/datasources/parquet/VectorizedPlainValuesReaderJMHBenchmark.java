@@ -170,36 +170,72 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     // ==================== Data Generation ====================
 
     /**
-     * Generates int data where {@code ancientRatio} fraction of values are ancient
-     * (below switchDay) and the rest are modern (>= switchDay).
+     * Generates int data where each BATCH_SIZE batch contains exactly
+     * {@code round(ancientRatio * batchSize)} ancient values (below switchDay),
+     * placed at random positions within that batch.
+     *
+     * <p>This ensures every batch the benchmark reads has the same data distribution,
+     * eliminating variance caused by some batches having zero ancient values and
+     * others having many when using purely random generation across the whole array.
      */
     private byte[] generateIntData(int count, Random random, int switchDay, double ancientRatio) {
         ByteBuffer buf = ByteBuffer.allocate(count * 4).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < count; i++) {
-            if (random.nextDouble() < ancientRatio) {
-                // ancient: random value in [switchDay - 500000, switchDay)
-                buf.putInt(switchDay - 1 - random.nextInt(500000));
-            } else {
-                // modern: random non-negative day value
-                buf.putInt(random.nextInt(Integer.MAX_VALUE));
+        for (int batchStart = 0; batchStart < count; batchStart += BATCH_SIZE) {
+            int batchLen = Math.min(BATCH_SIZE, count - batchStart);
+            int numAncient = (int) Math.round(ancientRatio * batchLen);
+            // Fill the batch: first numAncient ancient values, then modern values
+            int[] values = new int[batchLen];
+            for (int i = 0; i < numAncient; i++) {
+                values[i] = switchDay - 1 - random.nextInt(500000);
+            }
+            for (int i = numAncient; i < batchLen; i++) {
+                values[i] = random.nextInt(Integer.MAX_VALUE);
+            }
+            // Fisher-Yates shuffle to randomize positions within the batch
+            for (int i = batchLen - 1; i > 0; i--) {
+                int j = random.nextInt(i + 1);
+                int tmp = values[i];
+                values[i] = values[j];
+                values[j] = tmp;
+            }
+            for (int i = 0; i < batchLen; i++) {
+                buf.putInt(values[i]);
             }
         }
         return buf.array();
     }
 
     /**
-     * Generates long data where {@code ancientRatio} fraction of values are ancient
-     * (below switchTs) and the rest are modern (>= switchTs).
+     * Generates long data where each BATCH_SIZE batch contains exactly
+     * {@code round(ancientRatio * batchSize)} ancient values (below switchTs),
+     * placed at random positions within that batch.
+     *
+     * <p>This ensures every batch the benchmark reads has the same data distribution,
+     * eliminating variance caused by some batches having zero ancient values and
+     * others having many when using purely random generation across the whole array.
      */
     private byte[] generateLongData(int count, Random random, long switchTs, double ancientRatio) {
         ByteBuffer buf = ByteBuffer.allocate(count * 8).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < count; i++) {
-            if (random.nextDouble() < ancientRatio) {
-                // ancient: random value in [switchTs - 500_000_000_000L, switchTs)
-                buf.putLong(switchTs - 1 - (Math.abs(random.nextLong()) % 500_000_000_000L));
-            } else {
-                // modern: random non-negative microsecond value
-                buf.putLong(Math.abs(random.nextLong()));
+        for (int batchStart = 0; batchStart < count; batchStart += BATCH_SIZE) {
+            int batchLen = Math.min(BATCH_SIZE, count - batchStart);
+            int numAncient = (int) Math.round(ancientRatio * batchLen);
+            // Fill the batch: first numAncient ancient values, then modern values
+            long[] values = new long[batchLen];
+            for (int i = 0; i < numAncient; i++) {
+                values[i] = switchTs - 1 - (Math.abs(random.nextLong()) % 500_000_000_000L);
+            }
+            for (int i = numAncient; i < batchLen; i++) {
+                values[i] = Math.abs(random.nextLong());
+            }
+            // Fisher-Yates shuffle to randomize positions within the batch
+            for (int i = batchLen - 1; i > 0; i--) {
+                int j = random.nextInt(i + 1);
+                long tmp = values[i];
+                values[i] = values[j];
+                values[j] = tmp;
+            }
+            for (int i = 0; i < batchLen; i++) {
+                buf.putLong(values[i]);
             }
         }
         return buf.array();
