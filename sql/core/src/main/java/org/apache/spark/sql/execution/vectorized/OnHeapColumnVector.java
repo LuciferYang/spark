@@ -18,7 +18,6 @@ package org.apache.spark.sql.execution.vectorized;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
@@ -116,14 +115,14 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putNulls(int rowId, int count) {
     if (isAllNull()) return; // Skip writing nulls to all-null vector.
-    Arrays.fill(nulls, rowId, rowId + count, (byte) 1);
+    Platform.setMemory(nulls, Platform.BYTE_ARRAY_OFFSET + rowId, count, (byte) 1);
     numNulls += count;
   }
 
   @Override
   public void putNotNulls(int rowId, int count) {
     if (!hasNull()) return;
-    Arrays.fill(nulls, rowId, rowId + count, (byte) 0);
+    Platform.setMemory(nulls, Platform.BYTE_ARRAY_OFFSET + rowId, count, (byte) 0);
   }
 
   @Override
@@ -143,7 +142,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   @Override
   public void putBooleans(int rowId, int count, boolean value) {
     byte v = (byte)((value) ? 1 : 0);
-    Arrays.fill(byteData, rowId, rowId + count, v);
+    Platform.setMemory(byteData, Platform.BYTE_ARRAY_OFFSET + rowId, count, v);
   }
 
   @Override
@@ -186,7 +185,7 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putBytes(int rowId, int count, byte value) {
-    Arrays.fill(byteData, rowId, rowId + count, value);
+    Platform.setMemory(byteData, Platform.BYTE_ARRAY_OFFSET + rowId, count, value);
   }
 
   @Override
@@ -240,7 +239,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putShorts(int rowId, int count, short value) {
-    Arrays.fill(shortData, rowId, rowId + count, value);
+    // 使用直接赋值循环而非Arrays.fill，避免边界检查开销
+    for (int i = rowId, end = rowId + count; i < end; i++) {
+      shortData[i] = value;
+    }
   }
 
   @Override
@@ -304,7 +306,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putInts(int rowId, int count, int value) {
-    Arrays.fill(intData, rowId, rowId + count, value);
+    // 使用直接赋值循环而非Arrays.fill，避免边界检查开销
+    for (int i = rowId, end = rowId + count; i < end; i++) {
+      intData[i] = value;
+    }
   }
 
   @Override
@@ -378,7 +383,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putLongs(int rowId, int count, long value) {
-    Arrays.fill(longData, rowId, rowId + count, value);
+    // 使用直接赋值循环而非Arrays.fill，避免边界检查开销
+    for (int i = rowId, end = rowId + count; i < end; i++) {
+      longData[i] = value;
+    }
   }
 
   @Override
@@ -438,7 +446,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putFloats(int rowId, int count, float value) {
-    Arrays.fill(floatData, rowId, rowId + count, value);
+    // 使用直接赋值循环而非Arrays.fill，避免边界检查开销
+    for (int i = rowId, end = rowId + count; i < end; i++) {
+      floatData[i] = value;
+    }
   }
 
   @Override
@@ -499,7 +510,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putDoubles(int rowId, int count, double value) {
-    Arrays.fill(doubleData, rowId, rowId + count, value);
+    // 使用直接赋值循环而非Arrays.fill，避免边界检查开销
+    for (int i = rowId, end = rowId + count; i < end; i++) {
+      doubleData[i] = value;
+    }
   }
 
   @Override
