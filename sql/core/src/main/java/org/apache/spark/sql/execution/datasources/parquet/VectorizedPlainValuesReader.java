@@ -147,6 +147,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // allowing the common case (no rebase needed) to take the optimized bulk-write path.
   // When rebasing is needed, values before the first rebase boundary are bulk-written,
   // and remaining values are written individually with per-value rebase checks.
+  // For direct buffers, absolute-position reads (getInt(pos)) are used for scanning
+  // to avoid resetting the buffer position and re-reading data.
   @Override
   public final void readIntegersWithRebase(
       int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
@@ -177,33 +179,30 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      // non-array path: for direct buffers, we can't efficiently scan with absolute positions
-      // due to ByteBuffer.getInt(pos) overhead. Instead, we use sequential reads with early
-      // exit for the common allModern case.
-      int firstRebaseIdx = -1;
-      int startPos = buffer.position();
+      // non-array path: use absolute-position reads for scanning to avoid double-read.
+      // ByteBuffer.getInt(pos) does not advance the buffer position, so we can scan
+      // without losing our read cursor, then do a single sequential pass for writing.
+      int basePos = buffer.position();
 
-      // Scan to find if any rebase is needed
-      for (int i = 0; i < total; i++) {
-        if (buffer.getInt() < switchDay) {
+      // Scan using absolute positions to find the first value needing rebase
+      int firstRebaseIdx = -1;
+      for (int i = 0, pos = basePos; i < total; i++, pos += 4) {
+        if (buffer.getInt(pos) < switchDay) {
           firstRebaseIdx = i;
           break;
         }
       }
 
-      // Reset position based on scan result
-      buffer.position(startPos);
-
       if (firstRebaseIdx < 0) {
-        // allModern: direct sequential write without any conditional checks
+        // allModern: single sequential pass to write values, no conditional checks
         for (int i = 0; i < total; i++) {
           c.putInt(rowId + i, buffer.getInt());
         }
       } else {
-        // Has rebase: process all values with conditional rebase check
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
+        // Single sequential pass: write all values with per-value rebase check
         for (int i = 0; i < total; i++) {
           int days = buffer.getInt();
           c.putInt(rowId + i,
@@ -327,8 +326,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // scans for the first value that requires rebasing and exits early if none is found,
   // allowing the common case (no rebase needed) to take the optimized bulk-write path.
   // When rebasing is needed, values before the first rebase boundary are bulk-written,
-  // and remaining values are written individually with per-value rebase checks,
-  // avoiding unnecessary calls to rebaseJulianToGregorianMicros for modern timestamps.
+  // and remaining values are written individually with per-value rebase checks.
+  // For direct buffers, absolute-position reads (getLong(pos)) are used for scanning
+  // to avoid resetting the buffer position and re-reading data.
   @Override
   public final void readLongsWithRebase(
       int total,
@@ -363,33 +363,30 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         }
       }
     } else {
-      // non-array path: for direct buffers, we can't efficiently scan with absolute positions
-      // due to ByteBuffer.getLong(pos) overhead. Instead, we use sequential reads with early
-      // exit for the common allModern case.
-      int firstRebaseIdx = -1;
-      int startPos = buffer.position();
+      // non-array path: use absolute-position reads for scanning to avoid double-read.
+      // ByteBuffer.getLong(pos) does not advance the buffer position, so we can scan
+      // without losing our read cursor, then do a single sequential pass for writing.
+      int basePos = buffer.position();
 
-      // Scan to find if any rebase is needed
-      for (int i = 0; i < total; i++) {
-        if (buffer.getLong() < switchTs) {
+      // Scan using absolute positions to find the first value needing rebase
+      int firstRebaseIdx = -1;
+      for (int i = 0, pos = basePos; i < total; i++, pos += 8) {
+        if (buffer.getLong(pos) < switchTs) {
           firstRebaseIdx = i;
           break;
         }
       }
 
-      // Reset position based on scan result
-      buffer.position(startPos);
-
       if (firstRebaseIdx < 0) {
-        // allModern: direct sequential write without any conditional checks
+        // allModern: single sequential pass to write values, no conditional checks
         for (int i = 0; i < total; i++) {
           c.putLong(rowId + i, buffer.getLong());
         }
       } else {
-        // Has rebase: process all values with conditional rebase check
         if (failIfRebase) {
           throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
         }
+        // Single sequential pass: write all values with per-value rebase check
         for (int i = 0; i < total; i++) {
           long ts = buffer.getLong();
           c.putLong(rowId + i,
