@@ -41,8 +41,9 @@ import org.apache.spark.sql.types.DataTypes;
  * VectorizedPlainValuesReader (early-exit scan + partial bulk-write + per-value rebase).
  *
  * Data scenarios:
- * - allModern: all values >= rebase threshold (the dominant real-world case, no rebase needed)
- * - mixed: ~1% ancient values scattered among modern values (rebase needed for a few)
+ * - allRebase: all values < rebase threshold (all values need rebase)
+ * - allModern: all values >= rebase threshold (no values need rebase)
+ * - halfRebase: 50% ancient values mixed with 50% modern values
  *
  * Buffer scenarios:
  * - heap (hasArray=true):   tests the array-backed bulk-write path
@@ -74,33 +75,43 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     // ==================== Test Data ====================
 
     // int data (4 bytes per value) for readIntegersWithRebase
+    private byte[] intDataAllRebase;
     private byte[] intDataAllModern;
-    private byte[] intDataMixed;
+    private byte[] intDataHalfRebase;
 
     // long data (8 bytes per value) for readLongsWithRebase
+    private byte[] longDataAllRebase;
     private byte[] longDataAllModern;
-    private byte[] longDataMixed;
+    private byte[] longDataHalfRebase;
 
     // ==================== Readers ====================
-    // readIntegersWithRebase readers: old/new × heap/direct × allModern/mixed
+    // readIntegersWithRebase readers: old/new × heap/direct × allRebase/allModern/halfRebase
+    private OldVectorizedPlainValuesReader oldIntAllRebaseHeap;
+    private OldVectorizedPlainValuesReader oldIntAllRebaseDirect;
     private OldVectorizedPlainValuesReader oldIntAllModernHeap;
     private OldVectorizedPlainValuesReader oldIntAllModernDirect;
-    private OldVectorizedPlainValuesReader oldIntMixedHeap;
-    private OldVectorizedPlainValuesReader oldIntMixedDirect;
+    private OldVectorizedPlainValuesReader oldIntHalfRebaseHeap;
+    private OldVectorizedPlainValuesReader oldIntHalfRebaseDirect;
+    private VectorizedPlainValuesReader newIntAllRebaseHeap;
+    private VectorizedPlainValuesReader newIntAllRebaseDirect;
     private VectorizedPlainValuesReader newIntAllModernHeap;
     private VectorizedPlainValuesReader newIntAllModernDirect;
-    private VectorizedPlainValuesReader newIntMixedHeap;
-    private VectorizedPlainValuesReader newIntMixedDirect;
+    private VectorizedPlainValuesReader newIntHalfRebaseHeap;
+    private VectorizedPlainValuesReader newIntHalfRebaseDirect;
 
-    // readLongsWithRebase readers: old/new × heap/direct × allModern/mixed
+    // readLongsWithRebase readers: old/new × heap/direct × allRebase/allModern/halfRebase
+    private OldVectorizedPlainValuesReader oldLongAllRebaseHeap;
+    private OldVectorizedPlainValuesReader oldLongAllRebaseDirect;
     private OldVectorizedPlainValuesReader oldLongAllModernHeap;
     private OldVectorizedPlainValuesReader oldLongAllModernDirect;
-    private OldVectorizedPlainValuesReader oldLongMixedHeap;
-    private OldVectorizedPlainValuesReader oldLongMixedDirect;
+    private OldVectorizedPlainValuesReader oldLongHalfRebaseHeap;
+    private OldVectorizedPlainValuesReader oldLongHalfRebaseDirect;
+    private VectorizedPlainValuesReader newLongAllRebaseHeap;
+    private VectorizedPlainValuesReader newLongAllRebaseDirect;
     private VectorizedPlainValuesReader newLongAllModernHeap;
     private VectorizedPlainValuesReader newLongAllModernDirect;
-    private VectorizedPlainValuesReader newLongMixedHeap;
-    private VectorizedPlainValuesReader newLongMixedDirect;
+    private VectorizedPlainValuesReader newLongHalfRebaseHeap;
+    private VectorizedPlainValuesReader newLongHalfRebaseDirect;
 
     // ==================== Column Vector States ====================
 
@@ -138,33 +149,43 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
         int switchDay = RebaseDateTime.lastSwitchJulianDay();
         long switchTs = RebaseDateTime.lastSwitchJulianTs();
 
-        intDataAllModern = generateIntData(numValues, random, switchDay, 0.0);
-        intDataMixed = generateIntData(numValues, new Random(42), switchDay, 0.01);
-        longDataAllModern = generateLongData(numValues, random, switchTs, 0.0);
-        longDataMixed = generateLongData(numValues, new Random(42), switchTs, 0.01);
+        intDataAllRebase = generateIntData(numValues, random, switchDay, 1.0);
+        intDataAllModern = generateIntData(numValues, new Random(42), switchDay, 0.0);
+        intDataHalfRebase = generateIntData(numValues, new Random(43), switchDay, 0.5);
+        longDataAllRebase = generateLongData(numValues, random, switchTs, 1.0);
+        longDataAllModern = generateLongData(numValues, new Random(42), switchTs, 0.0);
+        longDataHalfRebase = generateLongData(numValues, new Random(43), switchTs, 0.5);
     }
 
     @Setup(Level.Invocation)
     public void setupInvocation() throws IOException {
         // readIntegersWithRebase readers
+        oldIntAllRebaseHeap = initOld(intDataAllRebase, false);
+        oldIntAllRebaseDirect = initOld(intDataAllRebase, true);
         oldIntAllModernHeap = initOld(intDataAllModern, false);
         oldIntAllModernDirect = initOld(intDataAllModern, true);
-        oldIntMixedHeap = initOld(intDataMixed, false);
-        oldIntMixedDirect = initOld(intDataMixed, true);
+        oldIntHalfRebaseHeap = initOld(intDataHalfRebase, false);
+        oldIntHalfRebaseDirect = initOld(intDataHalfRebase, true);
+        newIntAllRebaseHeap = initNew(intDataAllRebase, false);
+        newIntAllRebaseDirect = initNew(intDataAllRebase, true);
         newIntAllModernHeap = initNew(intDataAllModern, false);
         newIntAllModernDirect = initNew(intDataAllModern, true);
-        newIntMixedHeap = initNew(intDataMixed, false);
-        newIntMixedDirect = initNew(intDataMixed, true);
+        newIntHalfRebaseHeap = initNew(intDataHalfRebase, false);
+        newIntHalfRebaseDirect = initNew(intDataHalfRebase, true);
 
         // readLongsWithRebase readers
+        oldLongAllRebaseHeap = initOld(longDataAllRebase, false);
+        oldLongAllRebaseDirect = initOld(longDataAllRebase, true);
         oldLongAllModernHeap = initOld(longDataAllModern, false);
         oldLongAllModernDirect = initOld(longDataAllModern, true);
-        oldLongMixedHeap = initOld(longDataMixed, false);
-        oldLongMixedDirect = initOld(longDataMixed, true);
+        oldLongHalfRebaseHeap = initOld(longDataHalfRebase, false);
+        oldLongHalfRebaseDirect = initOld(longDataHalfRebase, true);
+        newLongAllRebaseHeap = initNew(longDataAllRebase, false);
+        newLongAllRebaseDirect = initNew(longDataAllRebase, true);
         newLongAllModernHeap = initNew(longDataAllModern, false);
         newLongAllModernDirect = initNew(longDataAllModern, true);
-        newLongMixedHeap = initNew(longDataMixed, false);
-        newLongMixedDirect = initNew(longDataMixed, true);
+        newLongHalfRebaseHeap = initNew(longDataHalfRebase, false);
+        newLongHalfRebaseDirect = initNew(longDataHalfRebase, true);
     }
 
     // ==================== Data Generation ====================
@@ -267,7 +288,47 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     }
 
     // ====================================================================================
-    // readIntegersWithRebase — allModern (no rebase needed, the common fast path)
+    // readIntegersWithRebase — allRebase (all values need rebase)
+    // ====================================================================================
+
+    @Benchmark
+    public void readIntWithRebase_allRebase_heap_Old(IntColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            oldIntAllRebaseHeap.readIntegersWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false);
+        }
+    }
+
+    @Benchmark
+    public void readIntWithRebase_allRebase_heap_New(IntColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            newIntAllRebaseHeap.readIntegersWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false);
+        }
+    }
+
+    @Benchmark
+    public void readIntWithRebase_allRebase_direct_Old(IntColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            oldIntAllRebaseDirect.readIntegersWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false);
+        }
+    }
+
+    @Benchmark
+    public void readIntWithRebase_allRebase_direct_New(IntColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            newIntAllRebaseDirect.readIntegersWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false);
+        }
+    }
+
+    // ====================================================================================
+    // readIntegersWithRebase — allModern (no rebase needed)
     // ====================================================================================
 
     @Benchmark
@@ -307,47 +368,87 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     }
 
     // ====================================================================================
-    // readIntegersWithRebase — mixed (~1% ancient values)
+    // readIntegersWithRebase — halfRebase (50% values need rebase)
     // ====================================================================================
 
     @Benchmark
-    public void readIntWithRebase_mixed_heap_Old(IntColumnState state) {
+    public void readIntWithRebase_halfRebase_heap_Old(IntColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            oldIntMixedHeap.readIntegersWithRebase(
+            oldIntHalfRebaseHeap.readIntegersWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false);
         }
     }
 
     @Benchmark
-    public void readIntWithRebase_mixed_heap_New(IntColumnState state) {
+    public void readIntWithRebase_halfRebase_heap_New(IntColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            newIntMixedHeap.readIntegersWithRebase(
+            newIntHalfRebaseHeap.readIntegersWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false);
         }
     }
 
     @Benchmark
-    public void readIntWithRebase_mixed_direct_Old(IntColumnState state) {
+    public void readIntWithRebase_halfRebase_direct_Old(IntColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            oldIntMixedDirect.readIntegersWithRebase(
+            oldIntHalfRebaseDirect.readIntegersWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false);
         }
     }
 
     @Benchmark
-    public void readIntWithRebase_mixed_direct_New(IntColumnState state) {
+    public void readIntWithRebase_halfRebase_direct_New(IntColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            newIntMixedDirect.readIntegersWithRebase(
+            newIntHalfRebaseDirect.readIntegersWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false);
         }
     }
 
     // ====================================================================================
-    // readLongsWithRebase — allModern (no rebase needed, the common fast path)
+    // readLongsWithRebase — allRebase (all values need rebase)
+    // ====================================================================================
+
+    @Benchmark
+    public void readLongWithRebase_allRebase_heap_Old(LongColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            oldLongAllRebaseHeap.readLongsWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
+        }
+    }
+
+    @Benchmark
+    public void readLongWithRebase_allRebase_heap_New(LongColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            newLongAllRebaseHeap.readLongsWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
+        }
+    }
+
+    @Benchmark
+    public void readLongWithRebase_allRebase_direct_Old(LongColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            oldLongAllRebaseDirect.readLongsWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
+        }
+    }
+
+    @Benchmark
+    public void readLongWithRebase_allRebase_direct_New(LongColumnState state) {
+        int n = numValues;
+        for (int i = 0; i < n; i += BATCH_SIZE) {
+            newLongAllRebaseDirect.readLongsWithRebase(
+                Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
+        }
+    }
+
+    // ====================================================================================
+    // readLongsWithRebase — allModern (no rebase needed)
     // ====================================================================================
 
     @Benchmark
@@ -387,41 +488,41 @@ public class VectorizedPlainValuesReaderJMHBenchmark {
     }
 
     // ====================================================================================
-    // readLongsWithRebase — mixed (~1% ancient values)
+    // readLongsWithRebase — halfRebase (50% values need rebase)
     // ====================================================================================
 
     @Benchmark
-    public void readLongWithRebase_mixed_heap_Old(LongColumnState state) {
+    public void readLongWithRebase_halfRebase_heap_Old(LongColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            oldLongMixedHeap.readLongsWithRebase(
+            oldLongHalfRebaseHeap.readLongsWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
         }
     }
 
     @Benchmark
-    public void readLongWithRebase_mixed_heap_New(LongColumnState state) {
+    public void readLongWithRebase_halfRebase_heap_New(LongColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            newLongMixedHeap.readLongsWithRebase(
+            newLongHalfRebaseHeap.readLongsWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
         }
     }
 
     @Benchmark
-    public void readLongWithRebase_mixed_direct_Old(LongColumnState state) {
+    public void readLongWithRebase_halfRebase_direct_Old(LongColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            oldLongMixedDirect.readLongsWithRebase(
+            oldLongHalfRebaseDirect.readLongsWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
         }
     }
 
     @Benchmark
-    public void readLongWithRebase_mixed_direct_New(LongColumnState state) {
+    public void readLongWithRebase_halfRebase_direct_New(LongColumnState state) {
         int n = numValues;
         for (int i = 0; i < n; i += BATCH_SIZE) {
-            newLongMixedDirect.readLongsWithRebase(
+            newLongHalfRebaseDirect.readLongsWithRebase(
                 Math.min(BATCH_SIZE, n - i), state.column, 0, false, "UTC");
         }
     }
