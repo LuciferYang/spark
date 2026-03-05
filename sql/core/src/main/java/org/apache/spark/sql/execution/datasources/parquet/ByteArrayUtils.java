@@ -36,6 +36,15 @@ public class ByteArrayUtils {
    * This is used to optimize rebase operations by finding the first value that requires
    * rebasing, allowing bulk-write of values before the boundary.
    *
+   * <p>Implementation uses a two-phase approach for performance:
+   * <ul>
+   *   <li>Phase 1: Branch-free scan using {@code |=} accumulation to detect if any value
+   *       is below the threshold. This loop has no conditional exits, allowing the JIT
+   *       compiler to auto-vectorize it into SIMD instructions.</li>
+   *   <li>Phase 2: Only executed when Phase 1 finds a match. Uses an early-exit scan
+   *       to locate the exact index of the first value below threshold.</li>
+   * </ul>
+   *
    * @param src the source byte array containing little-endian encoded integers
    * @param srcIndex the starting index in src
    * @param count the number of 4-byte integers to scan
@@ -43,7 +52,22 @@ public class ByteArrayUtils {
    * @return the index of the first int less than threshold, or -1 if none found
    */
   public static int findFirstIntLessThan(byte[] src, int srcIndex, int count, int threshold) {
+    // Phase 1: branch-free detection — JIT can auto-vectorize this loop
+    boolean found = false;
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (BIG_ENDIAN_PLATFORM) {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        found |= Integer.reverseBytes(Platform.getInt(src, srcOffset)) < threshold;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        found |= Platform.getInt(src, srcOffset) < threshold;
+      }
+    }
+    if (!found) return -1;
+
+    // Phase 2: locate exact index with early exit
+    srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
     if (BIG_ENDIAN_PLATFORM) {
       for (int i = 0; i < count; i++, srcOffset += 4) {
         if (Integer.reverseBytes(Platform.getInt(src, srcOffset)) < threshold) return i;
@@ -53,7 +77,7 @@ public class ByteArrayUtils {
         if (Platform.getInt(src, srcOffset) < threshold) return i;
       }
     }
-    return -1;
+    return -1; // unreachable, but needed for compilation
   }
 
   /**
@@ -63,6 +87,15 @@ public class ByteArrayUtils {
    * This is used to optimize rebase operations by finding the first value that requires
    * rebasing, allowing bulk-write of values before the boundary.
    *
+   * <p>Implementation uses a two-phase approach for performance:
+   * <ul>
+   *   <li>Phase 1: Branch-free scan using {@code |=} accumulation to detect if any value
+   *       is below the threshold. This loop has no conditional exits, allowing the JIT
+   *       compiler to auto-vectorize it into SIMD instructions.</li>
+   *   <li>Phase 2: Only executed when Phase 1 finds a match. Uses an early-exit scan
+   *       to locate the exact index of the first value below threshold.</li>
+   * </ul>
+   *
    * @param src the source byte array containing little-endian encoded longs
    * @param srcIndex the starting index in src
    * @param count the number of 8-byte longs to scan
@@ -70,7 +103,22 @@ public class ByteArrayUtils {
    * @return the index of the first long less than threshold, or -1 if none found
    */
   public static int findFirstLongLessThan(byte[] src, int srcIndex, int count, long threshold) {
+    // Phase 1: branch-free detection — JIT can auto-vectorize this loop
+    boolean found = false;
     int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (BIG_ENDIAN_PLATFORM) {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        found |= Long.reverseBytes(Platform.getLong(src, srcOffset)) < threshold;
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 8) {
+        found |= Platform.getLong(src, srcOffset) < threshold;
+      }
+    }
+    if (!found) return -1;
+
+    // Phase 2: locate exact index with early exit
+    srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
     if (BIG_ENDIAN_PLATFORM) {
       for (int i = 0; i < count; i++, srcOffset += 8) {
         if (Long.reverseBytes(Platform.getLong(src, srcOffset)) < threshold) return i;
@@ -80,7 +128,7 @@ public class ByteArrayUtils {
         if (Platform.getLong(src, srcOffset) < threshold) return i;
       }
     }
-    return -1;
+    return -1; // unreachable, but needed for compilation
   }
 
   /**

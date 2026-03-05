@@ -184,12 +184,20 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       // without losing our read cursor, then do a single sequential pass for writing.
       int basePos = buffer.position();
 
-      // Scan using absolute positions to find the first value needing rebase
+      // Phase 1: branch-free detection — JIT can auto-vectorize this loop
       int firstRebaseIdx = -1;
+      boolean needsRebase = false;
       for (int i = 0, pos = basePos; i < total; i++, pos += 4) {
-        if (buffer.getInt(pos) < switchDay) {
-          firstRebaseIdx = i;
-          break;
+        needsRebase |= buffer.getInt(pos) < switchDay;
+      }
+
+      // Phase 2: locate exact index with early exit (only if Phase 1 found a match)
+      if (needsRebase) {
+        for (int i = 0, pos = basePos; i < total; i++, pos += 4) {
+          if (buffer.getInt(pos) < switchDay) {
+            firstRebaseIdx = i;
+            break;
+          }
         }
       }
 
@@ -368,12 +376,20 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       // without losing our read cursor, then do a single sequential pass for writing.
       int basePos = buffer.position();
 
-      // Scan using absolute positions to find the first value needing rebase
+      // Phase 1: branch-free detection — JIT can auto-vectorize this loop
       int firstRebaseIdx = -1;
+      boolean needsRebase = false;
       for (int i = 0, pos = basePos; i < total; i++, pos += 8) {
-        if (buffer.getLong(pos) < switchTs) {
-          firstRebaseIdx = i;
-          break;
+        needsRebase |= buffer.getLong(pos) < switchTs;
+      }
+
+      // Phase 2: locate exact index with early exit (only if Phase 1 found a match)
+      if (needsRebase) {
+        for (int i = 0, pos = basePos; i < total; i++, pos += 8) {
+          if (buffer.getLong(pos) < switchTs) {
+            firstRebaseIdx = i;
+            break;
+          }
         }
       }
 
