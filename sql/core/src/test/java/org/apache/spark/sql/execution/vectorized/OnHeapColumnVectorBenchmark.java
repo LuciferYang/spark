@@ -60,7 +60,7 @@ public class OnHeapColumnVectorBenchmark {
 
     @State(Scope.Thread)
     public static class BaseState {
-        @Param({"1024", "4096"})
+        @Param({"4096", "8192", "16384", "32768", "65536"})
         int batchSize;
 
         OldOnHeapColumnVector oldBooleanVector;
