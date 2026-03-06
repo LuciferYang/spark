@@ -238,6 +238,10 @@ public final class Platform {
     _UNSAFE.setMemory(address, size, value);
   }
 
+  public static void copyMemory(long srcAddress, long destAddress, long bytes) {
+    _UNSAFE.copyMemory(srcAddress, destAddress, bytes);
+  }
+
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
     // Check if dstOffset is before or after srcOffset to determine if we should copy
