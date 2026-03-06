@@ -119,20 +119,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   @Override
   public void putNulls(int rowId, int count) {
     if (isAllNull()) return; // Skip writing nulls to all-null vector.
-    long offset = nulls + rowId;
-    for (int i = 0; i < count; ++i, ++offset) {
-      Platform.putByte(null, offset, (byte) 1);
-    }
+    Platform.setMemory(null, nulls + rowId, count, (byte) 1);
     numNulls += count;
   }
 
   @Override
   public void putNotNulls(int rowId, int count) {
     if (!hasNull()) return;
-    long offset = nulls + rowId;
-    for (int i = 0; i < count; ++i, ++offset) {
-      Platform.putByte(null, offset, (byte) 0);
-    }
+    Platform.setMemory(null, nulls + rowId, count, (byte) 0);
   }
 
   @Override
@@ -152,9 +146,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   @Override
   public void putBooleans(int rowId, int count, boolean value) {
     byte v = (byte)((value) ? 1 : 0);
-    for (int i = 0; i < count; ++i) {
-      Platform.putByte(null, data + rowId + i, v);
-    }
+    Platform.setMemory(null, data + rowId, count, v);
   }
 
   @Override
@@ -194,9 +186,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
 
   @Override
   public void putBytes(int rowId, int count, byte value) {
-    for (int i = 0; i < count; ++i) {
-      Platform.putByte(null, data + rowId + i, value);
-    }
+    Platform.setMemory(null, data + rowId, count, value);
   }
 
   @Override
