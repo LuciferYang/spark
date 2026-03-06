@@ -31,14 +31,15 @@ import org.apache.spark.sql.types.DataTypes;
  *
  * <p>Optimized methods under test:
  * <ul>
- *   <li>{@code putNulls(rowId, count)}       — off-heap byte fill using Platform.setMemory</li>
- *   <li>{@code putNotNulls(rowId, count)}     — off-heap byte clear using Platform.setMemory</li>
- *   <li>{@code putBooleans(rowId, count, v)}  — off-heap byte fill using Platform.setMemory</li>
- *   <li>{@code putBytes(rowId, count, v)}     — off-heap byte fill using Platform.setMemory</li>
+ *   <li>{@code putShorts(rowId, count, v)}   — off-heap fill using seed-and-copy</li>
+ *   <li>{@code putInts(rowId, count, v)}     — off-heap fill using seed-and-copy</li>
+ *   <li>{@code putLongs(rowId, count, v)}    — off-heap fill using seed-and-copy</li>
+ *   <li>{@code putFloats(rowId, count, v)}   — off-heap fill using seed-and-copy</li>
+ *   <li>{@code putDoubles(rowId, count, v)}  — off-heap fill using seed-and-copy</li>
  * </ul>
  *
  * <p>Each method is compared against the old implementation that uses element-by-element
- * assignment loops via Platform.putByte.
+ * assignment loops via Platform.putXxx.
  *
  * <p>To run:
  * <pre>{@code
@@ -288,4 +289,3 @@ public class OffHeapColumnVectorBenchmark {
         new Runner(opt).run();
     }
 }
-
