@@ -60,7 +60,7 @@ public class OffHeapColumnVectorBenchmark {
 
     @State(Scope.Thread)
     public static class BaseState {
-        @Param({"4096", "8192", "16384"})
+        @Param({"512", "1024", "4096", "8192", "16384"})
         int batchSize;
 
         OffHeapColumnVector booleanVector;
@@ -119,7 +119,6 @@ public class OffHeapColumnVectorBenchmark {
             oldDoubleVector.close();
         }
     }
-
 
     // ========================== putShorts (Optimized: seed-and-copy) ==========================
 
