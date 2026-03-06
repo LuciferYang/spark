@@ -120,9 +120,8 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putNulls(int rowId, int count) {
     if (isAllNull()) return; // Skip writing nulls to all-null vector.
     long offset = nulls + rowId;
-    if (count > 0) {
+    for (int i = 0; i < count; ++i, ++offset) {
       Platform.putByte(null, offset, (byte) 1);
-      fillMemory(offset, 1, count);
     }
     numNulls += count;
   }
@@ -131,9 +130,8 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putNotNulls(int rowId, int count) {
     if (!hasNull()) return;
     long offset = nulls + rowId;
-    if (count > 0) {
+    for (int i = 0; i < count; ++i, ++offset) {
       Platform.putByte(null, offset, (byte) 0);
-      fillMemory(offset, 1, count);
     }
   }
 
@@ -254,7 +252,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     long offset = data + 2L * rowId;
     if (count > 0) {
       Platform.putShort(null, offset, value);
-      fillMemory(offset, 2, count);
+      fillUsingSeedAndCopy(offset, 2, count);
     }
   }
 
@@ -324,7 +322,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     long offset = data + 4L * rowId;
     if (count > 0) {
       Platform.putInt(null, offset, value);
-      fillMemory(offset, 4, count);
+      fillUsingSeedAndCopy(offset, 4, count);
     }
   }
 
@@ -405,7 +403,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     long offset = data + 8L * rowId;
     if (count > 0) {
       Platform.putLong(null, offset, value);
-      fillMemory(offset, 8, count);
+      fillUsingSeedAndCopy(offset, 8, count);
     }
   }
 
@@ -474,7 +472,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     long offset = data + 4L * rowId;
     if (count > 0) {
       Platform.putFloat(null, offset, value);
-      fillMemory(offset, 4, count);
+      fillUsingSeedAndCopy(offset, 4, count);
     }
   }
 
@@ -542,7 +540,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     long offset = data + 8L * rowId;
     if (count > 0) {
       Platform.putDouble(null, offset, value);
-      fillMemory(offset, 8, count);
+      fillUsingSeedAndCopy(offset, 8, count);
     }
   }
 
@@ -665,11 +663,11 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   }
 
   /**
-   * Fills a region of off-heap memory with a repeated multi-byte value using a seed-and-doubling
-   * copy strategy. This is significantly faster than element-by-element loops for types wider
-   * than one byte (short, int, long, float, double), because {@code Unsafe.copyMemory} can
-   * leverage hardware-optimized memory copy (e.g., AVX/memcpy) whereas per-element stores
-   * cannot be auto-vectorized as effectively by the JIT.
+   * Fills a region of off-heap memory with a repeated value using a seed-and-doubling
+   * copy strategy. This is significantly faster than element-by-element loops for types
+   * (short, int, long, float, double), because {@code Platform.copyMemory} can leverage
+   * hardware-optimized memory copy (e.g., AVX/memcpy) whereas per-element stores cannot
+   * be auto-vectorized as effectively by the JIT.
    *
    * <p>The caller writes the first element at {@code address}, then this method doubles the
    * filled region using {@code copyMemory} until the entire range is covered.
@@ -678,7 +676,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
    * @param elementSize  the size in bytes of one element (e.g., 2 for short, 4 for int, 8 for long)
    * @param count     the total number of elements to fill (including the already-written first one)
    */
-  private void fillMemory(long address, int elementSize, int count) {
+  private void fillUsingSeedAndCopy(long address, int elementSize, int count) {
     long totalBytes = (long) count * elementSize;
     // First element is already written by caller.
     long filled = elementSize;
