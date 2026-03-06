@@ -64,28 +64,58 @@ public class OffHeapColumnVectorBenchmark {
 
         OffHeapColumnVector booleanVector;
         OffHeapColumnVector byteVector;
+        OffHeapColumnVector shortVector;
+        OffHeapColumnVector intVector;
+        OffHeapColumnVector longVector;
+        OffHeapColumnVector floatVector;
+        OffHeapColumnVector doubleVector;
 
         OldOffHeapColumnVector oldBooleanVector;
         OldOffHeapColumnVector oldByteVector;
+        OldOffHeapColumnVector oldShortVector;
+        OldOffHeapColumnVector oldIntVector;
+        OldOffHeapColumnVector oldLongVector;
+        OldOffHeapColumnVector oldFloatVector;
+        OldOffHeapColumnVector oldDoubleVector;
 
         @Setup(Level.Trial)
         public void setup() {
             // 优化后的实现
             booleanVector = new OffHeapColumnVector(batchSize, DataTypes.BooleanType);
             byteVector    = new OffHeapColumnVector(batchSize, DataTypes.ByteType);
+            shortVector   = new OffHeapColumnVector(batchSize, DataTypes.ShortType);
+            intVector     = new OffHeapColumnVector(batchSize, DataTypes.IntegerType);
+            longVector    = new OffHeapColumnVector(batchSize, DataTypes.LongType);
+            floatVector   = new OffHeapColumnVector(batchSize, DataTypes.FloatType);
+            doubleVector  = new OffHeapColumnVector(batchSize, DataTypes.DoubleType);
 
             // 优化前的实现（对照组）
             oldBooleanVector = new OldOffHeapColumnVector(batchSize, DataTypes.BooleanType);
             oldByteVector    = new OldOffHeapColumnVector(batchSize, DataTypes.ByteType);
+            oldShortVector   = new OldOffHeapColumnVector(batchSize, DataTypes.ShortType);
+            oldIntVector     = new OldOffHeapColumnVector(batchSize, DataTypes.IntegerType);
+            oldLongVector    = new OldOffHeapColumnVector(batchSize, DataTypes.LongType);
+            oldFloatVector   = new OldOffHeapColumnVector(batchSize, DataTypes.FloatType);
+            oldDoubleVector  = new OldOffHeapColumnVector(batchSize, DataTypes.DoubleType);
         }
 
         @TearDown(Level.Trial)
         public void tearDown() {
             booleanVector.close();
             byteVector.close();
+            shortVector.close();
+            intVector.close();
+            longVector.close();
+            floatVector.close();
+            doubleVector.close();
 
             oldBooleanVector.close();
             oldByteVector.close();
+            oldShortVector.close();
+            oldIntVector.close();
+            oldLongVector.close();
+            oldFloatVector.close();
+            oldDoubleVector.close();
         }
     }
 
@@ -186,6 +216,66 @@ public class OffHeapColumnVectorBenchmark {
     @Benchmark
     public void putBytes_old(BaseState state) {
         state.oldByteVector.putBytes(0, state.batchSize, (byte) 42);
+    }
+
+    // ========================== putShorts (Optimized: seed-and-copy) ==========================
+
+    @Benchmark
+    public void putShorts(BaseState state) {
+        state.shortVector.putShorts(0, state.batchSize, (short) 42);
+    }
+
+    @Benchmark
+    public void putShorts_old(BaseState state) {
+        state.oldShortVector.putShorts(0, state.batchSize, (short) 42);
+    }
+
+    // ========================== putInts (Optimized: seed-and-copy) ==========================
+
+    @Benchmark
+    public void putInts(BaseState state) {
+        state.intVector.putInts(0, state.batchSize, 42);
+    }
+
+    @Benchmark
+    public void putInts_old(BaseState state) {
+        state.oldIntVector.putInts(0, state.batchSize, 42);
+    }
+
+    // ========================== putLongs (Optimized: seed-and-copy) ==========================
+
+    @Benchmark
+    public void putLongs(BaseState state) {
+        state.longVector.putLongs(0, state.batchSize, 42L);
+    }
+
+    @Benchmark
+    public void putLongs_old(BaseState state) {
+        state.oldLongVector.putLongs(0, state.batchSize, 42L);
+    }
+
+    // ========================== putFloats (Optimized: seed-and-copy) ==========================
+
+    @Benchmark
+    public void putFloats(BaseState state) {
+        state.floatVector.putFloats(0, state.batchSize, 42.0f);
+    }
+
+    @Benchmark
+    public void putFloats_old(BaseState state) {
+        state.oldFloatVector.putFloats(0, state.batchSize, 42.0f);
+    }
+
+    // ========================== putDoubles (Optimized: seed-and-copy) ==========================
+
+    @Benchmark
+    public void putDoubles(BaseState state) {
+        state.doubleVector.putDoubles(0, state.batchSize, 42.0);
+    }
+
+    @Benchmark
+    public void putDoubles_old(BaseState state) {
+        state.oldDoubleVector.putDoubles(0, state.batchSize, 42.0);
     }
 
     // ==================== Main Method ====================
