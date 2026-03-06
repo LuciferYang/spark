@@ -177,18 +177,6 @@ public class OffHeapColumnVectorBenchmark {
         state.vector.putNotNulls(0, state.batchSize);
     }
 
-    @Benchmark
-    public void putBooleans(BaseState state) {
-        state.booleanVector.putBooleans(0, state.batchSize, true);
-    }
-
-    // ========================== putBytes ==========================
-
-    @Benchmark
-    public void putBytes(BaseState state) {
-        state.byteVector.putBytes(0, state.batchSize, (byte) 42);
-    }
-
     // ========================== Old Implementation Benchmarks (Control Group) ===================
 
     // ========================== putNulls (Old) ==========================
@@ -203,20 +191,6 @@ public class OffHeapColumnVectorBenchmark {
     @Benchmark
     public void putNotNulls_old(PutNotNullsState state) {
         state.oldVector.putNotNulls(0, state.batchSize);
-    }
-
-    // ========================== putBooleans (Old) ==========================
-
-    @Benchmark
-    public void putBooleans_old(BaseState state) {
-        state.oldBooleanVector.putBooleans(0, state.batchSize, true);
-    }
-
-    // ========================== putBytes (Old) ==========================
-
-    @Benchmark
-    public void putBytes_old(BaseState state) {
-        state.oldByteVector.putBytes(0, state.batchSize, (byte) 42);
     }
 
     // ========================== putShorts (Optimized: seed-and-copy) ==========================
