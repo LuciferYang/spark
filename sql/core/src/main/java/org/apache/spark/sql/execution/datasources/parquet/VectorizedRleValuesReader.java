@@ -171,11 +171,21 @@ public final class VectorizedRleValuesReader extends ValuesReader
       VectorizedValuesReader valueReader,
       ParquetVectorUpdater updater) {
     if (defLevels == null) {
-      readBatchInternal(state, values, values, valueReader, updater);
+      // Specialize for IntegerUpdater to allow JIT to inline the updater call sites in the
+      // hot loop, eliminating virtual dispatch overhead on readValue/readValues/skipValues.
+      if (updater instanceof ParquetVectorUpdaterFactory.IntegerUpdater intUpdater) {
+        readBatchInternalInteger(state, values, values, valueReader, intUpdater);
+      } else {
+        readBatchInternal(state, values, values, valueReader, updater);
+      }
     } else {
       readBatchInternalWithDefLevels(state, values, values, defLevels, valueReader, updater);
     }
   }
+
+  // Stateless singleton, safe to reuse across calls.
+  private static final ParquetVectorUpdaterFactory.IntegerUpdater INTEGER_UPDATER =
+      new ParquetVectorUpdaterFactory.IntegerUpdater();
 
   /**
    * Decoding for dictionary ids. The IDs are populated into 'values' and the nullability is
@@ -188,12 +198,97 @@ public final class VectorizedRleValuesReader extends ValuesReader
       WritableColumnVector defLevels,
       VectorizedValuesReader valueReader) {
     if (defLevels == null) {
-      readBatchInternal(state, values, nulls, valueReader,
-        new ParquetVectorUpdaterFactory.IntegerUpdater());
+      readBatchInternalInteger(state, values, nulls, valueReader, INTEGER_UPDATER);
     } else {
       readBatchInternalWithDefLevels(state, values, nulls, defLevels, valueReader,
-        new ParquetVectorUpdaterFactory.IntegerUpdater());
+        INTEGER_UPDATER);
     }
+  }
+
+  /**
+   * Specialized version of {@link #readBatchInternal} for {@link
+   * ParquetVectorUpdaterFactory.IntegerUpdater}.
+   *
+   * <p>The logic is intentionally identical to {@link #readBatchInternal}. The only difference
+   * is that the {@code updater} parameter is a concrete type instead of the
+   * {@link ParquetVectorUpdater} interface, which allows the JIT compiler to inline all
+   * {@code updater.readValue}, {@code updater.readValues} and {@code updater.skipValues} call
+   * sites in the hot loop and eliminate the overhead of virtual dispatch.
+   *
+   * <p><b>Maintenance note</b>: any behavioural change to {@link #readBatchInternal} must be
+   * mirrored here, and vice-versa.
+   */
+  private void readBatchInternalInteger(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdaterFactory.IntegerUpdater updater) {
+
+    long rowId = state.rowId;
+    int leftInBatch = state.rowsToReadInBatch;
+    int leftInPage = state.valuesToReadInPage;
+
+    while (leftInBatch > 0 && leftInPage > 0) {
+      if (currentCount == 0 && !readNextGroup()) break;
+      int n = Math.min(leftInBatch, Math.min(leftInPage, this.currentCount));
+
+      long rangeStart = state.currentRangeStart();
+      long rangeEnd = state.currentRangeEnd();
+
+      if (rowId + n < rangeStart) {
+        skipValues(n, state, valueReader, updater);
+        rowId += n;
+        leftInPage -= n;
+      } else if (rowId > rangeEnd) {
+        state.nextRange();
+      } else {
+        // The range [rowId, rowId + n) overlaps with the current row range in state
+        long start = Math.max(rangeStart, rowId);
+        long end = Math.min(rangeEnd, rowId + n - 1);
+
+        // Skip the part [rowId, start)
+        int toSkip = (int) (start - rowId);
+        if (toSkip > 0) {
+          skipValues(toSkip, state, valueReader, updater);
+          rowId += toSkip;
+          leftInPage -= toSkip;
+        }
+
+        // Read the part [start, end]
+        n = (int) (end - start + 1);
+
+        switch (mode) {
+          case RLE -> {
+            if (currentValue == state.maxDefinitionLevel) {
+              updater.readValues(n, state.valueOffset, values, valueReader);
+            } else {
+              nulls.putNulls(state.valueOffset, n);
+            }
+            state.valueOffset += n;
+          }
+          case PACKED -> {
+            for (int i = 0; i < n; ++i) {
+              int currentValue = currentBuffer[currentBufferIdx++];
+              if (currentValue == state.maxDefinitionLevel) {
+                updater.readValue(state.valueOffset++, values, valueReader);
+              } else {
+                nulls.putNull(state.valueOffset++);
+              }
+            }
+          }
+        }
+        state.levelOffset += n;
+        leftInBatch -= n;
+        rowId += n;
+        leftInPage -= n;
+        currentCount -= n;
+      }
+    }
+
+    state.rowsToReadInBatch = leftInBatch;
+    state.valuesToReadInPage = leftInPage;
+    state.rowId = rowId;
   }
 
   private void readBatchInternal(
