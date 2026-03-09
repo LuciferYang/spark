@@ -60,7 +60,7 @@ public class OffHeapColumnVectorBenchmark {
 
     @State(Scope.Thread)
     public static class BaseState {
-        @Param({"512", "1024", "4096", "8192", "16384"})
+        @Param({"32", "64", "128", "256", "512", "1024", "4096", "8192"})
         int batchSize;
 
         OffHeapColumnVector booleanVector;
