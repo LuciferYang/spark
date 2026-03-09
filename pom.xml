@@ -988,6 +988,18 @@
           </exclusion>
         </exclusions>
       </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-core</artifactId>
+        <version>1.37</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-generator-annprocess</artifactId>
+        <version>1.37</version>
+        <scope>test</scope>
+      </dependency>
       <!-- SPARK-38885: After Netty 4.1.76, add the following `Netty` dependencies explicitly
            to ensure `./dev/test-dependencies.sh` produce the same results on Linux and MacOS.
       -->
