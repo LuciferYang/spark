@@ -122,9 +122,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putInt(rowId + i, buffer.getInt());
-      }
+      byte[] tmp = new byte[requiredBytes];
+      buffer.get(tmp);
+      c.putIntsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -167,9 +167,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         int offset = buffer.arrayOffset() + buffer.position();
         c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
       } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, buffer.getInt());
-        }
+        byte[] tmp = new byte[requiredBytes];
+        buffer.get(tmp);
+        c.putIntsLittleEndian(rowId, total, tmp, 0);
       }
     }
   }
@@ -183,9 +183,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putLong(rowId + i, buffer.getLong());
-      }
+      byte[] tmp = new byte[requiredBytes];
+      buffer.get(tmp);
+      c.putLongsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -315,9 +315,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         int offset = buffer.arrayOffset() + buffer.position();
         c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
       } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putLong(rowId + i, buffer.getLong());
-        }
+        byte[] tmp = new byte[requiredBytes];
+        buffer.get(tmp);
+        c.putLongsLittleEndian(rowId, total, tmp, 0);
       }
     }
   }
@@ -331,9 +331,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putFloatsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putFloat(rowId + i, buffer.getFloat());
-      }
+      byte[] tmp = new byte[requiredBytes];
+      buffer.get(tmp);
+      c.putFloatsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -351,9 +351,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putDoublesLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putDouble(rowId + i, buffer.getDouble());
-      }
+      byte[] tmp = new byte[requiredBytes];
+      buffer.get(tmp);
+      c.putDoublesLittleEndian(rowId, total, tmp, 0);
     }
   }
 
