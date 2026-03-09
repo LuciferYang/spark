@@ -51,7 +51,7 @@ import org.apache.spark.sql.types.DataTypes;
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Fork(value = 2, jvmArgs = {"-Xms4G", "-Xmx4G"})
+@Fork(value = 1, jvmArgs = {"-Xms4G", "-Xmx4G"})
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 public class OffHeapColumnVectorBenchmark {
@@ -60,7 +60,7 @@ public class OffHeapColumnVectorBenchmark {
 
     @State(Scope.Thread)
     public static class BaseState {
-        @Param({"32", "64", "128", "256", "512", "1024", "4096", "8192"})
+        @Param({"16", "32", "64", "128", "256", "512", "1024", "4096", "8192"})
         int batchSize;
 
         OffHeapColumnVector booleanVector;
