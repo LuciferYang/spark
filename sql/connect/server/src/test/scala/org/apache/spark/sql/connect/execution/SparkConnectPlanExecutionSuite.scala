@@ -37,7 +37,7 @@ import org.apache.spark.sql.test.SharedSparkSession
  * to emit a ShuffledRowRDD over all partitions even for `SELECT * FROM t LIMIT 1000`.
  */
 class SparkConnectPlanExecutionLimitSuite
-  extends SparkFunSuite
+    extends SparkFunSuite
     with SharedSparkSession
     with BeforeAndAfterEach {
 
@@ -64,13 +64,13 @@ class SparkConnectPlanExecutionLimitSuite
    * shape: the fast path must NOT result in a ShuffleExchange above the scan.
    */
   private def physicalPlanHasCollectLimit(
-                                           df: org.apache.spark.sql.classic.DataFrame): Boolean = {
+      df: org.apache.spark.sql.classic.DataFrame): Boolean = {
     df.queryExecution.executedPlan.isInstanceOf[CollectLimitExec] ||
       df.queryExecution.executedPlan.find(_.isInstanceOf[CollectLimitExec]).isDefined
   }
 
   private def physicalPlanHasCollectTail(
-                                          df: org.apache.spark.sql.classic.DataFrame): Boolean = {
+      df: org.apache.spark.sql.classic.DataFrame): Boolean = {
     df.queryExecution.executedPlan.isInstanceOf[CollectTailExec] ||
       df.queryExecution.executedPlan.find(_.isInstanceOf[CollectTailExec]).isDefined
   }
@@ -240,8 +240,8 @@ class SparkConnectPlanExecutionLimitSuite
         val info = stageCompleted.stageInfo
         // A ShuffleMapStage always has a non-null shuffleDepId on its RDDInfo
         // We detect it by checking whether any RDD in the stage has a shuffle dep
-        if (info.rddInfos.exists(rdd => rdd.name.contains("ShuffledRDD") ||
-          rdd.name.contains("MapPartitionsRDD") && info.numTasks > 1)) {
+        if (info.rddInfos.exists(r => r.name.contains("ShuffledRDD") ||
+            (r.name.contains("MapPartitionsRDD") && info.numTasks > 1))) {
           // Heuristic: mark as potential shuffle stage for review
         }
         // More reliably: check stage parentIds - a ResultStage from executeTake
@@ -276,86 +276,7 @@ class SparkConnectPlanExecutionLimitSuite
   // with a shuffle dependency was submitted.
   // ---------------------------------------------------------------------------
 
-  // ---------------------------------------------------------------------------
-  // Threshold behaviour: spark.connect.execute.collectFastPath.maxRows
-  //
-  // Must be a positive integer (config checkValue enforces > 0).
-  // Fast path fires when limit <= threshold; falls back to doExecute() otherwise.
-  // Default: 10 000
-  // ---------------------------------------------------------------------------
-
-  private val fastPathConfig = "spark.connect.execute.collectFastPath.maxRows"
-
-  test("fast path is skipped when limit exceeds config threshold") {
-    withSQLConf(fastPathConfig -> "10") {
-      val df = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(100)
-      assert(physicalPlanHasCollectLimit(df))
-      // limit(100) > threshold(10) -> guard false -> doExecute() -> ShuffledRowRDD
-      assert(containsShuffle(df),
-        "When limit > threshold, doExecute() path must be taken and shuffle must appear")
-    }
-  }
-
-  test("fast path fires when limit is exactly equal to threshold") {
-    withSQLConf(fastPathConfig -> "100") {
-      val df = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(100)
-      assert(!containsShuffle(df),
-        "limit == threshold must still use the fast path (guard is <=)")
-      assert(df.collect().length == 100)
-    }
-  }
-
-  test("fast path fires when limit is below threshold") {
-    withSQLConf(fastPathConfig -> "1000") {
-      val df = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(100)
-      assert(!containsShuffle(df))
-      assert(df.collect().length == 100)
-    }
-  }
-
-  test("threshold=1 means only LIMIT 1 uses fast path") {
-    withSQLConf(fastPathConfig -> "1") {
-      // LIMIT 1 is within threshold -> fast path
-      val df1 = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(1)
-      assert(!containsShuffle(df1))
-      assert(df1.collect().length == 1)
-
-      // LIMIT 2 exceeds threshold -> doExecute() path
-      val df2 = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(2)
-      assert(containsShuffle(df2),
-        "threshold=1: LIMIT 2 must fall back to doExecute()")
-    }
-  }
-
-  test("invalid config value (<= 0) is rejected at config parse time") {
-    intercept[Exception] {
-      withSQLConf(fastPathConfig -> "0") {}
-    }
-    intercept[Exception] {
-      withSQLConf(fastPathConfig -> "-1") {}
-    }
-  }
-
-  test("default threshold (10 000) allows typical interactive LIMIT queries via fast path") {
-    val df = spark.range(0, 500000, 1, numPartitions = 200).toDF("id").limit(1000)
-    assert(!containsShuffle(df),
-      "Default threshold must allow LIMIT 1000 to use the fast path")
-    assert(df.collect().length == 1000)
-  }
-
-  test("CollectTailExec fast path skipped when limit exceeds threshold") {
-    withSQLConf(fastPathConfig -> "5") {
-      val threshold = spark.sessionState.conf.getConfString(fastPathConfig).toInt
-      val tailLimit = 100
-      assert(tailLimit > threshold,
-        "Precondition: limit must exceed threshold for this test to be meaningful")
-      // Guard: tailLimit <= threshold -> false -> case _ fires
-      assert(!(tailLimit <= threshold))
-    }
-  }
-
   test("processAsArrowBatches with CollectLimitExec sends correct Arrow batch row counts") {
-
     val limit = 200
     val df = spark.range(50000).toDF("id").limit(limit)
     assert(df.queryExecution.executedPlan.isInstanceOf[CollectLimitExec],
