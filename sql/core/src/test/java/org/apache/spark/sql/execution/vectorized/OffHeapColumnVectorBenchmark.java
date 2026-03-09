@@ -52,8 +52,8 @@ import org.apache.spark.sql.types.DataTypes;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(value = 1, jvmArgs = {"-Xms4G", "-Xmx4G"})
-@Warmup(iterations = 10, time = 1)
-@Measurement(iterations = 10, time = 1)
+@Warmup(iterations = 20, time = 1)
+@Measurement(iterations = 20, time = 1)
 public class OffHeapColumnVectorBenchmark {
 
     // ==================== Shared base state ====================
