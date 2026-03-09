@@ -19,14 +19,10 @@ package org.apache.spark.sql.connect.execution
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.mockito.Mockito._
-import org.mockito.ArgumentMatchers.any
 import org.scalatest.BeforeAndAfterEach
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.connect.proto
-import org.apache.spark.sql.classic.SparkSession
-import org.apache.spark.sql.execution.{CollectLimitExec, CollectTailExec, LocalTableScanExec}
+import org.apache.spark.sql.execution.{CollectLimitExec, CollectTailExec}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.test.SharedSparkSession
 
@@ -115,8 +111,8 @@ class SparkConnectPlanExecutionLimitSuite
 
   test("LIMIT on multi-partition dataset does NOT introduce ShuffleExchange") {
     // Create a dataset with many partitions to make the bug observable.
-    // With the bug: CollectLimitExec.doExecute() creates ShuffledRowRDD → ShuffleExchangeExec.
-    // With the fix: executeCollect() → executeTake() → no shuffle.
+    // With the bug: CollectLimitExec.doExecute() creates ShuffledRowRDD -> ShuffleExchangeExec.
+    // With the fix: executeCollect() -> executeTake() -> no shuffle.
     val df = spark.range(0, 100000, 1, numPartitions = 200).toDF("id").limit(1000)
     assert(physicalPlanHasCollectLimit(df))
     // The key assertion: no shuffle exchange should exist in the plan
@@ -161,7 +157,7 @@ class SparkConnectPlanExecutionLimitSuite
   }
 
   test("LIMIT with offset returns correct rows") {
-    // CollectLimitExec handles offset via executeCollect() → executeTake().drop(offset)
+    // CollectLimitExec handles offset via executeCollect() -> executeTake().drop(offset)
     val df = spark.range(1000).toDF("id")
     // Simulate offset via internal plan; use SQL for clarity
     val result = spark.sql(
@@ -232,7 +228,7 @@ class SparkConnectPlanExecutionLimitSuite
   // With the fix:   numStages == 1  (single ResultStage from executeTake)
   //
   // Note: executeTake itself may submit multiple small jobs internally, but
-  // each of those is a ResultStage only — no ShuffleMapStage is ever created.
+  // each of those is a ResultStage only - no ShuffleMapStage is ever created.
   // ---------------------------------------------------------------------------
 
   test("LIMIT query does not create ShuffleMapStage (stage-count check)") {
@@ -244,11 +240,11 @@ class SparkConnectPlanExecutionLimitSuite
         val info = stageCompleted.stageInfo
         // A ShuffleMapStage always has a non-null shuffleDepId on its RDDInfo
         // We detect it by checking whether any RDD in the stage has a shuffle dep
-        if (info.rddInfos.exists(_.name.contains("ShuffledRDD") ||
-          _.name.contains("MapPartitionsRDD") && info.numTasks > 1)) {
+        if (info.rddInfos.exists(rdd => rdd.name.contains("ShuffledRDD") ||
+          rdd.name.contains("MapPartitionsRDD") && info.numTasks > 1)) {
           // Heuristic: mark as potential shuffle stage for review
         }
-        // More reliably: check stage parentIds — a ResultStage from executeTake
+        // More reliably: check stage parentIds - a ResultStage from executeTake
         // has no parent shuffle stages when limit rows fit in first few partitions.
         // We record ALL completed stages and assert none is a ShuffleMapStage.
         if (info.name.contains("shuffle") || info.name.contains("Shuffle")) {
@@ -294,7 +290,7 @@ class SparkConnectPlanExecutionLimitSuite
     withSQLConf(fastPathConfig -> "10") {
       val df = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(100)
       assert(physicalPlanHasCollectLimit(df))
-      // limit(100) > threshold(10) → guard false → doExecute() → ShuffledRowRDD
+      // limit(100) > threshold(10) -> guard false -> doExecute() -> ShuffledRowRDD
       assert(containsShuffle(df),
         "When limit > threshold, doExecute() path must be taken and shuffle must appear")
     }
@@ -319,12 +315,12 @@ class SparkConnectPlanExecutionLimitSuite
 
   test("threshold=1 means only LIMIT 1 uses fast path") {
     withSQLConf(fastPathConfig -> "1") {
-      // LIMIT 1 is within threshold → fast path
+      // LIMIT 1 is within threshold -> fast path
       val df1 = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(1)
       assert(!containsShuffle(df1))
       assert(df1.collect().length == 1)
 
-      // LIMIT 2 exceeds threshold → doExecute() path
+      // LIMIT 2 exceeds threshold -> doExecute() path
       val df2 = spark.range(0, 10000, 1, numPartitions = 50).toDF("id").limit(2)
       assert(containsShuffle(df2),
         "threshold=1: LIMIT 2 must fall back to doExecute()")
@@ -353,14 +349,12 @@ class SparkConnectPlanExecutionLimitSuite
       val tailLimit = 100
       assert(tailLimit > threshold,
         "Precondition: limit must exceed threshold for this test to be meaningful")
-      // Guard: tailLimit <= threshold → false → case _ fires
+      // Guard: tailLimit <= threshold -> false -> case _ fires
       assert(!(tailLimit <= threshold))
     }
   }
 
   test("processAsArrowBatches with CollectLimitExec sends correct Arrow batch row counts") {
-    import org.apache.spark.connect.proto.ExecutePlanResponse
-    import scala.collection.mutable.ListBuffer
 
     val limit = 200
     val df = spark.range(50000).toDF("id").limit(limit)
