@@ -247,12 +247,23 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     Platform.putShort(null, data + 2L * rowId, value);
   }
 
+  // The threshold to use the seed-and-copy strategy.
+  // Based on the benchmark results, the seed-and-copy strategy is faster than the
+  // element-by-element assignment loop when the batch size is larger than 1024.
+  private static final int FILL_THRESHOLD = 1024;
+
   @Override
   public void putShorts(int rowId, int count, short value) {
     long offset = data + 2L * rowId;
     if (count > 0) {
-      Platform.putShort(null, offset, value);
-      fillUsingSeedAndCopy(offset, 2, count);
+      if (count < FILL_THRESHOLD) {
+        for (int i = 0; i < count; ++i) {
+          Platform.putShort(null, offset + 2L * i, value);
+        }
+      } else {
+        Platform.putShort(null, offset, value);
+        fillUsingSeedAndCopy(offset, 2, count);
+      }
     }
   }
 
@@ -321,8 +332,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putInts(int rowId, int count, int value) {
     long offset = data + 4L * rowId;
     if (count > 0) {
-      Platform.putInt(null, offset, value);
-      fillUsingSeedAndCopy(offset, 4, count);
+      if (count < FILL_THRESHOLD) {
+        for (int i = 0; i < count; ++i) {
+          Platform.putInt(null, offset + 4L * i, value);
+        }
+      } else {
+        Platform.putInt(null, offset, value);
+        fillUsingSeedAndCopy(offset, 4, count);
+      }
     }
   }
 
@@ -402,8 +419,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putLongs(int rowId, int count, long value) {
     long offset = data + 8L * rowId;
     if (count > 0) {
-      Platform.putLong(null, offset, value);
-      fillUsingSeedAndCopy(offset, 8, count);
+      if (count < FILL_THRESHOLD) {
+        for (int i = 0; i < count; ++i) {
+          Platform.putLong(null, offset + 8L * i, value);
+        }
+      } else {
+        Platform.putLong(null, offset, value);
+        fillUsingSeedAndCopy(offset, 8, count);
+      }
     }
   }
 
@@ -471,8 +494,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putFloats(int rowId, int count, float value) {
     long offset = data + 4L * rowId;
     if (count > 0) {
-      Platform.putFloat(null, offset, value);
-      fillUsingSeedAndCopy(offset, 4, count);
+      if (count < FILL_THRESHOLD) {
+        for (int i = 0; i < count; ++i) {
+          Platform.putFloat(null, offset + 4L * i, value);
+        }
+      } else {
+        Platform.putFloat(null, offset, value);
+        fillUsingSeedAndCopy(offset, 4, count);
+      }
     }
   }
 
@@ -539,8 +568,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   public void putDoubles(int rowId, int count, double value) {
     long offset = data + 8L * rowId;
     if (count > 0) {
-      Platform.putDouble(null, offset, value);
-      fillUsingSeedAndCopy(offset, 8, count);
+      if (count < FILL_THRESHOLD) {
+        for (int i = 0; i < count; ++i) {
+          Platform.putDouble(null, offset + 8L * i, value);
+        }
+      } else {
+        Platform.putDouble(null, offset, value);
+        fillUsingSeedAndCopy(offset, 8, count);
+      }
     }
   }
 
