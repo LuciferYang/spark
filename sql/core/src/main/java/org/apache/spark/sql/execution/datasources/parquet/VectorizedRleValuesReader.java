@@ -30,6 +30,7 @@ import org.apache.parquet.io.api.Binary;
 
 import org.apache.spark.SparkUnsupportedOperationException;
 import org.apache.spark.network.util.JavaUtils;
+import org.apache.spark.sql.execution.datasources.parquet.ParquetVectorUpdaterFactory.IntegerUpdater;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 
 /**
@@ -202,6 +203,83 @@ public final class VectorizedRleValuesReader extends ValuesReader
       WritableColumnVector nulls,
       VectorizedValuesReader valueReader,
       ParquetVectorUpdater updater) {
+    if (updater instanceof IntegerUpdater integerUpdater) {
+      readBatchInternalInteger(state, values, nulls, valueReader, integerUpdater);
+      return;
+    }
+
+    long rowId = state.rowId;
+    int leftInBatch = state.rowsToReadInBatch;
+    int leftInPage = state.valuesToReadInPage;
+
+    while (leftInBatch > 0 && leftInPage > 0) {
+      if (currentCount == 0 && !readNextGroup()) break;
+      int n = Math.min(leftInBatch, Math.min(leftInPage, this.currentCount));
+
+      long rangeStart = state.currentRangeStart();
+      long rangeEnd = state.currentRangeEnd();
+
+      if (rowId + n < rangeStart) {
+        skipValues(n, state, valueReader, updater);
+        rowId += n;
+        leftInPage -= n;
+      } else if (rowId > rangeEnd) {
+        state.nextRange();
+      } else {
+        // The range [rowId, rowId + n) overlaps with the current row range in state
+        long start = Math.max(rangeStart, rowId);
+        long end = Math.min(rangeEnd, rowId + n - 1);
+
+        // Skip the part [rowId, start)
+        int toSkip = (int) (start - rowId);
+        if (toSkip > 0) {
+          skipValues(toSkip, state, valueReader, updater);
+          rowId += toSkip;
+          leftInPage -= toSkip;
+        }
+
+        // Read the part [start, end]
+        n = (int) (end - start + 1);
+
+        switch (mode) {
+          case RLE -> {
+            if (currentValue == state.maxDefinitionLevel) {
+              updater.readValues(n, state.valueOffset, values, valueReader);
+            } else {
+              nulls.putNulls(state.valueOffset, n);
+            }
+            state.valueOffset += n;
+          }
+          case PACKED -> {
+            for (int i = 0; i < n; ++i) {
+              int currentValue = currentBuffer[currentBufferIdx++];
+              if (currentValue == state.maxDefinitionLevel) {
+                updater.readValue(state.valueOffset++, values, valueReader);
+              } else {
+                nulls.putNull(state.valueOffset++);
+              }
+            }
+          }
+        }
+        state.levelOffset += n;
+        leftInBatch -= n;
+        rowId += n;
+        leftInPage -= n;
+        currentCount -= n;
+      }
+    }
+
+    state.rowsToReadInBatch = leftInBatch;
+    state.valuesToReadInPage = leftInPage;
+    state.rowId = rowId;
+  }
+
+  private void readBatchInternalInteger(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      VectorizedValuesReader valueReader,
+      IntegerUpdater updater) {
 
     long rowId = state.rowId;
     int leftInBatch = state.rowsToReadInBatch;
