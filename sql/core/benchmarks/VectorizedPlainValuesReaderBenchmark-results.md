@@ -98,3 +98,22 @@
 - **Expected on x86**: On x86 with slower direct buffer access (JNI boundary), the bulk copy should show 2-5x improvement in DIRECT paths
 - **HEAP paths**: Correctly unchanged (within noise), confirming the optimization only affects the DIRECT branch
 - **Note**: Results have high error margins due to JMH warm-up variance; will be validated on x86
+
+---
+
+## Step 2: readBooleans Batch Byte Fetch Optimization
+
+**Change**: Replace per-byte `updateCurrentByte()` (which calls `in.read()` individually for each byte) in the main loop with a single `getBuffer(fullBytes)` call to fetch all boolean bytes at once. Then iterate over the local byte array or ByteBuffer.
+
+| Benchmark | bufferType | vectorType | Baseline (ops/s) | Step 2 (ops/s) | Change |
+|-----------|-----------|------------|-----------------|----------------|--------|
+| readBooleans | **HEAP** | **ON_HEAP** | **970,635** | **1,697,970** | **+75%** |
+| readBooleans | **HEAP** | **OFF_HEAP** | **1,277,167** | **1,775,597** | **+39%** |
+| readBooleans | **DIRECT** | **ON_HEAP** | **1,397,326** | **1,765,406** | **+26%** |
+| readBooleans | **DIRECT** | **OFF_HEAP** | **1,334,941** | **1,769,401** | **+33%** |
+
+### Observations (Step 2)
+- **Consistent improvement across all configurations**: 26-75% throughput increase
+- Biggest gain on HEAP/ON_HEAP (+75%), where the overhead of `ByteBufferInputStream.read()` per byte was highest
+- The batch fetch eliminates hundreds of `in.read()` calls (512 for 4096 booleans), replacing them with a single slice operation
+- On Apple M3 this is already significant; expected to be even better on x86 where function call overhead is higher
