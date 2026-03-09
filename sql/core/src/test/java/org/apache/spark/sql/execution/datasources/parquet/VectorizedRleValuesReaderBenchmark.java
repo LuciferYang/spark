@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.sql.execution.datasources.parquet;
 
 import org.apache.parquet.bytes.ByteBufferInputStream;
@@ -26,8 +43,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(1)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 public class VectorizedRleValuesReaderBenchmark {
 
   public static void main(String[] args) throws RunnerException {
@@ -38,13 +55,11 @@ public class VectorizedRleValuesReaderBenchmark {
     new Runner(opt).run();
   }
 
-  private static final int NUM_VALUES = 1024 * 1024; // 1M values
-  private static final int BIT_WIDTH = 4; // 4 bits [0, 15]
+private static final int NUM_VALUES = 1024 * 1024; // 1M values
 
   @Param({"PACKED", "RLE"})
   public String encodingMode;
-
-  @Param({"0.0", "0.5"})
+  @Param({"0.0", "0.1", "0.5"})
   public double nullDensity;
 
   private ByteBufferInputStream inputStream;
@@ -56,7 +71,6 @@ public class VectorizedRleValuesReaderBenchmark {
   
   // Data to reset
   private byte[] encodedBytes;
-  private int valuesToRead;
 
   private VectorizedValuesReader valueReader;
 
@@ -65,7 +79,6 @@ public class VectorizedRleValuesReaderBenchmark {
     // 1. Generate Definition Levels (0 or 1 for simplicity)
     // maxDefinitionLevel = 1.
     // 0 = null, 1 = non-null.
-    int maxDefLevel = 1;
     
     Random random = new Random(42);
     // Use DirectByteBufferAllocator to simulate real usage
@@ -98,7 +111,6 @@ public class VectorizedRleValuesReaderBenchmark {
     encodedBytes[3] = (byte) ((len >> 24) & 0xff);
     System.arraycopy(data, 0, encodedBytes, 4, data.length);
     
-    valuesToRead = NUM_VALUES;
 
     // 2. Prepare Vectors
     valuesVector = new OnHeapColumnVector(NUM_VALUES, DataTypes.IntegerType);
