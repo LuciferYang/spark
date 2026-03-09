@@ -43,6 +43,56 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   private int bitOffset;
   private byte currentByte = 0;
 
+  // Reusable buffers to avoid allocations and virtual calls in tight loops
+  private int[] scratchInts;
+  private long[] scratchLongs;
+  private float[] scratchFloats;
+  private double[] scratchDoubles;
+  private byte[] scratchBytes;
+  private short[] scratchShorts;
+
+  private int[] ensureScratchInts(int capacity) {
+    if (scratchInts == null || scratchInts.length < capacity) {
+      scratchInts = new int[capacity];
+    }
+    return scratchInts;
+  }
+
+  private short[] ensureScratchShorts(int capacity) {
+    if (scratchShorts == null || scratchShorts.length < capacity) {
+      scratchShorts = new short[capacity];
+    }
+    return scratchShorts;
+  }
+
+  private long[] ensureScratchLongs(int capacity) {
+    if (scratchLongs == null || scratchLongs.length < capacity) {
+      scratchLongs = new long[capacity];
+    }
+    return scratchLongs;
+  }
+
+  private float[] ensureScratchFloats(int capacity) {
+    if (scratchFloats == null || scratchFloats.length < capacity) {
+      scratchFloats = new float[capacity];
+    }
+    return scratchFloats;
+  }
+
+  private double[] ensureScratchDoubles(int capacity) {
+    if (scratchDoubles == null || scratchDoubles.length < capacity) {
+      scratchDoubles = new double[capacity];
+    }
+    return scratchDoubles;
+  }
+
+  private byte[] ensureScratchBytes(int capacity) {
+    if (scratchBytes == null || scratchBytes.length < capacity) {
+      scratchBytes = new byte[capacity];
+    }
+    return scratchBytes;
+  }
+
   public VectorizedPlainValuesReader() {
   }
 
@@ -122,9 +172,10 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putInt(rowId + i, buffer.getInt());
-      }
+      int[] scratch = ensureScratchInts(total);
+      buffer.asIntBuffer().get(scratch, 0, total);
+      c.putInts(rowId, total, scratch, 0);
+      buffer.position(buffer.position() + total * 4);
     }
   }
 
@@ -137,9 +188,14 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
+    int[] scratch = ensureScratchInts(total);
+    buffer.asIntBuffer().get(scratch, 0, total);
+    buffer.position(buffer.position() + total * 4);
+    long[] scratchL = ensureScratchLongs(total);
     for (int i = 0; i < total; i += 1) {
-      c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+      scratchL[i] = Integer.toUnsignedLong(scratch[i]);
     }
+    c.putLongs(rowId, total, scratchL, 0);
   }
 
   // A fork of `readIntegers` to rebase the date values. For performance reasons, this method
@@ -158,9 +214,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
+        int[] scratch = ensureScratchInts(total);
+        buffer.asIntBuffer().get(scratch, 0, total);
+        buffer.position(buffer.position() + total * 4);
         for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, RebaseDateTime.rebaseJulianToGregorianDays(buffer.getInt()));
+          scratch[i] = RebaseDateTime.rebaseJulianToGregorianDays(scratch[i]);
         }
+        c.putInts(rowId, total, scratch, 0);
       }
     } else {
       if (buffer.hasArray()) {
@@ -183,9 +243,10 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putLong(rowId + i, buffer.getLong());
-      }
+      long[] scratch = ensureScratchLongs(total);
+      buffer.asLongBuffer().get(scratch, 0, total);
+      c.putLongs(rowId, total, scratch, 0);
+      buffer.position(buffer.position() + total * 8);
     }
   }
 
@@ -199,7 +260,7 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
     // scratch buffer: max 9 bytes (0x00 sign byte + 8 value bytes), reused per batch
-    byte[] scratch = new byte[9];
+    byte[] scratch = ensureScratchBytes(9);
     if (buffer.hasArray()) {
       byte[] src = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
@@ -304,11 +365,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
+        long[] scratch = ensureScratchLongs(total);
+        buffer.asLongBuffer().get(scratch, 0, total);
+        buffer.position(buffer.position() + total * 8);
         for (int i = 0; i < total; i += 1) {
-          c.putLong(
-            rowId + i,
-            RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, buffer.getLong()));
+          scratch[i] = RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, scratch[i]);
         }
+        c.putLongs(rowId, total, scratch, 0);
       }
     } else {
       if (buffer.hasArray()) {
@@ -331,9 +394,10 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putFloatsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putFloat(rowId + i, buffer.getFloat());
-      }
+      float[] scratch = ensureScratchFloats(total);
+      buffer.asFloatBuffer().get(scratch, 0, total);
+      c.putFloats(rowId, total, scratch, 0);
+      buffer.position(buffer.position() + total * 4);
     }
   }
 
@@ -351,9 +415,10 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putDoublesLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putDouble(rowId + i, buffer.getDouble());
-      }
+      double[] scratch = ensureScratchDoubles(total);
+      buffer.asDoubleBuffer().get(scratch, 0, total);
+      c.putDoubles(rowId, total, scratch, 0);
+      buffer.position(buffer.position() + total * 8);
     }
   }
 
@@ -376,11 +441,14 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
         c.putByte(rowId + i, array[offset + i * 4]);
       }
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putByte(rowId + i, buffer.get());
-        // skip the next 3 bytes
-        buffer.position(buffer.position() + 3);
+      int[] scratch = ensureScratchInts(total);
+      buffer.asIntBuffer().get(scratch, 0, total);
+      buffer.position(buffer.position() + total * 4);
+      byte[] scratchB = ensureScratchBytes(total);
+      for (int i = 0; i < total; i++) {
+        scratchB[i] = (byte) scratch[i];
       }
+      c.putBytes(rowId, total, scratchB, 0);
     }
   }
 
@@ -398,9 +466,14 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putShortsFromIntsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putShort(rowId + i, (short) buffer.getInt());
+      int[] scratch = ensureScratchInts(total);
+      buffer.asIntBuffer().get(scratch, 0, total);
+      buffer.position(buffer.position() + total * 4);
+      short[] scratchS = ensureScratchShorts(total);
+      for (int i = 0; i < total; i++) {
+        scratchS[i] = (short) scratch[i];
       }
+      c.putShorts(rowId, total, scratchS, 0);
     }
   }
 
@@ -457,13 +530,28 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readBinary(int total, WritableColumnVector v, int rowId) {
     for (int i = 0; i < total; i++) {
       int len = readInteger();
-      ByteBuffer buffer = getBuffer(len);
-      if (buffer.hasArray()) {
-        v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+      if (len < 1024) { // Optimization: avoid slice() for small binaries
+        byte[] scratch = ensureScratchBytes(len);
+        int read = 0;
+        while (read < len) {
+          try {
+            int n = in.read(scratch, read, len - read);
+            if (n < 0) throw new ParquetDecodingException("EOF");
+            read += n;
+          } catch (IOException e) {
+            throw new ParquetDecodingException("Failed to read", e);
+          }
+        }
+        v.putByteArray(rowId + i, scratch, 0, len);
       } else {
-        byte[] bytes = new byte[len];
-        buffer.get(bytes);
-        v.putByteArray(rowId + i, bytes);
+        ByteBuffer buffer = getBuffer(len);
+        if (buffer.hasArray()) {
+          v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+        } else {
+          byte[] bytes = new byte[len];
+          buffer.get(bytes);
+          v.putByteArray(rowId + i, bytes);
+        }
       }
     }
   }
