@@ -277,8 +277,10 @@ public final class OffHeapColumnVector extends WritableColumnVector {
           (short) Integer.reverseBytes(Platform.getInt(src, srcOffset)));
       }
     } else {
+      // On LE platforms, the low 2 bytes of each INT32 are the short value.
+      // Use getShort directly to read only 2 bytes per element instead of 4.
       for (int i = 0; i < count; ++i, srcOffset += 4, dstOffset += 2) {
-        Platform.putShort(null, dstOffset, (short) Platform.getInt(src, srcOffset));
+        Platform.putShort(null, dstOffset, Platform.getShort(src, srcOffset));
       }
     }
   }
