@@ -1008,10 +1008,12 @@ public final class VectorizedRleValuesReader extends ValuesReader
           }
           currentBufferIdx = 0;
           int valueIndex = 0;
+          int totalBytes = numGroups * bitWidth;
+          ByteBuffer buffer = in.slice(totalBytes);
+          int pos = buffer.position();
           while (valueIndex < this.currentCount) {
-            // values are bit packed 8 at a time, so reading bitWidth will always work
-            ByteBuffer buffer = in.slice(bitWidth);
-            this.packer.unpack8Values(buffer, buffer.position(), this.currentBuffer, valueIndex);
+            this.packer.unpack8Values(buffer, pos, this.currentBuffer, valueIndex);
+            pos += bitWidth;
             valueIndex += 8;
           }
         }
@@ -1027,6 +1029,13 @@ public final class VectorizedRleValuesReader extends ValuesReader
    * Skip `n` values from the current reader.
    */
   private void skipValues(int n) {
+    if (n <= currentCount) {
+      if (mode == MODE.PACKED) {
+        currentBufferIdx += n;
+      }
+      currentCount -= n;
+      return;
+    }
     int left = n;
     while (left > 0) {
       if (this.currentCount == 0 && !readNextGroup()) break;
