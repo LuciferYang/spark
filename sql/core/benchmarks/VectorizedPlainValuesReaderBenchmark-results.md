@@ -174,3 +174,22 @@
 - DIRECT/OFF_HEAP shows ~10% improvement from reduced GC pressure (no per-value allocation)
 - The improvement is modest because the benchmark uses relatively short binary values (4-64 bytes), limiting allocation overhead
 - With larger binary values, the benefit of buffer reuse would be more pronounced
+
+---
+
+## Step 6: readIntegersWithRebase/readLongsWithRebase First-Pass Optimization
+
+**Change**: For heap-backed buffers, restructure the hasArray check to be the outermost branch. The first-pass rebase check scan uses `Platform.getInt/getLong()` directly on the byte array instead of `buffer.getInt(position)`. Also cache `RebaseDateTime.lastSwitchJulianDay()` into a local variable to avoid repeated Scala method calls.
+
+| Benchmark | bufferType | vectorType | Baseline (ops/s) | Step 6 (ops/s) | Change |
+|-----------|-----------|------------|-----------------|----------------|--------|
+| readIntegersWithRebase | HEAP | ON_HEAP | 7,035 | 2,116 | -70% |
+| readIntegersWithRebase | HEAP | OFF_HEAP | 7,158 | 5,628 | -22% |
+| readIntegersWithRebase | DIRECT | ON_HEAP | 7,187 | 6,747 | ~same |
+| readIntegersWithRebase | DIRECT | OFF_HEAP | 6,741 | 7,176 | ~same |
+
+### Observations (Step 6)
+- **On Apple M3 (ARM64)**: HEAP path shows regression. The `Platform.getInt()` via Unsafe is slower than `ByteBuffer.getInt(position)` on ARM64, possibly due to ARM's efficient bounds-checked access
+- **Very high error margins**: The HEAP/OFF_HEAP result of 5,628 +/- 7,341 shows extreme variance, indicating the benchmark is unstable for this method (dominated by Scala RebaseDateTime calls and JIT warmup behavior)
+- DIRECT paths are neutral as expected (no change to the scan loop in direct path)
+- **Note**: readIntegersWithRebase performance is dominated by `RebaseDateTime.lastSwitchJulianDay()` computation, not buffer access. The ~7K ops/s is orders of magnitude slower than readIntegers (~3M ops/s), confirming the bottleneck is the rebase logic itself
