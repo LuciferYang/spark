@@ -482,15 +482,18 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final void readBinary(int total, WritableColumnVector v, int rowId) {
+    byte[] reusableBuf = null;
     for (int i = 0; i < total; i++) {
       int len = readInteger();
       ByteBuffer buffer = getBuffer(len);
       if (buffer.hasArray()) {
         v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
       } else {
-        byte[] bytes = new byte[len];
-        buffer.get(bytes);
-        v.putByteArray(rowId + i, bytes);
+        if (reusableBuf == null || reusableBuf.length < len) {
+          reusableBuf = new byte[Math.max(len, 64)];
+        }
+        buffer.get(reusableBuf, 0, len);
+        v.putByteArray(rowId + i, reusableBuf, 0, len);
       }
     }
   }

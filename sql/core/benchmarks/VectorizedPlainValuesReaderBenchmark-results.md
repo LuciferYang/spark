@@ -155,3 +155,22 @@
 - The JIT on M3 was already effectively optimizing the original tight loop with ByteBuffer.getInt() + Integer.toUnsignedLong() + c.putLong()
 - **Expected on x86**: The tight loop with Platform.getInt + bulk putLongs should benefit from better JIT vectorization on x86
 - **Note**: Will be validated on x86; M3 results show ARM JIT handles virtual dispatch very efficiently
+
+---
+
+## Step 5: readBinary Buffer Reuse Optimization
+
+**Change**: In the DIRECT ByteBuffer path of readBinary, replace per-value `new byte[len]` allocation with a reusable buffer (`reusableBuf`) that grows on demand. Since `putByteArray` copies the data internally, reusing the temp buffer is safe.
+
+| Benchmark | bufferType | vectorType | Baseline (ops/s) | Step 5 (ops/s) | Change |
+|-----------|-----------|------------|-----------------|----------------|--------|
+| readBinary | HEAP | ON_HEAP | 133,620 | 132,013 | ~same |
+| readBinary | HEAP | OFF_HEAP | 104,176 | 106,269 | ~same |
+| readBinary | **DIRECT** | **ON_HEAP** | **78,898** | **80,049** | **+2%** |
+| readBinary | **DIRECT** | **OFF_HEAP** | **68,972** | **75,514** | **+10%** |
+
+### Observations (Step 5)
+- HEAP paths unchanged (expected - heap path already has zero-copy via array())
+- DIRECT/OFF_HEAP shows ~10% improvement from reduced GC pressure (no per-value allocation)
+- The improvement is modest because the benchmark uses relatively short binary values (4-64 bytes), limiting allocation overhead
+- With larger binary values, the benefit of buffer reuse would be more pronounced
