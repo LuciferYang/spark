@@ -441,7 +441,40 @@ trait GetArrayItemUtil {
  */
 trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
 
-  // todo: current search is O(n), improve it.
+  /**
+   * Minimum map size to use hash-based lookup. Below this threshold, linear scan
+   * is used since the overhead of building a hash index (Arrays.fill + loop)
+   * exceeds the cost of a linear scan. The value 20 is chosen empirically;
+   * for primitive key types the break-even is around 15-25 elements.
+   */
+  private val HASH_LOOKUP_THRESHOLD = 20
+
+  // Single-slot identity cache. Safe because expression instances are
+  // not shared across threads in Spark's task execution model.
+  @transient private var lastMap: MapData = _
+  @transient private var lastIndex: java.util.HashMap[Any, Int] = _
+
+  private def getOrBuildIndex(
+      map: MapData,
+      keyType: DataType): java.util.HashMap[Any, Int] = {
+    if (lastMap ne map) {
+      val keys = map.keyArray()
+      val len = keys.numElements()
+      // Both interpreted and codegen paths use first-occurrence semantics
+      // for duplicate keys, matching the behavior of the original linear scan.
+      val hm = new java.util.HashMap[Any, Int]((len * 1.5).toInt)
+      var i = 0
+      while (i < len) {
+        val k = keys.get(i, keyType)
+        if (!hm.containsKey(k)) hm.put(k, i)
+        i += 1
+      }
+      lastIndex = hm
+      lastMap = map
+    }
+    lastIndex
+  }
+
   def getValueEval(
       value: Any,
       ordinal: Any,
@@ -449,27 +482,67 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
       ordering: Ordering[Any]): Any = {
     val map = value.asInstanceOf[MapData]
     val length = map.numElements()
-    val keys = map.keyArray()
-    val values = map.valueArray()
+    if (length == 0) return null
 
-    var i = 0
-    var found = false
-    while (i < length && !found) {
-      if (ordering.equiv(keys.get(i, keyType), ordinal)) {
-        found = true
-      } else {
-        i += 1
-      }
-    }
-
-    if (!found || values.isNullAt(i)) {
-      null
+    if (length >= HASH_LOOKUP_THRESHOLD &&
+        TypeUtils.typeWithProperEquals(keyType)) {
+      val idx = getOrBuildIndex(map, keyType)
+        .getOrDefault(ordinal, -1)
+      if (idx == -1 || map.valueArray().isNullAt(idx)) null
+      else map.valueArray().get(idx, dataType)
     } else {
-      values.get(i, dataType)
+      val keys = map.keyArray()
+      val values = map.valueArray()
+      var i = 0
+      var found = false
+      while (i < length && !found) {
+        if (ordering.equiv(keys.get(i, keyType), ordinal)) {
+          found = true
+        } else {
+          i += 1
+        }
+      }
+      if (!found || values.isNullAt(i)) null
+      else values.get(i, dataType)
+    }
+  }
+
+  private def genHashExpr(
+      keyType: DataType,
+      keyVar: String): Option[String] = {
+    keyType match {
+      case BooleanType =>
+        Some(s"($keyVar ? 1 : 0)")
+      case ByteType | ShortType | IntegerType | DateType |
+           _: YearMonthIntervalType =>
+        Some(s"(int) $keyVar")
+      case LongType | TimestampType | TimestampNTZType |
+           _: DayTimeIntervalType =>
+        Some(s"(int)($keyVar ^ ($keyVar >>> 32))")
+      case FloatType =>
+        Some(s"Float.floatToIntBits($keyVar)")
+      case DoubleType =>
+        val bits = s"Double.doubleToLongBits($keyVar)"
+        Some(s"(int)($bits ^ ($bits >>> 32))")
+      case st: StringType if st.supportsBinaryEquality =>
+        Some(s"$keyVar.hashCode()")
+      case _ =>
+        None
     }
   }
 
   def doGetValueGenCode(
+      ctx: CodegenContext,
+      ev: ExprCode,
+      mapType: MapType): ExprCode = {
+    val keyType = mapType.keyType
+    genHashExpr(keyType, "dummy") match {
+      case Some(_) => doGetValueGenCodeHash(ctx, ev, mapType)
+      case None => doGetValueGenCodeLinear(ctx, ev, mapType)
+    }
+  }
+
+  private def doGetValueGenCodeLinear(
       ctx: CodegenContext,
       ev: ExprCode,
       mapType: MapType): ExprCode = {
@@ -494,7 +567,8 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
 
         int $index = 0;
         while ($index < $length) {
-          final $keyJavaType $key = ${CodeGenerator.getValue(keys, keyType, index)};
+          final $keyJavaType $key =
+            ${CodeGenerator.getValue(keys, keyType, index)};
           if (${ctx.genEqual(keyType, key, eval2)}) {
             break;
           } else {
@@ -505,7 +579,139 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
         if ($index == $length$nullCheck) {
           ${ev.isNull} = true;
         } else {
-          ${ev.value} = ${CodeGenerator.getValue(values, dataType, index)};
+          ${ev.value} =
+            ${CodeGenerator.getValue(values, dataType, index)};
+        }
+      """
+    })
+  }
+
+  private def doGetValueGenCodeHash(
+      ctx: CodegenContext,
+      ev: ExprCode,
+      mapType: MapType): ExprCode = {
+    val keyType = mapType.keyType
+    val keyJavaType = CodeGenerator.javaType(keyType)
+
+    val lastKeyArray = ctx.addMutableState(
+      "ArrayData", "lastKeyArray", v => s"$v = null;")
+    val hashBuckets = ctx.addMutableState(
+      "int[]", "hashBuckets", v => s"$v = null;")
+    val hashMask = ctx.addMutableState(
+      "int", "hashMask", v => s"$v = 0;")
+
+    val index = ctx.freshName("index")
+    val length = ctx.freshName("length")
+    val keys = ctx.freshName("keys")
+    val values = ctx.freshName("values")
+    val buildIdx = ctx.freshName("buildIdx")
+    val buildKey = ctx.freshName("buildKey")
+    val buildH = ctx.freshName("buildH")
+    val lookupH = ctx.freshName("lookupH")
+    val found = ctx.freshName("found")
+    val candidateKey = ctx.freshName("candidateKey")
+    val idx = ctx.freshName("idx")
+    val linearKey = ctx.freshName("linearKey")
+    val cap = ctx.freshName("cap")
+
+    val buildHashExpr = genHashExpr(keyType, buildKey).get
+
+    nullSafeCodeGen(ctx, ev, (eval1, eval2) => {
+      val lookupHash = genHashExpr(keyType, eval2).get
+
+      val nullCheckFound = if (mapType.valueContainsNull) {
+        s"""
+          if ($values.isNullAt($idx)) {
+            ${ev.isNull} = true;
+          } else {
+            ${ev.value} =
+              ${CodeGenerator.getValue(values, dataType, idx)};
+          }
+        """
+      } else {
+        s"""
+          ${ev.value} =
+            ${CodeGenerator.getValue(values, dataType, idx)};
+        """
+      }
+
+      val linearNullCheck = if (mapType.valueContainsNull) {
+        s" || $values.isNullAt($index)"
+      } else {
+        ""
+      }
+
+      s"""
+        final int $length = $eval1.numElements();
+        final ArrayData $keys = $eval1.keyArray();
+        final ArrayData $values = $eval1.valueArray();
+
+        if ($length == 0) {
+          ${ev.isNull} = true;
+        } else if ($length < $HASH_LOOKUP_THRESHOLD) {
+          int $index = 0;
+          while ($index < $length) {
+            final $keyJavaType $linearKey =
+              ${CodeGenerator.getValue(keys, keyType, index)};
+            if (${ctx.genEqual(keyType, linearKey, eval2)}) {
+              break;
+            } else {
+              $index++;
+            }
+          }
+          if ($index == $length$linearNullCheck) {
+            ${ev.isNull} = true;
+          } else {
+            ${ev.value} =
+              ${CodeGenerator.getValue(values, dataType, index)};
+          }
+        } else {
+          if ($keys != $lastKeyArray) {
+            int $cap = Math.max(
+              Integer.highestOneBit(
+                Math.max($length * 2 - 1, 1)) << 1, 4);
+            if ($hashBuckets == null ||
+                $hashBuckets.length < $cap) {
+              $hashBuckets = new int[$cap];
+            }
+            java.util.Arrays.fill($hashBuckets, 0, $cap, -1);
+            $hashMask = $cap - 1;
+            // Duplicate keys: we insert all occurrences unconditionally.
+            // During lookup, linear probing returns the first slot that
+            // matches, which is always the first-inserted occurrence of
+            // that key, preserving first-occurrence semantics consistent
+            // with the interpreted path.
+            // Capacity is 2*length so load factor stays <= 0.5 even with
+            // all-duplicate keys.
+            for (int $buildIdx = 0;
+                 $buildIdx < $length; $buildIdx++) {
+              $keyJavaType $buildKey =
+                ${CodeGenerator.getValue(keys, keyType, buildIdx)};
+              int $buildH = ($buildHashExpr) & $hashMask;
+              while ($hashBuckets[$buildH] != -1) {
+                $buildH = ($buildH + 1) & $hashMask;
+              }
+              $hashBuckets[$buildH] = $buildIdx;
+            }
+            $lastKeyArray = $keys;
+          }
+
+          int $lookupH = ($lookupHash) & $hashMask;
+          boolean $found = false;
+          while ($hashBuckets[$lookupH] != -1) {
+            final int $idx = $hashBuckets[$lookupH];
+            final $keyJavaType $candidateKey =
+              ${CodeGenerator.getValue(keys, keyType, idx)};
+            if (${ctx.genEqual(keyType, candidateKey, eval2)}) {
+              $found = true;
+              $nullCheckFound
+              break;
+            }
+            $lookupH = ($lookupH + 1) & $hashMask;
+          }
+          if (!$found) {
+            ${ev.isNull} = true;
+          }
         }
       """
     })
@@ -545,17 +751,9 @@ case class GetMapValue(child: Expression, key: Expression)
   override def left: Expression = child
   override def right: Expression = key
 
-  /**
-   * `Null` is returned for invalid ordinals.
-   *
-   * TODO: We could make nullability more precise in foldable cases (e.g., literal input).
-   * But, since the key search is O(n), it takes much time to compute nullability.
-   * If we find efficient key searches, revisit this.
-   */
   override def nullable: Boolean = true
   override def dataType: DataType = child.dataType.asInstanceOf[MapType].valueType
 
-  // todo: current search is O(n), improve it.
   override def nullSafeEval(value: Any, ordinal: Any): Any = {
     getValueEval(value, ordinal, keyType, ordering)
   }
