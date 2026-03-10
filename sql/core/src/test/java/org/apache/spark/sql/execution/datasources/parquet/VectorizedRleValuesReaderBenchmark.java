@@ -43,8 +43,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(1)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 public class VectorizedRleValuesReaderBenchmark {
 
   public static void main(String[] args) throws RunnerException {
@@ -61,7 +61,7 @@ public class VectorizedRleValuesReaderBenchmark {
   @Param({"PACKED", "RLE"})
   public String encodingMode;
 
-  @Param({"0.0", "0.5"})
+  @Param({"0.0", "0.1", "0.5"})
   public double nullDensity;
 
   private ByteBufferInputStream inputStream;
