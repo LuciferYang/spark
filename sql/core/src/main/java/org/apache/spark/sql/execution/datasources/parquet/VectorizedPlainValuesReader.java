@@ -31,6 +31,7 @@ import org.apache.spark.sql.execution.datasources.DataSourceUtils;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.GeographyType;
 import org.apache.spark.sql.types.GeometryType;
+import org.apache.spark.unsafe.Platform;
 import org.apache.spark.util.ByteBufferOutputStream;
 
 /**
@@ -150,9 +151,20 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    for (int i = 0; i < total; i += 1) {
-      c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+    long[] tmp = new long[total];
+    if (buffer.hasArray()) {
+      byte[] src = buffer.array();
+      int offset = buffer.arrayOffset() + buffer.position();
+      for (int i = 0; i < total; i++) {
+        tmp[i] = Integer.toUnsignedLong(
+            Platform.getInt(src, Platform.BYTE_ARRAY_OFFSET + offset + (long) i * 4));
+      }
+    } else {
+      for (int i = 0; i < total; i++) {
+        tmp[i] = Integer.toUnsignedLong(buffer.getInt());
+      }
     }
+    c.putLongs(rowId, total, tmp, 0);
   }
 
   // A fork of `readIntegers` to rebase the date values. For performance reasons, this method

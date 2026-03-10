@@ -136,3 +136,22 @@
 - The batch pattern (extract to tmp, then bulk write) adds an extra memory pass compared to the original inline approach
 - **Expected on x86**: On x86 with higher virtual method call overhead, the reduction from N putByte() calls to 1 putBytes() call should be beneficial
 - **Note**: The extraction stride pattern (every 4th byte) prevents vectorization, limiting the optimization potential
+
+---
+
+## Step 4: readUnsignedIntegers Batch Read+Convert Optimization
+
+**Change**: Replace per-element `buffer.getInt()` + `Integer.toUnsignedLong()` + `c.putLong()` loop with: heap-backed path using `Platform.getInt()` for tight loop, then bulk `c.putLongs(rowId, total, tmp, 0)`. Direct path uses `buffer.getInt()` loop into long[] tmp, then bulk write.
+
+| Benchmark | bufferType | vectorType | Baseline (ops/s) | Step 4 (ops/s) | Change |
+|-----------|-----------|------------|-----------------|----------------|--------|
+| readUnsignedIntegers | HEAP | ON_HEAP | 807,569 | 479,525 | -41% |
+| readUnsignedIntegers | HEAP | OFF_HEAP | 1,295,994 | 503,560 | -61% |
+| readUnsignedIntegers | DIRECT | ON_HEAP | 1,077,144 | 552,739 | -49% |
+| readUnsignedIntegers | DIRECT | OFF_HEAP | 1,312,479 | 212,787 | -84% |
+
+### Observations (Step 4)
+- **On Apple M3 (ARM64)**: Shows significant regression. The `Platform.getInt()` call is slower than `ByteBuffer.getInt()` on ARM64, and the additional long[] allocation + bulk copy adds overhead
+- The JIT on M3 was already effectively optimizing the original tight loop with ByteBuffer.getInt() + Integer.toUnsignedLong() + c.putLong()
+- **Expected on x86**: The tight loop with Platform.getInt + bulk putLongs should benefit from better JIT vectorization on x86
+- **Note**: Will be validated on x86; M3 results show ARM JIT handles virtual dispatch very efficiently
