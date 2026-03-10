@@ -272,8 +272,10 @@ public final class OnHeapColumnVector extends WritableColumnVector {
         shortData[rowId + i] = (short) Integer.reverseBytes(Platform.getInt(src, srcOffset));
       }
     } else {
+      // On LE platform, the low 2 bytes of each 4-byte INT32 contain the short value.
+      // Reading a short directly avoids reading 4 bytes and truncating.
       for (int i = 0; i < count; ++i, srcOffset += 4) {
-        shortData[rowId + i] = (short) Platform.getInt(src, srcOffset);
+        shortData[rowId + i] = Platform.getShort(src, srcOffset);
       }
     }
   }
