@@ -117,3 +117,22 @@
 - Biggest gain on HEAP/ON_HEAP (+75%), where the overhead of `ByteBufferInputStream.read()` per byte was highest
 - The batch fetch eliminates hundreds of `in.read()` calls (512 for 4096 booleans), replacing them with a single slice operation
 - On Apple M3 this is already significant; expected to be even better on x86 where function call overhead is higher
+
+---
+
+## Step 3: readBytes Batch Extraction Optimization
+
+**Change**: Extract bytes from 4-byte INT32 encoding into a temp `byte[]` first, then use bulk `c.putBytes(rowId, total, tmp, 0)` instead of per-element `c.putByte(rowId + i, ...)` virtual method calls.
+
+| Benchmark | bufferType | vectorType | Baseline (ops/s) | Step 3 (ops/s) | Change |
+|-----------|-----------|------------|-----------------|----------------|--------|
+| readBytes | HEAP | ON_HEAP | 1,627,965 | 1,295,244 | -20% |
+| readBytes | HEAP | OFF_HEAP | 1,598,881 | 1,276,987 | -20% |
+| readBytes | DIRECT | ON_HEAP | 1,689,879 | 1,355,796 | -20% |
+| readBytes | DIRECT | OFF_HEAP | 1,636,143 | 1,305,528 | -20% |
+
+### Observations (Step 3)
+- **On Apple M3 (ARM64)**: Shows ~20% regression. The extra temp byte[] allocation + strided extraction + bulk copy is slower than direct per-element writes on M3, where virtual method dispatch is highly optimized by the JIT
+- The batch pattern (extract to tmp, then bulk write) adds an extra memory pass compared to the original inline approach
+- **Expected on x86**: On x86 with higher virtual method call overhead, the reduction from N putByte() calls to 1 putBytes() call should be beneficial
+- **Note**: The extraction stride pattern (every 4th byte) prevents vectorization, limiting the optimization potential
