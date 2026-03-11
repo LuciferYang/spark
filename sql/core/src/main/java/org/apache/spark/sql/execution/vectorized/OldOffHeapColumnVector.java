@@ -16,19 +16,35 @@
  */
 package org.apache.spark.sql.execution.vectorized;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-
 import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.spark.sql.types.*;
+import org.apache.spark.sql.types.BooleanType;
+import org.apache.spark.sql.types.ByteType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DateType;
+import org.apache.spark.sql.types.DayTimeIntervalType;
+import org.apache.spark.sql.types.DecimalType;
+import org.apache.spark.sql.types.DoubleType;
+import org.apache.spark.sql.types.FloatType;
+import org.apache.spark.sql.types.IntegerType;
+import org.apache.spark.sql.types.LongType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.ShortType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimeType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
+import org.apache.spark.sql.types.YearMonthIntervalType;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Column data backed using offheap memory.
  */
-public final class OffHeapColumnVector extends WritableColumnVector {
+public final class OldOffHeapColumnVector extends WritableColumnVector {
 
   private static final boolean bigEndianPlatform =
     ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN);
@@ -38,7 +54,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OffHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
+  public static OldOffHeapColumnVector[] allocateColumns(int capacity, StructType schema) {
     return allocateColumns(capacity, schema.fields());
   }
 
@@ -47,10 +63,10 @@ public final class OffHeapColumnVector extends WritableColumnVector {
    * Capacity is the initial capacity of the vector and it will grow as necessary. Capacity is
    * in number of elements, not number of bytes.
    */
-  public static OffHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
-    OffHeapColumnVector[] vectors = new OffHeapColumnVector[fields.length];
+  public static OldOffHeapColumnVector[] allocateColumns(int capacity, StructField[] fields) {
+    OldOffHeapColumnVector[] vectors = new OldOffHeapColumnVector[fields.length];
     for (int i = 0; i < fields.length; i++) {
-      vectors[i] = new OffHeapColumnVector(capacity, fields[i].dataType());
+      vectors[i] = new OldOffHeapColumnVector(capacity, fields[i].dataType());
     }
     return vectors;
   }
@@ -64,7 +80,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   private long lengthData;
   private long offsetData;
 
-  public OffHeapColumnVector(int capacity, DataType type) {
+  public OldOffHeapColumnVector(int capacity, DataType type) {
     super(capacity, type);
 
     nulls = 0;
@@ -278,7 +294,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
       }
     } else {
       for (int i = 0; i < count; ++i, srcOffset += 4, dstOffset += 2) {
-        Platform.putShort(null, dstOffset, Platform.getShort(src, srcOffset));
+        Platform.putShort(null, dstOffset, (short) Platform.getInt(src, srcOffset));
       }
     }
   }
@@ -346,7 +362,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
       long offset = data + 4L * rowId;
       for (int i = 0; i < count; ++i, offset += 4, srcOffset += 4) {
         Platform.putInt(null, offset,
-            java.lang.Integer.reverseBytes(Platform.getInt(src, srcOffset)));
+            Integer.reverseBytes(Platform.getInt(src, srcOffset)));
       }
     }
   }
@@ -426,7 +442,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
       long offset = data + 8L * rowId;
       for (int i = 0; i < count; ++i, offset += 8, srcOffset += 8) {
         Platform.putLong(null, offset,
-            java.lang.Long.reverseBytes(Platform.getLong(src, srcOffset)));
+            Long.reverseBytes(Platform.getLong(src, srcOffset)));
       }
     }
   }
@@ -653,7 +669,7 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
-  public OffHeapColumnVector reserveNewColumn(int capacity, DataType type) {
-    return new OffHeapColumnVector(capacity, type);
+  public OldOffHeapColumnVector reserveNewColumn(int capacity, DataType type) {
+    return new OldOffHeapColumnVector(capacity, type);
   }
 }
