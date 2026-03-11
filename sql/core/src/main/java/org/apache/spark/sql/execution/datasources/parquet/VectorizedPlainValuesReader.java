@@ -31,6 +31,7 @@ import org.apache.spark.sql.execution.datasources.DataSourceUtils;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.GeographyType;
 import org.apache.spark.sql.types.GeometryType;
+import org.apache.spark.unsafe.Platform;
 import org.apache.spark.util.ByteBufferOutputStream;
 
 /**
@@ -42,6 +43,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   // Only used for booleans.
   private int bitOffset;
   private byte currentByte = 0;
+
+  // Reusable temporary buffers for batch optimizations.
+  private byte[] tmpHeapBuffer;
 
   public VectorizedPlainValuesReader() {
   }
@@ -72,9 +76,22 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       c.putBooleans(rowId, i, currentByte, bitOffset);
       bitOffset = (bitOffset + i) & 7;
     }
-    for (; i + 7 < total; i += 8) {
-      updateCurrentByte();
-      c.putBooleans(rowId + i, currentByte);
+    // Batch-read all full bytes in a single getBuffer call instead of per-byte in.read().
+    int fullBytes = (total - i) / 8;
+    if (fullBytes > 0) {
+      ByteBuffer buffer = getBuffer(fullBytes);
+      if (buffer.hasArray()) {
+        byte[] array = buffer.array();
+        int offset = buffer.arrayOffset() + buffer.position();
+        for (int j = 0; j < fullBytes; j++) {
+          c.putBooleans(rowId + i + j * 8, array[offset + j]);
+        }
+      } else {
+        for (int j = 0; j < fullBytes; j++) {
+          c.putBooleans(rowId + i + j * 8, buffer.get());
+        }
+      }
+      i += fullBytes * 8;
     }
     if (i < total) {
       updateCurrentByte();
@@ -113,6 +130,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
   }
 
+  private byte[] getTmpHeapBuffer(int size) {
+    if (tmpHeapBuffer == null || tmpHeapBuffer.length < size) {
+      tmpHeapBuffer = new byte[size];
+    }
+    return tmpHeapBuffer;
+  }
+
   @Override
   public final void readIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
@@ -137,8 +161,16 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    for (int i = 0; i < total; i += 1) {
-      c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+    if (buffer.hasArray()) {
+      byte[] src = buffer.array();
+      long srcOffset = buffer.arrayOffset() + buffer.position() + Platform.BYTE_ARRAY_OFFSET;
+      for (int i = 0; i < total; i++, srcOffset += 4) {
+        c.putLong(rowId + i, Integer.toUnsignedLong(Platform.getInt(src, srcOffset)));
+      }
+    } else {
+      for (int i = 0; i < total; i++) {
+        c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+      }
     }
   }
 
@@ -150,27 +182,36 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int total, WritableColumnVector c, int rowId, boolean failIfRebase) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    boolean rebase = false;
-    for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getInt(buffer.position() + i * 4) < RebaseDateTime.lastSwitchJulianDay();
+
+    byte[] src;
+    int offset;
+    if (buffer.hasArray()) {
+      src = buffer.array();
+      offset = buffer.arrayOffset() + buffer.position();
+    } else {
+      src = getTmpHeapBuffer(requiredBytes);
+      buffer.get(src, 0, requiredBytes);
+      offset = 0;
     }
+
+    long srcAddr = Platform.BYTE_ARRAY_OFFSET + offset;
+    boolean rebase = false;
+    int lastSwitchDay = RebaseDateTime.lastSwitchJulianDay();
+    for (int i = 0; i < total; i++) {
+      rebase |= Platform.getInt(src, srcAddr + i * 4L) < lastSwitchDay;
+    }
+
     if (rebase) {
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, RebaseDateTime.rebaseJulianToGregorianDays(buffer.getInt()));
+        for (int i = 0; i < total; i++) {
+          c.putInt(rowId + i, RebaseDateTime.rebaseJulianToGregorianDays(
+              Platform.getInt(src, srcAddr + i * 4L)));
         }
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putInt(rowId + i, buffer.getInt());
-        }
-      }
+      c.putIntsLittleEndian(rowId, total, src, offset);
     }
   }
 
@@ -296,29 +337,38 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       String timeZone) {
     int requiredBytes = total * 8;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    boolean rebase = false;
-    for (int i = 0; i < total; i += 1) {
-      rebase |= buffer.getLong(buffer.position() + i * 8) < RebaseDateTime.lastSwitchJulianTs();
+
+    byte[] src;
+    int offset;
+    if (buffer.hasArray()) {
+      src = buffer.array();
+      offset = buffer.arrayOffset() + buffer.position();
+    } else {
+      src = getTmpHeapBuffer(requiredBytes);
+      buffer.get(src, 0, requiredBytes);
+      offset = 0;
     }
+
+    long srcAddr = Platform.BYTE_ARRAY_OFFSET + offset;
+    boolean rebase = false;
+    long lastSwitchTs = RebaseDateTime.lastSwitchJulianTs();
+    for (int i = 0; i < total; i++) {
+      rebase |= Platform.getLong(src, srcAddr + i * 8L) < lastSwitchTs;
+    }
+
     if (rebase) {
       if (failIfRebase) {
         throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
       } else {
-        for (int i = 0; i < total; i += 1) {
+        for (int i = 0; i < total; i++) {
           c.putLong(
             rowId + i,
-            RebaseDateTime.rebaseJulianToGregorianMicros(timeZone, buffer.getLong()));
+            RebaseDateTime.rebaseJulianToGregorianMicros(
+                timeZone, Platform.getLong(src, srcAddr + i * 8L)));
         }
       }
     } else {
-      if (buffer.hasArray()) {
-        int offset = buffer.arrayOffset() + buffer.position();
-        c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
-      } else {
-        for (int i = 0; i < total; i += 1) {
-          c.putLong(rowId + i, buffer.getLong());
-        }
-      }
+      c.putLongsLittleEndian(rowId, total, src, offset);
     }
   }
 
@@ -365,7 +415,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   @Override
   public final void readBytes(int total, WritableColumnVector c, int rowId) {
     // Bytes are stored as a 4-byte little endian int. Just read the first byte.
-    // TODO: consider pushing this in ColumnVector by adding a readBytes with a stride.
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
 
@@ -461,9 +510,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       if (buffer.hasArray()) {
         v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
       } else {
-        byte[] bytes = new byte[len];
-        buffer.get(bytes);
-        v.putByteArray(rowId + i, bytes);
+        byte[] bytes = getTmpHeapBuffer(len);
+        buffer.get(bytes, 0, len);
+        v.putByteArray(rowId + i, bytes, 0, len);
       }
     }
   }
