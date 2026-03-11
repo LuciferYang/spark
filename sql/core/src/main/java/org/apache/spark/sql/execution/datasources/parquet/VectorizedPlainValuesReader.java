@@ -45,6 +45,8 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   private byte currentByte = 0;
 
   // Reusable temporary buffers for batch optimizations.
+  private byte[] tmpByteBuffer;
+  private short[] tmpShortBuffer;
   private byte[] tmpHeapBuffer;
 
   public VectorizedPlainValuesReader() {
@@ -137,6 +139,20 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     return tmpHeapBuffer;
   }
 
+  private byte[] getTmpByteBuffer(int size) {
+    if (tmpByteBuffer == null || tmpByteBuffer.length < size) {
+      tmpByteBuffer = new byte[size];
+    }
+    return tmpByteBuffer;
+  }
+
+  private short[] getTmpShortBuffer(int size) {
+    if (tmpShortBuffer == null || tmpShortBuffer.length < size) {
+      tmpShortBuffer = new short[size];
+    }
+    return tmpShortBuffer;
+  }
+
   @Override
   public final void readIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
@@ -146,9 +162,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putIntsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putInt(rowId + i, buffer.getInt());
-      }
+      byte[] tmp = getTmpHeapBuffer(requiredBytes);
+      buffer.get(tmp, 0, requiredBytes);
+      c.putIntsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -224,9 +240,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putLongsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putLong(rowId + i, buffer.getLong());
-      }
+      byte[] tmp = getTmpHeapBuffer(requiredBytes);
+      buffer.get(tmp, 0, requiredBytes);
+      c.putLongsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -381,9 +397,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putFloatsLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putFloat(rowId + i, buffer.getFloat());
-      }
+      byte[] tmp = getTmpHeapBuffer(requiredBytes);
+      buffer.get(tmp, 0, requiredBytes);
+      c.putFloatsLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -401,9 +417,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       int offset = buffer.arrayOffset() + buffer.position();
       c.putDoublesLittleEndian(rowId, total, buffer.array(), offset);
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putDouble(rowId + i, buffer.getDouble());
-      }
+      byte[] tmp = getTmpHeapBuffer(requiredBytes);
+      buffer.get(tmp, 0, requiredBytes);
+      c.putDoublesLittleEndian(rowId, total, tmp, 0);
     }
   }
 
@@ -417,20 +433,21 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     // Bytes are stored as a 4-byte little endian int. Just read the first byte.
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
+    byte[] tmp = getTmpByteBuffer(total);
 
     if (buffer.hasArray()) {
       byte[] array = buffer.array();
       int offset = buffer.arrayOffset() + buffer.position();
       for (int i = 0; i < total; i++) {
-        c.putByte(rowId + i, array[offset + i * 4]);
+        tmp[i] = array[offset + i * 4];
       }
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putByte(rowId + i, buffer.get());
-        // skip the next 3 bytes
+      for (int i = 0; i < total; i++) {
+        tmp[i] = buffer.get();
         buffer.position(buffer.position() + 3);
       }
     }
+    c.putBytes(rowId, total, tmp, 0);
   }
 
   @Override
@@ -442,15 +459,20 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readShorts(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
+    short[] tmp = getTmpShortBuffer(total);
 
     if (buffer.hasArray()) {
-      int offset = buffer.arrayOffset() + buffer.position();
-      c.putShortsFromIntsLittleEndian(rowId, total, buffer.array(), offset);
+      byte[] array = buffer.array();
+      long srcOffset = buffer.arrayOffset() + buffer.position() + Platform.BYTE_ARRAY_OFFSET;
+      for (int i = 0; i < total; i++) {
+        tmp[i] = (short) Platform.getInt(array, srcOffset + i * 4L);
+      }
     } else {
-      for (int i = 0; i < total; i += 1) {
-        c.putShort(rowId + i, (short) buffer.getInt());
+      for (int i = 0; i < total; i++) {
+        tmp[i] = (short) buffer.getInt();
       }
     }
+    c.putShorts(rowId, total, tmp, 0);
   }
 
   @Override
