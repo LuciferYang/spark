@@ -1,0 +1,189 @@
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=10, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    31             42           7          0.3        3120.4       1.0X
+GetMapValue codegen                                        26             31           3          0.4        2614.1       1.2X
+ElementAt interpreted                                      24             27           3          0.4        2353.2       1.3X
+ElementAt codegen                                          23             26           2          0.4        2346.5       1.3X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=10, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    22             25           2          0.4        2231.6       1.0X
+GetMapValue codegen                                        22             26           4          0.4        2223.7       1.0X
+ElementAt interpreted                                      22             23           2          0.5        2152.4       1.0X
+ElementAt codegen                                          21             23           2          0.5        2122.3       1.1X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=10, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    21             23           3          0.5        2064.4       1.0X
+GetMapValue codegen                                        20             22           2          0.5        2010.3       1.0X
+ElementAt interpreted                                      20             22           2          0.5        1999.2       1.0X
+ElementAt codegen                                          20             23           3          0.5        1991.8       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=20, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    20             22           2          0.5        2009.8       1.0X
+GetMapValue codegen                                        20             22           2          0.5        1960.5       1.0X
+ElementAt interpreted                                      20             21           1          0.5        1958.7       1.0X
+ElementAt codegen                                          19             22           2          0.5        1946.4       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=20, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    19             21           2          0.5        1927.0       1.0X
+GetMapValue codegen                                        19             20           2          0.5        1901.5       1.0X
+ElementAt interpreted                                      19             21           2          0.5        1936.5       1.0X
+ElementAt codegen                                          19             21           2          0.5        1890.9       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=20, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    19             20           1          0.5        1887.2       1.0X
+GetMapValue codegen                                        19             20           2          0.5        1864.1       1.0X
+ElementAt interpreted                                      18             20           2          0.5        1847.5       1.0X
+ElementAt codegen                                          19             20           1          0.5        1885.5       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=30, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    19             20           2          0.5        1874.4       1.0X
+GetMapValue codegen                                        18             20           1          0.5        1830.9       1.0X
+ElementAt interpreted                                      19             20           2          0.5        1879.0       1.0X
+ElementAt codegen                                          19             20           3          0.5        1866.4       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=30, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    19             20           1          0.5        1874.0       1.0X
+GetMapValue codegen                                        19             21           3          0.5        1850.2       1.0X
+ElementAt interpreted                                      19             20           2          0.5        1882.1       1.0X
+ElementAt codegen                                          18             20           1          0.5        1823.7       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=30, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    18             20           2          0.5        1822.6       1.0X
+GetMapValue codegen                                        18             19           1          0.6        1817.6       1.0X
+ElementAt interpreted                                      18             19           1          0.5        1835.8       1.0X
+ElementAt codegen                                          18             19           1          0.6        1803.3       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=50, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    18             20           3          0.5        1843.6       1.0X
+GetMapValue codegen                                        18             19           1          0.5        1822.1       1.0X
+ElementAt interpreted                                      18             20           2          0.5        1836.7       1.0X
+ElementAt codegen                                          18             20           2          0.5        1835.2       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=50, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    18             19           1          0.6        1804.0       1.0X
+GetMapValue codegen                                        18             19           2          0.6        1800.1       1.0X
+ElementAt interpreted                                      18             19           2          0.5        1841.0       1.0X
+ElementAt codegen                                          18             19           1          0.6        1808.7       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=50, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                    18             20           2          0.6        1805.6       1.0X
+GetMapValue codegen                                        18             19           1          0.6        1757.0       1.0X
+ElementAt interpreted                                      18             20           1          0.5        1839.8       1.0X
+ElementAt codegen                                          18             19           2          0.6        1766.8       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=100, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                     18             20           2          0.5        1835.8       1.0X
+GetMapValue codegen                                         18             19           1          0.6        1790.5       1.0X
+ElementAt interpreted                                       18             20           1          0.5        1844.0       1.0X
+ElementAt codegen                                           18             19           1          0.6        1784.5       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=100, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                     19             19           1          0.5        1853.9       1.0X
+GetMapValue codegen                                         18             20           2          0.6        1817.4       1.0X
+ElementAt interpreted                                       19             20           1          0.5        1869.6       1.0X
+ElementAt codegen                                           18             19           1          0.6        1811.7       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=100, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                     19             20           1          0.5        1864.2       1.0X
+GetMapValue codegen                                         18             19           1          0.6        1797.6       1.0X
+ElementAt interpreted                                       18             20           1          0.5        1847.5       1.0X
+ElementAt codegen                                           18             19           1          0.6        1812.7       1.0X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+--------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                      27             29           1          0.4        2717.6       1.0X
+GetMapValue codegen                                          22             23           1          0.5        2208.4       1.2X
+ElementAt interpreted                                        26             27           1          0.4        2581.4       1.1X
+ElementAt codegen                                            22             24           1          0.4        2244.4       1.2X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+--------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                      31             32           1          0.3        3091.6       1.0X
+GetMapValue codegen                                          24             25           1          0.4        2390.5       1.3X
+ElementAt interpreted                                        30             31           1          0.3        2992.2       1.0X
+ElementAt codegen                                            24             25           2          0.4        2414.8       1.3X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+--------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                      34             35           1          0.3        3384.8       1.0X
+GetMapValue codegen                                          26             27           1          0.4        2557.4       1.3X
+ElementAt interpreted                                        33             34           1          0.3        3318.0       1.0X
+ElementAt codegen                                            26             27           2          0.4        2578.5       1.3X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000000, hit=1.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-----------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                       7775          23859       16887          0.0      777499.6       1.0X
+GetMapValue codegen                                           7326          24724        8890          0.0      732610.1       1.1X
+ElementAt interpreted                                         7508          37200       12396          0.0      750821.7       1.0X
+ElementAt codegen                                             5794          21327       10726          0.0      579363.8       1.3X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000000, hit=0.5, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-----------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                      42114          62853        7339          0.0     4211428.5       1.0X
+GetMapValue codegen                                           7657          27509       18366          0.0      765671.2       5.5X
+ElementAt interpreted                                        10612          53554       18223          0.0     1061168.3       4.0X
+ElementAt codegen                                             7423          33251       21092          0.0      742256.3       5.7X
+
+OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.14.0-1017-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+MapLookup (size=1000000, hit=0.0, type=IntegerType):  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+-----------------------------------------------------------------------------------------------------------------------------------
+GetMapValue interpreted                                      63694          85599        7704          0.0     6369366.2       1.0X
+GetMapValue codegen                                           9531          30077       24136          0.0      953118.7       6.7X
+ElementAt interpreted                                        13650          63975       29016          0.0     1364998.8       4.7X
+ElementAt codegen                                            10153          52571       25509          0.0     1015254.8       6.3X
+
