@@ -189,7 +189,7 @@ jobs:
         key: tpcds-${{ hashFiles('.github/workflows/benchmark.yml', 'sql/core/src/test/scala/org/apache/spark/sql/TPCDSSchema.scala') }}
     - name: Run benchmarks
       run: |
-        ./build/sbt "project sql" "test:runMain org.apache.spark.sql.execution.datasources.parquet.VectorizedRleValuesReaderBenchmark"
+        build/sbt "sql/Test/runMain org.apache.spark.sql.execution.vectorized.ColumnVectorJmhBenchmark"
     - name: Create a pull request with the results
       if: ${{ inputs.create-commit && success() }}
       run: |
