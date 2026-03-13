@@ -969,5 +969,15 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     val df4 = spark.range(1).selectExpr(
       "transform(array(1, cast(null as int), 3), x -> x + 1) as arr")
     checkAnswer(df4, Row(Seq(2, null, 4)))
+
+    // Empty array
+    val df5 = spark.range(1).selectExpr(
+      "transform(array(), x -> x + 1) as arr")
+    checkAnswer(df5, Row(Seq.empty))
+
+    // Transform with nested CodegenFallback HOF (e.g., filter) in lambda body
+    val df6 = spark.range(1).selectExpr(
+      "transform(array(array(1, 2, 3), array(4, 5, 6)), x -> filter(x, y -> y > 2)) as arr")
+    checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
   }
 }

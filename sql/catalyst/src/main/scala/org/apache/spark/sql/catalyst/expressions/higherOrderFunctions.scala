@@ -165,6 +165,10 @@ case class LambdaFunction(
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     // LambdaFunction is a thin wrapper. The enclosing HOF is responsible for
     // registering lambda variable bindings before this is called.
+    assert(arguments.forall { a =>
+      val nlv = a.asInstanceOf[NamedLambdaVariable]
+      ctx.lambdaVariableMap.contains(nlv.exprId)
+    }, "LambdaFunction codegen requires all lambda variables to be bound in lambdaVariableMap")
     function.genCode(ctx)
   }
 
@@ -424,8 +428,11 @@ case class ArrayTransform(
     }
 
     // Also set the AtomicReference on the lambda variable so that any CodegenFallback
-    // expressions inside the lambda body (e.g., ArrayExists, ArrayFilter) can read
-    // the correct value via NamedLambdaVariable.eval().
+    // expressions nested inside the lambda body (e.g., ArrayExists, ArrayFilter that
+    // haven't been given codegen yet) can read the correct value via
+    // NamedLambdaVariable.eval(). This is NOT redundant with the mutable state bindings
+    // above -- the mutable state is for the codegen path, while AtomicReference is for
+    // CodegenFallback sub-expressions that call eval() at runtime.
     val elemAtomicRefTerm = ctx.addReferenceObj(
       "elementVarRef", elementVar.value,
       "java.util.concurrent.atomic.AtomicReference")
@@ -442,8 +449,7 @@ case class ArrayTransform(
                else FalseLiteral,
       value = JavaCode.variable(elementValue, elementType))
 
-    val bindings = mutable.HashMap[ExprId, ExprCode]()
-    bindings += elementVar.exprId -> elementCode
+    var bindings = Map[ExprId, ExprCode](elementVar.exprId -> elementCode)
 
     val indexExtract = if (indexVar.isDefined) {
       val indexValue = ctx.addMutableState(CodeGenerator.JAVA_INT, "indexValue")
@@ -464,8 +470,12 @@ case class ArrayTransform(
     }
 
     // Generate code for the lambda body with bindings registered.
-    val lambdaBody = function.asInstanceOf[LambdaFunction].function
-    val lambdaBodyGen = ctx.withLambdaVariableBindings(bindings.toMap) {
+    val lambdaBody = function match {
+      case lf: LambdaFunction => lf.function
+      case other => throw new IllegalStateException(
+        s"ArrayTransform expected LambdaFunction but got ${other.getClass.getName}")
+    }
+    val lambdaBodyGen = ctx.withLambdaVariableBindings(bindings) {
       lambdaBody.genCode(ctx)
     }
 

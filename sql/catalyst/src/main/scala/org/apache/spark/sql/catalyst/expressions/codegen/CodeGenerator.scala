@@ -183,6 +183,9 @@ class CodegenContext extends Logging {
    * The enclosing higher-order function registers entries before generating the lambda body code,
    * and restores the previous state after. This follows the same save/restore pattern as
    * `currentVars`/`INPUT_ROW`.
+   *
+   * Note: Like other mutable state in CodegenContext (e.g., `currentVars`, `INPUT_ROW`),
+   * this is not thread-safe. Callers must ensure single-threaded access during code generation.
    */
   var lambdaVariableMap: Map[ExprId, ExprCode] = Map.empty
 
