@@ -381,10 +381,22 @@ abstract class ExplodeBase extends UnaryExpression with CollectionGenerator with
         if (inputArray == null) {
           Nil
         } else {
-          val rows = new Array[InternalRow](inputArray.numElements())
-          inputArray.foreach(et, (i, e) => {
-            rows(i) = if (position) InternalRow(i, e) else InternalRow(e)
-          })
+          val numElements = inputArray.numElements()
+          val rows = new Array[InternalRow](numElements)
+          val numFields = if (position) 2 else 1
+          var i = 0
+          while (i < numElements) {
+            val e = inputArray.get(i, et)
+            val row = new GenericInternalRow(numFields)
+            if (position) {
+              row.update(0, i)
+              row.update(1, e)
+            } else {
+              row.update(0, e)
+            }
+            rows(i) = row
+            i += 1
+          }
           rows
         }
       case MapType(kt, vt, _) =>
@@ -392,10 +404,21 @@ abstract class ExplodeBase extends UnaryExpression with CollectionGenerator with
         if (inputMap == null) {
           Nil
         } else {
-          val rows = new Array[InternalRow](inputMap.numElements())
+          val numElements = inputMap.numElements()
+          val rows = new Array[InternalRow](numElements)
+          val numFields = if (position) 3 else 2
           var i = 0
           inputMap.foreach(kt, vt, (k, v) => {
-            rows(i) = if (position) InternalRow(i, k, v) else InternalRow(k, v)
+            val row = new GenericInternalRow(numFields)
+            if (position) {
+              row.update(0, i)
+              row.update(1, k)
+              row.update(2, v)
+            } else {
+              row.update(0, k)
+              row.update(1, v)
+            }
+            rows(i) = row
             i += 1
           })
           rows
