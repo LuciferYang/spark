@@ -1712,11 +1712,12 @@ object InferFiltersFromGenerate extends Rule[LogicalPlan] {
       //   - We may infer too many constraints later.
       //   - The input expression may fail to be evaluated under ANSI mode. If we reorder the
       //     predicates and evaluate the input expression first, we may fail the query unexpectedly.
-      // To be safe, here we only generate extra predicates if the input is an attribute.
+      // To be safe, here we only generate extra predicates if the input is an attribute or
+      // a chain of GetStructField on an attribute, which are always cheap to evaluate.
       // Note that, foldable input is also excluded here, to avoid constant filters like
       // 'size([1, 2, 3]) > 0'. These do not show up in child's constraints and then the
       // idempotence will break.
-      if (input.isInstanceOf[Attribute]) {
+      if (isCheapNonFoldableExtractor(input)) {
         // Exclude child's constraints to guarantee idempotency
         val inferredFilters = ExpressionSet(
           Seq(GreaterThan(Size(input), Literal(0)), IsNotNull(input))
@@ -1730,6 +1731,17 @@ object InferFiltersFromGenerate extends Rule[LogicalPlan] {
       } else {
         generate
       }
+  }
+
+  /**
+   * Check if the expression is a cheap, non-foldable extractor that is safe to duplicate
+   * in inferred filters. This includes plain attributes and chains of GetStructField on
+   * an attribute (e.g., `a.b.c`).
+   */
+  private def isCheapNonFoldableExtractor(e: Expression): Boolean = e match {
+    case _: Attribute => true
+    case g: GetStructField => isCheapNonFoldableExtractor(g.child)
+    case _ => false
   }
 
   private def canInferFilters(g: Generator): Boolean = g match {
