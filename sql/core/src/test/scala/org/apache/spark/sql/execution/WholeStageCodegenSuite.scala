@@ -992,5 +992,18 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
         "transform(cast(null as array<int>), x -> x + 1) as arr")
       checkAnswer(df7, Row(null))
     }
+
+    withClue("struct (non-primitive) element type") {
+      val df8 = spark.range(1).selectExpr(
+        "transform(array(named_struct('a', 1, 'b', 'x'), " +
+        "named_struct('a', 2, 'b', 'y')), s -> named_struct('a', s.a + 10, 'b', s.b)) as arr")
+      checkAnswer(df8, Row(Seq(Row(11, "x"), Row(12, "y"))))
+    }
+
+    withClue("string (non-primitive) element type") {
+      val df9 = spark.range(1).selectExpr(
+        "transform(array('hello', 'world'), x -> upper(x)) as arr")
+      checkAnswer(df9, Row(Seq("HELLO", "WORLD")))
+    }
   }
 }

@@ -115,6 +115,9 @@ case class NamedLambdaVariable(
         ctx.references += this
         val objectTerm = ctx.freshName("lambdaValue")
         val javaType = CodeGenerator.javaType(dataType)
+        // Pass null as the input row because NamedLambdaVariable.eval() ignores
+        // the input row entirely -- it reads its value from the AtomicReference
+        // set by the enclosing HOF's eval loop.
         if (nullable) {
           ev.copy(code = code"""
             Object $objectTerm = ((Expression) references[$idx]).eval(null);
@@ -185,7 +188,7 @@ case class LambdaFunction(
           s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding. " +
           s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
       case other =>
-        throw new IllegalStateException(
+        require(false,
           s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
     }
     function.genCode(ctx)
@@ -428,6 +431,8 @@ case class ArrayTransform(
     // variables. This is critical because Expression.reduceCodeSize() may extract
     // lambda body code into a separate private method, and local loop variables would
     // not be accessible from such extracted methods.
+    // Concurrency note: each Spark task runs in its own thread with a separate generated
+    // class instance, so these fields are not shared across tasks.
     val elementIsNull = ctx.addMutableState(
       CodeGenerator.JAVA_BOOLEAN, "elementIsNull")
     val elementValue = ctx.addMutableState(javaElementType, "elementValue")
@@ -505,31 +510,25 @@ case class ArrayTransform(
     // Determine the output element type and write strategy.
     val outputElementType = function.dataType
     val isPrimitive = CodeGenerator.isPrimitiveType(outputElementType)
+    val isNullOpt = if (function.nullable) Some(lambdaBodyGen.isNull.toString) else None
 
-    // For non-primitive nullable results, we must guard against NPE before calling .copy().
     // For primitives, setArrayElement handles null check internally.
-    val setResultElement = if (function.nullable) {
-      if (isPrimitive) {
-        CodeGenerator.setArrayElement(
-          resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString,
-          Some(lambdaBodyGen.isNull.toString))
-      } else {
-        s"""
-           |if (${lambdaBodyGen.isNull}) {
-           |  $resultArray.setNullAt($loopIndex);
-           |} else {
-           |  $resultArray.update($loopIndex,
-           |    InternalRow.copyValue(${lambdaBodyGen.value}));
-           |}
-         """.stripMargin
-      }
+    // For non-primitives, we must guard against NPE and copy to avoid memory aliasing.
+    val setResultElement = if (isPrimitive) {
+      CodeGenerator.setArrayElement(
+        resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString,
+        isNullOpt)
+    } else if (function.nullable) {
+      s"""
+         |if (${lambdaBodyGen.isNull}) {
+         |  $resultArray.setNullAt($loopIndex);
+         |} else {
+         |  $resultArray.update($loopIndex,
+         |    InternalRow.copyValue(${lambdaBodyGen.value}));
+         |}
+       """.stripMargin
     } else {
-      if (isPrimitive) {
-        CodeGenerator.setArrayElement(
-          resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString)
-      } else {
-        s"$resultArray.update($loopIndex, InternalRow.copyValue(${lambdaBodyGen.value}));"
-      }
+      s"$resultArray.update($loopIndex, InternalRow.copyValue(${lambdaBodyGen.value}));"
     }
 
     val allocation = CodeGenerator.createArrayData(
