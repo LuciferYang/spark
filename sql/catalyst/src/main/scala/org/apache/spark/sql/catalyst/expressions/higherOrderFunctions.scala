@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.MapHasAsScala
 
+import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{TypeCheckResult, TypeCoercion, UnresolvedException}
@@ -103,9 +104,9 @@ case class NamedLambdaVariable(
     ctx.lambdaVariableMap.get(exprId) match {
       case Some(binding) =>
         // Lambda variable has been bound by an enclosing higher-order function.
-        ev.isNull = binding.isNull
-        ev.value = binding.value
-        ev.copy(code = binding.code)
+        // Return the binding directly -- it already contains the correct code,
+        // isNull, and value referencing the mutable state fields.
+        binding
       case None =>
         // No binding found -- fall back to interpreted eval via references array.
         // This is unexpected in normal operation (the enclosing HOF should have registered
@@ -188,7 +189,7 @@ case class LambdaFunction(
           s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding. " +
           s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
       case other =>
-        require(false,
+        throw SparkException.internalError(
           s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
     }
     function.genCode(ctx)
