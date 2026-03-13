@@ -143,7 +143,8 @@ object NamedLambdaVariable extends Logging {
   private[expressions] def warnNoCodegenBinding(name: String, exprId: ExprId): Unit = {
     logWarning(
       s"NamedLambdaVariable '$name#${exprId.id}' has no codegen binding, " +
-      "falling back to interpreted eval. This is a compile-time warning (not per-row). " +
+      "falling back to interpreted eval. This warning is emitted during code generation " +
+      "(not per row at runtime). " +
       "Possible cause: missing binding in an enclosing higher-order function's doGenCode.")
   }
 }
@@ -481,10 +482,11 @@ case class ArrayTransform(
         val idxAtomicRefTerm = ctx.addReferenceObj(
           "indexVarRef", iv.value,
           "java.util.concurrent.atomic.AtomicReference")
+        val boxedIndexType = CodeGenerator.boxedType(iv.dataType)
         val extract =
           s"""
              |$indexValue = $loopIndex;
-             |$idxAtomicRefTerm.set((Integer) $loopIndex);
+             |$idxAtomicRefTerm.set(($boxedIndexType) $loopIndex);
            """.stripMargin
         (extract, Some(iv.exprId -> indexCode))
       case None =>
