@@ -229,15 +229,21 @@ case class GenerateExec(
       "0"
     }
     val numOutput = metricTerm(ctx, "numOutputRows")
+    // Batch the metric update outside the loop to avoid per-row atomic operation overhead.
+    val effectiveElements = if (outer) {
+      s"Math.max($numElements, 1)"
+    } else {
+      numElements
+    }
     s"""
        |${data.code}
        |$initMapData
        |int $numElements = ${data.isNull} ? 0 : ${data.value}.numElements();
        |for (int $index = $init; $index < $numElements; $index++) {
-       |  $numOutput.add(1);
        |  $updateRowData
        |  ${consume(ctx, input ++ position ++ values)}
        |}
+       |$numOutput.add($effectiveElements);
      """.stripMargin
   }
 
