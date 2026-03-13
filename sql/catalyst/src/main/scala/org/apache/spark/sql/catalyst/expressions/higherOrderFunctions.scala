@@ -191,6 +191,9 @@ case class LambdaFunction(
             s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
         }
       case other =>
+        // arguments should always be NamedLambdaVariable instances (bound by
+        // HigherOrderFunction.bind). When hidden=true, arguments is empty and
+        // this branch is unreachable.
         throw SparkException.internalError(
           s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
     }
