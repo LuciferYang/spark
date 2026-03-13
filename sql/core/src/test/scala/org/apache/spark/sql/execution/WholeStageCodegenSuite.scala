@@ -990,6 +990,9 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     withClue("null argument") {
       val df7 = spark.range(1).selectExpr(
         "transform(cast(null as array<int>), x -> x + 1) as arr")
+      val plan7 = df7.queryExecution.executedPlan
+      assert(plan7.exists(_.isInstanceOf[WholeStageCodegenExec]),
+        s"Expected WholeStageCodegenExec in plan:\n$plan7")
       checkAnswer(df7, Row(null))
     }
 

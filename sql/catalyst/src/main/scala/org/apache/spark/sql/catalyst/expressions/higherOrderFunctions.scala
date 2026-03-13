@@ -185,9 +185,11 @@ case class LambdaFunction(
     // registering lambda variable bindings before this is called.
     arguments.foreach {
       case nlv: NamedLambdaVariable =>
-        require(ctx.lambdaVariableMap.contains(nlv.exprId),
-          s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding. " +
-          s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
+        if (!ctx.lambdaVariableMap.contains(nlv.exprId)) {
+          throw SparkException.internalError(
+            s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding. " +
+            s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
+        }
       case other =>
         throw SparkException.internalError(
           s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
@@ -439,6 +441,9 @@ case class ArrayTransform(
     val elementValue = ctx.addMutableState(javaElementType, "elementValue")
 
     val elementExtract = if (elementVar.nullable) {
+      // For primitives, elementDefault provides a valid zero value (e.g. 0 for int) to avoid
+      // uninitialized reads. For non-primitives, it returns "null" -- logically redundant
+      // but harmless, and keeps the generated code pattern uniform across all types.
       s"""
          |$elementIsNull = $arrData.isNullAt($loopIndex);
          |$elementValue = $elementIsNull ?

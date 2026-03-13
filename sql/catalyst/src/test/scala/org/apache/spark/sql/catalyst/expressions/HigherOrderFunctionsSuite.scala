@@ -893,8 +893,8 @@ class HigherOrderFunctionsSuite extends SparkFunSuite with ExpressionEvalHelper 
     val lf = LambdaFunction(lv + Literal(1), Seq(lv))
     val ctx = new CodegenContext()
 
-    // genCode without registering bindings should fail with require
-    val e = intercept[IllegalArgumentException] {
+    // genCode without registering bindings should fail with SparkException
+    val e = intercept[SparkException] {
       lf.genCode(ctx)
     }
     assert(e.getMessage.contains("has no codegen binding"))

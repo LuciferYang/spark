@@ -198,7 +198,7 @@ class CodegenContext extends Logging {
    * This is safe because [[ExprId]]s are globally unique; inner and outer lambda
    * variables will never share the same ExprId.
    */
-  def withLambdaVariableBindings(bindings: Map[ExprId, ExprCode])(f: => ExprCode): ExprCode = {
+  def withLambdaVariableBindings[T](bindings: Map[ExprId, ExprCode])(f: => T): T = {
     val oldBindings = lambdaVariableMap
     lambdaVariableMap = lambdaVariableMap ++ bindings
     try f finally { lambdaVariableMap = oldBindings }
