@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.MapHasAsScala
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{TypeCheckResult, TypeCoercion, UnresolvedException}
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult.DataTypeMismatch
@@ -107,6 +108,9 @@ case class NamedLambdaVariable(
         ev.copy(code = binding.code)
       case None =>
         // No binding found -- fall back to interpreted eval via references array.
+        // This is unexpected in normal operation (the enclosing HOF should have registered
+        // bindings), but we degrade gracefully rather than failing the query.
+        NamedLambdaVariable.warnNoCodegenBinding(name, exprId)
         val idx = ctx.references.length
         ctx.references += this
         val objectTerm = ctx.freshName("lambdaValue")
@@ -132,6 +136,15 @@ case class NamedLambdaVariable(
 
   override def simpleString(maxFields: Int): String = {
     s"lambda $name#${exprId.id}: ${dataType.simpleString(maxFields)}"
+  }
+}
+
+object NamedLambdaVariable extends Logging {
+  private[expressions] def warnNoCodegenBinding(name: String, exprId: ExprId): Unit = {
+    logWarning(
+      s"NamedLambdaVariable '$name#${exprId.id}' has no codegen binding, " +
+      "falling back to interpreted eval. This may indicate a missing binding in " +
+      "an enclosing higher-order function's doGenCode.")
   }
 }
 
