@@ -991,6 +991,8 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
       val plan6 = df6.queryExecution.executedPlan
       assert(plan6.exists(_.isInstanceOf[WholeStageCodegenExec]),
         s"Expected WholeStageCodegenExec in plan:\n$plan6")
+      // filter(array(1,2,3), y -> y > 2) => [3]
+      // filter(array(4,5,6), y -> y > 2) => [4, 5, 6]
       checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
     }
 

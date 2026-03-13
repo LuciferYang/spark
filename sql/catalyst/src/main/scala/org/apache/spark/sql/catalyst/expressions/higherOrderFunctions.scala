@@ -444,6 +444,8 @@ case class ArrayTransform(
       // For primitives, elementDefault provides a valid zero value (e.g. 0 for int) to avoid
       // uninitialized reads. For non-primitives, it returns "null" -- logically redundant
       // but harmless, and keeps the generated code pattern uniform across all types.
+      // The isNull flag guards all downstream reads (setElemAtomicRef checks isNull before
+      // boxing, and lambdaBodyGen propagates isNull through the lambda variable binding).
       s"""
          |$elementIsNull = $arrData.isNullAt($loopIndex);
          |$elementValue = $elementIsNull ?
@@ -457,9 +459,10 @@ case class ArrayTransform(
        """.stripMargin
     }
 
-    // Check if the lambda body contains any CodegenFallback expressions that would
-    // need to read lambda variable values via NamedLambdaVariable.eval() at runtime.
-    // If not, we can skip the AtomicReference writes entirely, avoiding per-element
+    // Recursively check whether any sub-expression in the lambda body is a CodegenFallback.
+    // LambdaFunction and NamedLambdaVariable themselves no longer extend CodegenFallback,
+    // so this targets genuinely un-codegen'd sub-expressions (e.g., ArrayFilter).
+    // If none found, we can skip AtomicReference writes entirely, avoiding per-element
     // boxing overhead.
     val lambdaBodyHasFallback = function.exists(_.isInstanceOf[CodegenFallback])
 
