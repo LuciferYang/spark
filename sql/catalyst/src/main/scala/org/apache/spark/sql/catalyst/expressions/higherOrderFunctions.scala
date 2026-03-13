@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.analysis.{TypeCheckResult, TypeCoercion, Un
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult.DataTypeMismatch
 import org.apache.spark.sql.catalyst.expressions.Cast._
 import org.apache.spark.sql.catalyst.expressions.codegen._
+import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.optimizer.NormalizeFloatingNumbers
 import org.apache.spark.sql.catalyst.trees.{BinaryLike, CurrentOrigin, QuaternaryLike, TernaryLike}
 import org.apache.spark.sql.catalyst.trees.TreePattern._
@@ -81,8 +82,7 @@ case class NamedLambdaVariable(
     exprId: ExprId = NamedExpression.newExprId,
     value: AtomicReference[Any] = new AtomicReference())
   extends LeafExpression
-  with NamedExpression
-  with CodegenFallback {
+  with NamedExpression {
 
   override def qualifier: Seq[String] = Seq.empty
 
@@ -97,6 +97,36 @@ case class NamedLambdaVariable(
   override def references: AttributeSet = AttributeSet(toAttribute)
 
   override def eval(input: InternalRow): Any = value.get
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    ctx.lambdaVariableMap.get(exprId) match {
+      case Some(binding) =>
+        // Lambda variable has been bound by an enclosing higher-order function.
+        ev.isNull = binding.isNull
+        ev.value = binding.value
+        ev.copy(code = binding.code)
+      case None =>
+        // No binding found -- fall back to interpreted eval via references array.
+        val idx = ctx.references.length
+        ctx.references += this
+        val objectTerm = ctx.freshName("lambdaValue")
+        val javaType = CodeGenerator.javaType(dataType)
+        if (nullable) {
+          ev.copy(code = code"""
+            Object $objectTerm = ((Expression) references[$idx]).eval(null);
+            boolean ${ev.isNull} = $objectTerm == null;
+            $javaType ${ev.value} = ${CodeGenerator.defaultValue(dataType)};
+            if (!${ev.isNull}) {
+              ${ev.value} = (${CodeGenerator.boxedType(dataType)}) $objectTerm;
+            }""")
+        } else {
+          ev.copy(code = code"""
+            Object $objectTerm = ((Expression) references[$idx]).eval(null);
+            $javaType ${ev.value} = (${CodeGenerator.boxedType(dataType)}) $objectTerm;
+            """, isNull = FalseLiteral)
+        }
+    }
+  }
 
   override def toString: String = s"lambda $name#${exprId.id}$typeSuffix"
 
