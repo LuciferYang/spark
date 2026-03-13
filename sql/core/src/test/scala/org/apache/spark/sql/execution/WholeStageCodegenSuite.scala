@@ -961,6 +961,7 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     checkAnswer(df2, Row(Seq(4, 6, 8)))
 
     // Transform with index
+    // Transform with index: x + i => 10+0=10, 20+1=21, 30+2=32
     val df3 = spark.range(1).selectExpr(
       "transform(array(10, 20, 30), (x, i) -> x + i) as arr")
     checkAnswer(df3, Row(Seq(10, 21, 32)))

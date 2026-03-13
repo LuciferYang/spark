@@ -181,7 +181,8 @@ case class LambdaFunction(
     arguments.foreach {
       case nlv: NamedLambdaVariable =>
         require(ctx.lambdaVariableMap.contains(nlv.exprId),
-          s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding")
+          s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding. " +
+          s"Bound ids: [${ctx.lambdaVariableMap.keys.map(_.id).mkString(", ")}]")
       case other =>
         throw new IllegalStateException(
           s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
@@ -453,10 +454,14 @@ case class ArrayTransform(
     val elemAtomicRefTerm = ctx.addReferenceObj(
       "elementVarRef", elementVar.value,
       "java.util.concurrent.atomic.AtomicReference")
+    // Explicitly box primitive values to ensure the AtomicReference contains the
+    // correct boxed type (e.g., Byte for ByteType, Short for ShortType), matching
+    // what ArrayData.get() returns in the interpreted path.
+    val boxedElementType = CodeGenerator.boxedType(elementType)
     val setElemAtomicRef = if (elementVar.nullable) {
-      s"$elemAtomicRefTerm.set($elementIsNull ? null : $elementValue);"
+      s"$elemAtomicRefTerm.set($elementIsNull ? null : ($boxedElementType) $elementValue);"
     } else {
-      s"$elemAtomicRefTerm.set($elementValue);"
+      s"$elemAtomicRefTerm.set(($boxedElementType) $elementValue);"
     }
 
     // Build lambda variable bindings using the mutable state variables.
@@ -531,6 +536,7 @@ case class ArrayTransform(
 
     val loopCode =
       s"""
+         |// argumentGen.value is guaranteed to be ArrayData for ArrayType expressions.
          |ArrayData $arrData = (ArrayData) ${argumentGen.value};
          |int $numElements = $arrData.numElements();
          |$allocation
