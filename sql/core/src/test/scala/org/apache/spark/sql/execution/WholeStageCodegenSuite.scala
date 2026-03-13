@@ -979,5 +979,10 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     val df6 = spark.range(1).selectExpr(
       "transform(array(array(1, 2, 3), array(4, 5, 6)), x -> filter(x, y -> y > 2)) as arr")
     checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
+
+    // Null argument (entire array is null)
+    val df7 = spark.range(1).selectExpr(
+      "transform(cast(null as array<int>), x -> x + 1) as arr")
+    checkAnswer(df7, Row(null))
   }
 }

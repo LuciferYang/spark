@@ -143,8 +143,8 @@ object NamedLambdaVariable extends Logging {
   private[expressions] def warnNoCodegenBinding(name: String, exprId: ExprId): Unit = {
     logWarning(
       s"NamedLambdaVariable '$name#${exprId.id}' has no codegen binding, " +
-      "falling back to interpreted eval. This may indicate a missing binding in " +
-      "an enclosing higher-order function's doGenCode.")
+      "falling back to interpreted eval. This is a compile-time warning (not per-row). " +
+      "Possible cause: missing binding in an enclosing higher-order function's doGenCode.")
   }
 }
 
@@ -178,10 +178,14 @@ case class LambdaFunction(
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     // LambdaFunction is a thin wrapper. The enclosing HOF is responsible for
     // registering lambda variable bindings before this is called.
-    assert(arguments.forall {
-      case nlv: NamedLambdaVariable => ctx.lambdaVariableMap.contains(nlv.exprId)
-      case _ => false
-    }, "LambdaFunction codegen requires all arguments to be bound NamedLambdaVariables")
+    arguments.foreach {
+      case nlv: NamedLambdaVariable =>
+        require(ctx.lambdaVariableMap.contains(nlv.exprId),
+          s"Lambda variable '${nlv.name}#${nlv.exprId.id}' has no codegen binding")
+      case other =>
+        throw new IllegalStateException(
+          s"Expected NamedLambdaVariable but got ${other.getClass.getName}")
+    }
     function.genCode(ctx)
   }
 
@@ -485,13 +489,10 @@ case class ArrayTransform(
     val bindings = Map(elementVar.exprId -> elementCode) ++ indexBinding
 
     // Generate code for the lambda body with bindings registered.
-    val lambdaBody = function match {
-      case lf: LambdaFunction => lf.function
-      case other => throw new IllegalStateException(
-        s"ArrayTransform expected LambdaFunction but got ${other.getClass.getName}")
-    }
+    // Call function.genCode (not lf.function.genCode) so that LambdaFunction.doGenCode
+    // is exercised, including its binding validation.
     val lambdaBodyGen = ctx.withLambdaVariableBindings(bindings) {
-      lambdaBody.genCode(ctx)
+      function.genCode(ctx)
     }
 
     // Determine the output element type and write strategy.

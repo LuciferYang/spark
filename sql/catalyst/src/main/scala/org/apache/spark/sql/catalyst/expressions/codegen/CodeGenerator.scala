@@ -193,6 +193,10 @@ class CodegenContext extends Logging {
    * Registers lambda variable bindings, executes the given code generation function,
    * then restores the previous bindings. This ensures lambda variable scoping is correct
    * for nested higher-order functions.
+   *
+   * Note: bindings from inner HOFs take precedence over outer ones via `Map.++`.
+   * This is safe because [[ExprId]]s are globally unique; inner and outer lambda
+   * variables will never share the same ExprId.
    */
   def withLambdaVariableBindings(bindings: Map[ExprId, ExprCode])(f: => ExprCode): ExprCode = {
     val oldBindings = lambdaVariableMap
