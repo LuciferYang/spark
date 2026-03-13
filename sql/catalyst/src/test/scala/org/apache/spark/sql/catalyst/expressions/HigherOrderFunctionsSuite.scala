@@ -898,5 +898,6 @@ class HigherOrderFunctionsSuite extends SparkFunSuite with ExpressionEvalHelper 
       lf.genCode(ctx)
     }
     assert(e.getMessage.contains("has no codegen binding"))
+    assert(e.getMessage.contains("x#"), "Error message should include the variable name")
   }
 }

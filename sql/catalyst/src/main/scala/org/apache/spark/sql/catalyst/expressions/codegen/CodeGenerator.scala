@@ -190,7 +190,7 @@ class CodegenContext extends Logging {
   var lambdaVariableMap: Map[ExprId, ExprCode] = Map.empty
 
   /**
-   * Registers lambda variable bindings, executes the given code generation function,
+   * Registers lambda variable bindings, executes the given block,
    * then restores the previous bindings. This ensures lambda variable scoping is correct
    * for nested higher-order functions.
    *

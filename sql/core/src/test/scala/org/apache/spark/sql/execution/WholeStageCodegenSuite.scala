@@ -982,8 +982,15 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     }
 
     withClue("nested CodegenFallback HOF (filter) in lambda body") {
+      // ArrayFilter still uses CodegenFallback, but ArrayTransform's codegen handles
+      // this via AtomicReference dual-write: the filter sub-expression calls eval()
+      // at runtime, while the outer transform runs in codegen. The whole stage still
+      // uses WholeStageCodegenExec because ArrayTransform itself supports codegen.
       val df6 = spark.range(1).selectExpr(
         "transform(array(array(1, 2, 3), array(4, 5, 6)), x -> filter(x, y -> y > 2)) as arr")
+      val plan6 = df6.queryExecution.executedPlan
+      assert(plan6.exists(_.isInstanceOf[WholeStageCodegenExec]),
+        s"Expected WholeStageCodegenExec in plan:\n$plan6")
       checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
     }
 
