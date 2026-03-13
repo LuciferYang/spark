@@ -348,7 +348,7 @@ trait MapBasedSimpleHigherOrderFunction extends SimpleHigherOrderFunction {
 case class ArrayTransform(
     argument: Expression,
     function: Expression)
-  extends ArrayBasedSimpleHigherOrderFunction with CodegenFallback {
+  extends ArrayBasedSimpleHigherOrderFunction {
 
   override def dataType: ArrayType = ArrayType(function.dataType, function.nullable)
 
@@ -388,6 +388,145 @@ case class ArrayTransform(
       i += 1
     }
     result
+  }
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val argumentGen = argument.genCode(ctx)
+    val resultArray = ctx.freshName("resultArray")
+    val numElements = ctx.freshName("numElements")
+    val loopIndex = ctx.freshName("i")
+    val arrData = ctx.freshName("arrData")
+
+    val elementType = elementVar.dataType
+    val javaElementType = CodeGenerator.javaType(elementType)
+    val elementDefault = CodeGenerator.defaultValue(elementType)
+
+    // Use mutable state (class fields) for lambda variable bindings instead of local
+    // variables. This is critical because Expression.reduceCodeSize() may extract
+    // lambda body code into a separate private method, and local loop variables would
+    // not be accessible from such extracted methods.
+    val elementIsNull = ctx.addMutableState(
+      CodeGenerator.JAVA_BOOLEAN, "elementIsNull")
+    val elementValue = ctx.addMutableState(javaElementType, "elementValue")
+
+    val elementExtract = if (elementVar.nullable) {
+      s"""
+         |$elementIsNull = $arrData.isNullAt($loopIndex);
+         |$elementValue = $elementIsNull ?
+         |  $elementDefault : (${CodeGenerator.getValue(arrData, elementType, loopIndex)});
+       """.stripMargin
+    } else {
+      s"""
+         |$elementIsNull = false;
+         |$elementValue =
+         |  ${CodeGenerator.getValue(arrData, elementType, loopIndex)};
+       """.stripMargin
+    }
+
+    // Also set the AtomicReference on the lambda variable so that any CodegenFallback
+    // expressions inside the lambda body (e.g., ArrayExists, ArrayFilter) can read
+    // the correct value via NamedLambdaVariable.eval().
+    val elemAtomicRefTerm = ctx.addReferenceObj(
+      "elementVarRef", elementVar.value,
+      "java.util.concurrent.atomic.AtomicReference")
+    val setElemAtomicRef = if (elementVar.nullable) {
+      s"$elemAtomicRefTerm.set($elementIsNull ? null : $elementValue);"
+    } else {
+      s"$elemAtomicRefTerm.set($elementValue);"
+    }
+
+    // Build lambda variable bindings using the mutable state variables.
+    val elementCode = ExprCode(
+      code = EmptyBlock,
+      isNull = if (elementVar.nullable) JavaCode.isNullVariable(elementIsNull)
+               else FalseLiteral,
+      value = JavaCode.variable(elementValue, elementType))
+
+    val bindings = mutable.HashMap[ExprId, ExprCode]()
+    bindings += elementVar.exprId -> elementCode
+
+    val indexExtract = if (indexVar.isDefined) {
+      val indexValue = ctx.addMutableState(CodeGenerator.JAVA_INT, "indexValue")
+      val indexCode = ExprCode(
+        code = EmptyBlock,
+        isNull = FalseLiteral,
+        value = JavaCode.variable(indexValue, IntegerType))
+      bindings += indexVar.get.exprId -> indexCode
+      val idxAtomicRefTerm = ctx.addReferenceObj(
+        "indexVarRef", indexVar.get.value,
+        "java.util.concurrent.atomic.AtomicReference")
+      s"""
+         |$indexValue = $loopIndex;
+         |$idxAtomicRefTerm.set($loopIndex);
+       """.stripMargin
+    } else {
+      ""
+    }
+
+    // Generate code for the lambda body with bindings registered.
+    val lambdaBody = function.asInstanceOf[LambdaFunction].function
+    val lambdaBodyGen = ctx.withLambdaVariableBindings(bindings.toMap) {
+      lambdaBody.genCode(ctx)
+    }
+
+    // Determine the output element type and write strategy.
+    val outputElementType = function.dataType
+    val isPrimitive = CodeGenerator.isPrimitiveType(outputElementType)
+
+    // For non-primitive nullable results, we must guard against NPE before calling .copy().
+    // For primitives, setArrayElement handles null check internally.
+    val setResultElement = if (function.nullable) {
+      if (isPrimitive) {
+        CodeGenerator.setArrayElement(
+          resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString,
+          Some(lambdaBodyGen.isNull.toString))
+      } else {
+        s"""
+           |if (${lambdaBodyGen.isNull}) {
+           |  $resultArray.setNullAt($loopIndex);
+           |} else {
+           |  $resultArray.update($loopIndex,
+           |    InternalRow.copyValue(${lambdaBodyGen.value}));
+           |}
+         """.stripMargin
+      }
+    } else {
+      if (isPrimitive) {
+        CodeGenerator.setArrayElement(
+          resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString)
+      } else {
+        s"$resultArray.update($loopIndex, InternalRow.copyValue(${lambdaBodyGen.value}));"
+      }
+    }
+
+    val allocation = CodeGenerator.createArrayData(
+      resultArray, outputElementType, numElements,
+      " ArrayTransform failed.")
+
+    val loopCode =
+      s"""
+         |ArrayData $arrData = (ArrayData) ${argumentGen.value};
+         |int $numElements = $arrData.numElements();
+         |$allocation
+         |for (int $loopIndex = 0; $loopIndex < $numElements; $loopIndex++) {
+         |  $elementExtract
+         |  $setElemAtomicRef
+         |  $indexExtract
+         |  ${lambdaBodyGen.code}
+         |  $setResultElement
+         |}
+       """.stripMargin
+
+    // Null safety: if argument is null, output is null.
+    ev.copy(code = code"""
+      ${argumentGen.code}
+      boolean ${ev.isNull} = ${argumentGen.isNull};
+      ArrayData ${ev.value} = null;
+      if (!${ev.isNull}) {
+        $loopCode
+        ${ev.value} = $resultArray;
+      }
+    """)
   }
 
   override def nodeName: String = "transform"
