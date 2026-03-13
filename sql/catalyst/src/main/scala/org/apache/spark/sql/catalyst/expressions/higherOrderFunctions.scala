@@ -178,10 +178,10 @@ case class LambdaFunction(
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     // LambdaFunction is a thin wrapper. The enclosing HOF is responsible for
     // registering lambda variable bindings before this is called.
-    assert(arguments.forall { a =>
-      val nlv = a.asInstanceOf[NamedLambdaVariable]
-      ctx.lambdaVariableMap.contains(nlv.exprId)
-    }, "LambdaFunction codegen requires all lambda variables to be bound in lambdaVariableMap")
+    assert(arguments.forall {
+      case nlv: NamedLambdaVariable => ctx.lambdaVariableMap.contains(nlv.exprId)
+      case _ => false
+    }, "LambdaFunction codegen requires all arguments to be bound NamedLambdaVariables")
     function.genCode(ctx)
   }
 
@@ -462,25 +462,27 @@ case class ArrayTransform(
                else FalseLiteral,
       value = JavaCode.variable(elementValue, elementType))
 
-    var bindings = Map[ExprId, ExprCode](elementVar.exprId -> elementCode)
-
-    val indexExtract = if (indexVar.isDefined) {
-      val indexValue = ctx.addMutableState(CodeGenerator.JAVA_INT, "indexValue")
-      val indexCode = ExprCode(
-        code = EmptyBlock,
-        isNull = FalseLiteral,
-        value = JavaCode.variable(indexValue, IntegerType))
-      bindings += indexVar.get.exprId -> indexCode
-      val idxAtomicRefTerm = ctx.addReferenceObj(
-        "indexVarRef", indexVar.get.value,
-        "java.util.concurrent.atomic.AtomicReference")
-      s"""
-         |$indexValue = $loopIndex;
-         |$idxAtomicRefTerm.set($loopIndex);
-       """.stripMargin
-    } else {
-      ""
+    val (indexExtract, indexBinding) = indexVar match {
+      case Some(iv) =>
+        val indexValue = ctx.addMutableState(CodeGenerator.JAVA_INT, "indexValue")
+        val indexCode = ExprCode(
+          code = EmptyBlock,
+          isNull = FalseLiteral,
+          value = JavaCode.variable(indexValue, IntegerType))
+        val idxAtomicRefTerm = ctx.addReferenceObj(
+          "indexVarRef", iv.value,
+          "java.util.concurrent.atomic.AtomicReference")
+        val extract =
+          s"""
+             |$indexValue = $loopIndex;
+             |$idxAtomicRefTerm.set($loopIndex);
+           """.stripMargin
+        (extract, Some(iv.exprId -> indexCode))
+      case None =>
+        ("", None)
     }
+
+    val bindings = Map(elementVar.exprId -> elementCode) ++ indexBinding
 
     // Generate code for the lambda body with bindings registered.
     val lambdaBody = function match {
