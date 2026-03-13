@@ -519,7 +519,9 @@ case class ArrayTransform(
     val isNullOpt = if (function.nullable) Some(lambdaBodyGen.isNull.toString) else None
 
     // For primitives, setArrayElement handles null check internally.
-    // For non-primitives, we must guard against NPE and copy to avoid memory aliasing.
+    // For non-primitives, we must copy to avoid memory aliasing with mutable types
+    // (e.g., UnsafeRow, GenericArrayData). copyValue is a no-op for immutable types
+    // (e.g., UTF8String, Decimal), so the overhead is negligible.
     val setResultElement = if (isPrimitive) {
       CodeGenerator.setArrayElement(
         resultArray, outputElementType, loopIndex, lambdaBodyGen.value.toString,
