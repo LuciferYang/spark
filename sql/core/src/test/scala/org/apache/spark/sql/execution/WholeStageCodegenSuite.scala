@@ -946,44 +946,51 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
   }
 
   test("ArrayTransform should be included in WholeStageCodegen") {
-    val df = spark.range(1).selectExpr("transform(array(1, 2, 3), x -> x + 1) as arr")
-    val plan = df.queryExecution.executedPlan
-    assert(plan.exists(_.isInstanceOf[WholeStageCodegenExec]),
-      s"Expected WholeStageCodegenExec in plan:\n$plan")
-    checkAnswer(df, Row(Seq(2, 3, 4)))
+    withClue("basic transform") {
+      val df = spark.range(1).selectExpr("transform(array(1, 2, 3), x -> x + 1) as arr")
+      val plan = df.queryExecution.executedPlan
+      assert(plan.exists(_.isInstanceOf[WholeStageCodegenExec]),
+        s"Expected WholeStageCodegenExec in plan:\n$plan")
+      checkAnswer(df, Row(Seq(2, 3, 4)))
+    }
 
-    // Nested transform
-    val df2 = spark.range(1).selectExpr(
-      "transform(transform(array(1, 2, 3), x -> x + 1), y -> y * 2) as arr")
-    val plan2 = df2.queryExecution.executedPlan
-    assert(plan2.exists(_.isInstanceOf[WholeStageCodegenExec]),
-      s"Expected WholeStageCodegenExec in plan:\n$plan2")
-    checkAnswer(df2, Row(Seq(4, 6, 8)))
+    withClue("nested transform") {
+      val df2 = spark.range(1).selectExpr(
+        "transform(transform(array(1, 2, 3), x -> x + 1), y -> y * 2) as arr")
+      val plan2 = df2.queryExecution.executedPlan
+      assert(plan2.exists(_.isInstanceOf[WholeStageCodegenExec]),
+        s"Expected WholeStageCodegenExec in plan:\n$plan2")
+      checkAnswer(df2, Row(Seq(4, 6, 8)))
+    }
 
-    // Transform with index
-    // Transform with index: x + i => 10+0=10, 20+1=21, 30+2=32
-    val df3 = spark.range(1).selectExpr(
-      "transform(array(10, 20, 30), (x, i) -> x + i) as arr")
-    checkAnswer(df3, Row(Seq(10, 21, 32)))
+    withClue("transform with index: x+i => 10+0=10, 20+1=21, 30+2=32") {
+      val df3 = spark.range(1).selectExpr(
+        "transform(array(10, 20, 30), (x, i) -> x + i) as arr")
+      checkAnswer(df3, Row(Seq(10, 21, 32)))
+    }
 
-    // Transform with nullable elements
-    val df4 = spark.range(1).selectExpr(
-      "transform(array(1, cast(null as int), 3), x -> x + 1) as arr")
-    checkAnswer(df4, Row(Seq(2, null, 4)))
+    withClue("transform with nullable elements") {
+      val df4 = spark.range(1).selectExpr(
+        "transform(array(1, cast(null as int), 3), x -> x + 1) as arr")
+      checkAnswer(df4, Row(Seq(2, null, 4)))
+    }
 
-    // Empty array
-    val df5 = spark.range(1).selectExpr(
-      "transform(array(), x -> x + 1) as arr")
-    checkAnswer(df5, Row(Seq.empty))
+    withClue("empty array") {
+      val df5 = spark.range(1).selectExpr(
+        "transform(array(), x -> x + 1) as arr")
+      checkAnswer(df5, Row(Seq.empty))
+    }
 
-    // Transform with nested CodegenFallback HOF (e.g., filter) in lambda body
-    val df6 = spark.range(1).selectExpr(
-      "transform(array(array(1, 2, 3), array(4, 5, 6)), x -> filter(x, y -> y > 2)) as arr")
-    checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
+    withClue("nested CodegenFallback HOF (filter) in lambda body") {
+      val df6 = spark.range(1).selectExpr(
+        "transform(array(array(1, 2, 3), array(4, 5, 6)), x -> filter(x, y -> y > 2)) as arr")
+      checkAnswer(df6, Row(Seq(Seq(3), Seq(4, 5, 6))))
+    }
 
-    // Null argument (entire array is null)
-    val df7 = spark.range(1).selectExpr(
-      "transform(cast(null as array<int>), x -> x + 1) as arr")
-    checkAnswer(df7, Row(null))
+    withClue("null argument") {
+      val df7 = spark.range(1).selectExpr(
+        "transform(cast(null as array<int>), x -> x + 1) as arr")
+      checkAnswer(df7, Row(null))
+    }
   }
 }

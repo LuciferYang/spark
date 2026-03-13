@@ -484,7 +484,7 @@ case class ArrayTransform(
         val extract =
           s"""
              |$indexValue = $loopIndex;
-             |$idxAtomicRefTerm.set($loopIndex);
+             |$idxAtomicRefTerm.set((Integer) $loopIndex);
            """.stripMargin
         (extract, Some(iv.exprId -> indexCode))
       case None =>
@@ -534,9 +534,9 @@ case class ArrayTransform(
       resultArray, outputElementType, numElements,
       " ArrayTransform failed.")
 
+    // argumentGen.value is guaranteed to be ArrayData for ArrayType expressions.
     val loopCode =
       s"""
-         |// argumentGen.value is guaranteed to be ArrayData for ArrayType expressions.
          |ArrayData $arrData = (ArrayData) ${argumentGen.value};
          |int $numElements = $arrData.numElements();
          |$allocation
