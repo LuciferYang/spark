@@ -144,7 +144,7 @@ case class LambdaFunction(
     function: Expression,
     arguments: Seq[NamedExpression],
     hidden: Boolean = false)
-  extends Expression with CodegenFallback {
+  extends Expression {
 
   override def children: Seq[Expression] = function +: arguments
   override def dataType: DataType = function.dataType
@@ -161,6 +161,12 @@ case class LambdaFunction(
   lazy val bound: Boolean = arguments.forall(_.resolved)
 
   override def eval(input: InternalRow): Any = function.eval(input)
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    // LambdaFunction is a thin wrapper. The enclosing HOF is responsible for
+    // registering lambda variable bindings before this is called.
+    function.genCode(ctx)
+  }
 
   override protected def withNewChildrenInternal(
       newChildren: IndexedSeq[Expression]): LambdaFunction =
