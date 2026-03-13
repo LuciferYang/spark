@@ -457,23 +457,33 @@ case class ArrayTransform(
        """.stripMargin
     }
 
+    // Check if the lambda body contains any CodegenFallback expressions that would
+    // need to read lambda variable values via NamedLambdaVariable.eval() at runtime.
+    // If not, we can skip the AtomicReference writes entirely, avoiding per-element
+    // boxing overhead.
+    val lambdaBodyHasFallback = function.exists(_.isInstanceOf[CodegenFallback])
+
     // Also set the AtomicReference on the lambda variable so that any CodegenFallback
     // expressions nested inside the lambda body (e.g., ArrayExists, ArrayFilter that
     // haven't been given codegen yet) can read the correct value via
     // NamedLambdaVariable.eval(). This is NOT redundant with the mutable state bindings
     // above -- the mutable state is for the codegen path, while AtomicReference is for
     // CodegenFallback sub-expressions that call eval() at runtime.
-    val elemAtomicRefTerm = ctx.addReferenceObj(
-      "elementVarRef", elementVar.value,
-      "java.util.concurrent.atomic.AtomicReference")
-    // Explicitly box primitive values to ensure the AtomicReference contains the
-    // correct boxed type (e.g., Byte for ByteType, Short for ShortType), matching
-    // what ArrayData.get() returns in the interpreted path.
-    val boxedElementType = CodeGenerator.boxedType(elementType)
-    val setElemAtomicRef = if (elementVar.nullable) {
-      s"$elemAtomicRefTerm.set($elementIsNull ? null : ($boxedElementType) $elementValue);"
+    val setElemAtomicRef = if (lambdaBodyHasFallback) {
+      val elemAtomicRefTerm = ctx.addReferenceObj(
+        "elementVarRef", elementVar.value,
+        "java.util.concurrent.atomic.AtomicReference")
+      // Explicitly box primitive values to ensure the AtomicReference contains the
+      // correct boxed type (e.g., Byte for ByteType, Short for ShortType), matching
+      // what ArrayData.get() returns in the interpreted path.
+      val boxedElementType = CodeGenerator.boxedType(elementType)
+      if (elementVar.nullable) {
+        s"$elemAtomicRefTerm.set($elementIsNull ? null : ($boxedElementType) $elementValue);"
+      } else {
+        s"$elemAtomicRefTerm.set(($boxedElementType) $elementValue);"
+      }
     } else {
-      s"$elemAtomicRefTerm.set(($boxedElementType) $elementValue);"
+      ""
     }
 
     // Build lambda variable bindings using the mutable state variables.
@@ -490,14 +500,18 @@ case class ArrayTransform(
           code = EmptyBlock,
           isNull = FalseLiteral,
           value = JavaCode.variable(indexValue, IntegerType))
-        val idxAtomicRefTerm = ctx.addReferenceObj(
-          "indexVarRef", iv.value,
-          "java.util.concurrent.atomic.AtomicReference")
-        val boxedIndexType = CodeGenerator.boxedType(iv.dataType)
+        val idxAtomicRefUpdate = if (lambdaBodyHasFallback) {
+          val idxAtomicRefTerm = ctx.addReferenceObj(
+            "indexVarRef", iv.value,
+            "java.util.concurrent.atomic.AtomicReference")
+          val boxedIndexType = CodeGenerator.boxedType(iv.dataType)
+          s"\n$idxAtomicRefTerm.set(($boxedIndexType) $loopIndex);"
+        } else {
+          ""
+        }
         val extract =
           s"""
-             |$indexValue = $loopIndex;
-             |$idxAtomicRefTerm.set(($boxedIndexType) $loopIndex);
+             |$indexValue = $loopIndex;$idxAtomicRefUpdate
            """.stripMargin
         (extract, Some(iv.exprId -> indexCode))
       case None =>
