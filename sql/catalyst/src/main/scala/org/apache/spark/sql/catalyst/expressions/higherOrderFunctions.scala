@@ -86,6 +86,8 @@ case class NamedLambdaVariable(
   extends LeafExpression
   with NamedExpression {
 
+  final override val nodePatterns: Seq[TreePattern] = Seq(LAMBDA_VARIABLE)
+
   override def qualifier: Seq[String] = Seq.empty
 
   override def newInstance(): NamedExpression =
