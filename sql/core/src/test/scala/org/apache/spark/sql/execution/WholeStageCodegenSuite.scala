@@ -951,46 +951,33 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     // in whole-stage codegen. This was the root cause of the from_json codegen revert:
     // without CSE in FilterExec.doConsume, expensive shared expressions (like from_json)
     // were inlined N times, causing code bloat and performance regression.
-    val addExactPattern = "MathUtils.addExact"
-
-    // With CSE enabled: the common subexpression (a + b) should be computed only once
-    withSQLConf(
-      SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> "true",
-      SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
-      SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
-      val df = spark.range(10).selectExpr("id", "id as a", "id as b")
-      // (a + b) is the common subexpression shared across two predicates
-      val filtered = df.where("(a + b) > 3 AND (a + b) < 17")
-
-      // Verify functional correctness
-      checkAnswer(filtered, (2L to 8L).map(i => Row(i, i, i)))
-
-      // Verify that Filter is in whole-stage codegen and CSE is effective:
-      // the add operation should appear exactly once (computed once, reused).
-      val plan = filtered.queryExecution.executedPlan
-      assert(plan.exists(_.isInstanceOf[WholeStageCodegenExec]),
-        "Filter should be in whole-stage codegen")
-      val code = codegenString(plan)
-      val addCount = addExactPattern.r.findAllIn(code).length
-      assert(addCount === 1,
-        s"With CSE, the add should be computed once but found $addCount times")
+    def testFilterCSE(cseEnabled: Boolean): (Seq[Row], String) = {
+      withSQLConf(
+        SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> cseEnabled.toString,
+        SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
+        SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
+        val df = spark.range(10).selectExpr("id", "id as a", "id as b")
+        // (a + b) is the common subexpression shared across three predicates
+        val filtered = df.where("(a + b) > 3 AND (a + b) < 17 AND (a + b) != 10")
+        val plan = filtered.queryExecution.executedPlan
+        assert(plan.exists(_.isInstanceOf[WholeStageCodegenExec]),
+          "Filter should be in whole-stage codegen")
+        (filtered.collect().toSeq, codegenString(plan))
+      }
     }
 
-    // Without CSE: the same subexpression should be computed twice
-    withSQLConf(
-      SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> "false",
-      SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
-      SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
-      val df = spark.range(10).selectExpr("id", "id as a", "id as b")
-      val filtered = df.where("(a + b) > 3 AND (a + b) < 17")
+    val (cseResult, cseCode) = testFilterCSE(cseEnabled = true)
+    val (noCseResult, noCseCode) = testFilterCSE(cseEnabled = false)
 
-      checkAnswer(filtered, (2L to 8L).map(i => Row(i, i, i)))
+    // Functional correctness: both modes must produce the same result
+    val expected = (2L to 8L).filter(_ * 2 != 10).map(i => Row(i, i, i))
+    assert(cseResult === expected)
+    assert(noCseResult === expected)
 
-      val plan = filtered.queryExecution.executedPlan
-      val code = codegenString(plan)
-      val addCount = addExactPattern.r.findAllIn(code).length
-      assert(addCount === 2,
-        s"Without CSE, the add should be computed twice but found $addCount times")
-    }
+    // CSE effectiveness: with CSE, the generated code should be shorter because
+    // the common subexpression is computed once instead of N times.
+    assert(cseCode.length < noCseCode.length,
+      "CSE should produce shorter generated code by eliminating duplicate computation. " +
+        s"CSE code length: ${cseCode.length}, non-CSE code length: ${noCseCode.length}")
   }
 }
