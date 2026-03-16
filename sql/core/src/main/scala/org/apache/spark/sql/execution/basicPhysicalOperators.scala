@@ -253,8 +253,38 @@ case class FilterExec(condition: Expression, child: SparkPlan)
   override def doConsume(ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
     val numOutput = metricTerm(ctx, "numOutputRows")
 
-    val predicateCode = generatePredicateCode(
-      ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
+    // Subexpression elimination for filter predicates in whole-stage codegen.
+    // Only collect otherPreds for CSE -- notNullPreds are simple IsNotNull checks
+    // with no CSE value, including them would interfere with equivalence analysis.
+    //
+    // Note: CSE evaluation code is placed BEFORE predicate short-circuit checks.
+    // This means common subexpressions are evaluated unconditionally even if an earlier
+    // notNull check would have short-circuited. This is an intentional tradeoff:
+    // for expensive shared expressions (e.g., from_json appearing in 500 predicates),
+    // the benefit of evaluating once vs N times far outweighs the cost of losing
+    // short-circuit on the CSE portion. When there are no common subexpressions,
+    // subExprsCode is empty and this path has zero overhead.
+    val (subExprsCode, localValInputs, subExprStates) =
+      if (conf.subexpressionEliminationEnabled && otherPreds.nonEmpty) {
+        val boundOtherPreds = otherPreds.map(
+          BindReferences.bindReference(_, output))
+        val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
+        (ctx.evaluateSubExprEliminationState(subExprs.states.values),
+         subExprs.exprCodesNeedEvaluate,
+         subExprs.states)
+      } else {
+        ("", Seq.empty[ExprCode],
+         Map.empty[ExpressionEquals, SubExprEliminationState])
+      }
+
+    // Generate predicate code within CSE context so that genCode calls inside
+    // generatePredicateCode can look up pre-computed subexpressions.
+    var predicateCode: String = null
+    ctx.withSubExprEliminationExprs(subExprStates) {
+      predicateCode = generatePredicateCode(
+        ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
+      Seq.empty
+    }
 
     // Reset the isNull to false for the not-null columns, then the followed operators could
     // generate better code (remove dead branches).
@@ -268,6 +298,8 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // Note: wrap in "do { } while (false);", so the generated checks can jump out with "continue;"
     s"""
        |do {
+       |  ${evaluateVariables(localValInputs)}
+       |  $subExprsCode
        |  $predicateCode
        |  $numOutput.add(1);
        |  ${consume(ctx, resultVars)}
