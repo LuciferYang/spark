@@ -255,7 +255,8 @@ case class FilterExec(condition: Expression, child: SparkPlan)
 
     // Subexpression elimination for filter predicates in whole-stage codegen.
     // Only collect otherPreds for CSE -- notNullPreds are simple IsNotNull checks
-    // with no CSE value, including them would interfere with equivalence analysis.
+    // (guaranteed by the partition logic in FilterExec's constructor) with no CSE value,
+    // including them would interfere with equivalence analysis.
     //
     // Note: CSE evaluation code is placed BEFORE predicate short-circuit checks.
     // This means common subexpressions are evaluated unconditionally even if an earlier
@@ -269,8 +270,9 @@ case class FilterExec(condition: Expression, child: SparkPlan)
         val boundOtherPreds = otherPreds.map(
           BindReferences.bindReference(_, output))
         val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
-        // Generate predicate code within CSE context so that genCode calls inside
-        // generatePredicateCode can look up pre-computed subexpressions.
+        // withSubExprEliminationExprs expects a block returning Seq[ExprCode], but we need
+        // the String result from generatePredicateCode. Capture it via var + side effect
+        // since the API does not support returning arbitrary types.
         val predCode: String = {
           var code = ""
           ctx.withSubExprEliminationExprs(subExprs.states) {
@@ -285,6 +287,8 @@ case class FilterExec(condition: Expression, child: SparkPlan)
         (ctx.evaluateSubExprEliminationState(subExprs.states.values),
          subExprs.exprCodesNeedEvaluate, predCode)
       } else {
+        // CSE disabled or no other predicates: fall back to original codegen path
+        // with no overhead.
         ("", Seq.empty, generatePredicateCode(
           ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes))
       }

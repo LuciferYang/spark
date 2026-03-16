@@ -956,8 +956,10 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
         SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> cseEnabled.toString,
         SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
         SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false",
-        // Use a low split threshold to force the split code path, which generates
-        // class-level "subExprValue" fields that we can assert on.
+        // Use a low split threshold to force the split code path in CSE. The split path
+        // generates class-level "subExprValue" fields that we can assert on to verify CSE
+        // is active. Under the default threshold (65535), CSE still works but uses inline
+        // variables without a recognizable naming pattern.
         SQLConf.CODEGEN_METHOD_SPLIT_THRESHOLD.key -> "1") {
         val df = spark.range(10).selectExpr("id", "id as a", "id as b")
         // (a + b) is the common subexpression shared across three predicates
@@ -977,8 +979,10 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     assert(cseResult === expected)
     assert(noCseResult === expected)
 
-    // CSE effectiveness: the split code path generates class-level fields named
-    // "subExprValue" for pre-computed common subexpressions.
+    // CSE effectiveness: with a low methodSplitThreshold the split code path generates
+    // class-level fields with names containing "subExprValue" for pre-computed common
+    // subexpressions. This naming convention is an internal codegen implementation detail;
+    // if the naming changes, this assertion should be updated accordingly.
     assert(cseCode.contains("subExprValue"),
       "CSE enabled should generate subExprValue fields for common subexpressions")
     assert(!noCseCode.contains("subExprValue"),
