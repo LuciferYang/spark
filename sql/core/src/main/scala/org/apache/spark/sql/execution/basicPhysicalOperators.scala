@@ -264,27 +264,28 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // the benefit of evaluating once vs N times far outweighs the cost of losing
     // short-circuit on the CSE portion. When there are no common subexpressions,
     // subExprsCode is empty and this path has zero overhead.
-    val (subExprsCode, localValInputs, subExprStates) =
+    val (subExprsCode, localValInputs, predicateCode) =
       if (conf.subexpressionEliminationEnabled && otherPreds.nonEmpty) {
         val boundOtherPreds = otherPreds.map(
           BindReferences.bindReference(_, output))
         val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
+        // Generate predicate code within CSE context so that genCode calls inside
+        // generatePredicateCode can look up pre-computed subexpressions.
+        var predCode = ""
+        ctx.withSubExprEliminationExprs(subExprs.states) {
+          predCode = generatePredicateCode(
+            ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
+          Seq.empty
+        }
+        // Generate subexpression evaluation code AFTER predicate code generation.
+        // evaluateSubExprEliminationState clears state.eval.code to prevent duplicate
+        // evaluation, so it must be called after genCode has consumed the states.
         (ctx.evaluateSubExprEliminationState(subExprs.states.values),
-         subExprs.exprCodesNeedEvaluate,
-         subExprs.states)
+         subExprs.exprCodesNeedEvaluate, predCode)
       } else {
-        ("", Seq.empty[ExprCode],
-         Map.empty[ExpressionEquals, SubExprEliminationState])
+        ("", Seq.empty, generatePredicateCode(
+          ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes))
       }
-
-    // Generate predicate code within CSE context so that genCode calls inside
-    // generatePredicateCode can look up pre-computed subexpressions.
-    var predicateCode: String = null
-    ctx.withSubExprEliminationExprs(subExprStates) {
-      predicateCode = generatePredicateCode(
-        ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
-      Seq.empty
-    }
 
     // Reset the isNull to false for the not-null columns, then the followed operators could
     // generate better code (remove dead branches).
