@@ -955,7 +955,10 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
       withSQLConf(
         SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> cseEnabled.toString,
         SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
-        SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
+        SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false",
+        // Use a low split threshold to force the split code path, which generates
+        // class-level "subExprValue" fields that we can assert on.
+        SQLConf.CODEGEN_METHOD_SPLIT_THRESHOLD.key -> "1") {
         val df = spark.range(10).selectExpr("id", "id as a", "id as b")
         // (a + b) is the common subexpression shared across three predicates
         val filtered = df.where("(a + b) > 3 AND (a + b) < 17 AND (a + b) != 10")
@@ -974,10 +977,11 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     assert(cseResult === expected)
     assert(noCseResult === expected)
 
-    // CSE effectiveness: with CSE, the generated code should be shorter because
-    // the common subexpression is computed once instead of N times.
-    assert(cseCode.length < noCseCode.length,
-      "CSE should produce shorter generated code by eliminating duplicate computation. " +
-        s"CSE code length: ${cseCode.length}, non-CSE code length: ${noCseCode.length}")
+    // CSE effectiveness: the split code path generates class-level fields named
+    // "subExprValue" for pre-computed common subexpressions.
+    assert(cseCode.contains("subExprValue"),
+      "CSE enabled should generate subExprValue fields for common subexpressions")
+    assert(!noCseCode.contains("subExprValue"),
+      "CSE disabled should not generate subExprValue fields")
   }
 }
