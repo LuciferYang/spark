@@ -1249,11 +1249,11 @@ class CodegenContext extends Logging {
           throw SparkException.internalError(errMsg)
         } else {
           logInfo(errMsg)
-          (localSubExprEliminationExprsForNonSplit, Seq.empty)
+          (localSubExprEliminationExprsForNonSplit, exprCodesNeedEvaluate)
         }
       }
     } else {
-      (localSubExprEliminationExprsForNonSplit, Seq.empty)
+      (localSubExprEliminationExprsForNonSplit, exprCodesNeedEvaluate)
     }
     SubExprCodes(subExprsMap.toMap, exprCodes.flatten)
   }
