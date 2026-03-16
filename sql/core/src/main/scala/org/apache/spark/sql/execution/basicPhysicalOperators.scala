@@ -271,15 +271,17 @@ case class FilterExec(condition: Expression, child: SparkPlan)
         val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
         // Generate predicate code within CSE context so that genCode calls inside
         // generatePredicateCode can look up pre-computed subexpressions.
-        var predCode = ""
-        ctx.withSubExprEliminationExprs(subExprs.states) {
-          predCode = generatePredicateCode(
-            ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
-          Seq.empty
+        val predCode: String = {
+          var code = ""
+          ctx.withSubExprEliminationExprs(subExprs.states) {
+            code = generatePredicateCode(
+              ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes)
+            Seq.empty
+          }
+          code
         }
-        // Generate subexpression evaluation code AFTER predicate code generation.
-        // evaluateSubExprEliminationState clears state.eval.code to prevent duplicate
-        // evaluation, so it must be called after genCode has consumed the states.
+        // evaluateSubExprEliminationState must be called after predicate code generation;
+        // it emits the pre-computation code and marks states as consumed.
         (ctx.evaluateSubExprEliminationState(subExprs.states.values),
          subExprs.exprCodesNeedEvaluate, predCode)
       } else {
