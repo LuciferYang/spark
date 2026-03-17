@@ -265,6 +265,9 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // the benefit of evaluating once vs N times far outweighs the cost of losing
     // short-circuit on the CSE portion. When there are no common subexpressions,
     // subExprsCode is empty and this path has zero overhead.
+    // This is safe because Spark SQL expressions handle null inputs gracefully (returning
+    // null rather than throwing), so evaluating them before notNull guards does not
+    // introduce new exceptions.
     val (inputVarsCode, subExprsCode, predicateCode) =
       if (conf.subexpressionEliminationEnabled && otherPreds.nonEmpty) {
         val boundOtherPreds = otherPreds.map(
@@ -280,14 +283,14 @@ case class FilterExec(condition: Expression, child: SparkPlan)
         // and skip their declarations, causing "is not an rvalue" compilation errors.
         // By pre-evaluating here, we ensure input variable codes are already EmptyBlock before
         // CSE analysis runs, avoiding the conflict.
-        val otherPredInputAttrs = otherPreds.flatMap(_.references).distinct
+        val otherPredInputAttrs = AttributeSet(otherPreds.flatMap(_.references))
         val inputVarsEvalCode = evaluateRequiredVariables(
-          child.output, input, AttributeSet(otherPredInputAttrs))
+          child.output, input, otherPredInputAttrs)
 
         val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
-        // withSubExprEliminationExprs expects a block returning Seq[ExprCode], but we need
-        // the String result from generatePredicateCode. Capture it via var + side effect
-        // since the API does not support returning arbitrary types.
+        // withSubExprEliminationExprs requires Seq[ExprCode] return type, but we need
+        // the String result from generatePredicateCode. Use var + side-effect capture
+        // as a workaround for this API constraint.
         val predCode: String = {
           var code = ""
           ctx.withSubExprEliminationExprs(subExprs.states) {
