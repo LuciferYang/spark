@@ -53,9 +53,9 @@ import org.apache.spark.sql.types.DataTypes;
  * </pre>
  */
 @BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@Warmup(iterations = 20, time = 1)
+@Measurement(iterations = 50, time = 1)
 @Fork(1)
 @State(Scope.Benchmark)
 public class VectorizedPlainValuesReaderBenchmark {
