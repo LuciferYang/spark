@@ -956,10 +956,8 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
         SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> cseEnabled.toString,
         SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
         SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false",
-        // Use a low split threshold to force the split code path in CSE. The split path
-        // generates class-level "subExprValue" fields that we can assert on to verify CSE
-        // is active. Under the default threshold (65535), CSE still works but uses inline
-        // variables without a recognizable naming pattern.
+        // Use a low split threshold to exercise the split code path in CSE, where common
+        // subexpressions are extracted into separate helper functions.
         SQLConf.CODEGEN_METHOD_SPLIT_THRESHOLD.key -> "1") {
         val df = spark.range(10).selectExpr("id", "id as a", "id as b")
         // (a + b) is the common subexpression shared across three predicates
@@ -979,14 +977,16 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
     assert(cseResult === expected)
     assert(noCseResult === expected)
 
-    // CSE effectiveness: with a low methodSplitThreshold the split code path generates
-    // class-level fields with names containing "subExprValue" for pre-computed common
-    // subexpressions. This naming convention is an internal codegen implementation detail;
-    // if the naming changes, this assertion should be updated accordingly.
-    assert(cseCode.contains("subExprValue"),
-      "CSE enabled should generate subExprValue fields for common subexpressions")
-    assert(!noCseCode.contains("subExprValue"),
-      "CSE disabled should not generate subExprValue fields")
+    // CSE semantic check: count how many times the addition (a + b) is computed.
+    // The generated code uses MathUtils.addExact for long addition with overflow check.
+    // With CSE enabled, (a + b) should be computed once and reused across all three
+    // predicates; without CSE, it is inlined separately in each predicate.
+    val addExactPattern = "addExact".r
+    val cseAddCount = addExactPattern.findAllIn(cseCode).length
+    val noCseAddCount = addExactPattern.findAllIn(noCseCode).length
+    assert(cseAddCount < noCseAddCount,
+      s"CSE should reduce repeated evaluation: addExact appears $cseAddCount times with CSE " +
+        s"vs $noCseAddCount times without")
   }
 
   test("SPARK-50767: FilterExec CSE with notNullPreds sharing input variables") {
