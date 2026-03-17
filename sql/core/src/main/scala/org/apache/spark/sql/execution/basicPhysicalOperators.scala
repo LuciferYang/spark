@@ -265,10 +265,25 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // the benefit of evaluating once vs N times far outweighs the cost of losing
     // short-circuit on the CSE portion. When there are no common subexpressions,
     // subExprsCode is empty and this path has zero overhead.
-    val (subExprsCode, localValInputs, predicateCode) =
+    val (inputVarsCode, subExprsCode, predicateCode) =
       if (conf.subexpressionEliminationEnabled && otherPreds.nonEmpty) {
         val boundOtherPreds = otherPreds.map(
           BindReferences.bindReference(_, output))
+        // Pre-evaluate input variables referenced by otherPreds before CSE analysis.
+        // FilterExec sets usedInputs = AttributeSet.empty to defer input evaluation
+        // for short-circuit optimization. However, subexpressionEliminationForWholeStageCodegen's
+        // internal getLocalInputVariableValues has a side effect: it clears
+        // ctx.currentVars[i].code for input variables referenced by common subexpressions.
+        // In the non-split path, the cleared codes are baked into the subexpression eval code,
+        // and exprCodesNeedEvaluate is not returned. If notNullPreds reference the same input
+        // variables, generatePredicateCode's evaluateRequiredVariables would find empty code
+        // and skip their declarations, causing "is not an rvalue" compilation errors.
+        // By pre-evaluating here, we ensure input variable codes are already EmptyBlock before
+        // CSE analysis runs, avoiding the conflict.
+        val otherPredInputAttrs = otherPreds.flatMap(_.references).distinct
+        val inputVarsEvalCode = evaluateRequiredVariables(
+          child.output, input, AttributeSet(otherPredInputAttrs))
+
         val subExprs = ctx.subexpressionEliminationForWholeStageCodegen(boundOtherPreds)
         // withSubExprEliminationExprs expects a block returning Seq[ExprCode], but we need
         // the String result from generatePredicateCode. Capture it via var + side effect
@@ -284,12 +299,12 @@ case class FilterExec(condition: Expression, child: SparkPlan)
         }
         // evaluateSubExprEliminationState must be called after predicate code generation;
         // it emits the pre-computation code and marks states as consumed.
-        (ctx.evaluateSubExprEliminationState(subExprs.states.values),
-         subExprs.exprCodesNeedEvaluate, predCode)
+        (inputVarsEvalCode,
+         ctx.evaluateSubExprEliminationState(subExprs.states.values), predCode)
       } else {
         // CSE disabled or no other predicates: fall back to original codegen path
         // with no overhead.
-        ("", Seq.empty, generatePredicateCode(
+        ("", "", generatePredicateCode(
           ctx, child.output, input, output, notNullPreds, otherPreds, notNullAttributes))
       }
 
@@ -305,7 +320,7 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // Note: wrap in "do { } while (false);", so the generated checks can jump out with "continue;"
     s"""
        |do {
-       |  ${evaluateVariables(localValInputs)}
+       |  $inputVarsCode
        |  $subExprsCode
        |  $predicateCode
        |  $numOutput.add(1);

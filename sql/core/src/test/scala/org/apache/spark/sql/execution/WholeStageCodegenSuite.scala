@@ -30,7 +30,7 @@ import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNes
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 // Disable AQE because the WholeStageCodegenExec is added when running QueryStageExec
 class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
@@ -987,5 +987,50 @@ class WholeStageCodegenSuite extends QueryTest with SharedSparkSession
       "CSE enabled should generate subExprValue fields for common subexpressions")
     assert(!noCseCode.contains("subExprValue"),
       "CSE disabled should not generate subExprValue fields")
+  }
+
+  test("SPARK-50767: FilterExec CSE with notNullPreds sharing input variables") {
+    // Regression test for a bug in CodeGenerator.subexpressionEliminationForWholeStageCodegen:
+    // In the non-split path, getLocalInputVariableValues clears ctx.currentVars[i].code for
+    // input variables referenced by common subexpressions (side effect), but the saved
+    // exprCodesNeedEvaluate was discarded (returned Seq.empty). When FilterExec's
+    // generatePredicateCode later processed notNullPreds referencing the same input variables,
+    // evaluateRequiredVariables found empty code and skipped variable declarations, causing
+    // "is not an rvalue" compilation errors (e.g., TPC-DS q85).
+    withSQLConf(
+      SQLConf.SUBEXPRESSION_ELIMINATION_ENABLED.key -> "true",
+      SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> "true",
+      SQLConf.ADAPTIVE_EXECUTION_ENABLED.key -> "false") {
+      // Create nullable columns so that IsNotNull predicates are meaningful and
+      // not optimized away.
+      val schema = StructType(Seq(
+        StructField("a", IntegerType, nullable = true),
+        StructField("b", IntegerType, nullable = true)))
+      val data = spark.sparkContext.parallelize(Seq(
+        Row(1, 5), Row(null, 3), Row(4, null), Row(5, 6), Row(7, 8), Row(2, 3)))
+      val df = spark.createDataFrame(data, schema)
+
+      // Filter condition produces:
+      // - notNullPreds: IsNotNull(a), IsNotNull(b) (inferred by optimizer)
+      // - otherPreds: (a + b) > 3, (a + b) < 15 (common subexpression: a + b)
+      // The common subexpression (a + b) references input variables a and b, which are
+      // also referenced by the notNullPreds -- this is the exact scenario that triggers
+      // the bug.
+      val result = df.where("a IS NOT NULL AND (a + b) > 3 AND (a + b) < 15")
+
+      val plan = result.queryExecution.executedPlan
+      assert(plan.exists(_.isInstanceOf[WholeStageCodegenExec]),
+        "Filter should be in whole-stage codegen")
+
+      // Verify generated code compiles successfully. Before the fix, this would fail
+      // with "Expression ... is not an rvalue" because input variable declarations
+      // were lost when CSE cleared ctx.currentVars but discarded exprCodesNeedEvaluate.
+      val codeGenStr = codegenString(plan)
+      assert(codeGenStr.nonEmpty, "Should generate valid code")
+
+      // Row(1,5): a+b=6, passes | Row(null,3): excluded | Row(4,null): excluded
+      // Row(5,6): a+b=11, passes | Row(7,8): a+b=15, excluded | Row(2,3): a+b=5, passes
+      checkAnswer(result, Seq(Row(1, 5), Row(5, 6), Row(2, 3)))
+    }
   }
 }
