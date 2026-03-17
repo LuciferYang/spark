@@ -369,6 +369,12 @@ public abstract class WritableColumnVector extends ColumnVector {
   public abstract void putLongsLittleEndian(int rowId, int count, byte[] src, int srcIndex);
 
   /**
+   * Sets values from [src[srcIndex], src[srcIndex + count * 4]) to [rowId, rowId + count)
+   * The data in src must be 4-byte unsigned ints.
+   */
+  public abstract void putLongsFromUnsignedIntsLittleEndian(int rowId, int count, byte[] src, int srcIndex);
+
+  /**
    * Sets `value` to the value at rowId.
    */
   public abstract void putFloat(int rowId, float value);

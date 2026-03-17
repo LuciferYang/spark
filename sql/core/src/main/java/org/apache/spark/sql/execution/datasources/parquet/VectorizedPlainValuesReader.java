@@ -43,6 +43,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   private int bitOffset;
   private byte currentByte = 0;
 
+  // Reusable temporary buffers for batch optimizations.
+  private byte[] tmpHeapBuffer;
+
   public VectorizedPlainValuesReader() {
   }
 
@@ -151,8 +154,13 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   public final void readUnsignedIntegers(int total, WritableColumnVector c, int rowId) {
     int requiredBytes = total * 4;
     ByteBuffer buffer = getBuffer(requiredBytes);
-    for (int i = 0; i < total; i += 1) {
-      c.putLong(rowId + i, Integer.toUnsignedLong(buffer.getInt()));
+    if (buffer.hasArray()) {
+      c.putLongsFromUnsignedIntsLittleEndian(rowId, total,
+        buffer.array(), buffer.arrayOffset() + buffer.position());
+    } else {
+      byte[] src = getTmpHeapBuffer(requiredBytes);
+      buffer.get(src, 0, requiredBytes);
+      c.putLongsFromUnsignedIntsLittleEndian(rowId, total, src, 0);
     }
   }
 
@@ -556,5 +564,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     }
     out.close();
     v.arrayData().appendBytes(dataLen, out.toByteArray(), 0);
+  }
+
+  private byte[] getTmpHeapBuffer(int size) {
+    if (tmpHeapBuffer == null || tmpHeapBuffer.length < size) {
+      tmpHeapBuffer = new byte[size];
+    }
+    return tmpHeapBuffer;
   }
 }

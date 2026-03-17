@@ -419,6 +419,21 @@ public final class OnHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
+  public void putLongsFromUnsignedIntsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
+    int srcOffset = srcIndex + Platform.BYTE_ARRAY_OFFSET;
+    if (bigEndianPlatform) {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        longData[rowId + i] = Integer.toUnsignedLong(
+          Integer.reverseBytes(Platform.getInt(src, srcOffset)));
+      }
+    } else {
+      for (int i = 0; i < count; i++, srcOffset += 4) {
+        longData[rowId + i] = Integer.toUnsignedLong(Platform.getInt(src, srcOffset));
+      }
+    }
+  }
+
+  @Override
   public long getLong(int rowId) {
     if (dictionary == null) {
       return longData[rowId];
