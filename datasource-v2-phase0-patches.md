@@ -230,3 +230,33 @@ Patch 8 (清理 + Flag 翻转)    ← 收尾
 **已完成的清理**（在 Patch 7 中）:
 - SPARK-36340 TODO 注释已移除
 - `checkNoCollationsInMapKeys` 校验已对齐
+
+---
+
+## Phase 0 完成总结
+
+**状态**: ✅ Patch 1-7 全部完成，Patch 8 延迟到 Phase 1
+
+**成果**:
+- V2 文件写入路径已完整实现，通过 `spark.sql.sources.v2.file.write.enabled=true` 启用
+- 支持：非分区写入、分区写入、动态分区覆盖、truncate（全量覆盖）、DataFrame API 写入、Catalog 表写入（INSERT INTO / CTAS）
+- Schema 校验与 V1 对齐（`checkNoCollationsInMapKeys`、`checkColumnNameDuplication`、`validateSchema`）
+- 覆盖格式：Parquet、ORC、CSV、JSON、Text
+- 测试：`FileDataSourceV2FallBackSuite` 18/18 通过
+
+**已知限制（Phase 1 解决）**:
+- `SaveMode.ErrorIfExists` / `SaveMode.Ignore`：需要 `SupportsCatalogOptions`，当前 DataFrame API 回退 V1
+- `SHOW PARTITIONS`：需要 `SupportsPartitionManagement`
+- `INSERT INTO parquet.\`path\``：需要 `SupportsCatalogOptions`
+- Flag 默认值仍为 `false`，翻转需先解决 cache invalidation、分区信息匹配、错误消息统一
+
+**各 Patch 对应分支**:
+| Patch | 分支 |
+|-------|------|
+| 1 | `dsv2-phase0-patch1-partition-plumbing` |
+| 2 | `dsv2-phase0-patch2-feature-flag` |
+| 3 | `dsv2-phase0-patch3-partitioned-write` |
+| 4 | `dsv2-phase0-patch4-dynamic-overwrite` |
+| 5 | `dsv2-phase0-patch5-dataframe-api` |
+| 6 | `dsv2-phase0-patch6-remove-datasourcev2utils-guard` |
+| 7 | `dsv2-phase0-patch7-schema-validation` |
