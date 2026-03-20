@@ -237,4 +237,81 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
       }
     }
   }
+
+  test("V2 partitioned file write") {
+    Seq("parquet", "orc", "json", "csv").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempPath { path =>
+          val inputData = spark.range(20).selectExpr(
+            "id", "id % 5 as part")
+          inputData.write.option("header", "true")
+            .partitionBy("part").format(format).save(path.getCanonicalPath)
+          val readBack = spark.read.option("header", "true").schema(inputData.schema)
+            .format(format).load(path.getCanonicalPath)
+          checkAnswer(readBack, inputData)
+
+          // Verify partition directory structure exists
+          val partDirs = path.listFiles().filter(_.isDirectory).map(_.getName).sorted
+          assert(partDirs.exists(_.startsWith("part=")),
+            s"Expected partition directories for format $format, got: ${partDirs.mkString(", ")}")
+        }
+      }
+    }
+  }
+
+  test("V2 partitioned write produces same results as V1") {
+    Seq("parquet", "orc", "json", "csv").foreach { format =>
+      withTempPath { v1Path =>
+        withTempPath { v2Path =>
+          val inputData = spark.range(50).selectExpr(
+            "id", "id % 3 as category", "id * 10 as value")
+
+          // Write via V1 path
+          withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> format) {
+            inputData.write.option("header", "true")
+              .partitionBy("category").format(format).save(v1Path.getCanonicalPath)
+          }
+
+          // Write via V2 path
+          withSQLConf(
+            SQLConf.USE_V1_SOURCE_LIST.key -> "",
+            SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+            inputData.write.option("header", "true")
+              .partitionBy("category").format(format).save(v2Path.getCanonicalPath)
+          }
+
+          val v1Result = spark.read.option("header", "true").schema(inputData.schema)
+            .format(format).load(v1Path.getCanonicalPath)
+          val v2Result = spark.read.option("header", "true").schema(inputData.schema)
+            .format(format).load(v2Path.getCanonicalPath)
+          checkAnswer(v1Result, v2Result)
+        }
+      }
+    }
+  }
+
+  test("V2 multi-level partitioned write") {
+    withSQLConf(
+      SQLConf.USE_V1_SOURCE_LIST.key -> "",
+      SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+      withTempPath { path =>
+        val inputData = spark.range(30).selectExpr(
+          "id", "id % 3 as year", "id % 2 as month")
+        inputData.write.partitionBy("year", "month").parquet(path.getCanonicalPath)
+        val readBack = spark.read.parquet(path.getCanonicalPath)
+        checkAnswer(readBack, inputData)
+
+        // Verify two-level partition directory structure
+        val yearDirs = path.listFiles().filter(_.isDirectory).map(_.getName).sorted
+        assert(yearDirs.exists(_.startsWith("year=")),
+          s"Expected year partition directories, got: ${yearDirs.mkString(", ")}")
+        val firstYearDir = path.listFiles().filter(_.isDirectory).head
+        val monthDirs = firstYearDir.listFiles().filter(_.isDirectory).map(_.getName).sorted
+        assert(monthDirs.exists(_.startsWith("month=")),
+          s"Expected month partition directories, got: ${monthDirs.mkString(", ")}")
+      }
+    }
+  }
 }
