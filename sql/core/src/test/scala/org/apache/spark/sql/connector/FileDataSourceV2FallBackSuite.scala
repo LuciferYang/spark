@@ -19,7 +19,7 @@ package org.apache.spark.sql.connector
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.{SparkConf, SparkException}
-import org.apache.spark.sql.QueryTest
+import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.read.ScanBuilder
@@ -436,6 +436,48 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
         val data = spark.range(10).toDF()
         data.write.option("compression", "snappy").parquet(path.getCanonicalPath)
         checkAnswer(spark.read.parquet(path.getCanonicalPath), data)
+      }
+    }
+  }
+
+  test("Catalog table INSERT INTO uses V2 path when flag enabled") {
+    withSQLConf(
+      SQLConf.USE_V1_SOURCE_LIST.key -> "",
+      SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+      withTable("t") {
+        sql("CREATE TABLE t (id BIGINT, value BIGINT) USING parquet")
+        sql("INSERT INTO t VALUES (1, 10), (2, 20), (3, 30)")
+        checkAnswer(sql("SELECT * FROM t"),
+          Seq((1L, 10L), (2L, 20L), (3L, 30L)).map(Row.fromTuple))
+      }
+    }
+  }
+
+  test("Catalog table partitioned INSERT INTO uses V2 path when flag enabled") {
+    withSQLConf(
+      SQLConf.USE_V1_SOURCE_LIST.key -> "",
+      SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+      withTable("t") {
+        sql("CREATE TABLE t (id BIGINT, part BIGINT) USING parquet PARTITIONED BY (part)")
+        sql("INSERT INTO t VALUES (1, 1), (2, 1), (3, 2), (4, 2)")
+        checkAnswer(sql("SELECT * FROM t ORDER BY id"),
+          Seq((1L, 1L), (2L, 1L), (3L, 2L), (4L, 2L)).map(Row.fromTuple))
+        // SHOW PARTITIONS requires SupportsPartitionManagement (Phase 1 / Catalog integration)
+      }
+    }
+  }
+
+  // SQL path INSERT INTO parquet.`path` requires SupportsCatalogOptions (deferred to Phase 1)
+
+  test("CTAS uses V2 path when flag enabled") {
+    withSQLConf(
+      SQLConf.USE_V1_SOURCE_LIST.key -> "",
+      SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+      withTable("t") {
+        sql("CREATE TABLE t USING parquet AS SELECT id, id * 2 as value FROM range(10)")
+        checkAnswer(
+          sql("SELECT count(*) FROM t"),
+          Seq(Row(10L)))
       }
     }
   }

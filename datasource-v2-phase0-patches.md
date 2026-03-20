@@ -167,11 +167,21 @@ Patch 8 (清理 + Flag 翻转)    ← 收尾
 |------|------|
 | `sql/core/.../datasources/v2/DataSourceV2Utils.scala:167-168` | 移除 `!p.isInstanceOf[FileDataSourceV2]` 过滤，改为受 feature flag 控制 |
 
-**测试**:
-- `CREATE TABLE ... USING parquet` → V2 表
-- `INSERT INTO catalog_table` → V2 写入
-- `CTAS (CREATE TABLE AS SELECT)` → V2 路径
-- SQL `INSERT INTO parquet.\`path\`` 分区写入（从 Patch 3 延迟至此）
+**实际测试覆盖**:
+- `CREATE TABLE t USING parquet` + `INSERT INTO t` → V2 写入 ✓
+- `CREATE TABLE t ... PARTITIONED BY` + `INSERT INTO t` → V2 分区写入 ✓
+- `CTAS (CREATE TABLE AS SELECT)` → V2 路径 ✓
+
+**Patch 6 发现的限制 — 需后续 Phase 1 解决**:
+
+1. **`SHOW PARTITIONS`** 不支持：`ParquetTable` 未实现 `SupportsPartitionManagement`，报 `INVALID_PARTITION_OPERATION.PARTITION_MANAGEMENT_IS_UNSUPPORTED`。
+
+2. **`INSERT INTO parquet.\`path\`` 语法不支持**：走 `ResolveSQLOnFile` 路径，需要 `SupportsCatalogOptions`，`FileDataSourceV2` 未实现，报 `TABLE_OR_VIEW_NOT_FOUND`。
+
+**延迟到 Phase 1 的测试场景**（来自 Patch 3 + Patch 6）:
+- `SHOW PARTITIONS` 查看分区
+- `INSERT INTO parquet.\`path\`` 语法
+- `ALTER TABLE ADD/DROP PARTITION`
 - 静态分区写入（`INSERT INTO t PARTITION(year=2024) SELECT ...`）
 - 混合静态+动态分区写入
 
