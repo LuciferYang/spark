@@ -209,23 +209,24 @@ Patch 8 (清理 + Flag 翻转)    ← 收尾
 
 ---
 
-## Patch 8: 清理和 Flag 翻转
+## Patch 8: 清理和 Flag 翻转 — 延迟到 Phase 1
 
 **目标**: 移除 `FallBackFileSourceV2` 和残留 TODO，准备默认启用 V2。
 
-**依赖**: Patch 1-7 全部合入并稳定
+**状态**: ❌ 暂不可行，延迟到 Phase 1
 
-**改动**:
+**原因**: 翻转 flag 默认值（`false` → `true`）后，`FileBasedDataSourceSuite` 有 6 个测试失败：
 
-| 文件 | 改动 |
-|------|------|
-| `sql/core/.../datasources/FallBackFileSourceV2.scala` | **删除** |
-| `sql/core/.../internal/BaseSessionStateBuilder.scala:228` | 从规则链中移除 `FallBackFileSourceV2` |
-| `sql/hive/.../hive/HiveSessionStateBuilder.scala:128` | 同上 |
-| `sql/catalyst/.../internal/SQLConf.scala` | feature flag 默认值翻转为 `true`（或直接移除 flag） |
-| `sql/core/.../classic/DataFrameWriter.scala` | 移除 SPARK-28396 TODO 注释 |
-| `sql/core/.../datasources/v2/DataSourceV2Utils.scala` | 移除 SPARK-28396 TODO 注释 |
-| `sql/core/.../datasources/v2/FileWrite.scala` | 移除 SPARK-36340 TODO 注释 |
-| `sql/core/src/test/.../parquet/ParquetQuerySuite.scala:1339` 等 | 启用此前被禁用的 V2 写路径测试 |
+1. **Cache invalidation**（"Do not use cache on overwrite/append"）：V2 路径的 `refreshCache` 通过 plan 匹配，无法 invalidate 通过 `spark.read.orc(path)` 创建的 cached DataFrame。V1 通过路径匹配。
+2. **`checkPartitioningMatchesV2Table`**（SPARK-36568）：DataFrame API 第二次写入已有分区目录时，V2 FileTable 的 `partitioning()` 从 `fileIndex.partitionSchema` 读取，但 `getTable` 传入的 `partitioningAsV2` 与已有数据不一致。
+3. **数据类型校验路径差异**（SPARK-24204, SPARK-51590, Geospatial）：V1 和 V2 对不支持类型的错误消息/异常类型不同，导致 `intercept` 断言失败。
 
-**复杂度**: S
+**Phase 1 需要解决的前置问题**:
+- V2 FileTable cache invalidation（基于路径的 cache recache）
+- `checkPartitioningMatchesV2Table` 对 file source 的兼容
+- 数据类型校验错误消息统一
+- 然后才能安全翻转 flag 并删除 `FallBackFileSourceV2`
+
+**已完成的清理**（在 Patch 7 中）:
+- SPARK-36340 TODO 注释已移除
+- `checkNoCollationsInMapKeys` 校验已对齐
