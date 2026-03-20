@@ -30,7 +30,8 @@ case class AvroWrite(
     formatName: String,
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
-    partitionSchema: StructType) extends FileWrite {
+    partitionSchema: StructType,
+    override val dynamicPartitionOverwrite: Boolean) extends FileWrite {
   override def prepareWrite(
       sqlConf: SQLConf,
       job: Job,

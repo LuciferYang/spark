@@ -26,7 +26,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, LogicalWriteInfoImpl}
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, LogicalWriteInfoImpl, SupportsDynamicOverwrite, Write, WriteBuilder}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.streaming.runtime.MetadataLogFileIndex
@@ -173,6 +173,30 @@ abstract class FileTable(
       mergedOptions(writeInfo.options()),
       writeInfo.rowIdSchema(),
       writeInfo.metadataSchema())
+  }
+
+  /**
+   * Creates a [[WriteBuilder]] that supports dynamic partition overwrite for file-based tables.
+   *
+   * @param info the logical write info
+   * @param buildWrite factory function that creates the [[Write]] given write info,
+   *                   partition schema, and dynamic partition overwrite flag
+   */
+  protected def createFileWriteBuilder(
+      info: LogicalWriteInfo)(
+      buildWrite: (LogicalWriteInfo, StructType, Boolean) => Write): WriteBuilder = {
+    new WriteBuilder with SupportsDynamicOverwrite {
+      private var isDynamicOverwrite = false
+
+      override def overwriteDynamicPartitions(): WriteBuilder = {
+        isDynamicOverwrite = true
+        this
+      }
+
+      override def build(): Write = {
+        buildWrite(mergedWriteInfo(info), fileIndex.partitionSchema, isDynamicOverwrite)
+      }
+    }
   }
 }
 

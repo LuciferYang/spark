@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters._
 import org.apache.hadoop.fs.FileStatus
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, Write, WriteBuilder}
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.FileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetUtils
 import org.apache.spark.sql.execution.datasources.v2.FileTable
@@ -44,10 +44,8 @@ case class ParquetTable(
     ParquetUtils.inferSchema(sparkSession, options.asScala.toMap, files)
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    new WriteBuilder {
-      override def build(): Write =
-        ParquetWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
-          fileIndex.partitionSchema)
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite) =>
+      ParquetWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, dynamicOverwrite)
     }
   }
 

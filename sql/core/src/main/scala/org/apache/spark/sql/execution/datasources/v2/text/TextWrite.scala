@@ -32,7 +32,8 @@ case class TextWrite(
     formatName: String,
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
-    partitionSchema: StructType) extends FileWrite {
+    partitionSchema: StructType,
+    override val dynamicPartitionOverwrite: Boolean) extends FileWrite {
   private def verifySchema(schema: StructType): Unit = {
     if (schema.size != 1) {
       throw QueryCompilationErrors.textDataSourceWithMultiColumnsError(schema)

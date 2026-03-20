@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters._
 import org.apache.hadoop.fs.FileStatus
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, Write, WriteBuilder}
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.FileFormat
 import org.apache.spark.sql.execution.datasources.orc.OrcUtils
 import org.apache.spark.sql.execution.datasources.v2.FileTable
@@ -44,10 +44,8 @@ case class OrcTable(
     OrcUtils.inferSchema(sparkSession, files, options.asScala.toMap)
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    new WriteBuilder {
-      override def build(): Write =
-        OrcWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
-          fileIndex.partitionSchema)
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite) =>
+      OrcWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, dynamicOverwrite)
     }
   }
 

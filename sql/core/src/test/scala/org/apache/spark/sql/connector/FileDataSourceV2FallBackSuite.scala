@@ -314,4 +314,66 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
       }
     }
   }
+
+  test("V2 dynamic partition overwrite") {
+    Seq("parquet", "orc").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true",
+        SQLConf.PARTITION_OVERWRITE_MODE.key -> "dynamic") {
+        withTempPath { path =>
+          // Write initial data: part=0,1,2
+          val initialData = spark.range(9).selectExpr("id", "id % 3 as part")
+          initialData.write.partitionBy("part")
+            .format(format).save(path.getCanonicalPath)
+
+          // Overwrite only part=0 with new data
+          val overwriteData = spark.createDataFrame(Seq((100L, 0L), (101L, 0L)))
+            .toDF("id", "part")
+          overwriteData.write.mode("overwrite").partitionBy("part")
+            .format(format).save(path.getCanonicalPath)
+
+          // part=1 and part=2 should be untouched, part=0 should have new data
+          val result = spark.read.format(format).load(path.getCanonicalPath)
+          val expected = initialData.filter("part != 0").union(overwriteData)
+          checkAnswer(result, expected)
+        }
+      }
+    }
+  }
+
+  test("V2 dynamic partition overwrite produces same results as V1") {
+    Seq("parquet", "orc").foreach { format =>
+      withTempPath { v1Path =>
+        withTempPath { v2Path =>
+          val initialData = spark.range(12).selectExpr("id", "id % 4 as part")
+          val overwriteData = spark.createDataFrame(Seq((200L, 1L), (201L, 1L)))
+            .toDF("id", "part")
+
+          // V1 path
+          withSQLConf(
+            SQLConf.USE_V1_SOURCE_LIST.key -> format,
+            SQLConf.PARTITION_OVERWRITE_MODE.key -> "dynamic") {
+            initialData.write.partitionBy("part").format(format).save(v1Path.getCanonicalPath)
+            overwriteData.write.mode("overwrite").partitionBy("part")
+              .format(format).save(v1Path.getCanonicalPath)
+          }
+
+          // V2 path
+          withSQLConf(
+            SQLConf.USE_V1_SOURCE_LIST.key -> "",
+            SQLConf.V2_FILE_WRITE_ENABLED.key -> "true",
+            SQLConf.PARTITION_OVERWRITE_MODE.key -> "dynamic") {
+            initialData.write.partitionBy("part").format(format).save(v2Path.getCanonicalPath)
+            overwriteData.write.mode("overwrite").partitionBy("part")
+              .format(format).save(v2Path.getCanonicalPath)
+          }
+
+          val v1Result = spark.read.format(format).load(v1Path.getCanonicalPath)
+          val v2Result = spark.read.format(format).load(v2Path.getCanonicalPath)
+          checkAnswer(v1Result, v2Result)
+        }
+      }
+    }
+  }
 }

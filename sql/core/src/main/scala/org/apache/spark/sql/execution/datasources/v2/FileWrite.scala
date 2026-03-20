@@ -47,6 +47,7 @@ trait FileWrite extends Write {
   def allowDuplicatedColumnNames: Boolean = false
   def info: LogicalWriteInfo
   def partitionSchema: StructType
+  def dynamicPartitionOverwrite: Boolean = false
 
   private val schema = info.schema()
   private val queryId = info.queryId()
@@ -62,12 +63,15 @@ trait FileWrite extends Write {
     // Hadoop Configurations are case sensitive.
     val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
     val job = getJobInstance(hadoopConf, path)
+    val jobId = java.util.UUID.randomUUID().toString
     val committer = FileCommitProtocol.instantiate(
       sparkSession.sessionState.conf.fileCommitProtocolClass,
-      jobId = java.util.UUID.randomUUID().toString,
-      outputPath = paths.head)
+      jobId = jobId,
+      outputPath = paths.head,
+      dynamicPartitionOverwrite = dynamicPartitionOverwrite)
     lazy val description =
-      createWriteJobDescription(sparkSession, hadoopConf, job, paths.head, options.asScala.toMap)
+      createWriteJobDescription(sparkSession, hadoopConf, job, paths.head, options.asScala.toMap,
+        jobId)
 
     committer.setupJob(job)
     new FileBatchWrite(job, description, committer)
@@ -120,7 +124,8 @@ trait FileWrite extends Write {
       hadoopConf: Configuration,
       job: Job,
       pathName: String,
-      options: Map[String, String]): WriteJobDescription = {
+      options: Map[String, String],
+      jobId: String): WriteJobDescription = {
     val caseInsensitiveOptions = CaseInsensitiveMap(options)
     val allColumns = toAttributes(schema)
     val partitionColumnNames = partitionSchema.fields.map(_.name).toSet
@@ -144,6 +149,13 @@ trait FileWrite extends Write {
     val metrics: Map[String, SQLMetric] = BasicWriteJobStatsTracker.metrics
     val serializableHadoopConf = new SerializableConfiguration(hadoopConf)
     val statsTracker = new BasicWriteJobStatsTracker(serializableHadoopConf, metrics)
+    // For dynamic partition overwrite, write to a staging directory first.
+    // FileCommitProtocol will move files to the final output path during commit.
+    val outputPath = if (dynamicPartitionOverwrite) {
+      FileCommitProtocol.getStagingDir(pathName, jobId).toString
+    } else {
+      pathName
+    }
     new WriteJobDescription(
       uuid = UUID.randomUUID().toString,
       serializableHadoopConf = new SerializableConfiguration(job.getConfiguration),
@@ -152,7 +164,7 @@ trait FileWrite extends Write {
       dataColumns = dataColumns,
       partitionColumns = partitionColumns,
       bucketSpec = None,
-      path = pathName,
+      path = outputPath,
       customPartitionLocations = Map.empty,
       maxRecordsPerFile = caseInsensitiveOptions.get("maxRecordsPerFile").map(_.toLong)
         .getOrElse(sparkSession.sessionState.conf.maxRecordsPerFile),
