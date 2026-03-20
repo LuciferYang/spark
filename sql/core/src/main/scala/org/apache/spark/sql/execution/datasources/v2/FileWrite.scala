@@ -122,9 +122,11 @@ trait FileWrite extends Write {
       SchemaUtils.checkColumnNameDuplication(
         schema.fields.map(_.name).toImmutableArraySeq, caseSensitiveAnalysis)
     }
+    if (!sqlConf.allowCollationsInMapKeys) {
+      SchemaUtils.checkNoCollationsInMapKeys(schema)
+    }
     DataSource.validateSchema(formatName, schema, sqlConf)
 
-    // TODO: [SPARK-36340] Unify check schema filed of DataSource V2 Insert.
     schema.foreach { field =>
       if (!supportsDataType(field.dataType)) {
         throw QueryCompilationErrors.dataTypeUnsupportedByDataSourceError(formatName, field)
