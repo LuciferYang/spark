@@ -196,4 +196,45 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
       }
     }
   }
+
+  test("Use V2 write path when V2_FILE_WRITE_ENABLED is true") {
+    Seq("parquet", "orc", "json", "csv").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempPath { path =>
+          val inputData = spark.range(10).toDF()
+          inputData.write.option("header", "true").format(format).save(path.getCanonicalPath)
+          val readBack = spark.read.option("header", "true").schema(inputData.schema)
+            .format(format).load(path.getCanonicalPath)
+          checkAnswer(readBack, inputData)
+        }
+      }
+    }
+  }
+
+  test("V2 file write produces same results as V1 write") {
+    withTempPath { v1Path =>
+      withTempPath { v2Path =>
+        val inputData = spark.range(100).selectExpr("id", "id * 2 as value")
+
+        // Write via V1 path
+        withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "parquet") {
+          inputData.write.parquet(v1Path.getCanonicalPath)
+        }
+
+        // Write via V2 path
+        withSQLConf(
+          SQLConf.USE_V1_SOURCE_LIST.key -> "",
+          SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+          inputData.write.parquet(v2Path.getCanonicalPath)
+        }
+
+        // Both should produce the same results
+        val v1Result = spark.read.parquet(v1Path.getCanonicalPath)
+        val v2Result = spark.read.parquet(v2Path.getCanonicalPath)
+        checkAnswer(v1Result, v2Result)
+      }
+    }
+  }
 }
