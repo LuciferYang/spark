@@ -34,7 +34,8 @@ case class OrcWrite(
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
     partitionSchema: StructType,
-    override val dynamicPartitionOverwrite: Boolean) extends FileWrite {
+    override val dynamicPartitionOverwrite: Boolean,
+    override val isTruncate: Boolean) extends FileWrite {
 
   override def prepareWrite(
       sqlConf: SQLConf,

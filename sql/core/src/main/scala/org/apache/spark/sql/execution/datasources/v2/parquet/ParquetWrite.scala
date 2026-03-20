@@ -32,7 +32,8 @@ case class ParquetWrite(
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
     partitionSchema: StructType,
-    override val dynamicPartitionOverwrite: Boolean) extends FileWrite with Logging {
+    override val dynamicPartitionOverwrite: Boolean,
+    override val isTruncate: Boolean) extends FileWrite with Logging {
 
   override def prepareWrite(
       sqlConf: SQLConf,

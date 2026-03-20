@@ -48,6 +48,7 @@ trait FileWrite extends Write {
   def info: LogicalWriteInfo
   def partitionSchema: StructType
   def dynamicPartitionOverwrite: Boolean = false
+  def isTruncate: Boolean = false
 
   private val schema = info.schema()
   private val queryId = info.queryId()
@@ -62,6 +63,26 @@ trait FileWrite extends Write {
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.
     val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
+
+    // Ensure the output path exists. For new writes (Append to a new path, Overwrite on a new
+    // path), the path may not exist yet.
+    val fs = path.getFileSystem(hadoopConf)
+    val qualifiedPath = path.makeQualified(fs.getUri, fs.getWorkingDirectory)
+    if (!fs.exists(qualifiedPath)) {
+      fs.mkdirs(qualifiedPath)
+    }
+
+    // For truncate (full overwrite), delete existing data before writing.
+    if (isTruncate && fs.exists(qualifiedPath)) {
+      fs.listStatus(qualifiedPath).foreach { status =>
+        // Preserve hidden files/dirs (e.g., _SUCCESS, .spark-staging-*)
+        if (!status.getPath.getName.startsWith("_") &&
+            !status.getPath.getName.startsWith(".")) {
+          fs.delete(status.getPath, true)
+        }
+      }
+    }
+
     val job = getJobInstance(hadoopConf, path)
     val jobId = java.util.UUID.randomUUID().toString
     val committer = FileCommitProtocol.instantiate(
@@ -149,13 +170,6 @@ trait FileWrite extends Write {
     val metrics: Map[String, SQLMetric] = BasicWriteJobStatsTracker.metrics
     val serializableHadoopConf = new SerializableConfiguration(hadoopConf)
     val statsTracker = new BasicWriteJobStatsTracker(serializableHadoopConf, metrics)
-    // For dynamic partition overwrite, write to a staging directory first.
-    // FileCommitProtocol will move files to the final output path during commit.
-    val outputPath = if (dynamicPartitionOverwrite) {
-      FileCommitProtocol.getStagingDir(pathName, jobId).toString
-    } else {
-      pathName
-    }
     new WriteJobDescription(
       uuid = UUID.randomUUID().toString,
       serializableHadoopConf = new SerializableConfiguration(job.getConfiguration),
@@ -164,7 +178,7 @@ trait FileWrite extends Write {
       dataColumns = dataColumns,
       partitionColumns = partitionColumns,
       bucketSpec = None,
-      path = outputPath,
+      path = pathName,
       customPartitionLocations = Map.empty,
       maxRecordsPerFile = caseInsensitiveOptions.get("maxRecordsPerFile").map(_.toLong)
         .getOrElse(sparkSession.sessionState.conf.maxRecordsPerFile),
