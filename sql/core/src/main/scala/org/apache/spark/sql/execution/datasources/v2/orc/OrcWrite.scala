@@ -32,7 +32,8 @@ case class OrcWrite(
     paths: Seq[String],
     formatName: String,
     supportsDataType: DataType => Boolean,
-    info: LogicalWriteInfo) extends FileWrite {
+    info: LogicalWriteInfo,
+    partitionSchema: StructType) extends FileWrite {
 
   override def prepareWrite(
       sqlConf: SQLConf,

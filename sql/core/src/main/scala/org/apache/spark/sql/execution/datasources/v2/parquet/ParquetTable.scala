@@ -46,7 +46,8 @@ case class ParquetTable(
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     new WriteBuilder {
       override def build(): Write =
-        ParquetWrite(paths, formatName, supportsDataType, mergedWriteInfo(info))
+        ParquetWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
+          fileIndex.partitionSchema)
     }
   }
 

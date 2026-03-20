@@ -52,7 +52,8 @@ case class CSVTable(
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     new WriteBuilder {
       override def build(): Write =
-        CSVWrite(paths, formatName, supportsDataType, mergedWriteInfo(info))
+        CSVWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
+          fileIndex.partitionSchema)
     }
   }
 

@@ -45,7 +45,8 @@ case class AvroTable(
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     new WriteBuilder {
       override def build(): Write =
-        AvroWrite(paths, formatName, supportsDataType, mergedWriteInfo(info))
+        AvroWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
+          fileIndex.partitionSchema)
     }
   }
 

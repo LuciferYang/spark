@@ -46,6 +46,7 @@ trait FileWrite extends Write {
   def supportsDataType: DataType => Boolean
   def allowDuplicatedColumnNames: Boolean = false
   def info: LogicalWriteInfo
+  def partitionSchema: StructType
 
   private val schema = info.schema()
   private val queryId = info.queryId()
@@ -121,23 +122,35 @@ trait FileWrite extends Write {
       pathName: String,
       options: Map[String, String]): WriteJobDescription = {
     val caseInsensitiveOptions = CaseInsensitiveMap(options)
-    // Note: prepareWrite has side effect. It sets "job".
-    val outputWriterFactory =
-      prepareWrite(sparkSession.sessionState.conf, job, caseInsensitiveOptions, schema)
     val allColumns = toAttributes(schema)
+    val partitionColumnNames = partitionSchema.fields.map(_.name).toSet
+    val caseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
+    val partitionColumns = if (partitionColumnNames.nonEmpty) {
+      allColumns.filter { col =>
+        if (caseSensitive) {
+          partitionColumnNames.contains(col.name)
+        } else {
+          partitionColumnNames.exists(_.equalsIgnoreCase(col.name))
+        }
+      }
+    } else {
+      Seq.empty
+    }
+    val dataColumns = allColumns.filterNot(partitionColumns.contains)
+    // Note: prepareWrite has side effect. It sets "job".
+    val dataSchema = StructType(dataColumns.map(col => schema(col.name)))
+    val outputWriterFactory =
+      prepareWrite(sparkSession.sessionState.conf, job, caseInsensitiveOptions, dataSchema)
     val metrics: Map[String, SQLMetric] = BasicWriteJobStatsTracker.metrics
     val serializableHadoopConf = new SerializableConfiguration(hadoopConf)
     val statsTracker = new BasicWriteJobStatsTracker(serializableHadoopConf, metrics)
-    // TODO: after partitioning is supported in V2:
-    //       1. filter out partition columns in `dataColumns`.
-    //       2. Don't use Seq.empty for `partitionColumns`.
     new WriteJobDescription(
       uuid = UUID.randomUUID().toString,
       serializableHadoopConf = new SerializableConfiguration(job.getConfiguration),
       outputWriterFactory = outputWriterFactory,
       allColumns = allColumns,
-      dataColumns = allColumns,
-      partitionColumns = Seq.empty,
+      dataColumns = dataColumns,
+      partitionColumns = partitionColumns,
       bucketSpec = None,
       path = pathName,
       customPartitionLocations = Map.empty,

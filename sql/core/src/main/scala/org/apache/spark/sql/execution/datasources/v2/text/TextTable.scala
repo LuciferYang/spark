@@ -42,7 +42,8 @@ case class TextTable(
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     new WriteBuilder {
       override def build(): Write =
-        TextWrite(paths, formatName, supportsDataType, mergedWriteInfo(info))
+        TextWrite(paths, formatName, supportsDataType, mergedWriteInfo(info),
+          fileIndex.partitionSchema)
     }
   }
 
