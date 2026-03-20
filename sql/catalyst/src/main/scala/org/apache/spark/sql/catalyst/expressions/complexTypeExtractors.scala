@@ -447,7 +447,7 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
   /**
    * The threshold to determine whether to use hash lookup for map lookup expressions.
    * If the map size is small, the cost of building hash map exceeds the cost of a linear scan.
-   * This is configured by `spark.sql.mapLookupHashThreshold`.
+   * This is configured by `spark.sql.optimizer.mapLookupHashThreshold`.
    */
   @transient private lazy val hashLookupThreshold =
     SQLConf.get.getConf(SQLConf.MAP_LOOKUP_HASH_THRESHOLD)
