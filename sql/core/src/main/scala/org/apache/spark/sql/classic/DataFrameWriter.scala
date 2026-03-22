@@ -206,23 +206,23 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
           // For FileTable with ErrorIfExists/Ignore, check path existence (matching V1 semantics
           // in InsertIntoHadoopFsRelationCommand where fs.exists(outputPath) is used).
           if (fileV2CreateMode) {
-            val outputPath = Option(dsOptions.get("path")).map(new Path(_))
+            val outputPath =
+              Option(dsOptions.get("path")).map(new Path(_))
             outputPath.foreach { p =>
-              val hadoopConf = df.sparkSession.sessionState.newHadoopConf()
+              val hadoopConf =
+                df.sparkSession.sessionState.newHadoopConf()
               val fs = p.getFileSystem(hadoopConf)
               val qualifiedPath = fs.makeQualified(p)
               if (fs.exists(qualifiedPath)) {
                 if (curmode == SaveMode.ErrorIfExists) {
-                  throw QueryCompilationErrors.outputPathAlreadyExistsError(qualifiedPath)
+                  throw QueryCompilationErrors
+                    .outputPathAlreadyExistsError(qualifiedPath)
                 } else {
-                  // Ignore mode: path exists, skip writing
                   return LocalRelation(
-                    DataSourceV2Relation.create(table, catalog, ident, dsOptions).output)
+                    DataSourceV2Relation.create(
+                      table, catalog, ident,
+                      dsOptions).output)
                 }
-              } else {
-                // Path does not exist: fall back to V1 for writing to new paths,
-                // as the V2 write path has issues with non-existing paths.
-                return saveToV1SourceCommand(path)
               }
             }
           }

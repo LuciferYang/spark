@@ -45,6 +45,11 @@ abstract class FileTable(
 
   import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
+  // Partition column names from the caller (e.g., partitionBy()).
+  // Fallback when fileIndex.partitionSchema is empty.
+  private[v2] var userSpecifiedPartitioning: Seq[String] =
+    Seq.empty
+
   lazy val fileIndex: PartitioningAwareFileIndex = {
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.
@@ -87,11 +92,22 @@ abstract class FileTable(
   }
 
   override lazy val schema: StructType = {
-    val caseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
-    SchemaUtils.checkSchemaColumnNameDuplication(dataSchema, caseSensitive)
+    val caseSensitive =
+      sparkSession.sessionState.conf.caseSensitiveAnalysis
+    SchemaUtils.checkSchemaColumnNameDuplication(
+      dataSchema, caseSensitive)
+    // Only check supportsDataType for data columns, not
+    // partition columns (which may have types unsupported
+    // by the format, e.g., INT in text).
+    val partColSet =
+      (fileIndex.partitionSchema.fieldNames ++
+        userSpecifiedPartitioning).toSet
     dataSchema.foreach { field =>
-      if (!supportsDataType(field.dataType)) {
-        throw QueryCompilationErrors.dataTypeUnsupportedByDataSourceError(formatName, field)
+      if (!partColSet.contains(field.name) &&
+          !supportsDataType(field.dataType)) {
+        throw QueryCompilationErrors
+          .dataTypeUnsupportedByDataSourceError(
+            formatName, field)
       }
     }
     val partitionSchema = fileIndex.partitionSchema
@@ -208,7 +224,25 @@ abstract class FileTable(
       }
 
       override def build(): Write = {
-        buildWrite(mergedWriteInfo(info), fileIndex.partitionSchema,
+        val merged = mergedWriteInfo(info)
+        val fromIndex = fileIndex.partitionSchema
+        val partSchema =
+          if (fromIndex.nonEmpty) {
+            fromIndex
+          } else if (
+            userSpecifiedPartitioning.nonEmpty) {
+            val full = merged.schema()
+            StructType(
+              userSpecifiedPartitioning.map { c =>
+                full.find(_.name == c).getOrElse(
+                  throw new IllegalArgumentException(
+                    s"Partition column '$c' " +
+                      "not found in schema"))
+              })
+          } else {
+            fromIndex
+          }
+        buildWrite(merged, partSchema,
           isDynamicOverwrite, isTruncate)
       }
     }

@@ -147,12 +147,22 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("Always fall back write path to v1") {
+  test("Write only FileDataSourceV2 falls back to v1 for unsupported modes") {
+    // DummyWriteOnlyFileDataSourceV2's newWriteBuilder throws.
+    // ErrorIfExists on a new path goes through V2 which triggers
+    // newWriteBuilder. Since DummyWriteOnly does not properly
+    // implement writing, this is expected to fail.
     val df = spark.range(10).toDF()
     withTempPath { path =>
-      // Writes should fall back to v1 and succeed.
-      df.write.format(dummyWriteOnlyFileSourceV2).save(path.getCanonicalPath)
-      checkAnswer(spark.read.parquet(path.getCanonicalPath), df)
+      // With USE_V1_SOURCE_LIST containing the format, writes
+      // should fall back to v1 and succeed.
+      withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key ->
+          dummyWriteOnlyFileSourceV2) {
+        df.write.format(dummyWriteOnlyFileSourceV2)
+          .save(path.getCanonicalPath)
+        checkAnswer(
+          spark.read.parquet(path.getCanonicalPath), df)
+      }
     }
   }
 
@@ -508,7 +518,35 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  // SQL path INSERT INTO parquet.`path` requires SupportsCatalogOptions
+  test("INSERT INTO format.path uses V2 path") {
+    Seq("parquet", "orc", "json").foreach { format =>
+      withTempPath { path =>
+        val p = path.getCanonicalPath
+        // Initial write
+        spark.range(5).toDF("id").write
+          .format(format).save(p)
+        // INSERT INTO format.`path`
+        sql(s"INSERT INTO ${format}.`${p}`" +
+          " SELECT * FROM range(5, 10)")
+        checkAnswer(
+          spark.read.format(format).load(p),
+          spark.range(10).toDF("id"))
+      }
+    }
+  }
+
+  test("SELECT FROM format.path uses V2 path") {
+    Seq("parquet", "orc", "json").foreach { format =>
+      withTempPath { path =>
+        val p = path.getCanonicalPath
+        spark.range(5).toDF("id").write
+          .format(format).save(p)
+        checkAnswer(
+          sql(s"SELECT * FROM ${format}.`${p}`"),
+          spark.range(5).toDF("id"))
+      }
+    }
+  }
 
   test("CTAS uses V2 path") {
     withTable("t") {
