@@ -97,35 +97,21 @@ private def refreshCache(r: DataSourceV2Relation)(): Unit = r match {
 
 ## Patch 3: 数据类型校验错误消息统一
 
-**目标**: 统一 V1/V2 对不支持数据类型的错误处理，使异常类型和消息一致。
+**状态**: ✅ 无需改动（V2 已与 V1 一致）
 
-**修复测试**:
+**原始目标**: 统一 V1/V2 对不支持数据类型的错误处理，使异常类型和消息一致。
+
+**预期修复测试**:
 - "SPARK-24204 error handling for unsupported Null data types - csv, orc"
 - "SPARK-51590: unsupported the TIME data types in data sources"
 - "Geospatial types are not supported in file data sources other than Parquet"
 
-**根因分析**:
-- V1 路径：数据类型校验在 `DataSource.validateSchema()` 中，抛出 `AnalysisException`（`UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE`）
-- V2 路径：数据类型校验在 `FileTable.schema` 属性访问时触发（`FileTable.scala:86-89`），调用 `supportsDataType()` → 抛出 `QueryCompilationErrors.dataTypeUnsupportedByDataSourceError()`
-- 问题 1：V2 的校验发生在 `DataSourceV2Relation.create()` 阶段（读取 `table.columns.asSchema`），而非写入阶段
-- 问题 2：V2 校验在 `getTable` 时就触发了，而测试期望在 `write` 操作时抛出异常
-- 问题 3：某些测试 `intercept` 的异常类型与 V2 抛出的不同
+**验证结果**: 在 V2_FILE_WRITE_ENABLED=true 下，上述 3 个测试全部通过。原因：
+- V2 写入路径中，`DataFrameWriter.saveCommand()` → `getTable(df.schema)` → `FileTable.schema` → `supportsDataType()` 检查已经抛出与 V1 相同的 `UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE` 异常
+- `FileTable.schema` 和 `FileWrite.validateInputs()` 都使用 `QueryCompilationErrors.dataTypeUnsupportedByDataSourceError()`，与 V1 的 `DataSource` 路径错误条件完全一致
+- 原始分析中预期的异常类型差异并不存在
 
-**改动**:
-
-| 文件 | 改动 |
-|------|------|
-| `sql/core/.../v2/FileTable.scala:86-89` | `dataSchema` 中的 `supportsDataType` 校验改为延迟到写入阶段（或在 `getTable` 时不校验写入 schema，只校验读取 schema） |
-| `sql/core/.../v2/FileWrite.scala` | `validateInputs()` 中已有 `supportsDataType` 校验，确保错误消息与 V1 一致 |
-
-**具体方案**:
-- `FileTable.schema` 中的 `supportsDataType` 校验仅对读取路径生效
-- 写入路径的校验统一在 `FileWrite.validateInputs()` 中，使用与 V1 相同的 `DataSource.validateSchema()` 逻辑（已在 Patch 7 中部分对齐）
-- 需要确保 `getTable` 传入写入 schema 时不触发读取侧的类型校验
-
-**测试**: 现有 3 个失败测试通过
-
-**复杂度**: M
+**结论**: 跳过此 Patch，直接进入 Patch 4
 
 ---
 
@@ -237,12 +223,12 @@ private def refreshCache(r: DataSourceV2Relation)(): Unit = r match {
 
 ## 总结
 
-| Patch | 目标 | 修复测试数 | 复杂度 | 可并行 |
-|-------|------|-----------|--------|--------|
-| 1 | Cache invalidation | 2 | S | ✅ |
-| 2 | checkPartitioningMatchesV2Table | 1 | S | ✅ |
-| 3 | 数据类型校验统一 | 3 | M | ✅ |
-| 4 | Flag 翻转 + 删除 FallBack | — | M | ❌（依赖 1-3） |
+| Patch | 目标 | 修复测试数 | 复杂度 | 状态 |
+|-------|------|-----------|--------|------|
+| 1 | Cache invalidation | 2 | S | ✅ 完成 |
+| 2 | checkPartitioningMatchesV2Table | 1 | S | ✅ 完成 |
+| 3 | 数据类型校验统一 | 3 | — | ✅ 无需改动 |
+| 4 | Flag 翻转 + 删除 FallBack | — | M | ❌（依赖 1-2） |
 | 5 | SupportsCatalogOptions | — | M | ✅（依赖 4） |
 | 6 | SupportsPartitionManagement | — | M | ✅（依赖 5） |
 | 7 | customPartitionLocations | — | S | ❌（依赖 6） |

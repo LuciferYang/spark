@@ -56,8 +56,12 @@ abstract class FileTable(
         options.asScala.toMap, userSpecifiedSchema)
     } else {
       // This is a non-streaming file based datasource.
+      // When userSpecifiedSchema is provided (e.g., write path via DataFrame API), the path
+      // may not exist yet. Don't require it to exist in that case.
+      val checkFilesExist = userSpecifiedSchema.isEmpty
       val rootPathsSpecified = DataSource.checkAndGlobPathIfNecessary(paths, hadoopConf,
-        checkEmptyGlobPath = true, checkFilesExist = true, enableGlobbing = globPaths)
+        checkEmptyGlobPath = checkFilesExist, checkFilesExist = checkFilesExist,
+        enableGlobbing = globPaths)
       val fileStatusCache = FileStatusCache.getOrCreate(sparkSession)
       new InMemoryFileIndex(
         sparkSession, rootPathsSpecified, caseSensitiveMap, userSpecifiedSchema, fileStatusCache)

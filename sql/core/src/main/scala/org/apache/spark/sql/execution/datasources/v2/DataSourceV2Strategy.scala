@@ -72,6 +72,7 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
     case _ =>
       r.table match {
         case ft: FileTable =>
+          ft.fileIndex.refresh()
           val path = new Path(ft.fileIndex.rootPaths.head.toUri)
           val fs = path.getFileSystem(hadoopConf)
           cacheManager.recacheByPath(session, path, fs)

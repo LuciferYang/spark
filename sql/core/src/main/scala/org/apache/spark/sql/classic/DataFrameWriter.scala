@@ -610,9 +610,6 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
 
   private def lookupV2Provider(): Option[TableProvider] = {
     DataSource.lookupDataSourceV2(source, df.sparkSession.sessionState.conf) match {
-      case Some(_: FileDataSourceV2)
-          if !df.sparkSession.sessionState.conf.getConf(SQLConf.V2_FILE_WRITE_ENABLED) =>
-        None
       // File source V2 supports Append and Overwrite via the DataFrame API V2 write path.
       // ErrorIfExists and Ignore require SupportsCatalogOptions (catalog integration),
       // so fall back to V1 for these modes.
