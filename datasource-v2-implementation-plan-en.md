@@ -83,11 +83,13 @@ Track D (V2 Catalog Views)          <- Fully independent
 **Dependency**: Phase 1
 
 **Results**:
-- New `AnalyzeTableExec` (V2-native, no V1 command delegation)
+- New `AnalyzeTableExec` and `AnalyzeColumnExec` (V2-native, no V1 command delegation)
 - Statistics persisted via `TableCatalog.alterTable()` + `TableChange.setProperty()`
-- Properties: `spark.sql.statistics.totalSize`, `spark.sql.statistics.numRows`
-- Supports NOSCAN; ANALYZE COLUMN still unsupported
-- 204 tests passing, 0 regressions
+- Table-level: `spark.sql.statistics.totalSize`, `spark.sql.statistics.numRows`
+- Column-level: `spark.sql.statistics.colStats.<col>.<stat>`
+- Supports NOSCAN, FOR COLUMNS, FOR ALL COLUMNS
+- `FileScan.estimateStatistics()` returns stored `numRows` (injected via options), enabling optimizer join strategy selection
+- 206 tests passing, 0 regressions
 
 **Complexity**: S (simpler than estimated)
 

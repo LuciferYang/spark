@@ -86,8 +86,9 @@ Track D (V2 Catalog 视图)         ← 完全独立
 - 新增 `AnalyzeTableExec` 和 `AnalyzeColumnExec`（V2 原生，不依赖 V1 命令）
 - 通过 `TableCatalog.alterTable()` + `TableChange.setProperty()` 持久化统计
 - 表级属性：`spark.sql.statistics.totalSize`、`spark.sql.statistics.numRows`
-- 列级属性：`spark.sql.statistics.colStats.<col>.<stat>`（distinctCount/min/max/nullCount/avgLen/maxLen）
+- 列级属性：`spark.sql.statistics.colStats.<col>.<stat>`
 - 支持 NOSCAN、FOR COLUMNS、FOR ALL COLUMNS
+- `FileScan.estimateStatistics()` 返回存储的 `numRows`（通过 options 注入），优化器可利用行数统计
 - 206 测试通过，0 回归
 
 **复杂度**: S（实际比预估简单）
