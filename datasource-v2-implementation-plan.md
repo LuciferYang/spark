@@ -126,18 +126,16 @@ Track D (V2 Catalog 视图)         ← 完全独立
 
 ---
 
-## Track A: JDBC 原生 V2 — ✅ 写入完成，读取基本完成
+## Track A: JDBC 原生 V2 — ✅ 完成
 
 **JIRA**: SPARK-32593, SPARK-32595
 
-**写入路径**（SPARK-32595 ✅ 已修复）:
-- `JDBCBatchWrite` 替代 V1Write，truncate+append 原子性
-- `JDBCTable.capabilities`: `BATCH_WRITE` 替代 `V1_BATCH_WRITE`
-
-**读取路径**（SPARK-32593 基本完成）:
-- `JDBCScan` 从 `V1Scan` 迁移到原生 `Scan` + `Batch`
+**成果**:
+- `JDBCBatchWrite` 替代 V1Write，truncate+append 原子性（SPARK-32595）
+- `JDBCScan` 从 V1Scan 迁移到原生 Scan+Batch（SPARK-32593）
 - `JDBCPartitionReaderFactory` + `JDBCPartitionReader` 原生实现
-- 72/79 JDBCV2Suite 测试通过（7 个功能性差异待修复）
+- `BatchScanExec` 支持 External engine query 输出
+- 79/79 JDBCV2Suite 测试通过
 
 ---
 
