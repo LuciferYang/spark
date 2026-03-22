@@ -551,10 +551,64 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
   test("CTAS uses V2 path") {
     withTable("t") {
       sql("CREATE TABLE t USING parquet " +
-        "AS SELECT id, id * 2 as value FROM range(10)")
+        "AS SELECT id, id * 2 as value " +
+        "FROM range(10)")
       checkAnswer(
         sql("SELECT count(*) FROM t"),
         Seq(Row(10L)))
+    }
+  }
+
+  test("ANALYZE TABLE on V2 file table") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT) " +
+        "USING parquet")
+      sql("INSERT INTO t SELECT id FROM range(100)")
+      sql("ANALYZE TABLE t COMPUTE STATISTICS")
+      val props = sql("SHOW TBLPROPERTIES t")
+        .collect()
+        .map(r => r.getString(0) -> r.getString(1))
+        .toMap
+      assert(
+        props.contains(
+          "spark.sql.statistics.totalSize"),
+        "totalSize stat should be present")
+    }
+  }
+
+  test("ANALYZE TABLE NOSCAN on V2 file table") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT) " +
+        "USING parquet")
+      sql("INSERT INTO t SELECT id FROM range(50)")
+      sql("ANALYZE TABLE t COMPUTE STATISTICS " +
+        "NOSCAN")
+      val props = sql("SHOW TBLPROPERTIES t")
+        .collect()
+        .map(r => r.getString(0) -> r.getString(1))
+        .toMap
+      assert(
+        props.contains(
+          "spark.sql.statistics.totalSize"))
+    }
+  }
+
+  test("ANALYZE TABLE with row count") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT) " +
+        "USING parquet")
+      sql("INSERT INTO t SELECT id FROM range(42)")
+      sql("ANALYZE TABLE t COMPUTE STATISTICS")
+      val props = sql("SHOW TBLPROPERTIES t")
+        .collect()
+        .map(r => r.getString(0) -> r.getString(1))
+        .toMap
+      assert(props.get(
+        "spark.sql.statistics.numRows")
+        .contains("42"),
+        s"Expected numRows=42, got: " +
+          props.get(
+            "spark.sql.statistics.numRows"))
     }
   }
 
