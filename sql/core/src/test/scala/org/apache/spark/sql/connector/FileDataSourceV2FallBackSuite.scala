@@ -467,6 +467,66 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("V2 cache invalidation on overwrite") {
+    Seq("parquet", "orc").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempPath { path =>
+          val p = path.getCanonicalPath
+          spark.range(1000).toDF("id").write.format(format).save(p)
+          val df = spark.read.format(format).load(p).cache()
+          assert(df.count() == 1000)
+          // Overwrite via V2 path should invalidate cache
+          spark.range(10).toDF("id").write.mode("append").format(format).save(p)
+          spark.range(10).toDF("id").write
+            .mode("overwrite").format(format).save(p)
+          assert(df.count() == 10,
+            s"Cache should be invalidated after V2 overwrite for $format")
+          df.unpersist()
+        }
+      }
+    }
+  }
+
+  test("V2 cache invalidation on append") {
+    Seq("parquet", "orc").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempPath { path =>
+          val p = path.getCanonicalPath
+          spark.range(1000).toDF("id").write.format(format).save(p)
+          val df = spark.read.format(format).load(p).cache()
+          assert(df.count() == 1000)
+          // Append via V2 path should invalidate cache
+          spark.range(10).toDF("id").write.mode("append").format(format).save(p)
+          assert(df.count() == 1010,
+            s"Cache should be invalidated after V2 append for $format")
+          df.unpersist()
+        }
+      }
+    }
+  }
+
+  test("V2 cache invalidation on catalog table overwrite") {
+    withSQLConf(
+      SQLConf.USE_V1_SOURCE_LIST.key -> "",
+      SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+      withTable("t") {
+        sql("CREATE TABLE t (id BIGINT) USING parquet")
+        sql("INSERT INTO t SELECT id FROM range(100)")
+        spark.table("t").cache()
+        assert(spark.table("t").count() == 100)
+        // Overwrite via INSERT OVERWRITE should invalidate cache
+        sql("INSERT OVERWRITE TABLE t SELECT id FROM range(10)")
+        assert(spark.table("t").count() == 10,
+          "Cache should be invalidated after V2 catalog table overwrite")
+        spark.catalog.uncacheTable("t")
+      }
+    }
+  }
+
   // SQL path INSERT INTO parquet.`path` requires SupportsCatalogOptions (deferred to Phase 1)
 
   test("CTAS uses V2 path when flag enabled") {
