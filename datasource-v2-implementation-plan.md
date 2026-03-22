@@ -58,20 +58,21 @@ Track D (V2 Catalog 视图)         ← 完全独立
 
 ---
 
-## Phase 1: 文件 V2 Catalog 集成
+## Phase 1: 文件 V2 Catalog 集成 — ✅ 完成
 
 **依赖**: Phase 0
 
-**目标**: `V2SessionCatalog` 直接返回 `FileTable` 而非包装为 `V1Table`；写入后自动注册分区。
+**状态**: 全部完成。详见 `datasource-v2-phase1-patches.md`。
 
-**关键改动**:
-
-1. **`V2SessionCatalog.scala`** — `loadTable()` 对文件表返回原生 V2 `FileTable`
-2. **`FileTable.scala`** — 实现 `SupportsPartitionManagement`（当表为 catalog 管理且有分区列时）
-3. **`FileBatchWrite.scala`** — `commit()` 后发现新分区并通过 `SupportsPartitionManagement.createPartition()` 注册
-4. **写后缓存失效** — 类似 V1 的 `cacheManager.recacheByPath`
-
-**测试**: Catalog 管理的文件表创建、插入、`SHOW PARTITIONS`、`ALTER TABLE ADD/DROP PARTITION`
+**成果**:
+- `FallBackFileSourceV2` 已删除，`V2_FILE_WRITE_ENABLED` 配置已移除
+- V2 文件写入路径默认启用，所有 4 种 SaveMode 和 SQL 写入操作走 V2
+- `FileTable` 实现 `SupportsPartitionManagement`（SHOW/ADD/DROP PARTITION）
+- 写入后自动注册新分区到 catalog metastore
+- Cache invalidation 通过 `recacheByPath` + `fileIndex.refresh()`
+- `INSERT INTO format.\`path\`` 语法通过 V2 路径
+- 自定义分区路径（ALTER TABLE ADD PARTITION LOCATION）完整支持
+- 201 测试通过，0 回归
 
 **复杂度**: L
 
