@@ -65,6 +65,9 @@ case class JDBCScanBuilder(
 
   private var sortOrders: Array[String] = Array.empty[String]
 
+  private var originalSortOrders
+      : Array[SortOrder] = Array.empty[SortOrder]
+
   override def pushPredicates(predicates: Array[Predicate]): Array[Predicate] = {
     if (jdbcOptions.pushDownPredicate) {
       val (pushed, unSupported) = predicates.partition(dialect.compileExpression(_).isDefined)
@@ -78,6 +81,9 @@ case class JDBCScanBuilder(
   override def pushedPredicates(): Array[Predicate] = pushedPredicate
 
   private var pushedAggregateList: Array[String] = Array()
+
+  private var pushedAggregation
+      : Option[Aggregation] = None
 
   private var pushedGroupBys: Option[Array[String]] = None
 
@@ -118,6 +124,7 @@ case class JDBCScanBuilder(
       finalSchema = JDBCRDD.getQueryOutputSchema(aggQuery, jdbcOptions, dialect)
       pushedAggregateList = selectList
       pushedGroupBys = Some(compiledGroupBys)
+      pushedAggregation = Some(aggregation)
       true
     } catch {
       case NonFatal(e) =>
@@ -310,6 +317,7 @@ case class JDBCScanBuilder(
       if (orders.length != compiledOrders.length) return false
       pushedLimit = limit
       sortOrders = compiledOrders
+      originalSortOrders = orders
       return true
     }
     false
@@ -341,9 +349,14 @@ case class JDBCScanBuilder(
     // "DEPT","NAME",MAX("SALARY"),MIN("BONUS"), instead of getting column names from
     // prunedSchema and quote them (will become "MAX(SALARY)", "MIN(BONUS)" and can't
     // be used in sql string.
-    JDBCScan(JDBCRelation(schema, parts, jdbcOptions, additionalMetrics)(session),
-      finalSchema, pushedPredicate, pushedAggregateList, pushedGroupBys,
-      tableSample, pushedLimit, sortOrders, pushedOffset)
+    JDBCScan(
+      JDBCRelation(schema, parts, jdbcOptions,
+        additionalMetrics)(session),
+      finalSchema, pushedPredicate,
+      pushedAggregateList, pushedGroupBys,
+      tableSample, pushedLimit, sortOrders,
+      pushedOffset,
+      pushedAggregation, originalSortOrders)
   }
 
 }
