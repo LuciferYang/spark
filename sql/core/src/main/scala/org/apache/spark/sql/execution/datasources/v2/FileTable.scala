@@ -53,6 +53,16 @@ abstract class FileTable(
   private[v2] var userSpecifiedPartitioning: Seq[String] =
     Seq.empty
 
+  // CatalogTable reference for syncing partition ops
+  // to the metastore. Set by V2SessionCatalog.loadTable.
+  private[v2] var catalogTable: Option[
+    org.apache.spark.sql.catalyst.catalog.CatalogTable
+  ] = None
+
+  // When true, use CatalogFileIndex to support custom
+  // partition locations. Set by V2SessionCatalog.
+  private[v2] var useCatalogFileIndex: Boolean = false
+
   lazy val fileIndex: PartitioningAwareFileIndex = {
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.
@@ -62,19 +72,30 @@ abstract class FileTable(
     val isStreamingMetadata = userSpecifiedSchema.isEmpty &&
       FileStreamSink.hasMetadata(paths, hadoopConf, sparkSession.sessionState.conf)
     if (isStreamingMetadata) {
-      // We are reading from the results of a streaming query. We will load files from
-      // the metadata log instead of listing them using HDFS APIs.
       new MetadataLogFileIndex(sparkSession, new Path(paths.head),
         options.asScala.toMap, userSpecifiedSchema)
+    } else if (useCatalogFileIndex && catalogTable.exists(
+        _.partitionColumnNames.nonEmpty)) {
+      val ct = catalogTable.get
+      val stats = sparkSession.sessionState.catalog
+        .getTableMetadata(ct.identifier).stats
+        .map(_.sizeInBytes.toLong).getOrElse(0L)
+      new CatalogFileIndex(sparkSession, ct, stats)
+        .filterPartitions(Nil)
     } else {
-      // This is a non-streaming file based datasource.
       val checkFilesExist = userSpecifiedSchema.isEmpty
-      val rootPathsSpecified = DataSource.checkAndGlobPathIfNecessary(paths, hadoopConf,
-        checkEmptyGlobPath = checkFilesExist, checkFilesExist = checkFilesExist,
-        enableGlobbing = globPaths)
-      val fileStatusCache = FileStatusCache.getOrCreate(sparkSession)
+      val rootPathsSpecified =
+        DataSource.checkAndGlobPathIfNecessary(
+          paths, hadoopConf,
+          checkEmptyGlobPath = checkFilesExist,
+          checkFilesExist = checkFilesExist,
+          enableGlobbing = globPaths)
+      val fileStatusCache =
+        FileStatusCache.getOrCreate(sparkSession)
       new InMemoryFileIndex(
-        sparkSession, rootPathsSpecified, caseSensitiveMap, userSpecifiedSchema, fileStatusCache)
+        sparkSession, rootPathsSpecified,
+        caseSensitiveMap, userSpecifiedSchema,
+        fileStatusCache)
     }
   }
 
@@ -271,18 +292,28 @@ abstract class FileTable(
   override def createPartition(
       ident: InternalRow,
       properties: util.Map[String, String]): Unit = {
-    val partPath = partitionPath(ident)
+    val customLoc = Option(properties.get("location"))
+    val targetPath = customLoc
+      .map(new Path(_))
+      .getOrElse(partitionPath(ident))
     val hadoopConf = sparkSession.sessionState
       .newHadoopConfWithOptions(
         options.asCaseSensitiveMap.asScala.toMap)
-    val fs = partPath.getFileSystem(hadoopConf)
-    if (fs.exists(partPath)) {
+    val fs = targetPath.getFileSystem(hadoopConf)
+    // For custom locations, allow existing dirs
+    // (the location may already contain data).
+    // For default locations, check for conflicts.
+    if (customLoc.isEmpty && fs.exists(targetPath)) {
       throw new org.apache.spark.sql.catalyst
         .analysis.PartitionsAlreadyExistException(
           name(), ident, partitionSchema())
     }
-    fs.mkdirs(partPath)
+    if (!fs.exists(targetPath)) {
+      fs.mkdirs(targetPath)
+    }
     fileIndex.refresh()
+    // Sync to catalog metastore if available
+    syncCreatePartitionToCatalog(ident, properties)
   }
 
   override def dropPartition(
@@ -295,6 +326,7 @@ abstract class FileTable(
     if (fs.exists(partPath)) {
       fs.delete(partPath, true)
       fileIndex.refresh()
+      syncDropPartitionFromCatalog(ident)
       true
     } else {
       false
@@ -323,41 +355,28 @@ abstract class FileTable(
     val schema = partitionSchema()
     if (schema.isEmpty) return Array.empty
 
-    val basePath = new Path(paths.head)
-    val hadoopConf = sparkSession.sessionState
-      .newHadoopConfWithOptions(
-        options.asCaseSensitiveMap.asScala.toMap)
-    val fs = basePath.getFileSystem(hadoopConf)
-
-    // Scan directory structure to find partitions.
-    // Supports single-level partitioning for now.
-    val allPartitions = if (schema.length == 1) {
-      val field = schema.head
-      if (!fs.exists(basePath)) {
-        Array.empty[InternalRow]
-      } else {
-        fs.listStatus(basePath)
-          .filter(_.isDirectory)
-          .map(_.getPath.getName)
-          .filter(_.contains("="))
-          .map { dirName =>
-            val value = dirName.split("=", 2)(1)
-            val converted = Cast(
-              Literal(value),
-              field.dataType).eval()
-            InternalRow(converted)
-          }
+    // Merge partitions from catalog (for custom
+    // locations) and file system scan (for partitions
+    // created by data writes).
+    val fromFS = listPartitionsFromFS(schema)
+    val fromCatalog = catalogTable.flatMap { ct =>
+      try {
+        val tz = sparkSession.sessionState.conf
+          .sessionLocalTimeZone
+        val parts = sparkSession.sessionState.catalog
+          .listPartitions(ct.identifier)
+        if (parts.nonEmpty) {
+          Some(parts.map(_.toRow(schema, tz)).toArray)
+        } else {
+          None
+        }
+      } catch {
+        case _: Exception => None
       }
-    } else {
-      // Multi-level: use fileIndex partitionSpec
-      fileIndex.refresh()
-      fileIndex match {
-        case idx: PartitioningAwareFileIndex =>
-          idx.partitionSpec().partitions
-            .map(_.values).toArray
-        case _ => Array.empty[InternalRow]
-      }
-    }
+    }.getOrElse(Array.empty[InternalRow])
+    // Deduplicate by converting to Set
+    val allPartitions =
+      (fromFS ++ fromCatalog).distinct
 
     if (names.isEmpty) {
       allPartitions
@@ -379,6 +398,42 @@ abstract class FileTable(
     }
   }
 
+  /** List partitions by scanning the file system. */
+  private def listPartitionsFromFS(
+      schema: StructType): Array[InternalRow] = {
+    val basePath = new Path(paths.head)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = basePath.getFileSystem(hadoopConf)
+    if (schema.length == 1) {
+      val field = schema.head
+      if (!fs.exists(basePath)) {
+        Array.empty[InternalRow]
+      } else {
+        fs.listStatus(basePath)
+          .filter(_.isDirectory)
+          .map(_.getPath.getName)
+          .filter(_.contains("="))
+          .map { dirName =>
+            val value = dirName.split("=", 2)(1)
+            val converted = Cast(
+              Literal(value),
+              field.dataType).eval()
+            InternalRow(converted)
+          }
+      }
+    } else {
+      fileIndex.refresh()
+      fileIndex match {
+        case idx: PartitioningAwareFileIndex =>
+          idx.partitionSpec().partitions
+            .map(_.values).toArray
+        case _ => Array.empty[InternalRow]
+      }
+    }
+  }
+
   /** Build the partition directory path from an
    *  InternalRow of partition values. */
   private def partitionPath(
@@ -396,6 +451,61 @@ abstract class FileTable(
       s"$name=$valueStr"
     }
     new Path(basePath, parts.mkString("/"))
+  }
+
+  /** Convert InternalRow partition values to
+   *  TablePartitionSpec (Map[String, String]). */
+  private def toPartitionSpec(
+      ident: InternalRow): Map[String, String] = {
+    val schema = partitionSchema()
+    (0 until schema.length).map { i =>
+      val value = ident.get(i, schema(i).dataType)
+      schema(i).name -> (
+        if (value == null) null
+        else value.toString)
+    }.toMap
+  }
+
+  /** Sync createPartition to catalog metastore. */
+  private def syncCreatePartitionToCatalog(
+      ident: InternalRow,
+      properties: util.Map[String, String]
+  ): Unit = {
+    catalogTable.foreach { ct =>
+      try {
+        val spec = toPartitionSpec(ident)
+        val loc = Option(properties.get("location"))
+          .map(l => new java.net.URI(l))
+        val storage = ct.storage.copy(
+          locationUri = loc)
+        val part =
+          org.apache.spark.sql.catalyst.catalog
+            .CatalogTablePartition(spec, storage)
+        sparkSession.sessionState.catalog
+          .createPartitions(
+            ct.identifier, Seq(part),
+            ignoreIfExists = true)
+      } catch {
+        case _: Exception => // Best-effort sync
+      }
+    }
+  }
+
+  /** Sync dropPartition to catalog metastore. */
+  private def syncDropPartitionFromCatalog(
+      ident: InternalRow): Unit = {
+    catalogTable.foreach { ct =>
+      try {
+        val spec = toPartitionSpec(ident)
+        sparkSession.sessionState.catalog
+          .dropPartitions(
+            ct.identifier, Seq(spec),
+            ignoreIfNotExists = true,
+            purge = false, retainData = true)
+      } catch {
+        case _: Exception => // Best-effort sync
+      }
+    }
   }
 }
 

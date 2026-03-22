@@ -101,23 +101,43 @@ class V2SessionCatalog(catalog: SessionCatalog)
         }
         DataSourceV2Utils.getTableProvider(table.provider.get, conf) match {
           case Some(provider) =>
-            // Get the table properties during creation and append the path option
-            // to the properties.
-            val dsOptions = getDataSourceOptions(table.properties, table.storage)
-            // If the source accepts external table metadata, we can pass the schema and
-            // partitioning information stored in Hive to `getTable` to avoid expensive
-            // schema/partitioning inference.
-            if (provider.supportsExternalMetadata()) {
-              provider.getTable(
-                table.schema,
-                getV2Partitioning(table),
-                dsOptions.asCaseSensitiveMap())
-            } else {
-              provider.getTable(
-                provider.inferSchema(dsOptions),
-                provider.inferPartitioning(dsOptions),
-                dsOptions.asCaseSensitiveMap())
+            val dsOptions = getDataSourceOptions(
+              table.properties, table.storage)
+            val v2Table =
+              if (provider.supportsExternalMetadata()) {
+                provider.getTable(
+                  table.schema,
+                  getV2Partitioning(table),
+                  dsOptions.asCaseSensitiveMap())
+              } else {
+                provider.getTable(
+                  provider.inferSchema(dsOptions),
+                  provider.inferPartitioning(dsOptions),
+                  dsOptions.asCaseSensitiveMap())
+              }
+            // Set catalog info on FileTable for
+            // partition sync and custom paths.
+            v2Table match {
+              case ft: FileTable =>
+                ft.catalogTable = Some(table)
+                // Use CatalogFileIndex when catalog has
+                // registered partitions (needed for
+                // custom partition locations).
+                if (table.partitionColumnNames
+                    .nonEmpty) {
+                  try {
+                    val parts = catalog
+                      .listPartitions(table.identifier)
+                    if (parts.nonEmpty) {
+                      ft.useCatalogFileIndex = true
+                    }
+                  } catch {
+                    case _: Exception =>
+                  }
+                }
+              case _ =>
             }
+            v2Table
           case _ =>
             V1Table(table)
         }

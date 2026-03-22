@@ -587,6 +587,33 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("ALTER TABLE ADD PARTITION with custom LOCATION") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT) " +
+        "USING parquet PARTITIONED BY (part)")
+      withTempDir { dir1 =>
+        withTempDir { dir2 =>
+          val p1 = new java.io.File(dir1, "d1")
+            .getCanonicalPath
+          val p2 = new java.io.File(dir2, "d2")
+            .getCanonicalPath
+          spark.range(2).toDF("id").write
+            .mode("overwrite").parquet(p1)
+          spark.range(10, 13).toDF("id").write
+            .mode("overwrite").parquet(p2)
+          sql("ALTER TABLE t ADD PARTITION " +
+            s"(part=1) LOCATION '$p1'")
+          sql("ALTER TABLE t ADD PARTITION " +
+            s"(part=2) LOCATION '$p2'")
+          val cnt = sql("SELECT count(*) FROM t")
+            .collect().head.getLong(0)
+          assert(cnt === 5,
+            s"Expected 5 rows (2+3), got $cnt")
+        }
+      }
+    }
+  }
+
   test("V2 partitioned write to empty directory succeeds") {
     Seq("parquet", "orc").foreach { format =>
       withTempDir { dir =>
