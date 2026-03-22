@@ -55,7 +55,7 @@ case class JDBCTable(
   override def name(): String = ident.toString
 
   override def capabilities(): util.Set[TableCapability] = {
-    util.EnumSet.of(BATCH_READ, V1_BATCH_WRITE, TRUNCATE)
+    util.EnumSet.of(BATCH_READ, BATCH_WRITE, TRUNCATE)
   }
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): JDBCScanBuilder = {

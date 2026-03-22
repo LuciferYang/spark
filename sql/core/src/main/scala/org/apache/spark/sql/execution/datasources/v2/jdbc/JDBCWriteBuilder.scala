@@ -16,16 +16,14 @@
  */
 package org.apache.spark.sql.execution.datasources.v2.jdbc
 
-import org.apache.spark.sql._
 import org.apache.spark.sql.connector.write._
-import org.apache.spark.sql.execution.datasources.jdbc.{JdbcOptionsInWrite, JdbcUtils}
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.jdbc.JdbcDialects
-import org.apache.spark.sql.sources.InsertableRelation
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
 import org.apache.spark.sql.types.StructType
 
-case class JDBCWriteBuilder(schema: StructType, options: JdbcOptionsInWrite) extends WriteBuilder
-  with SupportsTruncate {
+case class JDBCWriteBuilder(
+    schema: StructType,
+    options: JdbcOptionsInWrite)
+    extends WriteBuilder with SupportsTruncate {
 
   private var isTruncate = false
 
@@ -34,15 +32,7 @@ case class JDBCWriteBuilder(schema: StructType, options: JdbcOptionsInWrite) ext
     this
   }
 
-  override def build(): V1Write = new V1Write {
-    override def toInsertableRelation: InsertableRelation = (data: DataFrame, _: Boolean) => {
-      // TODO (SPARK-32595): do truncate and append atomically.
-      if (isTruncate) {
-        val dialect = JdbcDialects.get(options.url)
-        val conn = dialect.createConnectionFactory(options)(-1)
-        JdbcUtils.truncateTable(conn, options)
-      }
-      JdbcUtils.saveTable(data, Some(schema), SQLConf.get.caseSensitiveAnalysis, options)
-    }
+  override def build(): Write = {
+    new JDBCBatchWrite(schema, options, isTruncate)
   }
 }
