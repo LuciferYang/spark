@@ -112,21 +112,17 @@ Track D (V2 Catalog 视图)         ← 完全独立
 
 ---
 
-## Phase 4: MSCK REPAIR TABLE
+## Phase 4: MSCK REPAIR TABLE — ✅ 完成
 
 **依赖**: Phase 1
 
-**JIRA**: SPARK-34397
+**成果**:
+- 新增 `RepairTableExec`（V2 原生）
+- 扫描 FS 分区目录，与 catalog 对比，注册缺失分区 / 删除孤立分区
+- 使用 `FileTable.listPartitionIdentifiers()` 和 `SessionCatalog.createPartitions/dropPartitions`
+- 208 测试通过，0 回归
 
-**目标**: 实现 `RepairTable` V2 物理执行计划。
-
-**关键改动**:
-
-1. **`DataSourceV2Strategy.scala:547-548`** — 移除抛异常，映射到 `RepairTableExec`
-2. **新增 `RepairTableExec.scala`** — 扫描文件系统分区目录 → 与 `SupportsPartitionManagement.listPartitionIdentifiers()` 对比 → 批量增删分区
-3. 逻辑计划 `RepairTable` 已存在于 `v2Commands.scala:1669`
-
-**复杂度**: M
+**复杂度**: S
 
 ---
 

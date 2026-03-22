@@ -118,17 +118,13 @@ Track D (V2 Catalog Views)          <- Fully independent
 
 **Dependency**: Phase 1
 
-**JIRA**: SPARK-34397
+**Results**:
+- New `RepairTableExec` (V2-native)
+- Scans FS partition dirs, compares with catalog, registers missing / drops orphaned
+- Uses `FileTable.listPartitionIdentifiers()` and `SessionCatalog.createPartitions/dropPartitions`
+- 208 tests passing, 0 regressions
 
-**Goal**: Implement `RepairTable` V2 physical execution plan.
-
-**Key Changes**:
-
-1. **`DataSourceV2Strategy.scala:547-548`** -- Remove exception throw, map to `RepairTableExec`
-2. **Add `RepairTableExec.scala`** -- Scan filesystem partition directories -> Compare with `SupportsPartitionManagement.listPartitionIdentifiers()` -> Batch add/drop partitions
-3. Logical plan `RepairTable` already exists in `v2Commands.scala:1669`
-
-**Complexity**: M
+**Complexity**: S
 
 ---
 
