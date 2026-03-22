@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
 import org.apache.spark.sql.connector.catalog.{SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
@@ -243,7 +244,9 @@ abstract class FileTable(
    */
   protected def createFileWriteBuilder(
       info: LogicalWriteInfo)(
-      buildWrite: (LogicalWriteInfo, StructType, Boolean, Boolean) => Write): WriteBuilder = {
+      buildWrite: (LogicalWriteInfo, StructType,
+        Option[BucketSpec], Boolean, Boolean) => Write
+  ): WriteBuilder = {
     new WriteBuilder with SupportsDynamicOverwrite with SupportsTruncate {
       private var isDynamicOverwrite = false
       private var isTruncate = false
@@ -277,7 +280,8 @@ abstract class FileTable(
           } else {
             fromIndex
           }
-        buildWrite(merged, partSchema,
+        val bSpec = catalogTable.flatMap(_.bucketSpec)
+        buildWrite(merged, partSchema, bSpec,
           isDynamicOverwrite, isTruncate)
       }
     }

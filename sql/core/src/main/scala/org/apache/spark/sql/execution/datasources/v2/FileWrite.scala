@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
 import org.apache.spark.sql.connector.distributions.{Distribution, Distributions}
@@ -35,7 +36,7 @@ import org.apache.spark.sql.connector.expressions.{Expressions, SortDirection}
 import org.apache.spark.sql.connector.expressions.{SortOrder => V2SortOrder}
 import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, RequiresDistributionAndOrdering, Write}
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.execution.datasources.{BasicWriteJobStatsTracker, DataSource, OutputWriterFactory, WriteJobDescription}
+import org.apache.spark.sql.execution.datasources.{BasicWriteJobStatsTracker, DataSource, OutputWriterFactory, V1WritesUtils, WriteJobDescription}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -51,6 +52,7 @@ trait FileWrite extends Write
   def allowDuplicatedColumnNames: Boolean = false
   def info: LogicalWriteInfo
   def partitionSchema: StructType
+  def bucketSpec: Option[BucketSpec] = None
   def dynamicPartitionOverwrite: Boolean = false
   def isTruncate: Boolean = false
 
@@ -213,7 +215,8 @@ trait FileWrite extends Write
       allColumns = allColumns,
       dataColumns = dataColumns,
       partitionColumns = partitionColumns,
-      bucketSpec = None,
+      bucketSpec = V1WritesUtils.getWriterBucketSpec(
+        bucketSpec, dataColumns, caseInsensitiveOptions),
       path = pathName,
       customPartitionLocations = Map.empty,
       maxRecordsPerFile = caseInsensitiveOptions.get("maxRecordsPerFile").map(_.toLong)
