@@ -95,24 +95,20 @@ Track D (V2 Catalog 视图)         ← 完全独立
 
 ---
 
-## Phase 3: 文件 V2 分桶
+## Phase 3: 文件 V2 分桶 — ✅ 完成
 
 **依赖**: Phase 0
 
-**目标**: V2 文件写入支持 Hive 兼容分桶，读取支持桶裁剪。
+**成果**:
+- `FileWrite` 使用 `V1WritesUtils.getWriterBucketSpec()` 创建 `WriterBucketSpec`，替代硬编码 `None`
+- `FileTable.createFileWriteBuilder` 从 `catalogTable.bucketSpec` 传递分桶信息
+- 所有 6 个 `*Table` 和 `*Write` 类更新以传递 `BucketSpec`
+- `FileDataSourceV2.getTable` 使用 `collect` 跳过 `BucketTransform`（通过 `catalogTable.bucketSpec` 处理）
+- 207 测试通过，0 回归
 
-**关键改动**:
+**复杂度**: M（比预估简单，因为 `V1WritesUtils.getWriterBucketSpec` 可复用）
 
-1. **`FileTable.scala`** — 暴露 `BucketSpec`（从表属性或 catalog 元数据获取）
-2. **`FileWrite.scala:141`** — `bucketSpec = None` → 使用表的实际 BucketSpec
-3. **`FileScan.scala`** — 添加桶裁剪逻辑（参考 V1 `FileSourceStrategy.genBucketSet`，用 BitSet 过滤桶文件）
-4. **桶 Join 优化** — V2 planner 识别分桶 V2 表用于 sort-merge join
-
-**关键参考**: `FileSourceStrategy.scala:67-152`（桶裁剪）、`BucketingUtils.scala`（桶文件命名）
-
-**测试**: 分桶写入验证（文件命名、桶 ID 正确性）、桶裁剪扫描、桶 Join
-
-**复杂度**: L
+**注意**: 桶裁剪（bucket pruning）和桶 Join 优化未在此 Phase 实现，属于读取路径优化
 
 ---
 

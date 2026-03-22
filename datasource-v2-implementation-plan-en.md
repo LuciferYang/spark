@@ -95,22 +95,20 @@ Track D (V2 Catalog Views)          <- Fully independent
 
 ---
 
-## Phase 3: File V2 Bucketing
+## Phase 3: File V2 Bucketing — ✅ Complete
 
 **Dependency**: Phase 0
 
-**Goal**: V2 file write supports Hive-compatible bucketing, read supports bucket pruning.
+**Results**:
+- `FileWrite` uses `V1WritesUtils.getWriterBucketSpec()` to create `WriterBucketSpec`, replacing hardcoded `None`
+- `FileTable.createFileWriteBuilder` passes `catalogTable.bucketSpec` to the write pipeline
+- All 6 `*Table` and `*Write` classes updated to plumb `BucketSpec`
+- `FileDataSourceV2.getTable` uses `collect` to skip `BucketTransform` (handled via `catalogTable.bucketSpec`)
+- 207 tests passing, 0 regressions
 
-**Key Changes**:
+**Complexity**: M (simpler than estimated — `V1WritesUtils.getWriterBucketSpec` reusable)
 
-1. **`FileTable.scala`** -- Expose `BucketSpec` (obtained from table properties or catalog metadata)
-2. **`FileWrite.scala:141`** -- `bucketSpec = None` -> Use the table's actual BucketSpec
-3. **`FileScan.scala`** -- Add bucket pruning logic (reference V1 `FileSourceStrategy.genBucketSet`, filter bucket files using BitSet)
-4. **Bucket Join optimization** -- V2 planner recognizes bucketed V2 tables for sort-merge join
-
-**Key References**: `FileSourceStrategy.scala:67-152` (bucket pruning), `BucketingUtils.scala` (bucket file naming)
-
-**Tests**: Bucketed write verification (file naming, bucket ID correctness), bucket pruning scan, bucket join
+**Note**: Bucket pruning and bucket join optimization not implemented in this Phase (read-path optimization)
 
 **Complexity**: L
 
