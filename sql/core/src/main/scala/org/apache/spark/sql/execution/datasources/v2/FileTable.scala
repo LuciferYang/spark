@@ -23,7 +23,9 @@ import scala.jdk.CollectionConverters._
 import org.apache.hadoop.fs.{FileStatus, Path}
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
+import org.apache.spark.sql.connector.catalog.{SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, LogicalWriteInfoImpl, SupportsDynamicOverwrite, SupportsTruncate, Write, WriteBuilder}
@@ -41,7 +43,8 @@ abstract class FileTable(
     options: CaseInsensitiveStringMap,
     paths: Seq[String],
     userSpecifiedSchema: Option[StructType])
-  extends Table with SupportsRead with SupportsWrite {
+  extends Table with SupportsRead with SupportsWrite
+    with SupportsPartitionManagement {
 
   import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
@@ -246,6 +249,153 @@ abstract class FileTable(
           isDynamicOverwrite, isTruncate)
       }
     }
+  }
+
+  // ---- SupportsPartitionManagement ----
+
+  override def partitionSchema(): StructType = {
+    val fromIndex = fileIndex.partitionSchema
+    if (fromIndex.nonEmpty) {
+      fromIndex
+    } else if (userSpecifiedPartitioning.nonEmpty) {
+      // Use user-specified partitioning when fileIndex
+      // has no partition info (empty or new directory).
+      val full = schema
+      StructType(userSpecifiedPartitioning.flatMap(
+        col => full.find(_.name == col)))
+    } else {
+      fromIndex
+    }
+  }
+
+  override def createPartition(
+      ident: InternalRow,
+      properties: util.Map[String, String]): Unit = {
+    val partPath = partitionPath(ident)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = partPath.getFileSystem(hadoopConf)
+    if (fs.exists(partPath)) {
+      throw new org.apache.spark.sql.catalyst
+        .analysis.PartitionsAlreadyExistException(
+          name(), ident, partitionSchema())
+    }
+    fs.mkdirs(partPath)
+    fileIndex.refresh()
+  }
+
+  override def dropPartition(
+      ident: InternalRow): Boolean = {
+    val partPath = partitionPath(ident)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = partPath.getFileSystem(hadoopConf)
+    if (fs.exists(partPath)) {
+      fs.delete(partPath, true)
+      fileIndex.refresh()
+      true
+    } else {
+      false
+    }
+  }
+
+  override def replacePartitionMetadata(
+      ident: InternalRow,
+      properties: util.Map[String, String]): Unit = {
+    throw new UnsupportedOperationException(
+      "replacePartitionMetadata is not supported " +
+        "for file-based tables")
+  }
+
+  override def loadPartitionMetadata(
+      ident: InternalRow
+  ): util.Map[String, String] = {
+    throw new UnsupportedOperationException(
+      "loadPartitionMetadata is not supported " +
+        "for file-based tables")
+  }
+
+  override def listPartitionIdentifiers(
+      names: Array[String],
+      ident: InternalRow): Array[InternalRow] = {
+    val schema = partitionSchema()
+    if (schema.isEmpty) return Array.empty
+
+    val basePath = new Path(paths.head)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = basePath.getFileSystem(hadoopConf)
+
+    // Scan directory structure to find partitions.
+    // Supports single-level partitioning for now.
+    val allPartitions = if (schema.length == 1) {
+      val field = schema.head
+      if (!fs.exists(basePath)) {
+        Array.empty[InternalRow]
+      } else {
+        fs.listStatus(basePath)
+          .filter(_.isDirectory)
+          .map(_.getPath.getName)
+          .filter(_.contains("="))
+          .map { dirName =>
+            val value = dirName.split("=", 2)(1)
+            val converted = Cast(
+              Literal(value),
+              field.dataType).eval()
+            InternalRow(converted)
+          }
+      }
+    } else {
+      // Multi-level: use fileIndex partitionSpec
+      fileIndex.refresh()
+      fileIndex match {
+        case idx: PartitioningAwareFileIndex =>
+          idx.partitionSpec().partitions
+            .map(_.values).toArray
+        case _ => Array.empty[InternalRow]
+      }
+    }
+
+    if (names.isEmpty) {
+      allPartitions
+    } else {
+      val indexes = names.map(schema.fieldIndex)
+      val dataTypes = names.map(schema(_).dataType)
+      allPartitions.filter { row =>
+        var matches = true
+        var i = 0
+        while (i < names.length && matches) {
+          val actual = row.get(
+            indexes(i), dataTypes(i))
+          val expected = ident.get(i, dataTypes(i))
+          matches = actual == expected
+          i += 1
+        }
+        matches
+      }
+    }
+  }
+
+  /** Build the partition directory path from an
+   *  InternalRow of partition values. */
+  private def partitionPath(
+      ident: InternalRow): Path = {
+    val schema = partitionSchema()
+    val basePath = new Path(paths.head)
+    val parts = (0 until schema.length).map { i =>
+      val name = schema(i).name
+      val value = ident.get(i, schema(i).dataType)
+      val valueStr = if (value == null) {
+        "__HIVE_DEFAULT_PARTITION__"
+      } else {
+        value.toString
+      }
+      s"$name=$valueStr"
+    }
+    new Path(basePath, parts.mkString("/"))
   }
 }
 

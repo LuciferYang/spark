@@ -550,10 +550,40 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
 
   test("CTAS uses V2 path") {
     withTable("t") {
-      sql("CREATE TABLE t USING parquet AS SELECT id, id * 2 as value FROM range(10)")
+      sql("CREATE TABLE t USING parquet " +
+        "AS SELECT id, id * 2 as value FROM range(10)")
       checkAnswer(
         sql("SELECT count(*) FROM t"),
         Seq(Row(10L)))
+    }
+  }
+
+  test("SHOW PARTITIONS on partitioned table") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT) " +
+        "USING parquet PARTITIONED BY (part)")
+      sql("INSERT INTO t VALUES (1, 1), (2, 2)")
+      val partitions = sql("SHOW PARTITIONS t")
+        .collect().map(_.getString(0)).sorted
+      assert(partitions === Array("part=1", "part=2"))
+    }
+  }
+
+  test("ALTER TABLE ADD/DROP PARTITION") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT) " +
+        "USING parquet PARTITIONED BY (part)")
+      sql("INSERT INTO t VALUES (1, 1)")
+      // Add partition
+      sql("ALTER TABLE t ADD PARTITION (part=2)")
+      val after = sql("SHOW PARTITIONS t")
+        .collect().map(_.getString(0)).sorted
+      assert(after === Array("part=1", "part=2"))
+      // Drop partition
+      sql("ALTER TABLE t DROP PARTITION (part=1)")
+      val afterDrop = sql("SHOW PARTITIONS t")
+        .collect().map(_.getString(0)).sorted
+      assert(afterDrop === Array("part=2"))
     }
   }
 
