@@ -128,20 +128,18 @@ Track D (V2 Catalog Views)          <- Fully independent
 
 ---
 
-## Track A: JDBC Native V2 — Write ✅ Complete, Read Pending
+## Track A: JDBC Native V2 — ✅ Write Complete, Read Mostly Complete
 
 **JIRA**: SPARK-32593, SPARK-32595
 
-**Write path results** (SPARK-32595 fixed):
-- New `JDBCBatchWrite` (extends Write + BatchWrite) replaces V1Write
-- Truncate + append atomic in same JDBC connection
+**Write path** (SPARK-32595 ✅ fixed):
+- `JDBCBatchWrite` replaces V1Write, atomic truncate+append
 - `JDBCTable.capabilities`: `BATCH_WRITE` replaces `V1_BATCH_WRITE`
-- 79/79 JDBCV2Suite tests passing
 
-**Read path** (SPARK-32593, pending):
-- `JDBCScan` still uses `V1Scan`, needs native `Scan` + `Batch`
-- Requires `InputPartition`, `PartitionReaderFactory`, `PartitionReader`
-- Low impact (JDBC doesn't support nested columns)
+**Read path** (SPARK-32593 mostly complete):
+- `JDBCScan` migrated from `V1Scan` to native `Scan` + `Batch`
+- `JDBCPartitionReaderFactory` + `JDBCPartitionReader` native impl
+- 72/79 JDBCV2Suite tests pass (7 functional differences pending)
 
 ---
 

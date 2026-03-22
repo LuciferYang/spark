@@ -20,7 +20,7 @@ import org.apache.spark.sql.connector.expressions.SortOrder
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReaderFactory, Scan}
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCPartition, JDBCRelation}
+import org.apache.spark.sql.execution.datasources.jdbc.{JDBCDatabaseMetadata, JDBCPartition, JDBCRelation}
 import org.apache.spark.sql.execution.datasources.v2.TableSampleInfo
 import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
@@ -39,8 +39,29 @@ case class JDBCScan(
     pushedOffset: Int,
     aggregation: Option[Aggregation] = None,
     originalSortOrders: Array[SortOrder] =
-      Array.empty)
+      Array.empty,
+    originalLimit: Int = 0,
+    originalOffset: Int = 0)
     extends Scan with Batch {
+
+  /** External engine query for explain output. */
+  def getExternalEngineQuery: Option[String] = {
+    val noPartition = JDBCPartition(
+      whereClause = null, idx = 0)
+    Some(buildSqlForPartition(noPartition))
+  }
+
+  /** Database metadata for the JDBC connection. */
+  def getDatabaseMetadata
+      : JDBCDatabaseMetadata = {
+    val dialect =
+      JdbcDialects.get(relation.jdbcOptions.url)
+    val connFactory =
+      dialect.createConnectionFactory(
+        relation.jdbcOptions)
+    JDBCDatabaseMetadata
+      .fromJDBCConnectionFactory(connFactory)
+  }
 
   override def readSchema(): StructType =
     prunedSchema
@@ -113,21 +134,21 @@ case class JDBCScan(
             .map(_.describe()).toImmutableArraySeq)
     }
 
-    if (pushedLimit > 0 &&
+    if (originalLimit > 0 &&
         originalSortOrders.nonEmpty) {
       val sorts = seqToString(
         originalSortOrders.map(_.describe())
           .toImmutableArraySeq)
       entries += "PushedTopN" ->
-        s"ORDER BY $sorts LIMIT $pushedLimit"
-    } else if (pushedLimit > 0) {
+        s"ORDER BY $sorts LIMIT $originalLimit"
+    } else if (originalLimit > 0) {
       entries += "PushedLimit" ->
-        s"LIMIT $pushedLimit"
+        s"LIMIT $originalLimit"
     }
 
-    if (pushedOffset > 0) {
+    if (originalOffset > 0) {
       entries += "PushedOffset" ->
-        s"OFFSET $pushedOffset"
+        s"OFFSET $originalOffset"
     }
 
     val metadataStr = entries.toSeq.sorted

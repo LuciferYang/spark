@@ -60,8 +60,10 @@ case class JDBCScanBuilder(
   private var tableSample: Option[TableSampleInfo] = None
 
   private var pushedLimit = 0
+  private var originalLimit = 0
 
   private var pushedOffset = 0
+  private var originalOffset = 0
 
   private var sortOrders: Array[String] = Array.empty[String]
 
@@ -293,6 +295,7 @@ case class JDBCScanBuilder(
   override def pushLimit(limit: Int): Boolean = {
     if (jdbcOptions.pushDownLimit && dialect.supportsLimit) {
       pushedLimit = limit
+      originalLimit = limit
       return true
     }
     false
@@ -306,6 +309,7 @@ case class JDBCScanBuilder(
         pushedLimit = pushedLimit - offset
       }
       pushedOffset = offset
+      originalOffset = offset
       return true
     }
     false
@@ -316,6 +320,7 @@ case class JDBCScanBuilder(
       val compiledOrders = orders.flatMap(dialect.compileExpression(_))
       if (orders.length != compiledOrders.length) return false
       pushedLimit = limit
+      originalLimit = limit
       sortOrders = compiledOrders
       originalSortOrders = orders
       return true
@@ -356,7 +361,8 @@ case class JDBCScanBuilder(
       pushedAggregateList, pushedGroupBys,
       tableSample, pushedLimit, sortOrders,
       pushedOffset,
-      pushedAggregation, originalSortOrders)
+      pushedAggregation, originalSortOrders,
+      originalLimit, originalOffset)
   }
 
 }

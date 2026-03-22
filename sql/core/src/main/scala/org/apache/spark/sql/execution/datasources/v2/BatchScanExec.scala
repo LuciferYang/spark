@@ -156,6 +156,22 @@ case class BatchScanExec(
     redact(result)
   }
 
+  override def verboseStringWithOperatorId()
+      : String = {
+    val base = super.verboseStringWithOperatorId()
+    scan match {
+      case jdbc: org.apache.spark.sql.execution
+          .datasources.v2.jdbc.JDBCScan =>
+        jdbc.getExternalEngineQuery match {
+          case Some(q) =>
+            base + "External engine query: " +
+              q + System.lineSeparator()
+          case None => base
+        }
+      case _ => base
+    }
+  }
+
   override def nodeName: String = {
     s"BatchScan ${table.name()}".trim
   }

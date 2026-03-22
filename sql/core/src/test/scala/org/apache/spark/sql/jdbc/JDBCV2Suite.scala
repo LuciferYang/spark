@@ -34,9 +34,10 @@ import org.apache.spark.sql.connector.catalog.{Catalogs, Identifier, TableCatalo
 import org.apache.spark.sql.connector.catalog.functions.{ScalarFunction, UnboundFunction}
 import org.apache.spark.sql.connector.catalog.index.SupportsIndex
 import org.apache.spark.sql.connector.expressions.Expression
-import org.apache.spark.sql.execution.{FormattedMode, RowDataSourceScanExec}
-import org.apache.spark.sql.execution.datasources.jdbc.{JDBCDatabaseMetadata, JDBCRDD}
-import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2ScanRelation, V1ScanWrapper}
+import org.apache.spark.sql.execution.FormattedMode
+import org.apache.spark.sql.execution.datasources.jdbc.JDBCDatabaseMetadata
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, DataSourceV2ScanRelation}
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScan
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog
 import org.apache.spark.sql.functions.{abs, acos, asin, atan, atan2, avg, ceil, coalesce, cos, cosh, cot, count, count_distinct, degrees, exp, floor, lit, log => logarithm, log10, not, pow, radians, round, signum, sin, sinh, sqrt, sum, tan, tanh, udf, when}
 import org.apache.spark.sql.internal.SQLConf
@@ -2619,8 +2620,8 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
           "PushedAggregates: [SUM(SALARY)], PushedFilters: [], PushedGroupByExpressions: []"
         checkKeywordsExistsInExplain(df2, expectedPlanFragment)
         relation.scan match {
-          case v1: V1ScanWrapper =>
-            assert(v1.pushedDownOperators.aggregation.nonEmpty)
+          case scan: JDBCScan =>
+            assert(scan.aggregation.nonEmpty)
       }
     }
     checkAnswer(df2, Seq(Row(53000.00)))
@@ -2638,8 +2639,8 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
     checkAggregateRemoved(query, false)
     query.queryExecution.optimizedPlan.collect {
       case relation: DataSourceV2ScanRelation => relation.scan match {
-        case v1: V1ScanWrapper =>
-          assert(v1.pushedDownOperators.aggregation.isEmpty)
+        case scan: JDBCScan =>
+          assert(scan.aggregation.isEmpty)
       }
     }
     checkAnswer(query, Seq(Row(29000.0)))
@@ -3107,14 +3108,14 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
 
   test("SPARK-52730: Database metadata is available in JDBCRDD") {
     val df = sql("SELECT * FROM h2.test.people")
-    // Force query execution as metadata is stored during execution
     df.collect()
 
-    val jdbcRdd = df.queryExecution.executedPlan
-      .collect { case r: RowDataSourceScanExec => r }
-      .head.rdd.asInstanceOf[JDBCRDD]
+    val scan = df.queryExecution.executedPlan
+      .collect {
+        case b: BatchScanExec =>
+          b.scan.asInstanceOf[JDBCScan]
+      }.head
 
-    // This is the Metadata for the testing H2 database
     val expectedMetadata = JDBCDatabaseMetadata(
       databaseMajorVersion = Some(2),
       databaseMinorVersion = Some(3),
@@ -3122,6 +3123,8 @@ class JDBCV2Suite extends QueryTest with SharedSparkSession with ExplainSuiteHel
       databaseDriverMinorVersion = Some(3)
     )
 
-    assertResult(expectedMetadata) { jdbcRdd.getDatabaseMetadata }
+    assertResult(expectedMetadata) {
+      scan.getDatabaseMetadata
+    }
   }
 }
