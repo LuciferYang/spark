@@ -541,4 +541,47 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
       }
     }
   }
+
+  test("V2 partitioned write to empty directory succeeds") {
+    Seq("parquet", "orc").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempDir { dir =>
+          // Write partitioned data to an empty directory via V2 path.
+          // This verifies checkPartitioningMatchesV2Table is skipped for FileTable,
+          // whose partitioning() from fileIndex is empty for new directories.
+          val data = spark.range(20).selectExpr("id", "id % 4 as k")
+          data.write.partitionBy("k").mode("overwrite")
+            .format(format).save(dir.toString)
+          checkAnswer(
+            spark.read.format(format).load(dir.toString),
+            data)
+        }
+      }
+    }
+  }
+
+  test("V2 partitioned overwrite to existing partitioned directory succeeds") {
+    Seq("parquet", "orc").foreach { format =>
+      withSQLConf(
+        SQLConf.USE_V1_SOURCE_LIST.key -> "",
+        SQLConf.V2_FILE_WRITE_ENABLED.key -> "true") {
+        withTempDir { dir =>
+          // First write via V2 overwrite
+          val data1 = spark.range(10).selectExpr("id", "id % 3 as k")
+          data1.write.partitionBy("k").mode("overwrite")
+            .format(format).save(dir.toString)
+          // Second partitioned overwrite to same path should not fail with
+          // checkPartitioningMatchesV2Table (table.partitioning() now has partition info)
+          val data2 = spark.range(10, 20).selectExpr("id", "id % 3 as k")
+          data2.write.partitionBy("k").mode("overwrite")
+            .format(format).save(dir.toString)
+          checkAnswer(
+            spark.read.format(format).load(dir.toString),
+            data2)
+        }
+      }
+    }
+  }
 }

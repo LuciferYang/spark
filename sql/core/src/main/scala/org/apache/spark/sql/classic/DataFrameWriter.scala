@@ -581,6 +581,14 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
    * Partitioning information is not required when appending data to V2 tables.
    */
   private def checkPartitioningMatchesV2Table(existingTable: Table): Unit = {
+    // Skip check for FileTable: its partitioning() is inferred from existing files on disk
+    // via fileIndex.partitionSchema, which may be empty for new/empty directories. The
+    // actual partitioning is controlled by the writer through getTable(schema, partitioning,
+    // options) and does not need to match the on-disk state.
+    existingTable match {
+      case _: FileTable => return
+      case _ =>
+    }
     val v2Partitions = partitioningAsV2
     if (v2Partitions.isEmpty) return
     require(v2Partitions.sameElements(existingTable.partitioning()),
