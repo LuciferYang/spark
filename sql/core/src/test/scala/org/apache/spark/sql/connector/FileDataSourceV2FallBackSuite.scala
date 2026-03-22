@@ -692,6 +692,46 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("MSCK REPAIR TABLE on V2 file table") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT)" +
+        " USING parquet PARTITIONED BY (part)")
+      val tableIdent =
+        org.apache.spark.sql.catalyst
+          .TableIdentifier("t")
+      val loc = spark.sessionState.catalog
+        .getTableMetadata(tableIdent).location
+      // Write data directly to FS partitions
+      Seq(1, 2, 3).foreach { p =>
+        val dir = new java.io.File(
+          loc.getPath, s"part=$p")
+        dir.mkdirs()
+        spark.range(p * 10, p * 10 + 5)
+          .toDF("id").write
+          .mode("overwrite")
+          .parquet(dir.getCanonicalPath)
+      }
+      // Before repair: catalog has no partitions
+      val beforeRepair = spark.sessionState
+        .catalog.listPartitions(tableIdent)
+      assert(beforeRepair.isEmpty,
+        "Catalog should have no partitions " +
+          "before REPAIR")
+      // MSCK REPAIR TABLE
+      sql("MSCK REPAIR TABLE t")
+      // After repair: 3 partitions in catalog
+      val afterRepair = spark.sessionState
+        .catalog.listPartitions(tableIdent)
+      assert(afterRepair.length === 3,
+        s"Expected 3 catalog partitions, got " +
+          s"${afterRepair.length}")
+      // Data should be readable
+      val cnt = sql("SELECT count(*) FROM t")
+        .collect().head.getLong(0)
+      assert(cnt === 15)
+    }
+  }
+
   test("SHOW PARTITIONS on partitioned table") {
     withTable("t") {
       sql("CREATE TABLE t (id BIGINT, part INT) " +
