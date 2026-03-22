@@ -49,15 +49,17 @@ abstract class FileTable(
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.
     val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
-    if (FileStreamSink.hasMetadata(paths, hadoopConf, sparkSession.sessionState.conf)) {
+    // When userSpecifiedSchema is provided (e.g., write path via DataFrame API), the path
+    // may not exist yet. Skip streaming metadata check and file existence checks.
+    val isStreamingMetadata = userSpecifiedSchema.isEmpty &&
+      FileStreamSink.hasMetadata(paths, hadoopConf, sparkSession.sessionState.conf)
+    if (isStreamingMetadata) {
       // We are reading from the results of a streaming query. We will load files from
       // the metadata log instead of listing them using HDFS APIs.
       new MetadataLogFileIndex(sparkSession, new Path(paths.head),
         options.asScala.toMap, userSpecifiedSchema)
     } else {
       // This is a non-streaming file based datasource.
-      // When userSpecifiedSchema is provided (e.g., write path via DataFrame API), the path
-      // may not exist yet. Don't require it to exist in that case.
       val checkFilesExist = userSpecifiedSchema.isEmpty
       val rootPathsSpecified = DataSource.checkAndGlobPathIfNecessary(paths, hadoopConf,
         checkEmptyGlobPath = checkFilesExist, checkFilesExist = checkFilesExist,

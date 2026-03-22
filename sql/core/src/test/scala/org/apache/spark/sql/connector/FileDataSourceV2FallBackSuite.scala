@@ -19,7 +19,7 @@ package org.apache.spark.sql.connector
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.{SparkConf, SparkException}
-import org.apache.spark.sql.{QueryTest, Row}
+import org.apache.spark.sql.{AnalysisException, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.read.ScanBuilder
@@ -465,6 +465,46 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
       assert(spark.table("t").count() == 10,
         "Cache should be invalidated after V2 catalog table overwrite")
       spark.catalog.uncacheTable("t")
+    }
+  }
+
+  test("DataFrame API ErrorIfExists mode") {
+    Seq("parquet", "orc").foreach { format =>
+      // ErrorIfExists on existing path should throw
+      withTempPath { path =>
+        spark.range(5).toDF().write.format(format).save(path.getCanonicalPath)
+        val e = intercept[AnalysisException] {
+          spark.range(10).toDF().write.mode("error").format(format).save(path.getCanonicalPath)
+        }
+        assert(e.getCondition == "PATH_ALREADY_EXISTS",
+          s"Expected PATH_ALREADY_EXISTS for $format, got: ${e.getCondition}")
+      }
+
+      // ErrorIfExists on new path should succeed (falls back to V1 for new paths)
+      withTempPath { path =>
+        spark.range(5).toDF().write.mode("error").format(format).save(path.getCanonicalPath)
+        checkAnswer(spark.read.format(format).load(path.getCanonicalPath),
+          spark.range(5).toDF())
+      }
+    }
+  }
+
+  test("DataFrame API Ignore mode") {
+    Seq("parquet", "orc").foreach { format =>
+      // Ignore on existing path should skip writing
+      withTempPath { path =>
+        spark.range(5).toDF().write.format(format).save(path.getCanonicalPath)
+        spark.range(100).toDF().write.mode("ignore").format(format).save(path.getCanonicalPath)
+        checkAnswer(spark.read.format(format).load(path.getCanonicalPath),
+          spark.range(5).toDF())
+      }
+
+      // Ignore on new path should write data (falls back to V1 for new paths)
+      withTempPath { path =>
+        spark.range(5).toDF().write.mode("ignore").format(format).save(path.getCanonicalPath)
+        checkAnswer(spark.read.format(format).load(path.getCanonicalPath),
+          spark.range(5).toDF())
+      }
     }
   }
 
