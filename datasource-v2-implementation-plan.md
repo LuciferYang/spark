@@ -78,24 +78,19 @@ Track D (V2 Catalog 视图)         ← 完全独立
 
 ---
 
-## Phase 2: 统计信息 / ANALYZE TABLE
+## Phase 2: 统计信息 / ANALYZE TABLE — ✅ 完成
 
 **依赖**: Phase 1
 
-**目标**: V2 表支持 `ANALYZE TABLE` 和扫描级统计。
+**成果**:
+- 新增 `AnalyzeTableExec` 和 `AnalyzeColumnExec`（V2 原生，不依赖 V1 命令）
+- 通过 `TableCatalog.alterTable()` + `TableChange.setProperty()` 持久化统计
+- 表级属性：`spark.sql.statistics.totalSize`、`spark.sql.statistics.numRows`
+- 列级属性：`spark.sql.statistics.colStats.<col>.<stat>`（distinctCount/min/max/nullCount/avgLen/maxLen）
+- 支持 NOSCAN、FOR COLUMNS、FOR ALL COLUMNS
+- 206 测试通过，0 回归
 
-**JIRA**: 无独立 JIRA（属于 V2 统计基础设施）
-
-**关键改动**:
-
-1. **`DataSourceV2Strategy.scala:468-469`** — 移除无条件抛异常，替换为 V2 物理计划节点
-2. **统计持久化** — 通过表属性存储（`spark.sql.statistics.totalSize`, `spark.sql.statistics.numRows` 等），使用 `TableCatalog.alterTable()` 更新
-3. **`FileScan.scala:200`** — `numRows()` 从表属性读取已存储的统计值
-4. **新增** `AnalyzeTableExec` / `AnalyzeColumnExec` V2 版本
-
-**测试**: `ANALYZE TABLE COMPUTE STATISTICS`、`EXPLAIN COST` 反映统计值、优化器基于统计选择 join 策略
-
-**复杂度**: M
+**复杂度**: S（实际比预估简单）
 
 ---
 

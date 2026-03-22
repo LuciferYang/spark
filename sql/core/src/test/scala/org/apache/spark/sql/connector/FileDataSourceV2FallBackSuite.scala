@@ -612,6 +612,60 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("ANALYZE TABLE FOR COLUMNS on V2 table") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, val DOUBLE)" +
+        " USING parquet")
+      sql("INSERT INTO t SELECT id, " +
+        "cast(id * 1.5 as double) FROM range(100)")
+      sql("ANALYZE TABLE t COMPUTE STATISTICS " +
+        "FOR COLUMNS id, val")
+      val props = sql("SHOW TBLPROPERTIES t")
+        .collect()
+        .map(r => r.getString(0) -> r.getString(1))
+        .toMap
+      val prefix =
+        "spark.sql.statistics.colStats.id."
+      assert(
+        props.contains(prefix + "distinctCount"),
+        "id distinctCount should be present")
+      assert(
+        props.contains(prefix + "min"),
+        "id min should be present")
+      assert(
+        props.contains(prefix + "max"),
+        "id max should be present")
+      assert(
+        props.contains(prefix + "nullCount"),
+        "id nullCount should be present")
+      assert(
+        props.get(
+          "spark.sql.statistics.numRows")
+          .contains("100"))
+    }
+  }
+
+  test("ANALYZE TABLE FOR ALL COLUMNS") {
+    withTable("t") {
+      sql("CREATE TABLE t (a INT, b STRING)" +
+        " USING parquet")
+      sql("INSERT INTO t VALUES " +
+        "(1, 'x'), (2, 'y'), (3, 'z')")
+      sql("ANALYZE TABLE t COMPUTE STATISTICS " +
+        "FOR ALL COLUMNS")
+      val props = sql("SHOW TBLPROPERTIES t")
+        .collect()
+        .map(r => r.getString(0) -> r.getString(1))
+        .toMap
+      assert(props.contains(
+        "spark.sql.statistics.colStats." +
+          "a.distinctCount"))
+      assert(props.contains(
+        "spark.sql.statistics.colStats." +
+          "b.distinctCount"))
+    }
+  }
+
   test("SHOW PARTITIONS on partitioned table") {
     withTable("t") {
       sql("CREATE TABLE t (id BIGINT, part INT) " +

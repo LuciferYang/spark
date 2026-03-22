@@ -202,10 +202,21 @@ abstract class FileTable(
    * @param options The options of the table operation.
    * @return
    */
-  protected def mergedOptions(options: CaseInsensitiveStringMap): CaseInsensitiveStringMap = {
-    val finalOptions = this.options.asCaseSensitiveMap().asScala ++
+  protected def mergedOptions(
+      options: CaseInsensitiveStringMap
+  ): CaseInsensitiveStringMap = {
+    val base = this.options.asCaseSensitiveMap()
+      .asScala ++
       options.asCaseSensitiveMap().asScala
-    new CaseInsensitiveStringMap(finalOptions.asJava)
+    // Inject stored numRows from catalog for
+    // FileScan.estimateStatistics()
+    val withStats = catalogTable.flatMap(_.stats)
+      .flatMap(_.rowCount) match {
+      case Some(rows) =>
+        base ++ Map("__numRows" -> rows.toString)
+      case None => base
+    }
+    new CaseInsensitiveStringMap(withStats.asJava)
   }
 
   /**

@@ -532,6 +532,14 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
         catalog, ident, ft,
         partitionSpec, noScan) :: Nil
 
+    case AnalyzeColumn(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        columnNames, allColumns) =>
+      AnalyzeColumnExec(
+        catalog, ident, ft,
+        columnNames, allColumns) :: Nil
+
     case AnalyzeTable(_: ResolvedTable, _, _) |
          AnalyzeColumn(_: ResolvedTable, _, _) =>
       throw QueryCompilationErrors
