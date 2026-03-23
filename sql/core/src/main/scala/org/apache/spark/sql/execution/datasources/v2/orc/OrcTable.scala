@@ -44,8 +44,8 @@ case class OrcTable(
     OrcUtils.inferSchema(sparkSession, files, options.asScala.toMap)
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite, truncate) =>
-      OrcWrite(paths, formatName, supportsDataType, mergedInfo, partSchema,
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
+      OrcWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
         dynamicOverwrite, truncate)
     }
   }

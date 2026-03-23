@@ -43,8 +43,8 @@ case class AvroTable(
     AvroUtils.inferSchema(sparkSession, options.asScala.toMap, files)
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite, truncate) =>
-      AvroWrite(paths, formatName, supportsDataType, mergedInfo, partSchema,
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
+      AvroWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
         dynamicOverwrite, truncate)
     }
   }

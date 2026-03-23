@@ -40,8 +40,8 @@ case class TextTable(
     Some(StructType(Array(StructField("value", StringType))))
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite, truncate) =>
-      TextWrite(paths, formatName, supportsDataType, mergedInfo, partSchema,
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
+      TextWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
         dynamicOverwrite, truncate)
     }
   }

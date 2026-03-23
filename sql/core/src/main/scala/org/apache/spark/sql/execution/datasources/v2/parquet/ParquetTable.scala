@@ -44,8 +44,8 @@ case class ParquetTable(
     ParquetUtils.inferSchema(sparkSession, options.asScala.toMap, files)
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    createFileWriteBuilder(info) { (mergedInfo, partSchema, dynamicOverwrite, truncate) =>
-      ParquetWrite(paths, formatName, supportsDataType, mergedInfo, partSchema,
+    createFileWriteBuilder(info) { (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
+      ParquetWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
         dynamicOverwrite, truncate)
     }
   }

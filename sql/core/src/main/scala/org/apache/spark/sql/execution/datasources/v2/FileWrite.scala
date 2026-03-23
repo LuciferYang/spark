@@ -47,6 +47,7 @@ trait FileWrite extends Write {
   def allowDuplicatedColumnNames: Boolean = false
   def info: LogicalWriteInfo
   def partitionSchema: StructType
+  def customPartitionLocations: Map[Map[String, String], String] = Map.empty
   def dynamicPartitionOverwrite: Boolean = false
   def isTruncate: Boolean = false
 
@@ -122,9 +123,11 @@ trait FileWrite extends Write {
       SchemaUtils.checkColumnNameDuplication(
         schema.fields.map(_.name).toImmutableArraySeq, caseSensitiveAnalysis)
     }
+    if (!sqlConf.allowCollationsInMapKeys) {
+      SchemaUtils.checkNoCollationsInMapKeys(schema)
+    }
     DataSource.validateSchema(formatName, schema, sqlConf)
 
-    // TODO: [SPARK-36340] Unify check schema filed of DataSource V2 Insert.
     schema.foreach { field =>
       if (!supportsDataType(field.dataType)) {
         throw QueryCompilationErrors.dataTypeUnsupportedByDataSourceError(formatName, field)
@@ -179,7 +182,7 @@ trait FileWrite extends Write {
       partitionColumns = partitionColumns,
       bucketSpec = None,
       path = pathName,
-      customPartitionLocations = Map.empty,
+      customPartitionLocations = customPartitionLocations,
       maxRecordsPerFile = caseInsensitiveOptions.get("maxRecordsPerFile").map(_.toLong)
         .getOrElse(sparkSession.sessionState.conf.maxRecordsPerFile),
       timeZoneId = caseInsensitiveOptions.get(DateTimeUtils.TIMEZONE_OPTION)

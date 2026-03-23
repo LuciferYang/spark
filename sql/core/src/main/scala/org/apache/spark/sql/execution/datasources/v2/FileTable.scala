@@ -81,15 +81,28 @@ abstract class FileTable(
   }
 
   override lazy val schema: StructType = {
-    val caseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
-    SchemaUtils.checkSchemaColumnNameDuplication(dataSchema, caseSensitive)
+    val caseSensitive =
+      sparkSession.sessionState.conf.caseSensitiveAnalysis
+    // Column name duplication check is done in
+    // FileWrite.validateInputs for write path.
+    // For read path, analyzer handles ambiguous
+    // references at query time.
+
+    // Only check supportsDataType for data columns, not
+    // partition columns (which may have types unsupported
+    // by the format, e.g., INT in text).
+    val partColSet =
+      (fileIndex.partitionSchema.fieldNames ++
+        userSpecifiedPartitioning).toSet
     dataSchema.foreach { field =>
-      if (!supportsDataType(field.dataType)) {
-        throw QueryCompilationErrors.dataTypeUnsupportedByDataSourceError(formatName, field)
+      if (!partColSet.contains(field.name) &&
+          !supportsDataType(field.dataType)) {
+        throw QueryCompilationErrors
+          .dataTypeUnsupportedByDataSourceError(
+            formatName, field)
       }
     }
     val partitionSchema = fileIndex.partitionSchema
-    SchemaUtils.checkSchemaColumnNameDuplication(partitionSchema, caseSensitive)
     val partitionNameSet: Set[String] =
       partitionSchema.fields.map(PartitioningUtils.getColName(_, caseSensitive)).toSet
 
@@ -186,7 +199,10 @@ abstract class FileTable(
    */
   protected def createFileWriteBuilder(
       info: LogicalWriteInfo)(
-      buildWrite: (LogicalWriteInfo, StructType, Boolean, Boolean) => Write): WriteBuilder = {
+      buildWrite: (LogicalWriteInfo, StructType,
+        Map[Map[String, String], String],
+        Boolean, Boolean) => Write
+  ): WriteBuilder = {
     new WriteBuilder with SupportsDynamicOverwrite with SupportsTruncate {
       private var isDynamicOverwrite = false
       private var isTruncate = false
@@ -202,9 +218,65 @@ abstract class FileTable(
       }
 
       override def build(): Write = {
-        buildWrite(mergedWriteInfo(info), fileIndex.partitionSchema,
-          isDynamicOverwrite, isTruncate)
+        val merged = mergedWriteInfo(info)
+        val fromIndex = fileIndex.partitionSchema
+        val partSchema =
+          if (fromIndex.nonEmpty) {
+            fromIndex
+          } else if (
+            userSpecifiedPartitioning.nonEmpty) {
+            val full = merged.schema()
+            StructType(
+              userSpecifiedPartitioning.map { c =>
+                full.find(_.name == c).getOrElse(
+                  throw new IllegalArgumentException(
+                    s"Partition column '$c' " +
+                      "not found in schema"))
+              })
+          } else {
+            fromIndex
+          }
+        val customLocs = getCustomPartitionLocations(
+          partSchema)
+        buildWrite(merged, partSchema,
+          customLocs, isDynamicOverwrite, isTruncate)
       }
+    }
+  }
+
+  /**
+   * Computes custom partition locations by comparing catalog
+   * partition locations against default paths. Mirrors V1
+   * InsertIntoHadoopFsRelationCommand.getCustomPartitionLocations.
+   */
+  private def getCustomPartitionLocations(
+      partSchema: StructType
+  ): Map[Map[String, String], String] = {
+    catalogTable match {
+      case Some(ct) if ct.partitionColumnNames.nonEmpty =>
+        val outputPath = new Path(paths.head)
+        val hadoopConf = sparkSession.sessionState
+          .newHadoopConfWithOptions(
+            options.asCaseSensitiveMap.asScala.toMap)
+        val fs = outputPath.getFileSystem(hadoopConf)
+        val qualifiedOutputPath = outputPath.makeQualified(
+          fs.getUri, fs.getWorkingDirectory)
+        val partitions = sparkSession.sessionState.catalog
+          .listPartitions(ct.identifier)
+        partitions.flatMap { p =>
+          val defaultLocation = qualifiedOutputPath.suffix(
+            "/" + PartitioningUtils.getPathFragment(
+              p.spec, partSchema)).toString
+          val catalogLocation = new Path(p.location)
+            .makeQualified(
+              fs.getUri, fs.getWorkingDirectory).toString
+          if (catalogLocation != defaultLocation) {
+            Some(p.spec -> catalogLocation)
+          } else {
+            None
+          }
+        }.toMap
+      case _ => Map.empty
     }
   }
 }
