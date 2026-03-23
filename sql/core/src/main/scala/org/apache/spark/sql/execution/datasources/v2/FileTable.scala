@@ -35,7 +35,6 @@ import org.apache.spark.sql.execution.streaming.runtime.MetadataLogFileIndex
 import org.apache.spark.sql.execution.streaming.sinks.FileStreamSink
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
-import org.apache.spark.sql.util.SchemaUtils
 import org.apache.spark.util.ArrayImplicits._
 
 abstract class FileTable(
@@ -118,8 +117,11 @@ abstract class FileTable(
   override lazy val schema: StructType = {
     val caseSensitive =
       sparkSession.sessionState.conf.caseSensitiveAnalysis
-    SchemaUtils.checkSchemaColumnNameDuplication(
-      dataSchema, caseSensitive)
+    // Column name duplication check is done in
+    // FileWrite.validateInputs for write path.
+    // For read path, analyzer handles ambiguous
+    // references at query time.
+
     // Only check supportsDataType for data columns, not
     // partition columns (which may have types unsupported
     // by the format, e.g., INT in text).
@@ -135,7 +137,6 @@ abstract class FileTable(
       }
     }
     val partitionSchema = fileIndex.partitionSchema
-    SchemaUtils.checkSchemaColumnNameDuplication(partitionSchema, caseSensitive)
     val partitionNameSet: Set[String] =
       partitionSchema.fields.map(PartitioningUtils.getColName(_, caseSensitive)).toSet
 
