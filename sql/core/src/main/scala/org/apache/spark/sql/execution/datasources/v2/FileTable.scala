@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
-import org.apache.spark.sql.connector.catalog.{SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column, SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, LogicalWriteInfoImpl, SupportsDynamicOverwrite, SupportsTruncate, Write, WriteBuilder}
@@ -33,6 +33,7 @@ import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.streaming.runtime.MetadataLogFileIndex
 import org.apache.spark.sql.execution.streaming.sinks.FileStreamSink
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
@@ -54,7 +55,7 @@ abstract class FileTable(
 
   // CatalogTable reference for syncing partition ops
   // to the metastore. Set by V2SessionCatalog.loadTable.
-  private[v2] var catalogTable: Option[
+  private[sql] var catalogTable: Option[
     org.apache.spark.sql.catalyst.catalog.CatalogTable
   ] = None
 
@@ -149,8 +150,77 @@ abstract class FileTable(
     StructType(fields)
   }
 
-  override def partitioning: Array[Transform] =
-    fileIndex.partitionSchema.names.toImmutableArraySeq.asTransforms
+  /**
+   * Override columns() to restore NOT NULL constraints from
+   * the catalog table schema. FileTable.schema makes all
+   * fields nullable (via asNullable) for safe reads. When
+   * the config is enabled, we restore the original
+   * nullability for proper INSERT validation.
+   */
+  override def columns(): Array[Column] = {
+    val baseSchema = schema
+    val conf = sparkSession.sessionState.conf
+    if (conf.getConf(SQLConf.FILE_SOURCE_INSERT_ENFORCE_NOT_NULL)
+        && catalogTable.isDefined) {
+      val catFields = catalogTable.get.schema.fields
+        .map(f => f.name -> f).toMap
+      val restored = StructType(baseSchema.fields.map { f =>
+        catFields.get(f.name) match {
+          case Some(cf) =>
+            f.copy(nullable = cf.nullable,
+              dataType = restoreNullability(
+                f.dataType, cf.dataType))
+          case None => f
+        }
+      })
+      CatalogV2Util.structTypeToV2Columns(restored)
+    } else {
+      CatalogV2Util.structTypeToV2Columns(baseSchema)
+    }
+  }
+
+  /** Recursively restore nullability from catalog type. */
+  private def restoreNullability(
+      dataType: DataType,
+      catalogType: DataType): DataType = {
+    import org.apache.spark.sql.types._
+    (dataType, catalogType) match {
+      case (ArrayType(et1, _), ArrayType(et2, cn)) =>
+        ArrayType(restoreNullability(et1, et2), cn)
+      case (MapType(kt1, vt1, _), MapType(kt2, vt2, vcn)) =>
+        MapType(restoreNullability(kt1, kt2),
+          restoreNullability(vt1, vt2), vcn)
+      case (StructType(f1), StructType(f2)) =>
+        val catMap = f2.map(f => f.name -> f).toMap
+        StructType(f1.map { f =>
+          catMap.get(f.name) match {
+            case Some(cf) =>
+              f.copy(nullable = cf.nullable,
+                dataType = restoreNullability(
+                  f.dataType, cf.dataType))
+            case None => f
+          }
+        })
+      case _ => dataType
+    }
+  }
+
+  override def partitioning: Array[Transform] = {
+    val fromIndex =
+      fileIndex.partitionSchema.names.toImmutableArraySeq
+    if (fromIndex.nonEmpty) {
+      fromIndex.asTransforms
+    } else if (userSpecifiedPartitioning.nonEmpty) {
+      userSpecifiedPartitioning.asTransforms
+    } else {
+      // Fall back to catalog partition columns if
+      // fileIndex has no partition info yet (empty dir).
+      catalogTable
+        .map(_.partitionColumnNames.toArray
+          .toImmutableArraySeq.asTransforms)
+        .getOrElse(fromIndex.asTransforms)
+    }
+  }
 
   override def properties: util.Map[String, String] = options.asCaseSensitiveMap
 

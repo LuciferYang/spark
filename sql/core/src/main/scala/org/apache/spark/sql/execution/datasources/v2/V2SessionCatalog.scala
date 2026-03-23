@@ -24,6 +24,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.SparkUnsupportedOperationException
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{QualifiedTableName, SQLConfHelper}
 import org.apache.spark.sql.catalyst.analysis.{NoSuchNamespaceException, NoSuchTableException, TableAlreadyExistsException}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogStorageFormat, CatalogTable, CatalogTableType, CatalogUtils, ClusterBySpec, SessionCatalog}
@@ -33,7 +34,7 @@ import org.apache.spark.sql.connector.catalog.NamespaceChange.RemoveProperty
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
-import org.apache.spark.sql.execution.datasources.DataSource
+import org.apache.spark.sql.execution.datasources.{DataSource, FileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -235,6 +236,18 @@ class V2SessionCatalog(catalog: SessionCatalog)
             partitions
           }
           val table = tableProvider.getTable(schema, partitions, dsOptions)
+          // Validate data types supported by the format.
+          table match {
+            case ft: FileTable =>
+              schema.foreach { field =>
+                if (!ft.supportsDataType(field.dataType)) {
+                  throw QueryCompilationErrors
+                    .dataTypeUnsupportedByDataSourceError(
+                      ft.formatName, field)
+                }
+              }
+            case _ =>
+          }
           // Check if the schema of the created table matches the given schema.
           val tableSchema = table.columns().asSchema
           if (!DataType.equalsIgnoreNullability(table.columns().asSchema, schema)) {
@@ -245,6 +258,26 @@ class V2SessionCatalog(catalog: SessionCatalog)
 
       case _ =>
         // The provider is not a V2 provider so we return the schema and partitions as is.
+        // Validate data types using the V1 FileFormat, matching V1 CreateDataSourceTableCommand
+        // behavior (which validates via DataSource.resolveRelation).
+        if (schema.nonEmpty) {
+          val ds = DataSource(
+            SparkSession.active,
+            userSpecifiedSchema = Some(schema),
+            className = provider)
+          ds.providingInstance() match {
+            case format: FileFormat =>
+              schema.foreach { field =>
+                if (!format.supportDataType(field.dataType)) {
+                  throw QueryCompilationErrors
+                    .dataTypeUnsupportedByDataSourceError(
+                      format.toString, field)
+                }
+              }
+            case _ =>
+          }
+        }
+        DataSource.validateSchema(provider, schema, conf)
         (schema, partitions)
     }
 
