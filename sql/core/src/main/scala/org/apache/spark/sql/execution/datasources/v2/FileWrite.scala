@@ -46,6 +46,9 @@ trait FileWrite extends Write {
   def supportsDataType: DataType => Boolean
   def allowDuplicatedColumnNames: Boolean = false
   def info: LogicalWriteInfo
+  def partitionSchema: StructType
+  def dynamicPartitionOverwrite: Boolean = false
+  def isTruncate: Boolean = false
 
   private val schema = info.schema()
   private val queryId = info.queryId()
@@ -60,13 +63,36 @@ trait FileWrite extends Write {
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.
     val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
+
+    // Ensure the output path exists. For new writes (Append to a new path, Overwrite on a new
+    // path), the path may not exist yet.
+    val fs = path.getFileSystem(hadoopConf)
+    val qualifiedPath = path.makeQualified(fs.getUri, fs.getWorkingDirectory)
+    if (!fs.exists(qualifiedPath)) {
+      fs.mkdirs(qualifiedPath)
+    }
+
+    // For truncate (full overwrite), delete existing data before writing.
+    if (isTruncate && fs.exists(qualifiedPath)) {
+      fs.listStatus(qualifiedPath).foreach { status =>
+        // Preserve hidden files/dirs (e.g., _SUCCESS, .spark-staging-*)
+        if (!status.getPath.getName.startsWith("_") &&
+            !status.getPath.getName.startsWith(".")) {
+          fs.delete(status.getPath, true)
+        }
+      }
+    }
+
     val job = getJobInstance(hadoopConf, path)
+    val jobId = java.util.UUID.randomUUID().toString
     val committer = FileCommitProtocol.instantiate(
       sparkSession.sessionState.conf.fileCommitProtocolClass,
-      jobId = java.util.UUID.randomUUID().toString,
-      outputPath = paths.head)
+      jobId = jobId,
+      outputPath = paths.head,
+      dynamicPartitionOverwrite = dynamicPartitionOverwrite)
     lazy val description =
-      createWriteJobDescription(sparkSession, hadoopConf, job, paths.head, options.asScala.toMap)
+      createWriteJobDescription(sparkSession, hadoopConf, job, paths.head, options.asScala.toMap,
+        jobId)
 
     committer.setupJob(job)
     new FileBatchWrite(job, description, committer)
@@ -119,25 +145,38 @@ trait FileWrite extends Write {
       hadoopConf: Configuration,
       job: Job,
       pathName: String,
-      options: Map[String, String]): WriteJobDescription = {
+      options: Map[String, String],
+      jobId: String): WriteJobDescription = {
     val caseInsensitiveOptions = CaseInsensitiveMap(options)
-    // Note: prepareWrite has side effect. It sets "job".
-    val outputWriterFactory =
-      prepareWrite(sparkSession.sessionState.conf, job, caseInsensitiveOptions, schema)
     val allColumns = toAttributes(schema)
+    val partitionColumnNames = partitionSchema.fields.map(_.name).toSet
+    val caseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
+    val partitionColumns = if (partitionColumnNames.nonEmpty) {
+      allColumns.filter { col =>
+        if (caseSensitive) {
+          partitionColumnNames.contains(col.name)
+        } else {
+          partitionColumnNames.exists(_.equalsIgnoreCase(col.name))
+        }
+      }
+    } else {
+      Seq.empty
+    }
+    val dataColumns = allColumns.filterNot(partitionColumns.contains)
+    // Note: prepareWrite has side effect. It sets "job".
+    val dataSchema = StructType(dataColumns.map(col => schema(col.name)))
+    val outputWriterFactory =
+      prepareWrite(sparkSession.sessionState.conf, job, caseInsensitiveOptions, dataSchema)
     val metrics: Map[String, SQLMetric] = BasicWriteJobStatsTracker.metrics
     val serializableHadoopConf = new SerializableConfiguration(hadoopConf)
     val statsTracker = new BasicWriteJobStatsTracker(serializableHadoopConf, metrics)
-    // TODO: after partitioning is supported in V2:
-    //       1. filter out partition columns in `dataColumns`.
-    //       2. Don't use Seq.empty for `partitionColumns`.
     new WriteJobDescription(
       uuid = UUID.randomUUID().toString,
       serializableHadoopConf = new SerializableConfiguration(job.getConfiguration),
       outputWriterFactory = outputWriterFactory,
       allColumns = allColumns,
-      dataColumns = allColumns,
-      partitionColumns = Seq.empty,
+      dataColumns = dataColumns,
+      partitionColumns = partitionColumns,
       bucketSpec = None,
       path = pathName,
       customPartitionLocations = Map.empty,
