@@ -60,6 +60,7 @@ object PushDownJoinThroughUnion
       if conf.getConf(SQLConf.PUSH_DOWN_JOIN_THROUGH_UNION_ENABLED) &&
         (joinType == Inner || joinType == LeftOuter) &&
         joinCond.isDefined &&
+        joinCond.get.deterministic &&
         isBroadcastable(joinType, right, hint) &&
         // Conservatively exclude any right subtree containing subqueries,
         // as DeduplicateRelations may not correctly handle correlated references.
@@ -76,15 +77,15 @@ object PushDownJoinThroughUnion
       // to share the same ExprIds, which holds after the analysis phase.
       val unionHeadOutput = u.children.head.output
       val newChildren = u.children.zipWithIndex.map { case (child, idx) =>
-        val newRight = if (idx == 0) right else dedupRight(right)
         // For idx == 0, child == u.children.head, so leftRewrites is identity
         // and rightRewrites is empty; the condition is used as-is.
-        val leftRewrites = AttributeMap(unionHeadOutput.zip(child.output))
-        val rightRewrites = if (idx == 0) {
-          AttributeMap.empty[Attribute]
+        val (newRight, rightRewrites) = if (idx == 0) {
+          (right, AttributeMap.empty[Attribute])
         } else {
-          AttributeMap(right.output.zip(newRight.output))
+          val deduped = dedupRight(right)
+          (deduped, AttributeMap(right.output.zip(deduped.output)))
         }
+        val leftRewrites = AttributeMap(unionHeadOutput.zip(child.output))
         val newCond = joinCond.map(_.transform {
           case a: Attribute if leftRewrites.contains(a) => leftRewrites(a)
           case a: Attribute if rightRewrites.contains(a) => rightRewrites(a)
