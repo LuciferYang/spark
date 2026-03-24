@@ -73,12 +73,63 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       r.table match {
         case ft: FileTable =>
           ft.fileIndex.refresh()
+          syncNewPartitionsToCatalog(ft)
           val path = new Path(ft.fileIndex.rootPaths.head.toUri)
           val fs = path.getFileSystem(hadoopConf)
           cacheManager.recacheByPath(session, path, fs)
         case _ =>
           cacheManager.recacheByPlan(session, r)
       }
+  }
+
+  /**
+   * After a V2 file write, discover new partitions on
+   * disk and register them in the catalog metastore.
+   */
+  private def syncNewPartitionsToCatalog(
+      ft: FileTable): Unit = {
+    ft.catalogTable.foreach { ct =>
+      if (ct.partitionColumnNames.isEmpty) return
+      try {
+        val catalog = session.sessionState.catalog
+        val existing = catalog
+          .listPartitions(ct.identifier)
+          .map(_.spec).toSet
+        // Scan FS for current partitions
+        val onDisk = ft.listPartitionIdentifiers(
+          Array.empty,
+          org.apache.spark.sql.catalyst
+            .InternalRow.empty)
+        val schema = ft.partitionSchema()
+        val tz = session.sessionState.conf
+          .sessionLocalTimeZone
+        onDisk.foreach { row =>
+          val spec = (0 until schema.length).map {
+            i =>
+              val v = row.get(i, schema(i).dataType)
+              schema(i).name -> (
+                if (v == null) null else v.toString)
+          }.toMap
+          if (!existing.contains(spec)) {
+            val partPath = ft.fileIndex.rootPaths
+              .head.suffix("/" + spec.map {
+                case (k, v) => s"$k=$v"
+              }.mkString("/"))
+            val storage = ct.storage.copy(
+              locationUri =
+                Some(partPath.toUri))
+            val part =
+              org.apache.spark.sql.catalyst.catalog
+                .CatalogTablePartition(spec, storage)
+            catalog.createPartitions(
+              ct.identifier, Seq(part),
+              ignoreIfExists = true)
+          }
+        }
+      } catch {
+        case _: Exception => // Best-effort
+      }
+    }
   }
 
   private def recacheTable(r: ResolvedTable, includeTimeTravel: Boolean)(): Unit = {

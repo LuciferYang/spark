@@ -273,8 +273,11 @@ abstract class FileTable(
    * @param options The options of the table operation.
    * @return
    */
-  protected def mergedOptions(options: CaseInsensitiveStringMap): CaseInsensitiveStringMap = {
-    val finalOptions = this.options.asCaseSensitiveMap().asScala ++
+  protected def mergedOptions(
+      options: CaseInsensitiveStringMap
+  ): CaseInsensitiveStringMap = {
+    val finalOptions = this.options.asCaseSensitiveMap()
+      .asScala ++
       options.asCaseSensitiveMap().asScala
     new CaseInsensitiveStringMap(finalOptions.asJava)
   }
@@ -381,6 +384,242 @@ abstract class FileTable(
           }
         }.toMap
       case _ => Map.empty
+    }
+  }
+
+  // ---- SupportsPartitionManagement ----
+
+  override def partitionSchema(): StructType = {
+    val fromIndex = fileIndex.partitionSchema
+    if (fromIndex.nonEmpty) {
+      fromIndex
+    } else if (userSpecifiedPartitioning.nonEmpty) {
+      // Use user-specified partitioning when fileIndex
+      // has no partition info (empty or new directory).
+      val full = schema
+      StructType(userSpecifiedPartitioning.flatMap(
+        col => full.find(_.name == col)))
+    } else {
+      fromIndex
+    }
+  }
+
+  override def createPartition(
+      ident: InternalRow,
+      properties: util.Map[String, String]): Unit = {
+    val customLoc = Option(properties.get("location"))
+    val targetPath = customLoc
+      .map(new Path(_))
+      .getOrElse(partitionPath(ident))
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = targetPath.getFileSystem(hadoopConf)
+    // For custom locations, allow existing dirs
+    // (the location may already contain data).
+    // For default locations, check for conflicts.
+    if (customLoc.isEmpty && fs.exists(targetPath)) {
+      throw new org.apache.spark.sql.catalyst
+        .analysis.PartitionsAlreadyExistException(
+          name(), ident, partitionSchema())
+    }
+    if (!fs.exists(targetPath)) {
+      fs.mkdirs(targetPath)
+    }
+    fileIndex.refresh()
+    // Sync to catalog metastore if available
+    syncCreatePartitionToCatalog(ident, properties)
+  }
+
+  override def dropPartition(
+      ident: InternalRow): Boolean = {
+    val partPath = partitionPath(ident)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = partPath.getFileSystem(hadoopConf)
+    if (fs.exists(partPath)) {
+      fs.delete(partPath, true)
+      fileIndex.refresh()
+      syncDropPartitionFromCatalog(ident)
+      true
+    } else {
+      false
+    }
+  }
+
+  override def replacePartitionMetadata(
+      ident: InternalRow,
+      properties: util.Map[String, String]): Unit = {
+    throw new UnsupportedOperationException(
+      "replacePartitionMetadata is not supported " +
+        "for file-based tables")
+  }
+
+  override def loadPartitionMetadata(
+      ident: InternalRow
+  ): util.Map[String, String] = {
+    throw new UnsupportedOperationException(
+      "loadPartitionMetadata is not supported " +
+        "for file-based tables")
+  }
+
+  override def listPartitionIdentifiers(
+      names: Array[String],
+      ident: InternalRow): Array[InternalRow] = {
+    val schema = partitionSchema()
+    if (schema.isEmpty) return Array.empty
+
+    // Merge partitions from catalog (for custom
+    // locations) and file system scan (for partitions
+    // created by data writes).
+    val fromFS = listPartitionsFromFS(schema)
+    val fromCatalog = catalogTable.flatMap { ct =>
+      try {
+        val tz = sparkSession.sessionState.conf
+          .sessionLocalTimeZone
+        val parts = sparkSession.sessionState.catalog
+          .listPartitions(ct.identifier)
+        if (parts.nonEmpty) {
+          Some(parts.map(_.toRow(schema, tz)).toArray)
+        } else {
+          None
+        }
+      } catch {
+        case _: Exception => None
+      }
+    }.getOrElse(Array.empty[InternalRow])
+    // Deduplicate by converting to Set
+    val allPartitions =
+      (fromFS ++ fromCatalog).distinct
+
+    if (names.isEmpty) {
+      allPartitions
+    } else {
+      val indexes = names.map(schema.fieldIndex)
+      val dataTypes = names.map(schema(_).dataType)
+      allPartitions.filter { row =>
+        var matches = true
+        var i = 0
+        while (i < names.length && matches) {
+          val actual = row.get(
+            indexes(i), dataTypes(i))
+          val expected = ident.get(i, dataTypes(i))
+          matches = actual == expected
+          i += 1
+        }
+        matches
+      }
+    }
+  }
+
+  /** List partitions by scanning the file system. */
+  private def listPartitionsFromFS(
+      schema: StructType): Array[InternalRow] = {
+    val basePath = new Path(paths.head)
+    val hadoopConf = sparkSession.sessionState
+      .newHadoopConfWithOptions(
+        options.asCaseSensitiveMap.asScala.toMap)
+    val fs = basePath.getFileSystem(hadoopConf)
+    if (schema.length == 1) {
+      val field = schema.head
+      if (!fs.exists(basePath)) {
+        Array.empty[InternalRow]
+      } else {
+        fs.listStatus(basePath)
+          .filter(_.isDirectory)
+          .map(_.getPath.getName)
+          .filter(_.contains("="))
+          .map { dirName =>
+            val value = dirName.split("=", 2)(1)
+            val converted = Cast(
+              Literal(value),
+              field.dataType).eval()
+            InternalRow(converted)
+          }
+      }
+    } else {
+      fileIndex.refresh()
+      fileIndex match {
+        case idx: PartitioningAwareFileIndex =>
+          idx.partitionSpec().partitions
+            .map(_.values).toArray
+        case _ => Array.empty[InternalRow]
+      }
+    }
+  }
+
+  /** Build the partition directory path from an
+   *  InternalRow of partition values. */
+  private def partitionPath(
+      ident: InternalRow): Path = {
+    val schema = partitionSchema()
+    val basePath = new Path(paths.head)
+    val parts = (0 until schema.length).map { i =>
+      val name = schema(i).name
+      val value = ident.get(i, schema(i).dataType)
+      val valueStr = if (value == null) {
+        "__HIVE_DEFAULT_PARTITION__"
+      } else {
+        value.toString
+      }
+      s"$name=$valueStr"
+    }
+    new Path(basePath, parts.mkString("/"))
+  }
+
+  /** Convert InternalRow partition values to
+   *  TablePartitionSpec (Map[String, String]). */
+  private def toPartitionSpec(
+      ident: InternalRow): Map[String, String] = {
+    val schema = partitionSchema()
+    (0 until schema.length).map { i =>
+      val value = ident.get(i, schema(i).dataType)
+      schema(i).name -> (
+        if (value == null) null
+        else value.toString)
+    }.toMap
+  }
+
+  /** Sync createPartition to catalog metastore. */
+  private def syncCreatePartitionToCatalog(
+      ident: InternalRow,
+      properties: util.Map[String, String]
+  ): Unit = {
+    catalogTable.foreach { ct =>
+      try {
+        val spec = toPartitionSpec(ident)
+        val loc = Option(properties.get("location"))
+          .map(l => new java.net.URI(l))
+        val storage = ct.storage.copy(
+          locationUri = loc)
+        val part =
+          org.apache.spark.sql.catalyst.catalog
+            .CatalogTablePartition(spec, storage)
+        sparkSession.sessionState.catalog
+          .createPartitions(
+            ct.identifier, Seq(part),
+            ignoreIfExists = true)
+      } catch {
+        case _: Exception => // Best-effort sync
+      }
+    }
+  }
+
+  /** Sync dropPartition to catalog metastore. */
+  private def syncDropPartitionFromCatalog(
+      ident: InternalRow): Unit = {
+    catalogTable.foreach { ct =>
+      try {
+        val spec = toPartitionSpec(ident)
+        sparkSession.sessionState.catalog
+          .dropPartitions(
+            ct.identifier, Seq(spec),
+            ignoreIfNotExists = true,
+            purge = false, retainData = true)
+      } catch {
+        case _: Exception => // Best-effort sync
+      }
     }
   }
 }
