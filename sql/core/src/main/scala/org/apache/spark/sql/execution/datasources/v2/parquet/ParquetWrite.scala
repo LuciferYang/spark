@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2.parquet
 import org.apache.hadoop.mapreduce.Job
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.connector.write.LogicalWriteInfo
 import org.apache.spark.sql.execution.datasources.OutputWriterFactory
 import org.apache.spark.sql.execution.datasources.parquet._
@@ -32,6 +33,7 @@ case class ParquetWrite(
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
     partitionSchema: StructType,
+    override val bucketSpec: Option[BucketSpec] = None,
     override val customPartitionLocations: Map[Map[String, String], String] = Map.empty,
     override val dynamicPartitionOverwrite: Boolean,
     override val isTruncate: Boolean) extends FileWrite with Logging {

@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
 import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column, SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
@@ -315,6 +316,7 @@ abstract class FileTable(
   protected def createFileWriteBuilder(
       info: LogicalWriteInfo)(
       buildWrite: (LogicalWriteInfo, StructType,
+        Option[BucketSpec],
         Map[Map[String, String], String],
         Boolean, Boolean) => Write
   ): WriteBuilder = {
@@ -351,9 +353,10 @@ abstract class FileTable(
           } else {
             fromIndex
           }
+        val bSpec = catalogTable.flatMap(_.bucketSpec)
         val customLocs = getCustomPartitionLocations(
           partSchema)
-        buildWrite(merged, partSchema,
+        buildWrite(merged, partSchema, bSpec,
           customLocs, isDynamicOverwrite, isTruncate)
       }
     }

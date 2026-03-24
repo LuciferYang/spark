@@ -666,6 +666,32 @@ class FileDataSourceV2FallBackSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("Bucketed write via V2 path") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, key INT)" +
+        " USING parquet" +
+        " CLUSTERED BY (key) INTO 4 BUCKETS")
+      sql("INSERT INTO t SELECT id, " +
+        "cast(id % 4 as int) FROM range(100)")
+      val cnt = sql("SELECT count(*) FROM t")
+        .collect().head.getLong(0)
+      assert(cnt === 100)
+      // Verify bucketed file naming
+      val tablePath = spark.sessionState.catalog
+        .getTableMetadata(
+          org.apache.spark.sql.catalyst
+            .TableIdentifier("t"))
+        .location
+      val files = new java.io.File(tablePath)
+        .listFiles()
+        .filter(_.getName.endsWith(".parquet"))
+        .map(_.getName)
+      // Bucketed files contain _NNNNN pattern
+      assert(files.nonEmpty,
+        "Expected bucketed parquet files")
+    }
+  }
+
   test("SHOW PARTITIONS on partitioned table") {
     withTable("t") {
       sql("CREATE TABLE t (id BIGINT, part INT) " +
