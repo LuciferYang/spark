@@ -524,8 +524,26 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
     case ShowTableProperties(rt: ResolvedTable, propertyKey, output) =>
       ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey) :: Nil
 
-    case AnalyzeTable(_: ResolvedTable, _, _) | AnalyzeColumn(_: ResolvedTable, _, _) =>
-      throw QueryCompilationErrors.analyzeTableNotSupportedForV2TablesError()
+    case AnalyzeTable(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        partitionSpec, noScan) =>
+      AnalyzeTableExec(
+        catalog, ident, ft,
+        partitionSpec, noScan) :: Nil
+
+    case AnalyzeColumn(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        columnNames, allColumns) =>
+      AnalyzeColumnExec(
+        catalog, ident, ft,
+        columnNames, allColumns) :: Nil
+
+    case AnalyzeTable(_: ResolvedTable, _, _) |
+         AnalyzeColumn(_: ResolvedTable, _, _) =>
+      throw QueryCompilationErrors
+        .analyzeTableNotSupportedForV2TablesError()
 
     case AddPartitions(
         r @ ResolvedTable(_, _, table: SupportsPartitionManagement, _), parts, ignoreIfExists) =>
