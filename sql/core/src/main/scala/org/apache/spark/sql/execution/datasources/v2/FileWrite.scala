@@ -30,7 +30,10 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
-import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, Write}
+import org.apache.spark.sql.connector.distributions.{Distribution, Distributions}
+import org.apache.spark.sql.connector.expressions.{Expressions, SortDirection}
+import org.apache.spark.sql.connector.expressions.{SortOrder => V2SortOrder}
+import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, RequiresDistributionAndOrdering, Write}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources.{BasicWriteJobStatsTracker, DataSource, OutputWriterFactory, WriteJobDescription}
 import org.apache.spark.sql.execution.metric.SQLMetric
@@ -40,7 +43,8 @@ import org.apache.spark.sql.util.SchemaUtils
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
 
-trait FileWrite extends Write {
+trait FileWrite extends Write
+    with RequiresDistributionAndOrdering {
   def paths: Seq[String]
   def formatName: String
   def supportsDataType: DataType => Boolean
@@ -56,6 +60,25 @@ trait FileWrite extends Write {
   val options = info.options()
 
   override def description(): String = formatName
+
+  // RequiresDistributionAndOrdering: sort by partition columns
+  // to ensure DynamicPartitionDataSingleWriter sees each
+  // partition value contiguously (preventing file name
+  // collisions from fileCounter resets).
+  override def requiredDistribution(): Distribution =
+    Distributions.unspecified()
+
+  override def requiredOrdering(): Array[V2SortOrder] = {
+    if (partitionSchema.isEmpty) {
+      Array.empty
+    } else {
+      partitionSchema.fieldNames.map { col =>
+        Expressions.sort(
+          Expressions.column(col),
+          SortDirection.ASCENDING)
+      }
+    }
+  }
 
   override def toBatch: BatchWrite = {
     val sparkSession = SparkSession.active
@@ -91,9 +114,14 @@ trait FileWrite extends Write {
       jobId = jobId,
       outputPath = paths.head,
       dynamicPartitionOverwrite = dynamicPartitionOverwrite)
-    lazy val description =
-      createWriteJobDescription(sparkSession, hadoopConf, job, paths.head, options.asScala.toMap,
-        jobId)
+    // Evaluate description (which calls prepareWrite)
+    // BEFORE setupJob, so that format-specific Job
+    // configuration (e.g., Parquet JOB_SUMMARY_LEVEL)
+    // is set before the OutputCommitter is created.
+    val description =
+      createWriteJobDescription(
+        sparkSession, hadoopConf, job, paths.head,
+        options.asScala.toMap, jobId)
 
     committer.setupJob(job)
     new FileBatchWrite(job, description, committer)
@@ -128,8 +156,14 @@ trait FileWrite extends Write {
     }
     DataSource.validateSchema(formatName, schema, sqlConf)
 
+    // Only validate data column types, not partition columns.
+    // Partition columns may use types unsupported by the format
+    // (e.g., INT in text) since they are written as directory
+    // names, not as data values.
+    val partColNames = partitionSchema.fieldNames.toSet
     schema.foreach { field =>
-      if (!supportsDataType(field.dataType)) {
+      if (!partColNames.contains(field.name) &&
+          !supportsDataType(field.dataType)) {
         throw QueryCompilationErrors.dataTypeUnsupportedByDataSourceError(formatName, field)
       }
     }

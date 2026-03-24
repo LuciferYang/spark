@@ -30,13 +30,14 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, InputFileBlockLeng
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.catalyst.util.TypeUtils._
 import org.apache.spark.sql.classic.SparkSession
 import org.apache.spark.sql.connector.expressions.{FieldReference, RewritableTransform}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.execution.datasources.{CreateTable => CreateTableV1}
-import org.apache.spark.sql.execution.datasources.v2.FileDataSourceV2
+import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Utils, FileDataSourceV2}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.InsertableRelation
 import org.apache.spark.sql.types.{ArrayType, DataType, MapType, MetadataBuilder, StructField, StructType}
@@ -56,32 +57,62 @@ class ResolveSQLOnFile(sparkSession: SparkSession) extends Rule[LogicalPlan] {
       val result = plan match {
         case u: UnresolvedRelation if maybeSQLFile(u) =>
           try {
-            val ds = resolveDataSource(u)
-            Some(LogicalRelation(ds.resolveRelation()))
+            // Try V2 resolution first for file formats
+            // that have a V2 provider.
+            resolveAsV2(u).orElse {
+              val ds = resolveDataSource(u)
+              Some(LogicalRelation(ds.resolveRelation()))
+            }
           } catch {
             case e: SparkUnsupportedOperationException =>
               u.failAnalysis(
                 errorClass = e.getCondition,
-                messageParameters = e.getMessageParameters.asScala.toMap)
+                messageParameters =
+                  e.getMessageParameters.asScala.toMap)
             case _: ClassNotFoundException => None
-            case e: Exception if !e.isInstanceOf[AnalysisException] =>
-              throw QueryCompilationErrors.failedToCreatePlanForDirectQueryError(
-                u.multipartIdentifier.head, e)
+            case e: Exception
+                if !e.isInstanceOf[AnalysisException] =>
+              throw QueryCompilationErrors
+                .failedToCreatePlanForDirectQueryError(
+                  u.multipartIdentifier.head, e)
           }
         case _ =>
           None
       }
       result.foreach(resolvedRelation => plan match {
         case unresolvedRelation: UnresolvedRelation =>
-          // We put the resolved relation into the [[AnalyzerBridgeState]] for
-          // it to be later reused by the single-pass [[Resolver]] to avoid resolving the
-          // relation metadata twice.
-          AnalysisContext.get.getSinglePassResolverBridgeState.foreach { bridgeState =>
-            bridgeState.addUnresolvedRelation(unresolvedRelation, resolvedRelation)
-          }
+          AnalysisContext.get
+            .getSinglePassResolverBridgeState
+            .foreach { bridgeState =>
+              bridgeState.addUnresolvedRelation(
+                unresolvedRelation, resolvedRelation)
+            }
         case _ =>
       })
       result
+    }
+  }
+
+  /**
+   * Try to resolve a SQL-on-file relation as a V2
+   * DataSourceV2Relation. Returns None if V2 resolution
+   * is not available.
+   */
+  private def resolveAsV2(
+      u: UnresolvedRelation): Option[LogicalPlan] = {
+    val ident = u.multipartIdentifier
+    val format = ident.head
+    val path = ident.last
+    DataSource.lookupDataSourceV2(format, conf).flatMap {
+      case p: FileDataSourceV2 =>
+        DataSourceV2Utils.loadV2Source(
+          sparkSession, p,
+          userSpecifiedSchema = None,
+          extraOptions =
+            CaseInsensitiveMap(u.options.asScala.toMap),
+          source = format,
+          path)
+      case _ => None
     }
   }
 
@@ -114,19 +145,32 @@ class ResolveSQLOnFile(sparkSession: SparkSession) extends Rule[LogicalPlan] {
     dataSource
   }
 
-  def apply(plan: LogicalPlan): LogicalPlan = plan resolveOperators {
-    case r @ RelationTimeTravel(u: UnresolvedRelation, timestamp, _)
-        if maybeSQLFile(u) && timestamp.forall(_.resolved) =>
-      // If we successfully look up the data source, then this is a path-based table, so we should
-      // fail to time travel. Otherwise, this is some other catalog table that isn't resolved yet,
-      // so we should leave it be for now.
+  def apply(plan: LogicalPlan)
+      : LogicalPlan = plan resolveOperators {
+    case r @ RelationTimeTravel(
+        u: UnresolvedRelation, timestamp, _)
+        if maybeSQLFile(u) &&
+          timestamp.forall(_.resolved) =>
       try {
         resolveDataSource(u)
-        throw QueryCompilationErrors.timeTravelUnsupportedError(toSQLId(u.multipartIdentifier))
+        throw QueryCompilationErrors
+          .timeTravelUnsupportedError(
+            toSQLId(u.multipartIdentifier))
       } catch {
         case _: ClassNotFoundException => r
       }
-    case UnresolvedRelationResolution(resolvedRelation) =>
+    // INSERT INTO format.`path`: table is not a tree
+    // child of InsertIntoStatement, so resolveOperators
+    // won't match UnresolvedRelation inside it.
+    case i @ InsertIntoStatement(
+        u: UnresolvedRelation, _, _, _, _, _, _, _)
+        if maybeSQLFile(u) =>
+      UnresolvedRelationResolution.unapply(u) match {
+        case Some(resolved) => i.copy(table = resolved)
+        case None => i
+      }
+    case UnresolvedRelationResolution(
+        resolvedRelation) =>
       resolvedRelation
   }
 }
