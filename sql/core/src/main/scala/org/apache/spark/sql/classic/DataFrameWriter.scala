@@ -581,6 +581,14 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
    * Partitioning information is not required when appending data to V2 tables.
    */
   private def checkPartitioningMatchesV2Table(existingTable: Table): Unit = {
+    // Skip check for FileTable: its partitioning() is inferred from existing files on disk
+    // via fileIndex.partitionSchema, which may be empty for new/empty directories. The
+    // actual partitioning is controlled by the writer through getTable(schema, partitioning,
+    // options) and does not need to match the on-disk state.
+    existingTable match {
+      case _: FileTable => return
+      case _ =>
+    }
     val v2Partitions = partitioningAsV2
     if (v2Partitions.isEmpty) return
     require(v2Partitions.sameElements(existingTable.partitioning()),
@@ -602,9 +610,6 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
 
   private def lookupV2Provider(): Option[TableProvider] = {
     DataSource.lookupDataSourceV2(source, df.sparkSession.sessionState.conf) match {
-      case Some(_: FileDataSourceV2)
-          if !df.sparkSession.sessionState.conf.getConf(SQLConf.V2_FILE_WRITE_ENABLED) =>
-        None
       // File source V2 supports Append and Overwrite via the DataFrame API V2 write path.
       // ErrorIfExists and Ignore require SupportsCatalogOptions (catalog integration),
       // so fall back to V1 for these modes.

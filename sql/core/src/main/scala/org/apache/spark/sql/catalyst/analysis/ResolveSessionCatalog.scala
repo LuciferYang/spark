@@ -33,7 +33,7 @@ import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTable => CreateTableV1, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Utils
+import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Utils, FileTable}
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf}
 import org.apache.spark.sql.internal.connector.V1Function
 import org.apache.spark.sql.types.{DataType, MetadataBuilder, StringType, StructField, StructType}
@@ -359,11 +359,27 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
         AnalyzePartitionCommand(ident, partitionSpec, noScan)
       }
 
-    case AnalyzeTables(ResolvedV1Database(db), noScan) =>
-      AnalyzeTablesCommand(Some(db), noScan)
+    // ANALYZE TABLE for V2 FileTable backed by session catalog.
+    // FileTable is a V2 table, so ResolvedV1TableOrViewIdentifier
+    // won't match. Use the catalog metadata to route to V1 command.
+    case AnalyzeTable(
+        ResolvedTable(catalog, ident, ft: FileTable, _), partitionSpec, noScan)
+        if supportsV1Command(catalog) && ft.catalogTable.isDefined =>
+      val tableIdent = ft.catalogTable.get.identifier
+      if (partitionSpec.isEmpty) {
+        AnalyzeTableCommand(tableIdent, noScan)
+      } else {
+        AnalyzePartitionCommand(tableIdent, partitionSpec, noScan)
+      }
 
     case AnalyzeColumn(ResolvedV1TableOrViewIdentifier(ident), columnNames, allColumns) =>
       AnalyzeColumnCommand(ident, columnNames, allColumns)
+
+    // ANALYZE COLUMN for V2 FileTable backed by session catalog.
+    case AnalyzeColumn(
+        ResolvedTable(catalog, ident, ft: FileTable, _), columnNames, allColumns)
+        if supportsV1Command(catalog) && ft.catalogTable.isDefined =>
+      AnalyzeColumnCommand(ft.catalogTable.get.identifier, columnNames, allColumns)
 
     // V2 catalog doesn't support REPAIR TABLE yet, we must use v1 command here.
     case RepairTable(

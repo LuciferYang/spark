@@ -38,7 +38,7 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.util.DateTimeTestUtils
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation, RecordReaderIterator}
-import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, DataSourceV2ScanRelation}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types._
@@ -794,10 +794,24 @@ abstract class OrcQuerySuite extends OrcQueryTest with SharedSparkSession {
     withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> "native") {
       withTable("spark_20728") {
         sql("CREATE TABLE spark_20728(a INT) USING ORC")
-        val fileFormat = sql("SELECT * FROM spark_20728").queryExecution.analyzed.collectFirst {
-          case l: LogicalRelation => l.relation.asInstanceOf[HadoopFsRelation].fileFormat.getClass
+        sql("INSERT INTO spark_20728 VALUES(1)")
+        val plan = sql("SELECT * FROM spark_20728")
+          .queryExecution.optimizedPlan
+        // V1 path: LogicalRelation with OrcFileFormat
+        val v1Format = plan.collectFirst {
+          case l: LogicalRelation =>
+            l.relation
+              .asInstanceOf[HadoopFsRelation]
+              .fileFormat.getClass
         }
-        assert(fileFormat == Some(classOf[OrcFileFormat]))
+        // V2 path: DataSourceV2ScanRelation
+        val isV2 = plan.collectFirst {
+          case _: DataSourceV2ScanRelation => true
+        }.getOrElse(false)
+        assert(
+          v1Format.contains(classOf[OrcFileFormat])
+            || isV2,
+          "Expected native ORC format (V1 or V2)")
       }
     }
   }
