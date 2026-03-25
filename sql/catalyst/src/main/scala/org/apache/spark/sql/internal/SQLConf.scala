@@ -2609,6 +2609,30 @@ object SQLConf {
     .booleanConf
     .createWithDefault(true)
 
+  val PLAN_MERGE_FILTER_PROPAGATION_ENABLED =
+    buildConf("spark.sql.planMerge.filterPropagation.enabled")
+      .internal()
+      .doc(
+        "When set to true different filters can be " +
+        "propagated up to aggregates.")
+      .version("4.1.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val PLAN_MERGE_FILTER_PROPAGATION_MAX_COST =
+    buildConf("spark.sql.planMerge.filterPropagation.maxCost")
+      .internal()
+      .doc(
+        "The maximum allowed additional cost of merging. " +
+        "By setting this value to -1 filter propagation " +
+        "is always allowed.")
+      .version("4.1.0")
+      .doubleConf
+      .checkValue(
+        c => c >= 0 || c == -1,
+        "The maximum allowed cost must not be negative")
+      .createWithDefault(100)
+
   val REMOVE_REDUNDANT_PROJECTS_ENABLED = buildConf("spark.sql.execution.removeRedundantProjects")
     .internal()
     .doc("Whether to remove redundant project exec node based on children's output and " +
