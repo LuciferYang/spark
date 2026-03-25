@@ -2616,6 +2616,7 @@ object SQLConf {
         "When set to true different filters can be " +
         "propagated up to aggregates.")
       .version("4.1.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
       .createWithDefault(true)
 
@@ -2627,6 +2628,7 @@ object SQLConf {
         "By setting this value to -1 filter propagation " +
         "is always allowed.")
       .version("4.1.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .doubleConf
       .checkValue(
         c => c >= 0 || c == -1,
