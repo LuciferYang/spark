@@ -325,13 +325,7 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
     }
 
     val session = df.sparkSession
-    // TODO(SPARK-56175): File source V2 does not support
-    // insertInto for catalog tables yet.
-    val canUseV2 = lookupV2Provider() match {
-      case Some(_: FileDataSourceV2) => false
-      case Some(_) => true
-      case None => false
-    }
+    val canUseV2 = lookupV2Provider().isDefined
 
     session.sessionState.sqlParser.parseMultipartIdentifier(tableName) match {
       case NonSessionCatalogAndIdentifier(catalog, ident) =>
@@ -451,12 +445,7 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
     import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
     val session = df.sparkSession
-    // TODO(SPARK-56230): File source V2 does not support
-    // saveAsTable yet. Always use V1 for file sources.
-    val v2ProviderOpt = lookupV2Provider().flatMap {
-      case _: FileDataSourceV2 => None
-      case other => Some(other)
-    }
+    val v2ProviderOpt = lookupV2Provider()
     val canUseV2 = v2ProviderOpt.isDefined ||
       (hasCustomSessionCatalog &&
         !df.sparkSession.sessionState.catalogManager
@@ -496,6 +485,45 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) extends sql.DataFram
         checkPartitioningMatchesV2Table(table)
         val v2Relation = DataSourceV2Relation.create(table, Some(catalog), Some(ident))
         AppendData.byName(v2Relation, df.logicalPlan, extraOptions.toMap)
+
+      // For file tables, Overwrite on existing table uses
+      // OverwriteByExpression (truncate + append) instead of
+      // ReplaceTableAsSelect (which requires StagingTableCatalog).
+      case (SaveMode.Overwrite, Some(table: FileTable)) =>
+        checkPartitioningMatchesV2Table(table)
+        val v2Relation = DataSourceV2Relation.create(table, Some(catalog), Some(ident))
+        val conf = df.sparkSession.sessionState.conf
+        val dynamicPartitionOverwrite = table.partitioning.length > 0 &&
+          conf.partitionOverwriteMode == PartitionOverwriteMode.DYNAMIC &&
+          partitioningColumns.exists(_.nonEmpty)
+        if (dynamicPartitionOverwrite) {
+          OverwritePartitionsDynamic.byName(
+            v2Relation, df.logicalPlan, extraOptions.toMap)
+        } else {
+          OverwriteByExpression.byName(
+            v2Relation, df.logicalPlan, Literal(true), extraOptions.toMap)
+        }
+
+      // File table Overwrite when table doesn't exist: create it.
+      case (SaveMode.Overwrite, None)
+          if v2ProviderOpt.exists(_.isInstanceOf[FileDataSourceV2]) =>
+        val tableSpec = UnresolvedTableSpec(
+          properties = Map.empty,
+          provider = Some(source),
+          optionExpression = OptionList(Seq.empty),
+          location = extraOptions.get("path"),
+          comment = extraOptions.get(TableCatalog.PROP_COMMENT),
+          collation = extraOptions.get(TableCatalog.PROP_COLLATION),
+          serde = None,
+          external = false,
+          constraints = Seq.empty)
+        CreateTableAsSelect(
+          UnresolvedIdentifier(nameParts),
+          partitioningAsV2,
+          df.queryExecution.analyzed,
+          tableSpec,
+          writeOptions = extraOptions.toMap,
+          ignoreIfExists = false)
 
       case (SaveMode.Overwrite, _) =>
         val tableSpec = UnresolvedTableSpec(
