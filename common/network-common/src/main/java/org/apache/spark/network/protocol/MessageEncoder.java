@@ -22,6 +22,7 @@ import java.util.List;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.FileRegion;
 import io.netty.handler.codec.MessageToMessageEncoder;
 
 import org.apache.spark.internal.LogKeys;
@@ -89,9 +90,19 @@ public final class MessageEncoder extends MessageToMessageEncoder<Message> {
     assert header.writableBytes() == 0;
 
     if (body != null) {
-      // We transfer ownership of the reference on in.body() to MessageWithHeader.
-      // This reference will be freed when MessageWithHeader.deallocate() is called.
-      out.add(new MessageWithHeader(in.body(), header, body, bodyLength));
+      if (body instanceof FileRegion) {
+        // Emit header and FileRegion as separate objects so that native transports
+        // (EPOLL, io_uring) can apply zero-copy sendfile/splice on the FileRegion directly.
+        // When wrapped in MessageWithHeader, native transports fall into a generic
+        // FileRegion.transferTo() fallback that copies data through user-space, bypassing
+        // the optimized sendfile() path.
+        out.add(header);
+        out.add(body);
+      } else {
+        // We transfer ownership of the reference on in.body() to MessageWithHeader.
+        // This reference will be freed when MessageWithHeader.deallocate() is called.
+        out.add(new MessageWithHeader(in.body(), header, body, bodyLength));
+      }
     } else {
       out.add(header);
     }
