@@ -90,9 +90,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
 
   test("within-query reuse: multiple references share one cache entry") {
     prepareData()
-    withSQLConf(
-      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
-      SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED.key -> "false") {
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
       spark.sql(cachableCteSQL).collect()
       assert(spark.sharedState.autoCTECacheManager.numEntries == 1,
         "Two references to the same CTE should share one cache entry")
@@ -101,9 +99,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
 
   test("cross-query CTE reuse via plan normalization") {
     prepareData()
-    withSQLConf(
-      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
-      SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED.key -> "false") {
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
 
       spark.sql(cachableCteSQL).collect()
       assert(spark.sharedState.autoCTECacheManager.numEntries == 1)
@@ -142,19 +138,22 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
   }
 
   test("TTL-based eviction") {
+    import org.apache.spark.sql.execution.AutoCTECacheManager
+    // Create a manager with 1ms TTL directly (these configs are not session-bindable)
+    val shortTtlManager = new AutoCTECacheManager(ttlMs = 1, maxSizeBytes = -1)
     prepareData()
-    withSQLConf(
-      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
-      SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED.key -> "true",
-      SQLConf.AUTO_CTE_CACHE_TTL.key -> "1ms") {
-
-      spark.sql(cachableCteSQL).collect()
-      assert(spark.sharedState.autoCTECacheManager.numEntries > 0)
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Manually track an entry to simulate caching
+      val plan = spark.sql(
+        "SELECT key, sum(value) as total FROM auto_cte_test GROUP BY key")
+        .queryExecution.optimizedPlan
+      shortTtlManager.trackEntry(1L, plan)
+      assert(shortTtlManager.numEntries == 1)
 
       Thread.sleep(10)
-      spark.sharedState.autoCTECacheManager.evictStaleEntries(spark)
+      shortTtlManager.evictStaleEntries(spark)
 
-      assert(spark.sharedState.autoCTECacheManager.numEntries == 0,
+      assert(shortTtlManager.numEntries == 0,
         "Should have evicted expired CTE cache entries")
     }
   }

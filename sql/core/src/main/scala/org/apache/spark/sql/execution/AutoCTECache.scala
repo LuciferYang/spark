@@ -200,20 +200,18 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
  *
  * Guava's `expireAfterAccess` provides idle-timeout semantics: each
  * `get`/`put` resets the TTL clock automatically.
+ *
+ * @param ttlMs  idle timeout in milliseconds (0 = no TTL)
+ * @param maxSizeBytes  maximum total weight in bytes (-1 = unlimited)
  */
-class AutoCTECacheManager extends Logging {
+class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
 
   import com.google.common.cache.{Cache, CacheBuilder, RemovalNotification, Weigher}
 
   // Pending uncache plans from eviction -- processed by evictStaleEntries
   private val pendingUncache = new java.util.concurrent.ConcurrentLinkedQueue[LogicalPlan]()
 
-  @volatile private var cache: Cache[java.lang.Long, AutoCTEEntry] = buildCache(
-    ttlNanos = java.util.concurrent.TimeUnit.HOURS.toNanos(1),
-    maxSizeBytes = -1L)
-
-  private def buildCache(ttlNanos: Long, maxSizeBytes: Long)
-      : Cache[java.lang.Long, AutoCTEEntry] = {
+  private val cache: Cache[java.lang.Long, AutoCTEEntry] = {
     val builder = CacheBuilder.newBuilder()
       .removalListener((notification: RemovalNotification[java.lang.Long, AutoCTEEntry]) => {
         if (notification.wasEvicted()) {
@@ -222,8 +220,8 @@ class AutoCTECacheManager extends Logging {
           logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
         }
       })
-    if (ttlNanos > 0) {
-      builder.expireAfterAccess(ttlNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+    if (ttlMs > 0) {
+      builder.expireAfterAccess(ttlMs, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
     if (maxSizeBytes >= 0) {
       builder
@@ -264,24 +262,10 @@ class AutoCTECacheManager extends Logging {
     }
   }
 
-  /**
-   * Triggers Guava's lazy eviction and uncaches expired entries from CacheManager.
-   *
-   * When `auto.clear.cte.cache.enabled` is false, the cache is rebuilt without
-   * TTL/size limits so entries persist until session end. This prevents Guava's
-   * lazy eviction from unexpectedly removing entries.
-   */
+  /** Triggers Guava's lazy eviction and uncaches expired entries from CacheManager. */
   def evictStaleEntries(spark: SparkSession): Unit = {
-    val conf = spark.sessionState.conf
-    val autoClear = conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)
-    val ttl = if (autoClear) conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL) else 0L
-    val maxSize = if (autoClear) conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE) else -1L
-    rebuildCacheIfNeeded(ttl, maxSize)
-
-    // Trigger Guava's lazy expiration
     cache.cleanUp()
 
-    // Drain pending uncache queue
     var plan = pendingUncache.poll()
     while (plan != null) {
       spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
@@ -289,27 +273,10 @@ class AutoCTECacheManager extends Logging {
     }
   }
 
-  private var currentTtlMs: Long = java.util.concurrent.TimeUnit.HOURS.toMillis(1)
-  private var currentMaxSizeBytes: Long = -1L
-
-  private synchronized def rebuildCacheIfNeeded(
-      newTtlMs: Long, newMaxSizeBytes: Long): Unit = {
-    if (newTtlMs != currentTtlMs || newMaxSizeBytes != currentMaxSizeBytes) {
-      val oldEntries = cache.asMap()
-      cache = buildCache(
-        java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(newTtlMs),
-        newMaxSizeBytes)
-      cache.putAll(oldEntries)
-      currentTtlMs = newTtlMs
-      currentMaxSizeBytes = newMaxSizeBytes
-    }
-  }
-
   def clearAll(spark: SparkSession): Unit = {
     val plans = new java.util.ArrayList[LogicalPlan]()
     cache.asMap().values().forEach(e => plans.add(e.plan))
     cache.invalidateAll()
-    // Also drain anything from pending queue
     var plan = pendingUncache.poll()
     while (plan != null) {
       plans.add(plan)
