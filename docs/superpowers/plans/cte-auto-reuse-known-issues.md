@@ -20,27 +20,26 @@ no more false positives from natural Or filters in CTE bodies.
 
 ---
 
-## Issue 2: Memory Pressure Integration
+## Issue 2: Memory Pressure — Spill Priority for Auto-CTE Blocks
 
-**Status:** Not implemented, deferred
+**Status:** Deferred (acceptable with current behavior)
 
-**Problem:** Currently, auto-cached CTE entries are evicted only by TTL
-(idle timeout) and maxSize (total weight limit). There is no eviction
-triggered by actual memory pressure — if the storage memory pool is
-under pressure (e.g., other cached tables, broadcast variables, shuffle
-data competing for memory), auto-CTE entries are not proactively evicted.
+**Problem:** When storage memory is tight, Spark's `MemoryStore` evicts
+(spills to disk) cached blocks using pure LRU ordering with no priority
+distinction. Auto-CTE blocks — which are opportunistic optimizations —
+compete equally with higher-priority data (explicit `CACHE TABLE`,
+broadcast tables). Ideally, auto-CTE blocks should spill first.
 
-**Impact:** With the default `maxSize=-1` (unlimited) and `MEMORY_AND_DISK`
-storage level, cached CTE data spills to disk under memory pressure rather
-than being evicted. This is handled by Spark's storage system and does not
-cause OOM, but disk spilling degrades performance.
+**Current behavior:** With `MEMORY_AND_DISK` storage level, auto-CTE
+blocks spill to disk automatically under memory pressure. The data
+remains accessible (just slower). On high-speed disks, this is acceptable.
+No OOM risk.
 
-**Fix:** Register an eviction callback with `UnifiedMemoryManager` that
-triggers `AutoCTECacheManager` eviction (e.g., invalidate LRU entries)
-when storage memory exceeds a configurable threshold. This requires changes
-to `MemoryManager` in Spark's core module to support eviction callbacks —
-a significant scope expansion beyond the CTE caching feature.
+**Ideal fix:** Priority-based eviction in `MemoryStore.evictBlocksToFreeSpace()`
+so auto-CTE blocks (lower priority) spill before user-requested caches
+(higher priority). This requires changes to Spark's core storage module
+(`MemoryStore`, `BlockManager`) to support eviction priorities — out of
+scope for this feature.
 
-**Workaround:** Users can set `spark.sql.auto.cte.cache.maxSize` to a
-reasonable value (e.g., `2g`) to cap total cache size and prevent
-excessive memory/disk usage.
+**Workaround:** Users can set `spark.sql.auto.cte.cache.maxSize` to cap
+total auto-CTE cache size and reduce pressure on the storage memory pool.
