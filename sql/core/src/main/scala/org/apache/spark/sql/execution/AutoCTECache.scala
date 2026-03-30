@@ -104,12 +104,13 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       cteMap: mutable.HashMap[Long, LogicalPlan]): LogicalPlan = plan match {
 
     case WithCTE(child, cteDefs) =>
+      val skippedDefs = mutable.ArrayBuffer.empty[CTERelationDef]
       cteDefs.foreach { cteDef =>
         val resolvedChild = replaceWithCache(spark, cteDef.child, cteMap)
 
         if (!shouldAutoCache(cteDef)) {
-          // Skip caching — use the resolved plan directly
-          cteMap.put(cteDef.id, resolvedChild)
+          // Leave for ReplaceCTERefWithRepartition to handle (preserves shuffle reuse)
+          skippedDefs += cteDef.copy(child = resolvedChild)
         } else {
           // Check if this CTE plan is already cached (cross-query reuse)
           val cacheManager = spark.sharedState.cacheManager
@@ -117,7 +118,9 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           val cachedPlan = cacheManager
             .lookupCachedData(spark, resolvedChild)
             .map { cached =>
-              autoCTEManager.recordAccess(cteDef.id)
+              // Use plan-based access recording for cross-query reuse,
+              // since the new query has different CTE IDs
+              autoCTEManager.recordAccessByPlan(spark, resolvedChild)
               cached.cachedRepresentation.withOutput(resolvedChild.output)
             }
             .getOrElse {
@@ -138,9 +141,18 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           cteMap.put(cteDef.id, cachedPlan)
         }
       }
-      replaceWithCache(spark, child, cteMap)
+      val newChild = replaceWithCache(spark, child, cteMap)
+      // Rebuild WithCTE if any CTEs were skipped, so ReplaceCTERefWithRepartition
+      // can handle them with proper shuffle reuse
+      if (skippedDefs.nonEmpty) {
+        WithCTE(newChild, skippedDefs.toSeq)
+      } else {
+        newChild
+      }
 
-    case ref: CTERelationRef =>
+    case ref: CTERelationRef if cteMap.contains(ref.cteId) =>
+      // Only replace refs for CTEs that were cached; leave others for
+      // ReplaceCTERefWithRepartition
       val ctePlan = cteMap(ref.cteId)
       if (ref.outputSet == ctePlan.outputSet) {
         ctePlan
@@ -178,7 +190,7 @@ class AutoCTECacheManager extends Logging {
 
   private val entries = mutable.LinkedHashMap.empty[Long, AutoCTEEntry]
 
-  def trackEntry(cteId: Long, plan: LogicalPlan): Unit = {
+  def trackEntry(cteId: Long, plan: LogicalPlan): Unit = synchronized {
     entries(cteId) = AutoCTEEntry(
       cteId = cteId,
       plan = plan,
@@ -187,13 +199,26 @@ class AutoCTECacheManager extends Logging {
       lastAccessedAt = System.currentTimeMillis())
   }
 
-  def recordAccess(cteId: Long): Unit = {
+  def recordAccess(cteId: Long): Unit = synchronized {
     entries.get(cteId).foreach { entry =>
       entries(cteId) = entry.copy(lastAccessedAt = System.currentTimeMillis())
     }
   }
 
-  def evictIfNeeded(spark: SparkSession): Unit = {
+  /**
+   * Records access by plan matching (for cross-query reuse where the new query
+   * has different CTE IDs than the original cached entry).
+   */
+  def recordAccessByPlan(spark: SparkSession, plan: LogicalPlan): Unit = synchronized {
+    val normalized = QueryExecution.normalize(spark, plan)
+    entries.find { case (_, entry) =>
+      QueryExecution.normalize(spark, entry.plan).sameResult(normalized)
+    }.foreach { case (id, entry) =>
+      entries(id) = entry.copy(lastAccessedAt = System.currentTimeMillis())
+    }
+  }
+
+  def evictIfNeeded(spark: SparkSession): Unit = synchronized {
     val conf = spark.sessionState.conf
     if (!conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
 
@@ -235,20 +260,24 @@ class AutoCTECacheManager extends Logging {
     }
   }
 
+  // Called within synchronized context only
   private def evictEntry(spark: SparkSession, cteId: Long): Unit = {
     entries.get(cteId).foreach { entry =>
-      spark.sharedState.cacheManager.uncacheTableOrView(
-        spark, Seq(entry.tableName), cascade = false)
+      spark.sharedState.cacheManager.uncacheQuery(
+        spark, entry.plan, cascade = false)
       entries.remove(cteId)
       logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
     }
   }
 
-  def clearAll(spark: SparkSession): Unit = {
+  def clearAll(spark: SparkSession): Unit = synchronized {
     entries.keys.toSeq.foreach(id => evictEntry(spark, id))
   }
 
-  def numEntries: Int = entries.size
+  def numEntries: Int = synchronized { entries.size }
+
+  /** Visible for testing. */
+  private[sql] def entryIds: Seq[Long] = synchronized { entries.keys.toSeq }
 }
 
 case class AutoCTEEntry(
