@@ -601,6 +601,15 @@ private[storage] class BlockInfoManager(trackingCacheVisibility: Boolean = false
     getBlockIdsFromMapping(sessionToBlockIds, sessionUUID)
 
   /**
+   * Returns the eviction priority for the given block. Lower values are evicted first.
+   * Returns 0 if the block is not found.
+   */
+  private[storage] def getEvictionPriority(blockId: BlockId): Int = {
+    val wrapper = blockInfoWrappers.get(blockId)
+    if (wrapper != null) wrapper.info.level.evictionPriority else 0
+  }
+
+  /**
    * Removes the given block and releases the write lock on it.
    *
    * This can only be called while holding a write lock on the given block.
