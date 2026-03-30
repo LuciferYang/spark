@@ -63,17 +63,11 @@ as InMemoryRelation on first execution. Subsequent references (within or across
 queries) read from cache.
 
 ```
-spark.sql.auto.clear.cte.cache.enabled (boolean, default true)
-```
-When true, enables automatic TTL-based eviction of auto-cached CTE entries.
-When false, CTE caches persist until session ends or explicit `UNCACHE TABLE`.
-
-```
 spark.sql.auto.cte.cache.ttl (duration, default 1h)
 ```
 Time-to-live for CTE cache entries since last access. Entries not accessed
-within this duration are evicted. Only effective when
-`auto.clear.cte.cache.enabled = true`. Set to 0 for no TTL-based eviction.
+within this duration are evicted. Set to 0 to disable eviction (entries
+persist until session ends).
 
 ```
 spark.sql.auto.cte.cache.maxSize (bytes, default -1 / unlimited)

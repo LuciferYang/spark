@@ -5634,25 +5634,13 @@ object SQLConf {
       .booleanConf
       .createWithDefault(false)
 
-  val AUTO_CLEAR_CTE_CACHE_ENABLED =
-    buildConf("spark.sql.auto.clear.cte.cache.enabled")
-      .doc(
-        "When true, automatically evicts auto-cached CTE entries based on " +
-        "TTL. When false, auto-cached CTEs persist until the session ends " +
-        "or explicit UNCACHE. Only effective when " +
-        "spark.sql.auto.reused.cte.enabled is true.")
-      .version("4.2.0")
-      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
-      .booleanConf
-      .createWithDefault(true)
-
   val AUTO_CTE_CACHE_TTL =
     buildConf("spark.sql.auto.cte.cache.ttl")
       .doc(
         "Time-to-live for auto-cached CTE entries since last access. " +
-        "Entries not accessed within this duration are eligible for " +
-        "eviction. Only effective when auto.clear.cte.cache.enabled is " +
-        "true. Set to 0 for no TTL-based eviction.")
+        "Entries not accessed within this duration are evicted. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to 0 to disable eviction (entries persist until session ends).")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
       .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
@@ -5662,8 +5650,9 @@ object SQLConf {
     buildConf("spark.sql.auto.cte.cache.maxSize")
       .doc(
         "Maximum total memory for auto-cached CTE entries. LRU eviction " +
-        "when exceeded. Only effective when auto.clear.cte.cache.enabled " +
-        "is true. Set to -1 for unlimited.")
+        "when exceeded. Only effective when " +
+        "spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to -1 for unlimited.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
       .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)

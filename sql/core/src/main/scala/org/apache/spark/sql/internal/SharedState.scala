@@ -103,10 +103,9 @@ private[sql] class SharedState(
   val autoCTECacheManager: AutoCTECacheManager = {
     val sqlConf = new SQLConf()
     conf.getAll.foreach { case (k, v) => sqlConf.setConfString(k, v) }
-    val autoClear = sqlConf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)
-    val ttlMs = if (autoClear) sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_TTL) else 0L
-    val maxSize = if (autoClear) sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE) else -1L
-    new AutoCTECacheManager(ttlMs, maxSize)
+    new AutoCTECacheManager(
+      ttlMs = sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_TTL),
+      maxSizeBytes = sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE))
   }
 
   /**
