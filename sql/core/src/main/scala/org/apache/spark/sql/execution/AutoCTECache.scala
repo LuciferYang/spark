@@ -259,20 +259,19 @@ class AutoCTECacheManager extends Logging {
         }.keys
       }
 
-      // Size-based LRU eviction
+      // Size-based LRU eviction (exclude TTL-evicted entries from size computation)
       val maxSize = conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
       if (maxSize >= 0) {
         val cacheManager = spark.sharedState.cacheManager
-        var totalSize = entries.values.map { entry =>
+        val remaining = entries.toSeq.filterNot(e => evictIds.contains(e._1))
+        var totalSize = remaining.map { case (_, entry) =>
           cacheManager.lookupCachedData(spark, entry.plan)
             .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
             .getOrElse(0L)
         }.sum
 
         if (totalSize > maxSize) {
-          val sortedByAccess = entries.toSeq
-            .filterNot(e => evictIds.contains(e._1)) // skip already-marked
-            .sortBy(_._2.lastAccessedAt)
+          val sortedByAccess = remaining.sortBy(_._2.lastAccessedAt)
           for ((id, entry) <- sortedByAccess if totalSize > maxSize) {
             val entrySize = cacheManager.lookupCachedData(spark, entry.plan)
               .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
