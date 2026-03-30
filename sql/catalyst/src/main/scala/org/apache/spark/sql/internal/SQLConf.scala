@@ -5658,6 +5658,17 @@ object SQLConf {
       .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
       .createWithDefaultString("1h")
 
+  val AUTO_CTE_CACHE_MAX_SIZE =
+    buildConf("spark.sql.auto.cte.cache.maxSize")
+      .doc(
+        "Maximum total memory for auto-cached CTE entries. LRU eviction " +
+        "when exceeded. Only effective when auto.clear.cte.cache.enabled " +
+        "is true. Set to -1 for unlimited.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("-1")
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +

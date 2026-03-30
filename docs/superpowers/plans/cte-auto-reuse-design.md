@@ -75,7 +75,12 @@ Time-to-live for CTE cache entries since last access. Entries not accessed
 within this duration are evicted. Only effective when
 `auto.clear.cte.cache.enabled = true`. Set to 0 for no TTL-based eviction.
 
-Future phases may add size-based LRU eviction.
+```
+spark.sql.auto.cte.cache.maxSize (bytes, default -1 / unlimited)
+```
+Maximum total size for auto-cached CTE entries. LRU eviction when exceeded.
+Set to -1 for unlimited (default). Since the storage level is MEMORY_AND_DISK,
+the cache spills to disk when memory is full, so unlimited is safe.
 
 ### Component 1: CTE Auto-Materialization
 
