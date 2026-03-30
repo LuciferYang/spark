@@ -129,7 +129,7 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
                 spark,
                 resolvedChild,
                 tableName = Some(s"auto_cte_${cteDef.id}"),
-                StorageLevel.MEMORY_AND_DISK)
+                StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
               autoCTEManager.trackEntry(cteDef.id, resolvedChild)
               cacheManager.lookupCachedData(spark, resolvedChild)
                 .map(_.cachedRepresentation.withOutput(resolvedChild.output))
