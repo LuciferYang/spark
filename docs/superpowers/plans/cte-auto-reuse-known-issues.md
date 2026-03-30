@@ -22,24 +22,16 @@ no more false positives from natural Or filters in CTE bodies.
 
 ## Issue 2: Memory Pressure — Spill Priority for Auto-CTE Blocks
 
-**Status:** Deferred (acceptable with current behavior)
+**Status:** Resolved
 
-**Problem:** When storage memory is tight, Spark's `MemoryStore` evicts
-(spills to disk) cached blocks using pure LRU ordering with no priority
-distinction. Auto-CTE blocks — which are opportunistic optimizations —
-compete equally with higher-priority data (explicit `CACHE TABLE`,
-broadcast tables). Ideally, auto-CTE blocks should spill first.
+**Solution:** Added `evictionPriority` field to `StorageLevel` (lower =
+evict first, default 0). `MemoryStore.evictBlocksToFreeSpace` now sorts
+eviction candidates by priority before LRU order. Auto-CTE caching uses
+`MEMORY_AND_DISK.withEvictionPriority(-1)`, so its blocks spill to disk
+before user-requested caches (priority 0) when memory is tight.
 
-**Current behavior:** With `MEMORY_AND_DISK` storage level, auto-CTE
-blocks spill to disk automatically under memory pressure. The data
-remains accessible (just slower). On high-speed disks, this is acceptable.
-No OOM risk.
-
-**Ideal fix:** Priority-based eviction in `MemoryStore.evictBlocksToFreeSpace()`
-so auto-CTE blocks (lower priority) spill before user-requested caches
-(higher priority). This requires changes to Spark's core storage module
-(`MemoryStore`, `BlockManager`) to support eviction priorities — out of
-scope for this feature.
-
-**Workaround:** Users can set `spark.sql.auto.cte.cache.maxSize` to cap
-total auto-CTE cache size and reduce pressure on the storage memory pool.
+**Implementation:**
+- `StorageLevel`: new `evictionPriority` field + `withEvictionPriority()` method
+- `MemoryStore`: two-phase eviction (collect candidates, stable-sort by priority)
+- `BlockInfoManager`: `getEvictionPriority()` to read priority from `BlockInfo`
+- `AutoCTECache`: uses `StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1)`

@@ -103,6 +103,12 @@ AutoCTECacheManager(ttlMs, maxSizeBytes)
 created by auto-CTE caching, so TTL/size eviction doesn't affect entries
 from explicit `CACHE TABLE`.
 
+**Eviction priority**: Auto-CTE blocks are cached with
+`StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1)`. When storage
+memory is tight, `MemoryStore` spills lower-priority blocks first —
+auto-CTE entries (priority -1) yield before user-requested caches
+(default priority 0).
+
 **Access tracking**: On cache hit, `recordAccessByPlan` refreshes Guava's
 access time via `getIfPresent`. Uses reference equality (O(1) fast path for
 within-query hits), falling back to `sameResult` (for cross-query hits).
