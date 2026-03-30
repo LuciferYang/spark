@@ -53,7 +53,48 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       case _: Subquery => plan
       case _ =>
         val spark = SparkSession.active
+        // Evict stale/oversized auto-CTE cache entries before processing new CTEs
+        spark.sharedState.autoCTECacheManager.evictIfNeeded(spark)
         replaceWithCache(spark, plan, mutable.HashMap.empty)
+    }
+  }
+
+  /**
+   * Checks whether a CTE definition should be auto-cached based on heuristics.
+   * Returns false if caching would likely cause regressions (e.g., blocking
+   * predicate pushdown) or if the CTE is too cheap to benefit from caching.
+   */
+  private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
+    !hasDivergentPredicates(cteDef) && isExpensiveEnough(cteDef.child)
+  }
+
+  /**
+   * Checks if different CTE references apply substantially different filter
+   * predicates. If yes, caching blocks predicate pushdown and causes regressions.
+   */
+  private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
+    cteDef.originalPlanWithPredicates match {
+      case Some((_, predicates)) if predicates.nonEmpty =>
+        // If predicates were pushed down, the original plan had filters that
+        // differ across references — caching would prevent this optimization
+        val distinctPredicates = predicates.map(_.semanticHash()).distinct
+        distinctPredicates.size > 1
+      case _ => false
+    }
+  }
+
+  /**
+   * Returns true if the CTE plan contains at least one expensive operator
+   * (Join, Aggregate, Sort, Window). Simple scan-only CTEs are cheap to
+   * recompute and caching them wastes memory.
+   */
+  private def isExpensiveEnough(plan: LogicalPlan): Boolean = {
+    plan.exists {
+      case _: Join => true
+      case _: Aggregate => true
+      case _: Sort => true
+      case _: Window => true
+      case _ => false
     }
   }
 
@@ -66,28 +107,36 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       cteDefs.foreach { cteDef =>
         val resolvedChild = replaceWithCache(spark, cteDef.child, cteMap)
 
-        // Check if this CTE plan is already cached (cross-query reuse)
-        val cacheManager = spark.sharedState.cacheManager
-        val cachedPlan = cacheManager
-          .lookupCachedData(spark, resolvedChild)
-          .map(_.cachedRepresentation.withOutput(resolvedChild.output))
-          .getOrElse {
-            // Cache the CTE definition
-            cacheManager.cacheQuery(
-              spark,
-              resolvedChild,
-              tableName = Some(s"auto_cte_${cteDef.id}"),
-              StorageLevel.MEMORY_AND_DISK)
-            // Track for lifecycle management
-            spark.sharedState.autoCTECacheManager
-              .trackEntry(cteDef.id, resolvedChild)
-            // Retrieve the cached representation
-            cacheManager.lookupCachedData(spark, resolvedChild)
-              .map(_.cachedRepresentation.withOutput(resolvedChild.output))
-              .getOrElse(resolvedChild)
-          }
+        if (!shouldAutoCache(cteDef)) {
+          // Skip caching — use the resolved plan directly
+          cteMap.put(cteDef.id, resolvedChild)
+        } else {
+          // Check if this CTE plan is already cached (cross-query reuse)
+          val cacheManager = spark.sharedState.cacheManager
+          val autoCTEManager = spark.sharedState.autoCTECacheManager
+          val cachedPlan = cacheManager
+            .lookupCachedData(spark, resolvedChild)
+            .map { cached =>
+              autoCTEManager.recordAccess(cteDef.id)
+              cached.cachedRepresentation.withOutput(resolvedChild.output)
+            }
+            .getOrElse {
+              // Cache the CTE definition
+              cacheManager.cacheQuery(
+                spark,
+                resolvedChild,
+                tableName = Some(s"auto_cte_${cteDef.id}"),
+                StorageLevel.MEMORY_AND_DISK)
+              // Track for lifecycle management
+              autoCTEManager.trackEntry(cteDef.id, resolvedChild)
+              // Retrieve the cached representation
+              cacheManager.lookupCachedData(spark, resolvedChild)
+                .map(_.cachedRepresentation.withOutput(resolvedChild.output))
+                .getOrElse(resolvedChild)
+            }
 
-        cteMap.put(cteDef.id, cachedPlan)
+          cteMap.put(cteDef.id, cachedPlan)
+        }
       }
       replaceWithCache(spark, child, cteMap)
 
@@ -132,9 +181,16 @@ class AutoCTECacheManager extends Logging {
   def trackEntry(cteId: Long, plan: LogicalPlan): Unit = {
     entries(cteId) = AutoCTEEntry(
       cteId = cteId,
+      plan = plan,
       tableName = s"auto_cte_$cteId",
       createdAt = System.currentTimeMillis(),
       lastAccessedAt = System.currentTimeMillis())
+  }
+
+  def recordAccess(cteId: Long): Unit = {
+    entries.get(cteId).foreach { entry =>
+      entries(cteId) = entry.copy(lastAccessedAt = System.currentTimeMillis())
+    }
   }
 
   def evictIfNeeded(spark: SparkSession): Unit = {
@@ -144,12 +200,37 @@ class AutoCTECacheManager extends Logging {
     val now = System.currentTimeMillis()
     val ttl = conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
 
+    // TTL-based eviction
     if (ttl > 0) {
       val expired = entries.filter { case (_, e) =>
         now - e.lastAccessedAt > ttl
       }.keys.toSeq
       expired.foreach { id =>
         evictEntry(spark, id)
+      }
+    }
+
+    // Size-based LRU eviction
+    val maxSize = conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
+    if (maxSize >= 0) {
+      val cacheManager = spark.sharedState.cacheManager
+      var totalSize = entries.values.map { entry =>
+        cacheManager.lookupCachedData(spark, entry.plan)
+          .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
+          .getOrElse(0L)
+      }.sum
+
+      if (totalSize > maxSize) {
+        // Evict LRU entries (LinkedHashMap iterates in insertion order;
+        // sort by lastAccessedAt to get true LRU)
+        val sortedByAccess = entries.toSeq.sortBy(_._2.lastAccessedAt)
+        for ((id, entry) <- sortedByAccess if totalSize > maxSize) {
+          val entrySize = cacheManager.lookupCachedData(spark, entry.plan)
+            .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
+            .getOrElse(0L)
+          evictEntry(spark, id)
+          totalSize -= entrySize
+        }
       }
     }
   }
@@ -172,6 +253,7 @@ class AutoCTECacheManager extends Logging {
 
 case class AutoCTEEntry(
     cteId: Long,
+    plan: LogicalPlan,
     tableName: String,
     createdAt: Long,
     lastAccessedAt: Long)
