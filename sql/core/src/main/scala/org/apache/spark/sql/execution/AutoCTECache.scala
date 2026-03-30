@@ -264,13 +264,18 @@ class AutoCTECacheManager extends Logging {
     }
   }
 
-  /** Triggers Guava's lazy eviction and uncaches expired entries from CacheManager. */
+  /**
+   * Triggers Guava's lazy eviction and uncaches expired entries from CacheManager.
+   *
+   * When `auto.clear.cte.cache.enabled` is false, the cache is rebuilt without
+   * TTL/size limits so entries persist until session end. This prevents Guava's
+   * lazy eviction from unexpectedly removing entries.
+   */
   def evictStaleEntries(spark: SparkSession): Unit = {
-    if (!spark.sessionState.conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
-
-    // Rebuild cache if config changed
-    val ttl = spark.sessionState.conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
-    val maxSize = spark.sessionState.conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
+    val conf = spark.sessionState.conf
+    val autoClear = conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)
+    val ttl = if (autoClear) conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL) else 0L
+    val maxSize = if (autoClear) conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE) else -1L
     rebuildCacheIfNeeded(ttl, maxSize)
 
     // Trigger Guava's lazy expiration
@@ -287,7 +292,8 @@ class AutoCTECacheManager extends Logging {
   private var currentTtlMs: Long = java.util.concurrent.TimeUnit.HOURS.toMillis(1)
   private var currentMaxSizeBytes: Long = -1L
 
-  private def rebuildCacheIfNeeded(newTtlMs: Long, newMaxSizeBytes: Long): Unit = {
+  private synchronized def rebuildCacheIfNeeded(
+      newTtlMs: Long, newMaxSizeBytes: Long): Unit = {
     if (newTtlMs != currentTtlMs || newMaxSizeBytes != currentMaxSizeBytes) {
       val oldEntries = cache.asMap()
       cache = buildCache(
