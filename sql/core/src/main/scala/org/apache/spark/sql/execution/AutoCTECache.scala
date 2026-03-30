@@ -208,7 +208,7 @@ class AutoCTECacheManager extends Logging {
   // Pending uncache plans from eviction -- processed by evictStaleEntries
   private val pendingUncache = new java.util.concurrent.ConcurrentLinkedQueue[LogicalPlan]()
 
-  private var cache: Cache[java.lang.Long, AutoCTEEntry] = buildCache(
+  @volatile private var cache: Cache[java.lang.Long, AutoCTEEntry] = buildCache(
     ttlNanos = java.util.concurrent.TimeUnit.HOURS.toNanos(1),
     maxSizeBytes = -1L)
 
@@ -230,8 +230,13 @@ class AutoCTECacheManager extends Logging {
         .maximumWeight(maxSizeBytes)
         .weigher(new Weigher[java.lang.Long, AutoCTEEntry] {
           override def weigh(key: java.lang.Long, value: AutoCTEEntry): Int = {
-            // Use stats estimate; actual materialized size may differ
-            math.min(value.plan.stats.sizeInBytes.toLong, Int.MaxValue).toInt
+            // Use stats estimate; actual materialized size may differ.
+            // Fallback to 1 if stats computation fails.
+            try {
+              math.min(value.plan.stats.sizeInBytes.toLong, Int.MaxValue).toInt
+            } catch {
+              case _: Exception => 1
+            }
           }
         })
     }
