@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
-import org.apache.spark.sql.catalyst.expressions.{Alias, Or, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, Or, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -77,6 +77,10 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * plan directly. After `PushdownPredicatesAndPruneColumnsForCTEDef`, divergent
    * predicates are combined as `Filter(Or(pred1, pred2), ...)` in the CTE child.
    * If the Or children are semantically different, the predicates are divergent.
+   *
+   * Known limitation: if the CTE body itself starts with a Filter(Or(...), ...)
+   * (not from pushdown), this may produce a false positive. In practice this is
+   * rare and the fallback to repartition-based reuse is safe.
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
     cteDef.child match {
@@ -96,9 +100,7 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * Flattens a nested Or tree into its leaf predicates.
    * e.g., Or(Or(a, b), c) => Seq(a, b, c)
    */
-  private def collectOrBranches(
-      expr: org.apache.spark.sql.catalyst.expressions.Expression)
-      : Seq[org.apache.spark.sql.catalyst.expressions.Expression] = expr match {
+  private def collectOrBranches(expr: Expression): Seq[Expression] = expr match {
     case Or(left, right) => collectOrBranches(left) ++ collectOrBranches(right)
     case other => Seq(other)
   }
