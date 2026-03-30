@@ -150,23 +150,43 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
 }
 
 /**
- * Tracks auto-cached CTE entries for TTL-based eviction.
+ * Tracks auto-cached CTE entries for TTL-based eviction using Guava Cache.
  *
  * This is a lightweight companion to [[CacheManager]]. CacheManager stores
  * the actual cached data; this class only tracks which entries were created
  * by auto-CTE caching so they can be evicted by TTL without affecting
  * entries created by explicit `CACHE TABLE`.
+ *
+ * Guava's `expireAfterAccess` provides idle-timeout semantics: each
+ * `get`/`put` resets the TTL clock automatically.
  */
 class AutoCTECacheManager extends Logging {
 
-  private val entries = mutable.LinkedHashMap.empty[Long, AutoCTEEntry]
+  import com.google.common.cache.{Cache, CacheBuilder, RemovalNotification}
 
-  def trackEntry(cteId: Long, plan: LogicalPlan): Unit = synchronized {
-    val now = System.currentTimeMillis()
-    entries(cteId) = AutoCTEEntry(
-      plan = plan,
-      tableName = s"auto_cte_$cteId",
-      lastAccessedAt = now)
+  // Pending uncache plans from eviction -- processed by evictStaleEntries
+  private val pendingUncache = new java.util.concurrent.ConcurrentLinkedQueue[LogicalPlan]()
+
+  private var cache: Cache[java.lang.Long, AutoCTEEntry] = buildCache(
+    java.util.concurrent.TimeUnit.HOURS.toNanos(1))
+
+  private def buildCache(ttlNanos: Long): Cache[java.lang.Long, AutoCTEEntry] = {
+    val builder = CacheBuilder.newBuilder()
+      .removalListener((notification: RemovalNotification[java.lang.Long, AutoCTEEntry]) => {
+        if (notification.wasEvicted()) {
+          val entry = notification.getValue
+          pendingUncache.add(entry.plan)
+          logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
+        }
+      })
+    if (ttlNanos > 0) {
+      builder.expireAfterAccess(ttlNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+    }
+    builder.build()
+  }
+
+  def trackEntry(cteId: Long, plan: LogicalPlan): Unit = {
+    cache.put(cteId, AutoCTEEntry(plan = plan, tableName = s"auto_cte_$cteId"))
   }
 
   /**
@@ -174,51 +194,67 @@ class AutoCTECacheManager extends Logging {
    * Uses reference equality first (fast path for within-query hits),
    * then falls back to sameResult (for cross-query hits).
    */
-  def recordAccessByPlan(plan: LogicalPlan): Unit = synchronized {
-    val now = System.currentTimeMillis()
-    val matched = entries.find(_._2.plan eq plan)
-      .orElse(entries.find(_._2.plan.sameResult(plan)))
-    matched.foreach { case (id, entry) =>
-      entries(id) = entry.copy(lastAccessedAt = now)
+  def recordAccessByPlan(plan: LogicalPlan): Unit = {
+    val it = cache.asMap().entrySet().iterator()
+    while (it.hasNext) {
+      val e = it.next()
+      if ((e.getValue.plan eq plan) || e.getValue.plan.sameResult(plan)) {
+        // getIfPresent refreshes the access time for expireAfterAccess
+        cache.getIfPresent(e.getKey)
+        return
+      }
     }
   }
 
-  /** Evicts entries not accessed within the configured TTL. */
+  /** Triggers Guava's lazy eviction and uncaches expired entries from CacheManager. */
   def evictStaleEntries(spark: SparkSession): Unit = {
     if (!spark.sessionState.conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
 
+    // Rebuild cache if TTL config changed
     val ttl = spark.sessionState.conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
-    if (ttl <= 0) return
+    rebuildCacheIfNeeded(ttl)
 
-    val now = System.currentTimeMillis()
-    val toEvict = synchronized {
-      val expiredIds = entries.collect {
-        case (id, e) if now - e.lastAccessedAt > ttl => id
-      }.toSeq
-      expiredIds.flatMap(id => entries.remove(id))
+    // Trigger Guava's lazy expiration
+    cache.cleanUp()
+
+    // Drain pending uncache queue
+    var plan = pendingUncache.poll()
+    while (plan != null) {
+      spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
+      plan = pendingUncache.poll()
     }
-    toEvict.foreach { entry =>
-      spark.sharedState.cacheManager.uncacheQuery(
-        spark, entry.plan, cascade = false)
-      logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
+  }
+
+  private var currentTtlMs: Long = java.util.concurrent.TimeUnit.HOURS.toMillis(1)
+
+  private def rebuildCacheIfNeeded(newTtlMs: Long): Unit = {
+    if (newTtlMs != currentTtlMs) {
+      // Migrate existing entries to a new cache with updated TTL
+      val oldEntries = cache.asMap()
+      cache = buildCache(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(newTtlMs))
+      cache.putAll(oldEntries)
+      currentTtlMs = newTtlMs
     }
   }
 
   def clearAll(spark: SparkSession): Unit = {
-    val plans = synchronized {
-      val result = entries.values.map(_.plan).toSeq
-      entries.clear()
-      result
+    val plans = new java.util.ArrayList[LogicalPlan]()
+    cache.asMap().values().forEach(e => plans.add(e.plan))
+    cache.invalidateAll()
+    // Also drain anything from pending queue
+    var plan = pendingUncache.poll()
+    while (plan != null) {
+      plans.add(plan)
+      plan = pendingUncache.poll()
     }
-    plans.foreach { plan =>
-      spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
+    plans.forEach { p =>
+      spark.sharedState.cacheManager.uncacheQuery(spark, p, cascade = false)
     }
   }
 
-  def numEntries: Int = synchronized { entries.size }
+  def numEntries: Int = cache.asMap().size()
 }
 
 private[sql] case class AutoCTEEntry(
     plan: LogicalPlan,
-    tableName: String,
-    lastAccessedAt: Long)
+    tableName: String)
