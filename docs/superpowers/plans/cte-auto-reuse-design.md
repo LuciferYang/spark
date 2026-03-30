@@ -68,14 +68,12 @@ shouldAutoCache(cteDef) =
 - **`isExpensiveEnough`**: CTE plan must contain at least one Join, Aggregate,
   Sort, or Window. Scan-only CTEs are cheap to recompute.
 
-- **`hasDivergentPredicates`**: After `PushdownPredicatesAndPruneColumnsForCTEDef`
-  runs, divergent predicates from different CTE references are combined as
-  `Filter(Or(pred1, pred2), ...)` in the CTE child. If the Or branches are
-  semantically different, caching would block predicate pushdown → skip.
-  Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo` before
-  this rule runs, so detection examines the plan structure directly. Known
-  limitation: natural top-level `Filter(Or(...))` in the CTE body may produce
-  false positives (conservatively skips caching; falls back to repartition).
+- **`hasDivergentPredicates`**: Reads `originalPlanWithPredicates` from
+  `CTERelationDef`, which stores the per-reference predicates accumulated by
+  `PushdownPredicatesAndPruneColumnsForCTEDef`. If multiple distinct predicates
+  exist, caching would block per-reference predicate pushdown → skip.
+  `CleanUpTempCTEInfo` has been moved to run AFTER this rule in `SparkOptimizer`
+  so the field is still available.
 
 **Cross-query reuse**: `CacheManager.lookupCachedData` normalizes plans via
 `QueryExecution.normalize()` and matches via `sameResult()`. This enables cache
@@ -125,7 +123,7 @@ with fresh data — including auto-CTE entries.
 |-----------------|-------------|
 | `InlineCTE` | Inlined CTEs (deterministic or refCount=1) are NOT cached — already expanded. Only non-inlined CTEs reach this rule. |
 | `PushdownPredicatesAndPruneColumnsForCTEDef` | Runs BEFORE this rule. Pushed-down predicates inform the divergent-predicates check. |
-| `CleanUpTempCTEInfo` | Clears `originalPlanWithPredicates` BEFORE this rule. Divergent predicates detected via plan structure instead. |
+| `CleanUpTempCTEInfo` | Moved to run AFTER `ReplaceCTERefWithCache` in `SparkOptimizer`, so `originalPlanWithPredicates` is available for divergent-predicate detection. |
 | `ReplaceCTERefWithRepartition` | Handles CTEs skipped by our heuristic. Both rules coexist in the same batch. |
 | `ReusedExchange` | CTE cache is at the logical/data level. ReusedExchange is at the physical/shuffle level. Both coexist. |
 | `CacheManager` invalidation | Auto-CTE entries are regular `CachedData` entries — DML triggers automatic refresh. |
@@ -141,16 +139,6 @@ with fresh data — including auto-CTE entries.
 | `AutoCTECacheSuite.scala` | 7 tests: enable/disable, correctness, within-query reuse, cross-query reuse, scan-only skip, TTL eviction |
 
 ## Future Work
-
-- **Divergent-predicate detection improvement**: Current detection examines
-  the CTE child for `Filter(Or(...))` pushed by
-  `PushdownPredicatesAndPruneColumnsForCTEDef`. This has a known false positive
-  for CTE bodies that naturally start with `Filter(Or(...))`. An alternative
-  approach (walking the outer query to collect per-reference predicates) was
-  investigated but doesn't work: the optimizer pushes join conditions as `Filter`
-  nodes above individual refs, causing false divergence detection for joins.
-  A robust solution would require preserving `originalPlanWithPredicates` past
-  `CleanUpTempCTEInfo`.
 - **TPC-DS benchmarking**: Verify speedups on multi-part queries (q23, q24, q39)
   and no regressions on q1, q31, q39a.
 - **Memory pressure integration**: Evict auto-CTE entries when storage memory

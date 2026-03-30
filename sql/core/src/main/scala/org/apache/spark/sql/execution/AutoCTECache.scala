@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
-import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, Or, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -69,36 +69,21 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   /**
    * Checks if `PushdownPredicatesAndPruneColumnsForCTEDef` pushed divergent
    * predicates into the CTE definition. When different CTE references have
-   * different filter predicates, the optimizer combines them as
-   * `Filter(Or(pred1, pred2), ...)` in the CTE child. If the Or branches
-   * are semantically different, caching would block per-reference predicate
-   * pushdown.
+   * different filter predicates, the per-reference predicates are stored in
+   * `originalPlanWithPredicates`. If multiple distinct predicates exist,
+   * caching would block per-reference predicate pushdown.
    *
-   * Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo`
-   * before this rule runs, so we detect pushed predicates by examining the
-   * CTE child plan directly.
-   *
-   * Known limitation: a CTE body that naturally starts with `Filter(Or(...))`
-   * may produce a false positive (conservatively skips caching; falls back to
-   * repartition-based reuse).
+   * This works because `CleanUpTempCTEInfo` has been moved to run AFTER
+   * this rule in `SparkOptimizer`, so `originalPlanWithPredicates` is still
+   * available.
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
-    cteDef.child match {
-      case Filter(condition, _) =>
-        // Collect all top-level Or branches
-        val branches = collectOrBranches(condition)
-        branches.size > 1 && {
-          val hashes = branches.map(_.semanticHash()).distinct
-          hashes.size > 1
-        }
+    cteDef.originalPlanWithPredicates match {
+      case Some((_, predicates)) if predicates.size > 1 =>
+        val hashes = predicates.map(_.semanticHash()).distinct
+        hashes.size > 1
       case _ => false
     }
-  }
-
-  /** Flattens a nested Or tree into its leaf predicates. */
-  private def collectOrBranches(expr: Expression): Seq[Expression] = expr match {
-    case Or(left, right) => collectOrBranches(left) ++ collectOrBranches(right)
-    case other => Seq(other)
   }
 
   /**

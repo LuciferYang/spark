@@ -51,7 +51,9 @@ class SparkOptimizer(
 
   override def defaultBatches: Seq[Batch] = flattenBatches(Seq(
     preOptimizationBatches,
-    super.defaultBatches,
+    // Move CleanUpTempCTEInfo to after ReplaceCTERefWithCache so that
+    // originalPlanWithPredicates is available for divergent-predicate detection.
+    super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info"),
     Batch("Optimize Metadata Only Query", Once, OptimizeMetadataOnlyQuery(catalog)),
     Batch("PartitionPruning", Once,
       PartitionPruning,
@@ -97,7 +99,7 @@ class SparkOptimizer(
       EliminateLimits),
     Batch("User Provided Optimizers", fixedPoint, experimentalMethods.extraOptimizations: _*),
     Batch("Replace CTE with Repartition", Once,
-      ReplaceCTERefWithCache, ReplaceCTERefWithRepartition)))
+      ReplaceCTERefWithCache, ReplaceCTERefWithRepartition, CleanUpTempCTEInfo)))
 
   override def nonExcludableRules: Seq[String] = super.nonExcludableRules ++
     Seq(
