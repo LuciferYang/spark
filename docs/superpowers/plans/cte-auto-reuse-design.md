@@ -71,10 +71,11 @@ When false, CTE caches persist until session ends or explicit `UNCACHE TABLE`.
 ```
 spark.sql.auto.cte.cache.ttl (duration, default 1h)
 ```
-Time-to-live for CTE cache entries since creation. Only effective when
+Time-to-live for CTE cache entries since last access. Entries not accessed
+within this duration are evicted. Only effective when
 `auto.clear.cte.cache.enabled = true`. Set to 0 for no TTL-based eviction.
 
-Future phases may add size-based LRU eviction and access-based TTL refresh.
+Future phases may add size-based LRU eviction.
 
 ### Component 1: CTE Auto-Materialization
 

@@ -5649,10 +5649,10 @@ object SQLConf {
   val AUTO_CTE_CACHE_TTL =
     buildConf("spark.sql.auto.cte.cache.ttl")
       .doc(
-        "Time-to-live for auto-cached CTE entries since creation. " +
-        "Entries older than this duration are evicted. Only effective " +
-        "when auto.clear.cte.cache.enabled is true. " +
-        "Set to 0 for no TTL-based eviction.")
+        "Time-to-live for auto-cached CTE entries since last access. " +
+        "Entries not accessed within this duration are eligible for " +
+        "eviction. Only effective when auto.clear.cte.cache.enabled is " +
+        "true. Set to 0 for no TTL-based eviction.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)

@@ -89,17 +89,21 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           skippedDefs += cteDef.copy(child = resolvedChild)
         } else {
           val cacheManager = spark.sharedState.cacheManager
+          val autoCTEManager = spark.sharedState.autoCTECacheManager
           val cachedPlan = cacheManager
             .lookupCachedData(spark, resolvedChild)
-            .map(_.cachedRepresentation.withOutput(resolvedChild.output))
+            .map { cached =>
+              // Cache hit -- refresh TTL for the matching entry
+              autoCTEManager.recordAccessByPlan(resolvedChild)
+              cached.cachedRepresentation.withOutput(resolvedChild.output)
+            }
             .getOrElse {
               cacheManager.cacheQuery(
                 spark,
                 resolvedChild,
                 tableName = Some(s"auto_cte_${cteDef.id}"),
                 StorageLevel.MEMORY_AND_DISK)
-              spark.sharedState.autoCTECacheManager
-                .trackEntry(cteDef.id, resolvedChild)
+              autoCTEManager.trackEntry(cteDef.id, resolvedChild)
               cacheManager.lookupCachedData(spark, resolvedChild)
                 .map(_.cachedRepresentation.withOutput(resolvedChild.output))
                 .getOrElse(resolvedChild)
@@ -158,13 +162,28 @@ class AutoCTECacheManager extends Logging {
   private val entries = mutable.LinkedHashMap.empty[Long, AutoCTEEntry]
 
   def trackEntry(cteId: Long, plan: LogicalPlan): Unit = synchronized {
+    val now = System.currentTimeMillis()
     entries(cteId) = AutoCTEEntry(
       plan = plan,
       tableName = s"auto_cte_$cteId",
-      createdAt = System.currentTimeMillis())
+      lastAccessedAt = now)
   }
 
-  /** Evicts entries older than the configured TTL. */
+  /**
+   * Refreshes the TTL for the entry whose plan matches the given plan.
+   * Uses reference equality first (fast path for within-query hits),
+   * then falls back to sameResult (for cross-query hits).
+   */
+  def recordAccessByPlan(plan: LogicalPlan): Unit = synchronized {
+    val now = System.currentTimeMillis()
+    val matched = entries.find(_._2.plan eq plan)
+      .orElse(entries.find(_._2.plan.sameResult(plan)))
+    matched.foreach { case (id, entry) =>
+      entries(id) = entry.copy(lastAccessedAt = now)
+    }
+  }
+
+  /** Evicts entries not accessed within the configured TTL. */
   def evictStaleEntries(spark: SparkSession): Unit = {
     if (!spark.sessionState.conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
 
@@ -174,7 +193,7 @@ class AutoCTECacheManager extends Logging {
     val now = System.currentTimeMillis()
     val toEvict = synchronized {
       val expiredIds = entries.collect {
-        case (id, e) if now - e.createdAt > ttl => id
+        case (id, e) if now - e.lastAccessedAt > ttl => id
       }.toSeq
       expiredIds.flatMap(id => entries.remove(id))
     }
@@ -202,4 +221,4 @@ class AutoCTECacheManager extends Logging {
 private[sql] case class AutoCTEEntry(
     plan: LogicalPlan,
     tableName: String,
-    createdAt: Long)
+    lastAccessedAt: Long)
