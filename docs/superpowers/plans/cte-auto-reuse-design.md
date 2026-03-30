@@ -65,26 +65,16 @@ queries) read from cache.
 ```
 spark.sql.auto.clear.cte.cache.enabled (boolean, default true)
 ```
-When true, enables automatic eviction of CTE caches based on:
-- **Memory pressure**: evict LRU entries when storage memory exceeds threshold
-- **Access staleness**: evict entries not accessed for `cte.cache.ttl` duration
-- **Size limit**: evict when total CTE cache exceeds `cte.cache.maxSize`
-
+When true, enables automatic TTL-based eviction of auto-cached CTE entries.
 When false, CTE caches persist until session ends or explicit `UNCACHE TABLE`.
 
 ```
-spark.sql.auto.clear.cte.cache.ttl (duration, default 1h)
+spark.sql.auto.cte.cache.ttl (duration, default 1h)
 ```
-Time-to-live for CTE cache entries since last access. Only effective when
-`auto.clear.cte.cache.enabled = true`.
+Time-to-live for CTE cache entries since creation. Only effective when
+`auto.clear.cte.cache.enabled = true`. Set to 0 for no TTL-based eviction.
 
-```
-spark.sql.auto.clear.cte.cache.maxSize (bytes, default -1 / unlimited)
-```
-Maximum total size for auto-cached CTE entries. LRU eviction when exceeded.
-Set to -1 for unlimited (default). Since the storage level is MEMORY_AND_DISK,
-the cache spills to disk when memory is full, so unlimited is safe — TTL-based
-eviction is the primary lifecycle control.
+Future phases may add size-based LRU eviction and access-based TTL refresh.
 
 ### Component 1: CTE Auto-Materialization
 

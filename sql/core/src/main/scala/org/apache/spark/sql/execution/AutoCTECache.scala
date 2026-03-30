@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
-import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, Or, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -36,9 +36,10 @@ import org.apache.spark.storage.StorageLevel
  * definition is executed once and cached; all references read
  * from cache.
  *
- * When the feature is disabled, falls back to
+ * CTEs that are too cheap to benefit from caching (no Join, Aggregate,
+ * Sort, or Window) are left for
  * [[org.apache.spark.sql.catalyst.optimizer.ReplaceCTERefWithRepartition]]
- * behavior (inline with repartition for ReusedExchange).
+ * to handle with repartition-based shuffle reuse.
  *
  * Cache lifecycle is managed by [[AutoCTECacheManager]].
  */
@@ -53,56 +54,9 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       case _: Subquery => plan
       case _ =>
         val spark = SparkSession.active
-        // Evict stale/oversized auto-CTE cache entries before processing new CTEs
-        spark.sharedState.autoCTECacheManager.evictIfNeeded(spark)
+        spark.sharedState.autoCTECacheManager.evictStaleEntries(spark)
         replaceWithCache(spark, plan, mutable.HashMap.empty)
     }
-  }
-
-  /**
-   * Checks whether a CTE definition should be auto-cached based on heuristics.
-   * Returns false if caching would likely cause regressions (e.g., blocking
-   * predicate pushdown) or if the CTE is too cheap to benefit from caching.
-   */
-  private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
-    !hasDivergentPredicates(cteDef) && isExpensiveEnough(cteDef.child)
-  }
-
-  /**
-   * Checks if different CTE references apply substantially different filter
-   * predicates. If yes, caching blocks predicate pushdown and causes regressions.
-   *
-   * Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo` before
-   * this rule runs, so we detect divergent predicates by examining the CTE child
-   * plan directly. After `PushdownPredicatesAndPruneColumnsForCTEDef`, divergent
-   * predicates are combined as `Filter(Or(pred1, pred2), ...)` in the CTE child.
-   * If the Or children are semantically different, the predicates are divergent.
-   *
-   * Known limitation: if the CTE body itself starts with a Filter(Or(...), ...)
-   * (not from pushdown), this may produce a false positive. In practice this is
-   * rare and the fallback to repartition-based reuse is safe.
-   */
-  private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
-    cteDef.child match {
-      case Filter(or: Or, _) =>
-        // Collect all Or-branch leaves
-        val branches = collectOrBranches(or)
-        // If any branches are semantically different, predicates are divergent
-        branches.size > 1 && {
-          val hashes = branches.map(_.semanticHash()).distinct
-          hashes.size > 1
-        }
-      case _ => false
-    }
-  }
-
-  /**
-   * Flattens a nested Or tree into its leaf predicates.
-   * e.g., Or(Or(a, b), c) => Seq(a, b, c)
-   */
-  private def collectOrBranches(expr: Expression): Seq[Expression] = expr match {
-    case Or(left, right) => collectOrBranches(left) ++ collectOrBranches(right)
-    case other => Seq(other)
   }
 
   /**
@@ -130,31 +84,22 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       cteDefs.foreach { cteDef =>
         val resolvedChild = replaceWithCache(spark, cteDef.child, cteMap)
 
-        if (!shouldAutoCache(cteDef)) {
-          // Leave for ReplaceCTERefWithRepartition to handle (preserves shuffle reuse)
+        if (!isExpensiveEnough(cteDef.child)) {
+          // Leave for ReplaceCTERefWithRepartition (preserves shuffle reuse)
           skippedDefs += cteDef.copy(child = resolvedChild)
         } else {
-          // Check if this CTE plan is already cached (cross-query reuse)
           val cacheManager = spark.sharedState.cacheManager
-          val autoCTEManager = spark.sharedState.autoCTECacheManager
           val cachedPlan = cacheManager
             .lookupCachedData(spark, resolvedChild)
-            .map { cached =>
-              // Use plan-based access recording for cross-query reuse,
-              // since the new query has different CTE IDs
-              autoCTEManager.recordAccessByPlan(spark, resolvedChild)
-              cached.cachedRepresentation.withOutput(resolvedChild.output)
-            }
+            .map(_.cachedRepresentation.withOutput(resolvedChild.output))
             .getOrElse {
-              // Cache the CTE definition
               cacheManager.cacheQuery(
                 spark,
                 resolvedChild,
                 tableName = Some(s"auto_cte_${cteDef.id}"),
                 StorageLevel.MEMORY_AND_DISK)
-              // Track for lifecycle management
-              autoCTEManager.trackEntry(cteDef.id, resolvedChild)
-              // Retrieve the cached representation
+              spark.sharedState.autoCTECacheManager
+                .trackEntry(cteDef.id, resolvedChild)
               cacheManager.lookupCachedData(spark, resolvedChild)
                 .map(_.cachedRepresentation.withOutput(resolvedChild.output))
                 .getOrElse(resolvedChild)
@@ -164,8 +109,6 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
         }
       }
       val newChild = replaceWithCache(spark, child, cteMap)
-      // Rebuild WithCTE if any CTEs were skipped, so ReplaceCTERefWithRepartition
-      // can handle them with proper shuffle reuse
       if (skippedDefs.nonEmpty) {
         WithCTE(newChild, skippedDefs.toSeq)
       } else {
@@ -173,8 +116,6 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
       }
 
     case ref: CTERelationRef if cteMap.contains(ref.cteId) =>
-      // Only replace refs for CTEs that were cached; leave others for
-      // ReplaceCTERefWithRepartition
       val ctePlan = cteMap(ref.cteId)
       if (ref.outputSet == ctePlan.outputSet) {
         ctePlan
@@ -205,8 +146,12 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
 }
 
 /**
- * Manages the lifecycle of auto-cached CTE entries.
- * Tracks entries for TTL-based and LRU eviction.
+ * Tracks auto-cached CTE entries for TTL-based eviction.
+ *
+ * This is a lightweight companion to [[CacheManager]]. CacheManager stores
+ * the actual cached data; this class only tracks which entries were created
+ * by auto-CTE caching so they can be evicted by TTL without affecting
+ * entries created by explicit `CACHE TABLE`.
  */
 class AutoCTECacheManager extends Logging {
 
@@ -214,86 +159,29 @@ class AutoCTECacheManager extends Logging {
 
   def trackEntry(cteId: Long, plan: LogicalPlan): Unit = synchronized {
     entries(cteId) = AutoCTEEntry(
-      cteId = cteId,
       plan = plan,
       tableName = s"auto_cte_$cteId",
-      createdAt = System.currentTimeMillis(),
-      lastAccessedAt = System.currentTimeMillis())
+      createdAt = System.currentTimeMillis())
   }
 
-  def recordAccess(cteId: Long): Unit = synchronized {
-    entries.get(cteId).foreach { entry =>
-      entries(cteId) = entry.copy(lastAccessedAt = System.currentTimeMillis())
-    }
-  }
+  /** Evicts entries older than the configured TTL. */
+  def evictStaleEntries(spark: SparkSession): Unit = {
+    if (!spark.sessionState.conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
 
-  /**
-   * Records access by plan matching (for cross-query reuse where the new query
-   * has different CTE IDs than the original cached entry).
-   */
-  def recordAccessByPlan(spark: SparkSession, plan: LogicalPlan): Unit = synchronized {
-    val normalized = QueryExecution.normalize(spark, plan)
-    entries.find { case (_, entry) =>
-      QueryExecution.normalize(spark, entry.plan).sameResult(normalized)
-    }.foreach { case (id, entry) =>
-      entries(id) = entry.copy(lastAccessedAt = System.currentTimeMillis())
-    }
-  }
+    val ttl = spark.sessionState.conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
+    if (ttl <= 0) return
 
-  def evictIfNeeded(spark: SparkSession): Unit = {
-    val conf = spark.sessionState.conf
-    if (!conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
-
-    // Collect entries to evict under the lock, then uncache outside the lock
-    // to avoid holding AutoCTECacheManager.synchronized while calling into
-    // CacheManager (which has its own synchronization).
+    val now = System.currentTimeMillis()
     val toEvict = synchronized {
-      val evictIds = mutable.ArrayBuffer.empty[Long]
-      val now = System.currentTimeMillis()
-      val ttl = conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
-
-      // TTL-based eviction
-      if (ttl > 0) {
-        evictIds ++= entries.filter { case (_, e) =>
-          now - e.lastAccessedAt > ttl
-        }.keys
-      }
-
-      // Size-based LRU eviction (exclude TTL-evicted entries from size computation)
-      val maxSize = conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
-      if (maxSize >= 0) {
-        val cacheManager = spark.sharedState.cacheManager
-        val remaining = entries.toSeq.filterNot(e => evictIds.contains(e._1))
-        var totalSize = remaining.map { case (_, entry) =>
-          cacheManager.lookupCachedData(spark, entry.plan)
-            .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
-            .getOrElse(0L)
-        }.sum
-
-        if (totalSize > maxSize) {
-          val sortedByAccess = remaining.sortBy(_._2.lastAccessedAt)
-          for ((id, entry) <- sortedByAccess if totalSize > maxSize) {
-            val entrySize = cacheManager.lookupCachedData(spark, entry.plan)
-              .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
-              .getOrElse(0L)
-            evictIds += id
-            totalSize -= entrySize
-          }
-        }
-      }
-
-      // Remove from entries map under the lock, collect plans to uncache
-      evictIds.flatMap { id =>
-        entries.remove(id).map { entry =>
-          logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
-          entry.plan
-        }
+      val expiredIds = entries.collect {
+        case (id, e) if now - e.createdAt > ttl => id
       }.toSeq
+      expiredIds.flatMap(id => entries.remove(id))
     }
-
-    // Uncache from CacheManager outside the lock
-    toEvict.foreach { plan =>
-      spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
+    toEvict.foreach { entry =>
+      spark.sharedState.cacheManager.uncacheQuery(
+        spark, entry.plan, cascade = false)
+      logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
     }
   }
 
@@ -309,14 +197,9 @@ class AutoCTECacheManager extends Logging {
   }
 
   def numEntries: Int = synchronized { entries.size }
-
-  /** Visible for testing. */
-  private[sql] def entryIds: Seq[Long] = synchronized { entries.keys.toSeq }
 }
 
-case class AutoCTEEntry(
-    cteId: Long,
+private[sql] case class AutoCTEEntry(
     plan: LogicalPlan,
     tableName: String,
-    createdAt: Long,
-    lastAccessedAt: Long)
+    createdAt: Long)

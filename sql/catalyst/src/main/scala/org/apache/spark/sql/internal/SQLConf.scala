@@ -5638,9 +5638,9 @@ object SQLConf {
     buildConf("spark.sql.auto.clear.cte.cache.enabled")
       .doc(
         "When true, automatically evicts auto-cached CTE entries based on " +
-        "access staleness and memory budget. When false, auto-cached CTEs " +
-        "persist until the session ends or explicit UNCACHE. Only effective " +
-        "when spark.sql.auto.reused.cte.enabled is true.")
+        "TTL. When false, auto-cached CTEs persist until the session ends " +
+        "or explicit UNCACHE. Only effective when " +
+        "spark.sql.auto.reused.cte.enabled is true.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
@@ -5649,25 +5649,14 @@ object SQLConf {
   val AUTO_CTE_CACHE_TTL =
     buildConf("spark.sql.auto.cte.cache.ttl")
       .doc(
-        "Time-to-live for auto-cached CTE entries since last access. " +
-        "Entries not accessed within this duration are eligible for " +
-        "eviction. Only effective when auto.clear.cte.cache.enabled is " +
-        "true. Set to 0 for no TTL-based eviction.")
+        "Time-to-live for auto-cached CTE entries since creation. " +
+        "Entries older than this duration are evicted. Only effective " +
+        "when auto.clear.cte.cache.enabled is true. " +
+        "Set to 0 for no TTL-based eviction.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
       .createWithDefaultString("1h")
-
-  val AUTO_CTE_CACHE_MAX_SIZE =
-    buildConf("spark.sql.auto.cte.cache.maxSize")
-      .doc(
-        "Maximum total memory for auto-cached CTE entries. LRU eviction " +
-        "when exceeded. Only effective when auto.clear.cte.cache.enabled " +
-        "is true. Set to -1 for unlimited.")
-      .version("4.2.0")
-      .withBindingPolicy(ConfigBindingPolicy.SESSION)
-      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
-      .createWithDefaultString("-1")
 
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
