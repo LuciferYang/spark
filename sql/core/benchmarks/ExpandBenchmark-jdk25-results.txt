@@ -1,0 +1,59 @@
+================================================================================================
+Expand: varying number of COUNT(DISTINCT)
+================================================================================================
+
+OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+2 distinct aggregates:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+with sum - baseline (ratio 3)                      3072           3103          18          3.4         293.0       1.0X
+with sum - optimized (ratio 3)                     3036           3060          18          3.5         289.6       1.0X
+pure distinct - baseline (ratio 2)                 1651           1667          16          6.4         157.5       1.9X
+pure distinct - optimized (ratio 2)                 605            607           2         17.3          57.7       5.1X
+
+OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+4 distinct aggregates:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+with sum - baseline (ratio 5)                      4869           4897          30          2.2         464.3       1.0X
+with sum - optimized (ratio 5)                     4818           4873          39          2.2         459.5       1.0X
+pure distinct - baseline (ratio 4)                 3758           3788          44          2.8         358.4       1.3X
+pure distinct - optimized (ratio 4)                 731            746          20         14.3          69.7       6.7X
+
+OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+6 distinct aggregates:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+with sum - baseline (ratio 7)                      7616           7662          46          1.4         726.3       1.0X
+with sum - optimized (ratio 7)                     7601           7661          40          1.4         724.8       1.0X
+pure distinct - baseline (ratio 6)                 6190           6208          21          1.7         590.3       1.2X
+pure distinct - optimized (ratio 6)                 785            797          13         13.4          74.9       9.7X
+
+OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+8 distinct aggregates:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+with sum - baseline (ratio 9)                     11932          11989          75          0.9        1137.9       1.0X
+with sum - optimized (ratio 9)                    11892          11981          59          0.9        1134.1       1.0X
+pure distinct - baseline (ratio 8)                10081          10167          66          1.0         961.4       1.2X
+pure distinct - optimized (ratio 8)                1557           1597          23          6.7         148.5       7.7X
+
+
+================================================================================================
+Expand: varying data characteristics (pure distinct)
+================================================================================================
+
+OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
+Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+6 pure distinct aggs with varying data:   Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+1K groups, moderate card - baseline                6151           6157           6          1.7         586.6       1.0X
+1K groups, moderate card - optimized                776            781           5         13.5          74.0       7.9X
+100K groups, moderate card - baseline             12285          12459         172          0.9        1171.6       0.5X
+100K groups, moderate card - optimized             3418           3481          41          3.1         326.0       1.8X
+1K groups, low card (5 vals) - baseline            5879           5908          23          1.8         560.7       1.0X
+1K groups, low card (5 vals) - optimized            685            691           7         15.3          65.3       9.0X
+no grouping key - baseline                         3926           3937          12          2.7         374.4       1.6X
+no grouping key - optimized                         304            310           9         34.5          29.0      20.3X
+
+
