@@ -142,10 +142,15 @@ with fresh data — including auto-CTE entries.
 
 ## Future Work
 
-- **Divergent-predicate detection improvement**: Current detection via
-  `Filter(Or(...))` has false positives for natural Or filters. A more robust
-  approach would require preserving `originalPlanWithPredicates` past
-  `CleanUpTempCTEInfo`, or collecting per-reference predicates at rule time.
+- **Divergent-predicate detection improvement**: Current detection examines
+  the CTE child for `Filter(Or(...))` pushed by
+  `PushdownPredicatesAndPruneColumnsForCTEDef`. This has a known false positive
+  for CTE bodies that naturally start with `Filter(Or(...))`. An alternative
+  approach (walking the outer query to collect per-reference predicates) was
+  investigated but doesn't work: the optimizer pushes join conditions as `Filter`
+  nodes above individual refs, causing false divergence detection for joins.
+  A robust solution would require preserving `originalPlanWithPredicates` past
+  `CleanUpTempCTEInfo`.
 - **TPC-DS benchmarking**: Verify speedups on multi-part queries (q23, q24, q39)
   and no regressions on q1, q31, q39a.
 - **Memory pressure integration**: Evict auto-CTE entries when storage memory

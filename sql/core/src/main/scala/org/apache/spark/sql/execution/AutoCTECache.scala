@@ -61,31 +61,32 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
 
   /**
    * Checks whether a CTE definition should be auto-cached based on heuristics.
-   * Returns false if caching would likely cause regressions (e.g., blocking
-   * predicate pushdown) or if the CTE is too cheap to benefit from caching.
    */
   private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
     !hasDivergentPredicates(cteDef) && isExpensiveEnough(cteDef.child)
   }
 
   /**
-   * Checks if different CTE references apply substantially different filter
-   * predicates. If yes, caching blocks predicate pushdown and causes regressions.
+   * Checks if `PushdownPredicatesAndPruneColumnsForCTEDef` pushed divergent
+   * predicates into the CTE definition. When different CTE references have
+   * different filter predicates, the optimizer combines them as
+   * `Filter(Or(pred1, pred2), ...)` in the CTE child. If the Or branches
+   * are semantically different, caching would block per-reference predicate
+   * pushdown.
    *
-   * Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo` before
-   * this rule runs, so we detect divergent predicates by examining the CTE child
-   * plan directly. After `PushdownPredicatesAndPruneColumnsForCTEDef`, divergent
-   * predicates are combined as `Filter(Or(pred1, pred2), ...)` in the CTE child.
-   * If the Or children are semantically different, the predicates are divergent.
+   * Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo`
+   * before this rule runs, so we detect pushed predicates by examining the
+   * CTE child plan directly.
    *
-   * Known limitation: if the CTE body itself starts with a Filter(Or(...), ...)
-   * (not from pushdown), this may produce a false positive. In practice this is
-   * rare and the fallback to repartition-based reuse is safe.
+   * Known limitation: a CTE body that naturally starts with `Filter(Or(...))`
+   * may produce a false positive (conservatively skips caching; falls back to
+   * repartition-based reuse).
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
     cteDef.child match {
-      case Filter(or: Or, _) =>
-        val branches = collectOrBranches(or)
+      case Filter(condition, _) =>
+        // Collect all top-level Or branches
+        val branches = collectOrBranches(condition)
         branches.size > 1 && {
           val hashes = branches.map(_.semanticHash()).distinct
           hashes.size > 1
