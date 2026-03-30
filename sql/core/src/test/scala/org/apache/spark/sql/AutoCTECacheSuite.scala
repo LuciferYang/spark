@@ -115,7 +115,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
       SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
       SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED.key -> "false") {
 
-      // Non-deterministic CTE referenced twice — both refs should use
+      // Non-deterministic CTE referenced twice --both refs should use
       // the same cached InMemoryRelation
       val sql =
         """WITH expensive_cte AS (
@@ -223,7 +223,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
   test("smart heuristic: cache CTE with expensive operators") {
     prepareData()
     withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
-      // CTE with Aggregate — should be cached
+      // CTE with Aggregate --should be cached
       val sql =
         """WITH expensive_cte AS (
           |  SELECT key, sum(value) as total, rand() as r
@@ -263,7 +263,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
       Thread.sleep(40)
       mgr.recordAccess(mgr.entryIds.head)
 
-      // Wait — total time since creation > TTL, but time since last access < TTL
+      // Wait --total time since creation > TTL, but time since last access < TTL
       Thread.sleep(70)
       mgr.evictIfNeeded(spark)
 
