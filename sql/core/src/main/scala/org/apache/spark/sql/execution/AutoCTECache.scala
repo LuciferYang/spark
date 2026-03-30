@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
-import org.apache.spark.sql.catalyst.expressions.{Alias, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Or, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -71,16 +71,36 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   /**
    * Checks if different CTE references apply substantially different filter
    * predicates. If yes, caching blocks predicate pushdown and causes regressions.
+   *
+   * Note: `originalPlanWithPredicates` is cleared by `CleanUpTempCTEInfo` before
+   * this rule runs, so we detect divergent predicates by examining the CTE child
+   * plan directly. After `PushdownPredicatesAndPruneColumnsForCTEDef`, divergent
+   * predicates are combined as `Filter(Or(pred1, pred2), ...)` in the CTE child.
+   * If the Or children are semantically different, the predicates are divergent.
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
-    cteDef.originalPlanWithPredicates match {
-      case Some((_, predicates)) if predicates.nonEmpty =>
-        // If predicates were pushed down, the original plan had filters that
-        // differ across references — caching would prevent this optimization
-        val distinctPredicates = predicates.map(_.semanticHash()).distinct
-        distinctPredicates.size > 1
+    cteDef.child match {
+      case Filter(or: Or, _) =>
+        // Collect all Or-branch leaves
+        val branches = collectOrBranches(or)
+        // If any branches are semantically different, predicates are divergent
+        branches.size > 1 && {
+          val hashes = branches.map(_.semanticHash()).distinct
+          hashes.size > 1
+        }
       case _ => false
     }
+  }
+
+  /**
+   * Flattens a nested Or tree into its leaf predicates.
+   * e.g., Or(Or(a, b), c) => Seq(a, b, c)
+   */
+  private def collectOrBranches(
+      expr: org.apache.spark.sql.catalyst.expressions.Expression)
+      : Seq[org.apache.spark.sql.catalyst.expressions.Expression] = expr match {
+    case Or(left, right) => collectOrBranches(left) ++ collectOrBranches(right)
+    case other => Seq(other)
   }
 
   /**
@@ -218,60 +238,73 @@ class AutoCTECacheManager extends Logging {
     }
   }
 
-  def evictIfNeeded(spark: SparkSession): Unit = synchronized {
+  def evictIfNeeded(spark: SparkSession): Unit = {
     val conf = spark.sessionState.conf
     if (!conf.getConf(SQLConf.AUTO_CLEAR_CTE_CACHE_ENABLED)) return
 
-    val now = System.currentTimeMillis()
-    val ttl = conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
+    // Collect entries to evict under the lock, then uncache outside the lock
+    // to avoid holding AutoCTECacheManager.synchronized while calling into
+    // CacheManager (which has its own synchronization).
+    val toEvict = synchronized {
+      val evictIds = mutable.ArrayBuffer.empty[Long]
+      val now = System.currentTimeMillis()
+      val ttl = conf.getConf(SQLConf.AUTO_CTE_CACHE_TTL)
 
-    // TTL-based eviction
-    if (ttl > 0) {
-      val expired = entries.filter { case (_, e) =>
-        now - e.lastAccessedAt > ttl
-      }.keys.toSeq
-      expired.foreach { id =>
-        evictEntry(spark, id)
+      // TTL-based eviction
+      if (ttl > 0) {
+        evictIds ++= entries.filter { case (_, e) =>
+          now - e.lastAccessedAt > ttl
+        }.keys
       }
-    }
 
-    // Size-based LRU eviction
-    val maxSize = conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
-    if (maxSize >= 0) {
-      val cacheManager = spark.sharedState.cacheManager
-      var totalSize = entries.values.map { entry =>
-        cacheManager.lookupCachedData(spark, entry.plan)
-          .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
-          .getOrElse(0L)
-      }.sum
-
-      if (totalSize > maxSize) {
-        // Evict LRU entries (LinkedHashMap iterates in insertion order;
-        // sort by lastAccessedAt to get true LRU)
-        val sortedByAccess = entries.toSeq.sortBy(_._2.lastAccessedAt)
-        for ((id, entry) <- sortedByAccess if totalSize > maxSize) {
-          val entrySize = cacheManager.lookupCachedData(spark, entry.plan)
+      // Size-based LRU eviction
+      val maxSize = conf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE)
+      if (maxSize >= 0) {
+        val cacheManager = spark.sharedState.cacheManager
+        var totalSize = entries.values.map { entry =>
+          cacheManager.lookupCachedData(spark, entry.plan)
             .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
             .getOrElse(0L)
-          evictEntry(spark, id)
-          totalSize -= entrySize
+        }.sum
+
+        if (totalSize > maxSize) {
+          val sortedByAccess = entries.toSeq
+            .filterNot(e => evictIds.contains(e._1)) // skip already-marked
+            .sortBy(_._2.lastAccessedAt)
+          for ((id, entry) <- sortedByAccess if totalSize > maxSize) {
+            val entrySize = cacheManager.lookupCachedData(spark, entry.plan)
+              .map(_.cachedRepresentation.cacheBuilder.sizeInBytesStats.value.longValue())
+              .getOrElse(0L)
+            evictIds += id
+            totalSize -= entrySize
+          }
         }
       }
+
+      // Remove from entries map under the lock, collect plans to uncache
+      evictIds.flatMap { id =>
+        entries.remove(id).map { entry =>
+          logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
+          entry.plan
+        }
+      }.toSeq
+    }
+
+    // Uncache from CacheManager outside the lock
+    toEvict.foreach { plan =>
+      spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
     }
   }
 
-  // Called within synchronized context only
-  private def evictEntry(spark: SparkSession, cteId: Long): Unit = {
-    entries.get(cteId).foreach { entry =>
-      spark.sharedState.cacheManager.uncacheQuery(
-        spark, entry.plan, cascade = false)
-      entries.remove(cteId)
-      logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
+  def clearAll(spark: SparkSession): Unit = {
+    val plans = synchronized {
+      val result = entries.values.map(_.plan).toSeq
+      entries.clear()
+      result
     }
-  }
-
-  def clearAll(spark: SparkSession): Unit = synchronized {
-    entries.keys.toSeq.foreach(id => evictEntry(spark, id))
+    plans.foreach { plan =>
+      spark.sharedState.cacheManager.uncacheQuery(spark, plan, cascade = false)
+    }
   }
 
   def numEntries: Int = synchronized { entries.size }

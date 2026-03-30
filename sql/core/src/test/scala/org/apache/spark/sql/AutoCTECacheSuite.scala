@@ -85,16 +85,7 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
   test("correctness: auto-cached CTE produces same results") {
     prepareData()
 
-    val sql =
-      """WITH cte AS (
-        |  SELECT key, count(*) as cnt
-        |  FROM auto_cte_test GROUP BY key
-        |)
-        |SELECT a.key, a.cnt + b.cnt as total_cnt
-        |FROM cte a JOIN cte b ON a.key = b.key""".stripMargin
-
-    // Note: this CTE is deterministic so InlineCTE will inline it.
-    // For correctness test we use non-deterministic variant.
+    // Use non-deterministic CTE to prevent InlineCTE from inlining it
     val sqlNonDet =
       """WITH cte AS (
         |  SELECT key, count(*) as cnt, rand() as r
