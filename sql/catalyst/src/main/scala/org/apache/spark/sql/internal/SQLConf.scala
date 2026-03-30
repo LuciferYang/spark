@@ -5642,6 +5642,7 @@ object SQLConf {
         "or explicit UNCACHE. Only effective when " +
         "spark.sql.auto.reused.cte.enabled is true.")
       .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
       .booleanConf
       .createWithDefault(true)
 
@@ -5653,6 +5654,7 @@ object SQLConf {
         "eviction. Only effective when auto.clear.cte.cache.enabled is " +
         "true. Set to 0 for no TTL-based eviction.")
       .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
       .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
       .createWithDefaultString("1h")
 
@@ -5663,6 +5665,7 @@ object SQLConf {
         "when exceeded. Only effective when auto.clear.cte.cache.enabled " +
         "is true. Set to -1 for unlimited.")
       .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
       .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
       .createWithDefaultString("-1")
 
