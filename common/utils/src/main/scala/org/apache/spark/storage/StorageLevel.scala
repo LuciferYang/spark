@@ -156,8 +156,13 @@ class StorageLevel private(
   /**
    * Return a new StorageLevel with the given eviction priority. Lower priority levels are
    * evicted from memory before higher priority levels (default priority is 0).
+   *
+   * @throws IllegalArgumentException if this StorageLevel does not use memory,
+   *         since eviction priority only affects in-memory blocks.
    */
   def withEvictionPriority(priority: Int): StorageLevel = {
+    require(useMemory,
+      "evictionPriority has no effect on StorageLevels that do not use memory")
     StorageLevel.getCachedStorageLevel(
       new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication, priority))
   }
