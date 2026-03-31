@@ -100,21 +100,19 @@ class StorageLevel private(
     ret
   }
 
-  // Serialization format (backward compatible):
-  //   v1 (original):       [flags:1byte][replication:1byte]
-  //   v2 (with priority):  [flags:1byte][replication:1byte][priority:4bytes]
-  // When priority is 0 (default), only 2 bytes are written (v1 format).
-  // When priority != 0, 6 bytes are written. Old code reads 2 bytes and stops;
-  // the extra 4 bytes are harmless only if StorageLevel is the last field in
-  // the enclosing object's serialization. In practice, StorageLevel is
-  // serialized via readResolve/getCachedStorageLevel as a standalone object.
+  // Serialization format:
+  //   v1 (original): [flags:1byte][replication:1byte]           --2 bytes
+  //   v2 (current):  [flags:1byte][replication:1byte][priority:4bytes] --6 bytes
+  // v2 always writes 6 bytes because Externalizable has no object boundaries:
+  // the reader must consume exactly the bytes the writer wrote. Conditional
+  // write would corrupt the stream when StorageLevel is embedded in a larger
+  // object. readExternal handles v1 data via try-catch (EOF on the 3rd byte).
+  // Note: driver and executors must run the same Spark version.
 
   override def writeExternal(out: ObjectOutput): Unit = SparkErrorUtils.tryOrIOException {
     out.writeByte(toInt)
     out.writeByte(_replication)
-    if (_evictionPriority != 0) {
-      out.writeInt(_evictionPriority)
-    }
+    out.writeInt(_evictionPriority)
   }
 
   override def readExternal(in: ObjectInput): Unit = SparkErrorUtils.tryOrIOException {
@@ -124,10 +122,8 @@ class StorageLevel private(
     _useOffHeap = (flags & 2) != 0
     _deserialized = (flags & 1) != 0
     _replication = in.readByte()
-    // Try reading priority (v2 format). Falls back to 0 for v1 data (EOF)
-    // or if the stream has no more bytes.
     _evictionPriority = try {
-      if (in.available() >= 4) in.readInt() else 0
+      in.readInt()
     } catch {
       case _: Exception => 0
     }
