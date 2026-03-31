@@ -609,6 +609,14 @@ class DataSourceV2Strategy(session: SparkSession)
         Seq(to).asResolvedPartitionSpecs.head,
         recacheTable(r, includeTimeTravel = false)) :: Nil
 
+    case RecoverPartitions(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _)) =>
+      RepairTableExec(
+        catalog, ident, ft,
+        enableAddPartitions = true,
+        enableDropPartitions = false) :: Nil
+
     case RecoverPartitions(_: ResolvedTable) =>
       throw QueryCompilationErrors.alterTableRecoverPartitionsNotSupportedForV2TablesError()
 
@@ -656,6 +664,14 @@ class DataSourceV2Strategy(session: SparkSession)
         catalog,
         table,
         pattern.map(_.asInstanceOf[ResolvedPartitionSpec])) :: Nil
+
+    case RepairTable(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        enableAdd, enableDrop) =>
+      RepairTableExec(
+        catalog, ident, ft,
+        enableAdd, enableDrop) :: Nil
 
     case RepairTable(_: ResolvedTable, _, _) =>
       throw QueryCompilationErrors.repairTableNotSupportedForV2TablesError()
