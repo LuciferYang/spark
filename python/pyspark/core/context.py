@@ -2137,14 +2137,16 @@ class SparkContext:
             raise TypeError("storageLevel must be of type pyspark.StorageLevel")
         assert self._jvm is not None
         newStorageLevel = getattr(self._jvm, "org.apache.spark.storage.StorageLevel")
-        return newStorageLevel(
+        jlevel = newStorageLevel(
             storageLevel.useDisk,
             storageLevel.useMemory,
             storageLevel.useOffHeap,
             storageLevel.deserialized,
             storageLevel.replication,
-            storageLevel.evictionPriority,
         )
+        if storageLevel.evictionPriority != 0:
+            jlevel = jlevel.withEvictionPriority(storageLevel.evictionPriority)
+        return jlevel
 
     def setJobGroup(self, groupId: str, description: str, interruptOnCancel: bool = False) -> None:
         """
