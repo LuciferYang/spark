@@ -45,6 +45,17 @@ class StorageLevel private(
     private var _evictionPriority: Int = 0)
   extends Externalizable {
 
+  // Needed by Py4J which uses Java reflection to find constructors by parameter types.
+  // Scala default parameters don't generate overloaded constructors in bytecode.
+  private[spark] def this(
+      useDisk: Boolean,
+      useMemory: Boolean,
+      useOffHeap: Boolean,
+      deserialized: Boolean,
+      replication: Int) = {
+    this(useDisk, useMemory, useOffHeap, deserialized, replication, 0)
+  }
+
   private def this(flags: Int, replication: Int) = {
     this((flags & 8) != 0, (flags & 4) != 0, (flags & 2) != 0, (flags & 1) != 0, replication, 0)
   }
