@@ -430,33 +430,8 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
     case AnalyzeTables(ResolvedV1Database(db), noScan) =>
       AnalyzeTablesCommand(Some(db), noScan)
 
-    // TODO(SPARK-56176): V2-native ANALYZE TABLE/COLUMN for file tables.
-    // FileTable from V2SessionCatalog.loadTable doesn't match V1 extractors,
-    // so we intercept here and delegate to V1 commands using catalogTable.
-    case AnalyzeTable(
-        ResolvedTable(catalog, _, ft: FileTable, _),
-        partitionSpec, noScan)
-        if supportsV1Command(catalog)
-          && ft.catalogTable.isDefined =>
-      val tableIdent = ft.catalogTable.get.identifier
-      if (partitionSpec.isEmpty) {
-        AnalyzeTableCommand(tableIdent, noScan)
-      } else {
-        AnalyzePartitionCommand(
-          tableIdent, partitionSpec, noScan)
-      }
-
     case AnalyzeColumn(ResolvedV1TableOrViewIdentifier(ident), columnNames, allColumns) =>
       AnalyzeColumnCommand(ident, columnNames, allColumns)
-
-    case AnalyzeColumn(
-        ResolvedTable(catalog, _, ft: FileTable, _),
-        columnNames, allColumns)
-        if supportsV1Command(catalog)
-          && ft.catalogTable.isDefined =>
-      AnalyzeColumnCommand(
-        ft.catalogTable.get.identifier,
-        columnNames, allColumns)
 
     // V2 catalog doesn't support REPAIR TABLE yet, we must use v1 command here.
     case RepairTable(

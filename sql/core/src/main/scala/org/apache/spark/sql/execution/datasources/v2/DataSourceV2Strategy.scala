@@ -75,6 +75,7 @@ class DataSourceV2Strategy(session: SparkSession)
         case ft: FileTable if ft.fileIndex.rootPaths.nonEmpty =>
           ft.fileIndex.refresh()
           syncNewPartitionsToCatalog(ft)
+          updateTableStats(ft)
           val path = new Path(ft.fileIndex.rootPaths.head.toUri)
           val fsConf = session.sessionState.newHadoopConfWithOptions(
             scala.jdk.CollectionConverters.MapHasAsScala(
@@ -116,6 +117,32 @@ class DataSourceV2Strategy(session: SparkSession)
       } catch {
         case e: Exception =>
           logWarning(s"Failed to sync partitions to catalog for " +
+            s"${ct.identifier}: ${e.getMessage}")
+      }
+    }
+  }
+
+  /**
+   * After a V2 file write, update the table's totalSize statistic
+   * in the catalog metastore (best-effort). Row count is not updated
+   * here -- use ANALYZE TABLE for accurate row counts.
+   */
+  private def updateTableStats(ft: FileTable): Unit = {
+    ft.catalogTable.foreach { ct =>
+      try {
+        val totalSize = ft.fileIndex.sizeInBytes
+        val newStats = ct.stats match {
+          case Some(existing) =>
+            Some(existing.copy(sizeInBytes = BigInt(totalSize)))
+          case None =>
+            Some(org.apache.spark.sql.catalyst.catalog.CatalogStatistics(
+              sizeInBytes = BigInt(totalSize)))
+        }
+        val updatedTable = ct.copy(stats = newStats)
+        session.sessionState.catalog.alterTable(updatedTable)
+      } catch {
+        case e: Exception =>
+          logWarning(s"Failed to update table stats for " +
             s"${ct.identifier}: ${e.getMessage}")
       }
     }
@@ -533,8 +560,26 @@ class DataSourceV2Strategy(session: SparkSession)
     case ShowTableProperties(rt: ResolvedTable, propertyKey, output) =>
       ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey) :: Nil
 
-    case AnalyzeTable(_: ResolvedTable, _, _) | AnalyzeColumn(_: ResolvedTable, _, _) =>
-      throw QueryCompilationErrors.analyzeTableNotSupportedForV2TablesError()
+    case AnalyzeTable(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        partitionSpec, noScan) =>
+      AnalyzeTableExec(
+        catalog, ident, ft,
+        partitionSpec, noScan) :: Nil
+
+    case AnalyzeColumn(
+        ResolvedTable(catalog, ident,
+          ft: FileTable, _),
+        columnNames, allColumns) =>
+      AnalyzeColumnExec(
+        catalog, ident, ft,
+        columnNames, allColumns) :: Nil
+
+    case AnalyzeTable(_: ResolvedTable, _, _) |
+         AnalyzeColumn(_: ResolvedTable, _, _) =>
+      throw QueryCompilationErrors
+        .analyzeTableNotSupportedForV2TablesError()
 
     case AddPartitions(
         r @ ResolvedTable(_, _, table: SupportsPartitionManagement, _), parts, ignoreIfExists) =>

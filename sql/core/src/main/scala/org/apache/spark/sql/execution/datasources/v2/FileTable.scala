@@ -273,9 +273,16 @@ abstract class FileTable(
    * @return
    */
   protected def mergedOptions(options: CaseInsensitiveStringMap): CaseInsensitiveStringMap = {
-    val finalOptions = this.options.asCaseSensitiveMap().asScala ++
+    val base = this.options.asCaseSensitiveMap().asScala ++
       options.asCaseSensitiveMap().asScala
-    new CaseInsensitiveStringMap(finalOptions.asJava)
+    // Inject stored numRows from catalog for FileScan.estimateStatistics()
+    val withStats = catalogTable.flatMap(_.stats)
+      .flatMap(_.rowCount) match {
+      case Some(rows) =>
+        base ++ Map(FileTable.NUM_ROWS_KEY -> rows.toString)
+      case None => base
+    }
+    new CaseInsensitiveStringMap(withStats.asJava)
   }
 
   /**
@@ -568,4 +575,7 @@ abstract class FileTable(
 object FileTable {
   private val CAPABILITIES = util.EnumSet.of(
     BATCH_READ, BATCH_WRITE, TRUNCATE, OVERWRITE_DYNAMIC)
+
+  /** Option key for injecting stored row count from ANALYZE TABLE into FileScan. */
+  val NUM_ROWS_KEY: String = "__numRows"
 }

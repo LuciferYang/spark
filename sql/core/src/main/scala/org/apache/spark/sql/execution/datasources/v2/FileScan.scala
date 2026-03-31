@@ -37,6 +37,7 @@ import org.apache.spark.sql.internal.{SessionStateHelper, SQLConf}
 import org.apache.spark.sql.internal.connector.SupportsMetadata
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.Utils
 
 trait FileScan extends Scan
@@ -67,6 +68,8 @@ trait FileScan extends Scan
    * Returns the required partition schema
    */
   def readPartitionSchema: StructType
+
+  def options: CaseInsensitiveStringMap
 
   /**
    * Returns the filters that can be use for partition pruning
@@ -197,9 +200,21 @@ trait FileScan extends Scan
         OptionalLong.of(size)
       }
 
-      override def numRows(): OptionalLong = OptionalLong.empty()
+      override def numRows(): OptionalLong = {
+        // Try to read stored row count from table
+        // properties (set by ANALYZE TABLE).
+        storedNumRows.map(OptionalLong.of)
+          .getOrElse(OptionalLong.empty())
+      }
     }
   }
+
+  /**
+   * Stored row count from ANALYZE TABLE, if available.
+   * Injected via FileTable.mergedOptions.
+   */
+  protected def storedNumRows: Option[Long] =
+    Option(options.get(FileTable.NUM_ROWS_KEY)).map(_.toLong)
 
   override def toBatch: Batch = this
 
