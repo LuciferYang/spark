@@ -2143,6 +2143,7 @@ class SparkContext:
             storageLevel.useOffHeap,
             storageLevel.deserialized,
             storageLevel.replication,
+            storageLevel.evictionPriority,
         )
 
     def setJobGroup(self, groupId: str, description: str, interruptOnCancel: bool = False) -> None:

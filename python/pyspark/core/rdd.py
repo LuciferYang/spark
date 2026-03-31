@@ -4696,7 +4696,7 @@ class RDD(Generic[T_co]):
         --------
         >>> rdd = sc.parallelize([1,2])
         >>> rdd.getStorageLevel()
-        StorageLevel(False, False, False, False, 1)
+        StorageLevel(False, False, False, False, 1, 0)
         >>> print(rdd.getStorageLevel())
         Serialized 1x Replicated
         """
@@ -4707,6 +4707,7 @@ class RDD(Generic[T_co]):
             java_storage_level.useOffHeap(),
             java_storage_level.deserialized(),
             java_storage_level.replication(),
+            java_storage_level.evictionPriority(),
         )
         return storage_level
 

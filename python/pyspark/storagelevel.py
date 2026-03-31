@@ -48,20 +48,35 @@ class StorageLevel:
         useOffHeap: bool,
         deserialized: bool,
         replication: int = 1,
+        evictionPriority: int = 0,
     ):
         self.useDisk = useDisk
         self.useMemory = useMemory
         self.useOffHeap = useOffHeap
         self.deserialized = deserialized
         self.replication = replication
+        self.evictionPriority = evictionPriority
 
-    def __repr__(self) -> str:
-        return "StorageLevel(%s, %s, %s, %s, %s)" % (
+    def withEvictionPriority(self, priority: int) -> "StorageLevel":
+        """Return a new StorageLevel with the given eviction priority.
+        Lower priority levels are evicted from memory first (default is 0)."""
+        return StorageLevel(
             self.useDisk,
             self.useMemory,
             self.useOffHeap,
             self.deserialized,
             self.replication,
+            priority,
+        )
+
+    def __repr__(self) -> str:
+        return "StorageLevel(%s, %s, %s, %s, %s, %s)" % (
+            self.useDisk,
+            self.useMemory,
+            self.useOffHeap,
+            self.deserialized,
+            self.replication,
+            self.evictionPriority,
         )
 
     def __str__(self) -> str:
@@ -76,11 +91,12 @@ class StorageLevel:
     def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, StorageLevel)
-            and self.useMemory == other.useMemory
             and self.useDisk == other.useDisk
+            and self.useMemory == other.useMemory
             and self.useOffHeap == other.useOffHeap
             and self.deserialized == other.deserialized
             and self.replication == other.replication
+            and self.evictionPriority == other.evictionPriority
         )
 
 

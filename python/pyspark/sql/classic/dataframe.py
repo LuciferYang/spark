@@ -555,6 +555,7 @@ class DataFrame(ParentDataFrame, PandasMapOpsMixin, PandasConversionMixin):
             java_storage_level.useOffHeap(),
             java_storage_level.deserialized(),
             java_storage_level.replication(),
+            java_storage_level.evictionPriority(),
         )
         return storage_level
 
