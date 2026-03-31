@@ -100,14 +100,10 @@ class StorageLevel private(
     ret
   }
 
-  // Serialization format:
-  //   v1 (original): [flags:1byte][replication:1byte]           --2 bytes
-  //   v2 (current):  [flags:1byte][replication:1byte][priority:4bytes] --6 bytes
-  // v2 always writes 6 bytes because Externalizable has no object boundaries:
-  // the reader must consume exactly the bytes the writer wrote. Conditional
-  // write would corrupt the stream when StorageLevel is embedded in a larger
-  // object. readExternal handles v1 data via try-catch (EOF on the 3rd byte).
-  // Note: driver and executors must run the same Spark version.
+  // Serialization: [flags:1byte][replication:1byte][priority:4bytes] = 6 bytes.
+  // Always writes 6 bytes -- Externalizable has no object boundaries, so the
+  // reader must consume exactly what the writer wrote. readExternal handles
+  // old 2-byte data (without priority) via try-catch, defaulting to 0.
 
   override def writeExternal(out: ObjectOutput): Unit = SparkErrorUtils.tryOrIOException {
     out.writeByte(toInt)
