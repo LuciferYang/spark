@@ -19,6 +19,7 @@ package org.apache.spark.sql.v2.avro
 import org.apache.hadoop.mapreduce.Job
 
 import org.apache.spark.sql.avro.AvroUtils
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.connector.write.LogicalWriteInfo
 import org.apache.spark.sql.execution.datasources.OutputWriterFactory
 import org.apache.spark.sql.execution.datasources.v2.FileWrite
@@ -31,6 +32,7 @@ case class AvroWrite(
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
     partitionSchema: StructType,
+    override val bucketSpec: Option[BucketSpec] = None,
     override val customPartitionLocations: Map[Map[String, String], String] = Map.empty,
     override val dynamicPartitionOverwrite: Boolean,
     override val isTruncate: Boolean) extends FileWrite {

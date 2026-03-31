@@ -18,6 +18,7 @@ package org.apache.spark.sql.execution.datasources.v2.csv
 
 import org.apache.hadoop.mapreduce.{Job, TaskAttemptContext}
 
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.csv.CSVOptions
 import org.apache.spark.sql.catalyst.util.CompressionCodecs
 import org.apache.spark.sql.connector.write.LogicalWriteInfo
@@ -33,6 +34,7 @@ case class CSVWrite(
     supportsDataType: DataType => Boolean,
     info: LogicalWriteInfo,
     partitionSchema: StructType,
+    override val bucketSpec: Option[BucketSpec] = None,
     override val customPartitionLocations: Map[Map[String, String], String] = Map.empty,
     override val dynamicPartitionOverwrite: Boolean,
     override val isTruncate: Boolean) extends FileWrite {

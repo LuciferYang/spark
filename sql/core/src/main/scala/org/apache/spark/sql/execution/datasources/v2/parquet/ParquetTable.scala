@@ -45,9 +45,9 @@ case class ParquetTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     createFileWriteBuilder(info) {
-      (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
-      ParquetWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
-        dynamicOverwrite, truncate)
+      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate) =>
+      ParquetWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, bSpec,
+        customLocs, dynamicOverwrite, truncate)
     }
   }
 

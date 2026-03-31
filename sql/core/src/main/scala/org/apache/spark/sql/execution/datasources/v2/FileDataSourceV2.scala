@@ -128,12 +128,11 @@ trait FileDataSourceV2 extends TableProvider with DataSourceRegister {
     if (partitioning.nonEmpty) {
       table match {
         case ft: FileTable =>
+          // Extract partition column names from IdentityTransform only.
+          // BucketTransform is handled via catalogTable.bucketSpec.
           ft.userSpecifiedPartitioning =
-            partitioning.map {
+            partitioning.collect {
               case IdentityTransform(FieldReference(Seq(col))) => col
-              case x =>
-                throw new IllegalArgumentException(
-                  "Unsupported partition transform: " + x)
             }.toImmutableArraySeq
         case _ =>
       }

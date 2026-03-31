@@ -24,7 +24,8 @@ import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.spark.internal.io.{FileCommitProtocol, SparkHadoopWriterUtils}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, DataWriterFactory}
-import org.apache.spark.sql.execution.datasources.{DynamicPartitionDataSingleWriter, SingleDirectoryDataWriter, WriteJobDescription}
+import org.apache.spark.sql.execution.datasources.{DynamicPartitionDataConcurrentWriter, DynamicPartitionDataSingleWriter, SingleDirectoryDataWriter, WriteJobDescription}
+import org.apache.spark.sql.execution.datasources.FileFormatWriter.ConcurrentOutputWriterSpec
 
 case class FileWriterFactory (
     description: WriteJobDescription,
@@ -40,8 +41,17 @@ case class FileWriterFactory (
   override def createWriter(partitionId: Int, realTaskId: Long): DataWriter[InternalRow] = {
     val taskAttemptContext = createTaskAttemptContext(partitionId, realTaskId.toInt & Int.MaxValue)
     committer.setupTask(taskAttemptContext)
-    if (description.partitionColumns.isEmpty) {
+    if (description.partitionColumns.isEmpty && description.bucketSpec.isEmpty) {
       new SingleDirectoryDataWriter(description, taskAttemptContext, committer)
+    } else if (description.bucketSpec.isDefined) {
+      // Use concurrent writers for bucketed writes: V2's
+      // RequiresDistributionAndOrdering cannot express the hash-based
+      // ordering that DynamicPartitionDataSingleWriter requires.
+      val spec = ConcurrentOutputWriterSpec(Int.MaxValue, () =>
+        throw new UnsupportedOperationException(
+          "Sort fallback should not be triggered for V2 bucketed writes"))
+      new DynamicPartitionDataConcurrentWriter(
+        description, taskAttemptContext, committer, spec)
     } else {
       new DynamicPartitionDataSingleWriter(description, taskAttemptContext, committer)
     }

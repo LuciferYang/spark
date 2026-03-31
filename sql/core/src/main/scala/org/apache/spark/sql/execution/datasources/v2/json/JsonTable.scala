@@ -51,9 +51,9 @@ case class JsonTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     createFileWriteBuilder(info) {
-      (mergedInfo, partSchema, customLocs, dynamicOverwrite, truncate) =>
-      JsonWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, customLocs,
-        dynamicOverwrite, truncate)
+      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate) =>
+      JsonWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, bSpec,
+        customLocs, dynamicOverwrite, truncate)
     }
   }
 

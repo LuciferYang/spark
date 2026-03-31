@@ -608,6 +608,72 @@ class FileDataSourceV2WriteSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("Bucketed write via V2 path") {
+    import org.apache.spark.sql.execution.datasources.BucketingUtils
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, key INT)" +
+        " USING parquet" +
+        " CLUSTERED BY (key) INTO 4 BUCKETS")
+      sql("INSERT INTO t SELECT id, " +
+        "cast(id % 4 as int) FROM range(100)")
+      checkAnswer(
+        sql("SELECT count(*) FROM t"),
+        Row(100))
+      // Verify bucketed file naming: each file should have a bucket ID
+      val tablePath = spark.sessionState.catalog
+        .getTableMetadata(
+          org.apache.spark.sql.catalyst
+            .TableIdentifier("t"))
+        .location
+      val files = new java.io.File(tablePath)
+        .listFiles()
+        .filter(_.getName.endsWith(".parquet"))
+        .map(_.getName)
+      assert(files.nonEmpty,
+        "Expected bucketed parquet files")
+      val bucketIds = files.flatMap(BucketingUtils.getBucketId)
+      assert(bucketIds.nonEmpty,
+        s"Expected bucket IDs in file names, got: ${files.mkString(", ")}")
+      assert(bucketIds.forall(id => id >= 0 && id < 4),
+        s"Bucket IDs should be in [0, 4), got: ${bucketIds.mkString(", ")}")
+    }
+  }
+
+  test("Partitioned and bucketed write via V2 path") {
+    import org.apache.spark.sql.execution.datasources.BucketingUtils
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, key INT, part STRING)" +
+        " USING parquet PARTITIONED BY (part)" +
+        " CLUSTERED BY (key) INTO 4 BUCKETS")
+      sql("INSERT INTO t SELECT id, " +
+        "cast(id % 4 as int), " +
+        "cast(id % 2 as string) FROM range(100)")
+      checkAnswer(
+        sql("SELECT count(*) FROM t"),
+        Row(100))
+      // Verify partition directories exist
+      val tablePath = spark.sessionState.catalog
+        .getTableMetadata(
+          org.apache.spark.sql.catalyst
+            .TableIdentifier("t"))
+        .location
+      val partDirs = new java.io.File(tablePath)
+        .listFiles()
+        .filter(f => f.isDirectory && f.getName.startsWith("part="))
+      assert(partDirs.length == 2,
+        s"Expected 2 partition dirs, got: ${partDirs.map(_.getName).mkString(", ")}")
+      // Verify bucketed files in each partition
+      partDirs.foreach { dir =>
+        val files = dir.listFiles()
+          .filter(_.getName.endsWith(".parquet"))
+          .map(_.getName)
+        val bucketIds = files.flatMap(BucketingUtils.getBucketId)
+        assert(bucketIds.nonEmpty,
+          s"Expected bucket IDs in ${dir.getName}, got: ${files.mkString(", ")}")
+      }
+    }
+  }
+
   test("SELECT FROM format.path uses V2 path") {
     Seq("parquet", "orc", "json").foreach { format =>
       withTempPath { path =>
