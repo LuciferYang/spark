@@ -50,10 +50,10 @@ object OptimizeOneRowPlan extends Rule[LogicalPlan] {
         isChildEligible(child, enableForStreaming) => child
       case Sort(_, false, child, _) if child.maxRowsPerPartition.exists(_ <= 1L) &&
         isChildEligible(child, enableForStreaming) => child
-      case agg @ Aggregate(_, _, child, _) if agg.groupOnly && child.maxRows.exists(_ <= 1L) &&
-        isChildEligible(child, enableForStreaming) =>
-        Project(agg.aggregateExpressions, child)
-      case agg: Aggregate if agg.child.maxRows.exists(_ <= 1L) &&
+      case agg: AggregateBase if agg.groupOnly && agg.child.maxRows.exists(_ <= 1L) &&
+        isChildEligible(agg.child, enableForStreaming) =>
+        Project(agg.aggregateExpressions, agg.child)
+      case agg: AggregateBase if agg.child.maxRows.exists(_ <= 1L) &&
         isChildEligible(agg.child, enableForStreaming) =>
         agg.transformExpressions {
           case aggExpr: AggregateExpression if aggExpr.isDistinct =>

@@ -244,6 +244,9 @@ abstract class Optimizer(catalogManager: CatalogManager)
     // aggregate distinct column
     Batch("Distinct Aggregate Rewrite", Once,
       RewriteDistinctAggregates),
+    Batch("Partial Aggregation Optimization", Once,
+      PushPartialAggregationThroughJoin,
+      DeduplicateRightSideOfLeftSemiAntiJoin),
     Batch("Object Expressions Optimization", fixedPoint,
       EliminateMapObjects,
       CombineTypedFilters,
@@ -265,6 +268,7 @@ abstract class Optimizer(catalogManager: CatalogManager)
       LimitPushDown,
       ColumnPruning,
       CollapseProject,
+      DeduplicateRightSideOfLeftSemiAntiJoin,
       RemoveRedundantAliases,
       RemoveNoopOperators),
     // This batch must be executed after the `RewriteSubquery` batch, which creates joins.
@@ -714,7 +718,7 @@ object RemoveRedundantAliases extends Rule[LogicalPlan] {
         // aliases, use identity otherwise.
         val clean: Expression => Expression = plan match {
           case _: Project => removeRedundantAlias(_, excluded)
-          case _: Aggregate => removeRedundantAlias(_, excluded)
+          case _: AggregateBase => removeRedundantAlias(_, excluded)
           case _: Window => removeRedundantAlias(_, excluded)
           case _ => identity[Expression]
         }
@@ -725,6 +729,44 @@ object RemoveRedundantAliases extends Rule[LogicalPlan] {
             case a: Attribute => mapping.get(a).map(_.withName(a.name)).getOrElse(a)
           })
         }
+    }
+  }
+
+  /**
+   * In case a [[Project]], [[Aggregate]] or [[Window]] is a child of [[Union]], we don't remove an
+   * [[Alias]] in case it is on top of an [[Attribute]] which exists in the output set of the
+   * operator. This is needed because otherwise, we end up having an operator with duplicates in
+   * its output. When that happens, [[Union]] is not resolved, and we fail (but we shouldn't).
+   * In this example:
+   *
+   * {{{ SELECT col1 FROM values(1) WHERE 100 IN (SELECT col1 UNION SELECT col1); }}}
+   *
+   * Without `shouldRemoveAliasesUnderUnion` check, we would remove the [[Alias]] introduced in
+   * [[DeduplicateRelations]] rule (in a [[Project]] tagged as
+   * `PROJECT_FOR_EXPRESSION_ID_DEDUPLICATION`), the result is unresolved [[Union]] which causes the
+   * failure. With the check, [[Alias]] stays, and we resolve the plan properly.
+   */
+  private def shouldRemoveAliasesUnderUnion(operator: LogicalPlan): Boolean = {
+    operator match {
+      case project: Project =>
+        project.projectList.forall {
+          case Alias(attribute: Attribute, _) =>
+            !project.outputSet.contains(attribute)
+          case _ => true
+        }
+      case aggregate: AggregateBase =>
+        aggregate.aggregateExpressions.forall {
+          case Alias(attribute: Attribute, _) =>
+            !aggregate.outputSet.contains(attribute)
+          case _ => true
+        }
+      case window: Window =>
+        window.windowExpressions.forall {
+          case Alias(attribute: Attribute, _) =>
+            !window.outputSet.contains(attribute)
+          case _ => true
+        }
+      case other => true
     }
   }
 
@@ -743,8 +785,8 @@ object RemoveNoopOperators extends Rule[LogicalPlan] {
       val newChild = child match {
         case p: Project =>
           p.copy(projectList = restoreOriginalOutputNames(p.projectList, projectList.map(_.name)))
-        case agg: Aggregate =>
-          agg.copy(aggregateExpressions =
+        case agg: AggregateBase =>
+          agg.withAggregateExpressions(
             restoreOriginalOutputNames(agg.aggregateExpressions, projectList.map(_.name)))
         case _ =>
           child
@@ -985,9 +1027,9 @@ object ColumnPruning extends Rule[LogicalPlan] {
     // Prunes the unused columns from project list of Project/Aggregate/Expand
     case p @ Project(_, p2: Project) if !p2.outputSet.subsetOf(p.references) =>
       p.copy(child = p2.copy(projectList = p2.projectList.filter(p.references.contains)))
-    case p @ Project(_, a: Aggregate) if !a.outputSet.subsetOf(p.references) =>
-      p.copy(
-        child = a.copy(aggregateExpressions = a.aggregateExpressions.filter(p.references.contains)))
+    case p @ Project(_, a: AggregateBase) if !a.outputSet.subsetOf(p.references) =>
+      val newAggregateExprs = a.aggregateExpressions.filter(p.references.contains)
+      p.copy(child = a.withAggregateExpressions(newAggregateExprs))
     case a @ Project(_, e @ Expand(_, _, grandChild)) if !e.outputSet.subsetOf(a.references) =>
       val newOutput = e.output.filter(a.references.contains(_))
       val newProjects = e.projections.map { proj =>
@@ -1007,8 +1049,8 @@ object ColumnPruning extends Rule[LogicalPlan] {
       d.copy(child = prunedChild(child, d.references))
 
     // Prunes the unused columns from child of Aggregate/Expand/Generate/ScriptTransformation
-    case a @ Aggregate(_, _, child, _) if !child.outputSet.subsetOf(a.references) =>
-      a.copy(child = prunedChild(child, a.references))
+    case a: AggregateBase if !a.child.outputSet.subsetOf(a.references) =>
+      a.withNewChildren(Seq(prunedChild(a.child, a.references)))
     case f @ FlatMapGroupsInPandas(_, _, _, child) if !child.outputSet.subsetOf(f.references) =>
       f.copy(child = prunedChild(child, f.references))
     case e @ Expand(_, _, child) if !child.outputSet.subsetOf(e.references) =>
@@ -1141,11 +1183,11 @@ object CollapseProject extends Rule[LogicalPlan] with AliasHelper {
       case p1 @ Project(_, p2: Project)
           if canCollapseExpressions(p1.projectList, p2.projectList, alwaysInline) =>
         p2.copy(projectList = buildCleanedProjectList(p1.projectList, p2.projectList))
-      case p @ Project(_, agg: Aggregate)
+      case p @ Project(_, agg: AggregateBase)
           if canCollapseExpressions(p.projectList, agg.aggregateExpressions, alwaysInline) &&
              canCollapseAggregate(p, agg) =>
-        agg.copy(aggregateExpressions = buildCleanedProjectList(
-          p.projectList, agg.aggregateExpressions))
+        val newAggregateExps = buildCleanedProjectList(p.projectList, agg.aggregateExpressions)
+        agg.withAggregateExpressions(newAggregateExps)
       case Project(l1, g @ GlobalLimit(_, limit @ LocalLimit(_, p2 @ Project(l2, _))))
         if isRenaming(l1, l2) =>
         val newProjectList = buildCleanedProjectList(l1, l2)
@@ -1283,7 +1325,7 @@ object CollapseProject extends Rule[LogicalPlan] with AliasHelper {
    * in aggregate if they are also part of the grouping expressions. Otherwise the plan
    * after subquery rewrite will not be valid.
    */
-  private def canCollapseAggregate(p: Project, a: Aggregate): Boolean =
+  private def canCollapseAggregate(p: Project, a: AggregateBase): Boolean =
     !p.projectList.exists(hasCorrelatedSubquery)
 
   def buildCleanedProjectList(
@@ -1842,7 +1884,7 @@ object PushPredicateThroughNonJoin extends Rule[LogicalPlan] with PredicateHelpe
     // If we can push down a filter through Aggregate, it means the filter only references the
     // grouping keys or constants. The Aggregate operator can't reduce distinct values of grouping
     // keys so the filter won't see any new data after push down.
-    case filter @ Filter(condition, aggregate: Aggregate)
+    case filter @ Filter(condition, aggregate: AggregateBase)
       if aggregate.aggregateExpressions.forall(_.deterministic)
         && aggregate.groupingExpressions.nonEmpty =>
       val aliasMap = getAliasMap(aggregate)
@@ -1858,7 +1900,7 @@ object PushPredicateThroughNonJoin extends Rule[LogicalPlan] with PredicateHelpe
       if (pushDown.nonEmpty) {
         val pushDownPredicate = pushDown.reduce(And)
         val replaced = replaceAlias(pushDownPredicate, aliasMap)
-        val newAggregate = aggregate.copy(child = Filter(replaced, aggregate.child))
+        val newAggregate = aggregate.withNewChildren(Seq(Filter(replaced, aggregate.child)))
         // If there is no more filter to stay up, just eliminate the filter.
         // Otherwise, create "Filter(stayUp) <- Aggregate <- Filter(pushDownPredicate)".
         if (stayUp.isEmpty) newAggregate else Filter(stayUp.reduce(And), newAggregate)
@@ -2242,7 +2284,7 @@ object DecimalAggregates extends Rule[LogicalPlan] {
     case q: LogicalPlan => q.transformExpressionsDownWithPruning(
       _.containsAnyPattern(SUM, AVERAGE), ruleId) {
       case we @ WindowExpression(ae @ AggregateExpression(af, _, _, _, _), _) => af match {
-        case Sum(e @ DecimalExpression(prec, scale), _) if prec + 10 <= MAX_LONG_DIGITS =>
+        case Sum(e @ DecimalExpression(prec, scale), _, _) if prec + 10 <= MAX_LONG_DIGITS =>
           MakeDecimal(we.copy(windowFunction = ae.copy(aggregateFunction = Sum(UnscaledValue(e)))),
             prec + 10, scale)
 
@@ -2256,7 +2298,7 @@ object DecimalAggregates extends Rule[LogicalPlan] {
         case _ => we
       }
       case ae @ AggregateExpression(af, _, _, _, _) => af match {
-        case Sum(e @ DecimalExpression(prec, scale), _) if prec + 10 <= MAX_LONG_DIGITS =>
+        case Sum(e @ DecimalExpression(prec, scale), _, _) if prec + 10 <= MAX_LONG_DIGITS =>
           MakeDecimal(ae.copy(aggregateFunction = Sum(UnscaledValue(e))), prec + 10, scale)
 
         case Average(e @ DecimalExpression(prec, scale), _) if prec + 4 <= MAX_DOUBLE_DIGITS =>
