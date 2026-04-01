@@ -1108,7 +1108,7 @@ object SQLConf {
       .version("4.2.0")
 
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO =
     buildConf("spark.sql.optimizer.partialAggregationOptimization.benefitRatio")
