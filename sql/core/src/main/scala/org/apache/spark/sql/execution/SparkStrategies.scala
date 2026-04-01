@@ -25,6 +25,7 @@ import org.apache.spark.sql.{execution, AnalysisException}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper, NormalizeFloatingNumbers}
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans._
@@ -584,15 +585,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
             "You hit a query analyzer bug. Please report your query to Spark user mailing list.")
         }
 
-        // Ideally this should be done in `NormalizeFloatingNumbers`, but we do it here because
-        // `groupingExpressions` is not extracted during logical phase.
-        val normalizedGroupingExpressions = groupingExpressions.map { e =>
-          NormalizeFloatingNumbers.normalize(e) match {
-            case n: NamedExpression => n
-            // Keep the name of the original expression.
-            case other => Alias(other, e.name)(exprId = e.exprId)
-          }
-        }
+        val normalizedGroupingExpressions = normalizeGroupingExpressions(groupingExpressions)
 
         val aggregateOperator =
           if (functionsWithDistinct.isEmpty) {
@@ -657,8 +650,44 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           .map(_.asInstanceOf[PythonUDAF].name)
         // If cannot match the two cases above, then it's an error
         throw QueryCompilationErrors.invalidPandasUDFPlacementError(groupAggPandasUDFNames.distinct)
+      case PartialAggregate(groupingExps, aggregateExps, child, _) =>
+        PhysicalAggregation.unapply(Aggregate(groupingExps, aggregateExps, child)) match {
+          case Some((groupingExpressions, aggExpressions, resultExpressions, _))
+            if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+            AggUtils.planPartialAggregateWithoutDistinct(
+              normalizeGroupingExpressions(groupingExpressions),
+              aggExpressions.map(_.asInstanceOf[AggregateExpression]),
+              resultExpressions,
+              planLater(child))
 
+          case _ => Nil
+        }
+
+      case FinalAggregate(groupingExps, aggregateExps, child, _) =>
+        PhysicalAggregation.unapply(Aggregate(groupingExps, aggregateExps, child)) match {
+          case Some((groupingExpressions, aggExpressions, resultExpressions, _))
+            if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+            AggUtils.planFinalAggregateWithoutDistinct(
+              normalizeGroupingExpressions(groupingExpressions),
+              aggExpressions.map(_.asInstanceOf[AggregateExpression]),
+              resultExpressions,
+              planLater(child))
+
+          case _ => Nil
+        }
       case _ => Nil
+    }
+
+    private def normalizeGroupingExpressions(groupingExpressions: Seq[NamedExpression]) = {
+      // Ideally this should be done in `NormalizeFloatingNumbers`, but we do it here because
+      // `groupingExpressions` is not extracted during logical phase.
+      groupingExpressions.map { e =>
+        NormalizeFloatingNumbers.normalize(e) match {
+          case n: NamedExpression => n
+          // Keep the name of the original expression.
+          case other => Alias(other, e.name)(exprId = e.exprId)
+        }
+      }
     }
   }
 

@@ -292,6 +292,22 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]]
   }
 
   /**
+   * Returns a Seq containing the result until the condition specified by `f`.
+   * The condition is recursively applied to this node and all of its children.
+   */
+  def collectUntil(f: BaseType => Boolean): Seq[BaseType] = {
+    val buf = scala.collection.mutable.ArrayBuffer.empty[BaseType]
+    def collect(node: BaseType): Unit = {
+      if (!f(node)) {
+        buf += node
+        node.children.foreach(c => collect(c.asInstanceOf[BaseType]))
+      }
+    }
+    collect(this)
+    buf.toSeq
+  }
+
+  /**
    * Finds and returns the first [[TreeNode]] of the tree for which the given partial function
    * is defined (pre-order), and applies the partial function to it.
    */
