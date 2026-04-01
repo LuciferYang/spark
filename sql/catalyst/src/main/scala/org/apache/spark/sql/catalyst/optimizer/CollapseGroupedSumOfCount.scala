@@ -68,7 +68,7 @@ object CollapseGroupedSumOfCount extends Rule[LogicalPlan] {
       case ae: AggregateExpression => ae
     })
     def isCollapsibleSum(ae: AggregateExpression): Boolean = ae match {
-      case AggregateExpression(Sum(a: Attribute, context), _, false, None, _) =>
+      case AggregateExpression(Sum(a: Attribute, context, _), _, false, None, _) =>
         context.evalMode != EvalMode.TRY && countOutputs.contains(a)
       case _ => false
     }
@@ -83,7 +83,7 @@ object CollapseGroupedSumOfCount extends Rule[LogicalPlan] {
 
     val rewrittenExpressions = upper.aggregateExpressions.map { expr =>
       expr.transform {
-        case ae @ AggregateExpression(Sum(a: Attribute, context), _, false, None, _)
+        case ae @ AggregateExpression(Sum(a: Attribute, context, _), _, false, None, _)
             if countOutputs.contains(a) =>
           ae.copy(aggregateFunction = Sum(Literal(1L), context))
       }.asInstanceOf[NamedExpression]

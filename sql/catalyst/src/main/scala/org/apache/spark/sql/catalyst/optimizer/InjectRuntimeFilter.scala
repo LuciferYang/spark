@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.expressions.aggregate.BloomFilterAggregate
 import org.apache.spark.sql.catalyst.planning.ExtractEquiJoinKeys
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.catalyst.trees.TreePattern.{INVOKE, JSON_TO_STRUCT, LIKE_FAMLIY, PYTHON_UDF, REGEXP_EXTRACT_FAMILY, REGEXP_REPLACE, SCALA_UDF}
 import org.apache.spark.sql.internal.SQLConf
 
 /**
@@ -170,6 +169,14 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
         } else {
           None
         }
+      // An AggregateBase (Aggregate, PartialAggregate, FinalAggregate) that groups by the
+      // target key produces a superset of distinct key values, so it's safe to traverse
+      // through it for bloom filter creation. We reset predicate/filter state since the
+      // aggregate may change the plan structure above the selective filter.
+      case agg: AggregateBase if agg.output.exists(_.semanticEquals(targetKey)) =>
+        extract(agg.child, AttributeSet.empty,
+          hasHitFilter = false, hasHitSelectiveFilter = false,
+          currentPlan = currentPlan, targetKey = targetKey)
       case _: LeafNode if hasHitSelectiveFilter =>
         Some((targetKey, currentPlan))
       case _ => None
@@ -181,11 +188,6 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
     } else {
       None
     }
-  }
-
-  private def isSimpleExpression(e: Expression): Boolean = {
-    !e.containsAnyPattern(PYTHON_UDF, SCALA_UDF, INVOKE, JSON_TO_STRUCT, LIKE_FAMLIY,
-      REGEXP_EXTRACT_FAMILY, REGEXP_REPLACE)
   }
 
   private def isProbablyShuffleJoin(left: LogicalPlan,
