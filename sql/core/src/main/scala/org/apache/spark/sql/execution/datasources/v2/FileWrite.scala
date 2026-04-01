@@ -34,6 +34,7 @@ import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
 import org.apache.spark.sql.connector.distributions.{Distribution, Distributions}
 import org.apache.spark.sql.connector.expressions.{Expressions, SortDirection}
 import org.apache.spark.sql.connector.expressions.{SortOrder => V2SortOrder}
+import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, RequiresDistributionAndOrdering, Write}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources.{BasicWriteJobStatsTracker, DataSource, OutputWriterFactory, V1WritesUtils, WriteJobDescription}
@@ -52,6 +53,7 @@ trait FileWrite extends Write
   def info: LogicalWriteInfo
   def partitionSchema: StructType
   def bucketSpec: Option[BucketSpec] = None
+  def overwritePredicates: Option[Array[Predicate]] = None
   def customPartitionLocations: Map[Map[String, String], String] = Map.empty
   def dynamicPartitionOverwrite: Boolean = false
   def isTruncate: Boolean = false
@@ -93,13 +95,29 @@ trait FileWrite extends Write
       fs.mkdirs(qualifiedPath)
     }
 
-    // For truncate (full overwrite), delete existing data before writing.
     if (isTruncate && fs.exists(qualifiedPath)) {
+      // Full overwrite: delete all non-hidden data
       fs.listStatus(qualifiedPath).foreach { status =>
-        // Preserve hidden files/dirs (e.g., _SUCCESS, .spark-staging-*)
         if (!status.getPath.getName.startsWith("_") &&
             !status.getPath.getName.startsWith(".")) {
           fs.delete(status.getPath, true)
+        }
+      }
+    } else if (overwritePredicates.exists(_.nonEmpty) &&
+        fs.exists(qualifiedPath)) {
+      // Static partition overwrite: delete only matching partition dir.
+      // Extract partition spec from predicates and order by
+      // partitionSchema to match the directory structure.
+      val specMap = overwritePredicates.get
+        .flatMap(FileWrite.predicateToPartitionSpec)
+        .toMap
+      if (specMap.nonEmpty) {
+        val partPath = partitionSchema.fieldNames
+          .flatMap(col => specMap.get(col).map(v => s"$col=$v"))
+          .mkString("/")
+        val targetPath = new Path(qualifiedPath, partPath)
+        if (fs.exists(targetPath)) {
+          fs.delete(targetPath, true)
         }
       }
     }
@@ -216,6 +234,34 @@ trait FileWrite extends Write
         .getOrElse(sparkSession.sessionState.conf.sessionLocalTimeZone),
       statsTrackers = Seq(statsTracker)
     )
+  }
+}
+
+private[v2] object FileWrite {
+  /**
+   * Extract a (column, value) pair from a V2 equality
+   * predicate (e.g., `p <=> 1` => `("p", "1")`).
+   */
+  def predicateToPartitionSpec(
+      predicate: Predicate): Option[(String, String)] = {
+    if (predicate.name() == "=" || predicate.name() == "<=>") {
+      val children = predicate.children()
+      if (children.length == 2) {
+        val name = children(0) match {
+          case ref: org.apache.spark.sql.connector
+              .expressions.NamedReference =>
+            Some(ref.fieldNames().head)
+          case _ => None
+        }
+        val value = children(1) match {
+          case lit: org.apache.spark.sql.connector
+              .expressions.Literal[_] =>
+            Some(lit.value().toString)
+          case _ => None
+        }
+        for (n <- name; v <- value) yield (n, v)
+      } else None
+    } else None
   }
 }
 

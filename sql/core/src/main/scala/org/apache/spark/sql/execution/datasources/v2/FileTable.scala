@@ -31,9 +31,10 @@ import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column,
   Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
+import org.apache.spark.sql.connector.expressions.filter.{AlwaysTrue, Predicate}
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo,
   LogicalWriteInfoImpl, SupportsDynamicOverwrite,
-  SupportsTruncate, Write, WriteBuilder}
+  SupportsOverwriteV2, Write, WriteBuilder}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.streaming.runtime.MetadataLogFileIndex
@@ -308,19 +309,23 @@ abstract class FileTable(
       buildWrite: (LogicalWriteInfo, StructType,
         Option[BucketSpec],
         Map[Map[String, String], String],
-        Boolean, Boolean) => Write
+        Boolean, Boolean,
+        Option[Array[Predicate]]) => Write
   ): WriteBuilder = {
-    new WriteBuilder with SupportsDynamicOverwrite with SupportsTruncate {
+    new WriteBuilder with SupportsDynamicOverwrite
+        with SupportsOverwriteV2 {
       private var isDynamicOverwrite = false
-      private var isTruncate = false
+      private var overwritePredicates
+        : Option[Array[Predicate]] = None
 
       override def overwriteDynamicPartitions(): WriteBuilder = {
         isDynamicOverwrite = true
         this
       }
 
-      override def truncate(): WriteBuilder = {
-        isTruncate = true
+      override def overwrite(
+          predicates: Array[Predicate]): WriteBuilder = {
+        overwritePredicates = Some(predicates)
         this
       }
 
@@ -362,10 +367,13 @@ abstract class FileTable(
               .getOrElse(fromIndex)
           }
         val bSpec = catalogTable.flatMap(_.bucketSpec)
+        val isTruncate = overwritePredicates.exists(
+          _.exists(_.isInstanceOf[AlwaysTrue]))
         val customLocs = getCustomPartitionLocations(
           partSchema)
         buildWrite(merged, partSchema, bSpec,
-          customLocs, isDynamicOverwrite, isTruncate)
+          customLocs, isDynamicOverwrite, isTruncate,
+          overwritePredicates)
       }
     }
   }
@@ -577,7 +585,8 @@ abstract class FileTable(
 
 object FileTable {
   private val CAPABILITIES = util.EnumSet.of(
-    BATCH_READ, BATCH_WRITE, TRUNCATE, OVERWRITE_DYNAMIC)
+    BATCH_READ, BATCH_WRITE, TRUNCATE,
+    OVERWRITE_BY_FILTER, OVERWRITE_DYNAMIC)
 
   /** Option key for injecting stored row count from ANALYZE TABLE into FileScan. */
   val NUM_ROWS_KEY: String = "__numRows"

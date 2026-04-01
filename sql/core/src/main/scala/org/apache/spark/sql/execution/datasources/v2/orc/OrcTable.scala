@@ -45,9 +45,9 @@ case class OrcTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     createFileWriteBuilder(info) {
-      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate) =>
+      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate, overPreds) =>
       OrcWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, bSpec,
-        customLocs, dynamicOverwrite, truncate)
+        overPreds, customLocs, dynamicOverwrite, truncate)
     }
   }
 

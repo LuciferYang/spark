@@ -41,9 +41,9 @@ case class TextTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     createFileWriteBuilder(info) {
-      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate) =>
+      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate, overPreds) =>
       TextWrite(paths, formatName, supportsDataType, mergedInfo, partSchema, bSpec,
-        customLocs, dynamicOverwrite, truncate)
+        overPreds, customLocs, dynamicOverwrite, truncate)
     }
   }
 

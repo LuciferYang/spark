@@ -22,6 +22,7 @@ import org.apache.orc.OrcConf.{COMPRESS, MAPRED_OUTPUT_SCHEMA}
 import org.apache.orc.mapred.OrcStruct
 
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.write.LogicalWriteInfo
 import org.apache.spark.sql.execution.datasources.{OutputWriter, OutputWriterFactory}
 import org.apache.spark.sql.execution.datasources.orc.{OrcOptions, OrcOutputWriter, OrcUtils}
@@ -36,6 +37,7 @@ case class OrcWrite(
     info: LogicalWriteInfo,
     partitionSchema: StructType,
     override val bucketSpec: Option[BucketSpec] = None,
+    override val overwritePredicates: Option[Array[Predicate]] = None,
     override val customPartitionLocations: Map[Map[String, String], String] = Map.empty,
     override val dynamicPartitionOverwrite: Boolean,
     override val isTruncate: Boolean) extends FileWrite {

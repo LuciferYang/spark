@@ -709,6 +709,20 @@ class FileDataSourceV2WriteSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("SPARK-56316: static partition overwrite via V2 path") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT)" +
+        " USING parquet PARTITIONED BY (part)")
+      sql("INSERT INTO t VALUES (1, 1), (2, 2)")
+      // Overwrite only partition part=1
+      sql("INSERT OVERWRITE TABLE t PARTITION(part=1)" +
+        " SELECT 100")
+      checkAnswer(
+        sql("SELECT * FROM t ORDER BY part"),
+        Seq(Row(100, 1), Row(2, 2)))
+    }
+  }
+
   test("SELECT FROM format.path uses V2 path") {
     Seq("parquet", "orc", "json").foreach { format =>
       withTempPath { path =>

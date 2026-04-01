@@ -52,9 +52,9 @@ case class CSVTable(
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
     createFileWriteBuilder(info) {
-      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate) =>
+      (mergedInfo, partSchema, bSpec, customLocs, dynamicOverwrite, truncate, overPreds) =>
       CSVWrite(paths, formatName, supportsWriteDataType, mergedInfo, partSchema, bSpec,
-        customLocs, dynamicOverwrite, truncate)
+        overPreds, customLocs, dynamicOverwrite, truncate)
     }
   }
 
