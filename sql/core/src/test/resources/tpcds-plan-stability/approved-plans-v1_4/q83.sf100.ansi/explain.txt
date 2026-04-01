@@ -62,7 +62,7 @@ Input [3]: [sr_item_sk#1, sr_return_quantity#2, sr_returned_date_sk#3]
 Input [3]: [sr_item_sk#1, sr_return_quantity#2, sr_returned_date_sk#3]
 Condition : isnotnull(sr_item_sk#1)
 
-(4) ReusedExchange [Reuses operator id: 62]
+(4) ReusedExchange [Reuses operator id: 63]
 Output [1]: [d_date_sk#5]
 
 (5) BroadcastHashJoin [codegen id : 5]
@@ -136,7 +136,7 @@ Input [3]: [cr_item_sk#13, cr_return_quantity#14, cr_returned_date_sk#15]
 Input [3]: [cr_item_sk#13, cr_return_quantity#14, cr_returned_date_sk#15]
 Condition : isnotnull(cr_item_sk#13)
 
-(19) ReusedExchange [Reuses operator id: 62]
+(19) ReusedExchange [Reuses operator id: 63]
 Output [1]: [d_date_sk#16]
 
 (20) BroadcastHashJoin [codegen id : 10]
@@ -209,7 +209,7 @@ Input [3]: [wr_item_sk#24, wr_return_quantity#25, wr_returned_date_sk#26]
 Input [3]: [wr_item_sk#24, wr_return_quantity#25, wr_returned_date_sk#26]
 Condition : isnotnull(wr_item_sk#24)
 
-(34) ReusedExchange [Reuses operator id: 62]
+(34) ReusedExchange [Reuses operator id: 63]
 Output [1]: [d_date_sk#27]
 
 (35) BroadcastHashJoin [codegen id : 16]
@@ -274,22 +274,23 @@ Arguments: 100, [item_id#11 ASC NULLS FIRST, sr_item_qty#12 ASC NULLS FIRST], [i
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 1 Hosting Expression = sr_returned_date_sk#3 IN dynamicpruning#4
-BroadcastExchange (62)
-+- * Project (61)
-   +- * BroadcastHashJoin LeftSemi BuildRight (60)
+BroadcastExchange (63)
++- * Project (62)
+   +- * BroadcastHashJoin LeftSemi BuildRight (61)
       :- * Filter (49)
       :  +- * ColumnarToRow (48)
       :     +- Scan parquet spark_catalog.default.date_dim (47)
-      +- BroadcastExchange (59)
-         +- * Project (58)
-            +- * BroadcastHashJoin LeftSemi BuildRight (57)
+      +- BroadcastExchange (60)
+         +- * Project (59)
+            +- * BroadcastHashJoin LeftSemi BuildRight (58)
                :- * ColumnarToRow (51)
                :  +- Scan parquet spark_catalog.default.date_dim (50)
-               +- BroadcastExchange (56)
-                  +- * Project (55)
-                     +- * Filter (54)
-                        +- * ColumnarToRow (53)
-                           +- Scan parquet spark_catalog.default.date_dim (52)
+               +- BroadcastExchange (57)
+                  +- * HashAggregate (56)
+                     +- * Project (55)
+                        +- * Filter (54)
+                           +- * ColumnarToRow (53)
+                              +- Scan parquet spark_catalog.default.date_dim (52)
 
 
 (47) Scan parquet spark_catalog.default.date_dim
@@ -333,35 +334,42 @@ Condition : d_date#42 IN (2000-06-30,2000-09-27,2000-11-17)
 Output [1]: [d_week_seq#43]
 Input [2]: [d_date#42, d_week_seq#43]
 
-(56) BroadcastExchange
+(56) HashAggregate [codegen id : 1]
+Input [1]: [d_week_seq#43]
+Keys [1]: [d_week_seq#43]
+Functions: []
+Aggregate Attributes: []
+Results [1]: [d_week_seq#43]
+
+(57) BroadcastExchange
 Input [1]: [d_week_seq#43]
 Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=7]
 
-(57) BroadcastHashJoin [codegen id : 2]
+(58) BroadcastHashJoin [codegen id : 2]
 Left keys [1]: [d_week_seq#41]
 Right keys [1]: [d_week_seq#43]
 Join type: LeftSemi
 Join condition: None
 
-(58) Project [codegen id : 2]
+(59) Project [codegen id : 2]
 Output [1]: [d_date#40]
 Input [2]: [d_date#40, d_week_seq#41]
 
-(59) BroadcastExchange
+(60) BroadcastExchange
 Input [1]: [d_date#40]
 Arguments: HashedRelationBroadcastMode(List(input[0, date, true]),false), [plan_id=8]
 
-(60) BroadcastHashJoin [codegen id : 3]
+(61) BroadcastHashJoin [codegen id : 3]
 Left keys [1]: [d_date#39]
 Right keys [1]: [d_date#40]
 Join type: LeftSemi
 Join condition: None
 
-(61) Project [codegen id : 3]
+(62) Project [codegen id : 3]
 Output [1]: [d_date_sk#5]
 Input [2]: [d_date_sk#5, d_date#39]
 
-(62) BroadcastExchange
+(63) BroadcastExchange
 Input [1]: [d_date_sk#5]
 Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=9]
 
