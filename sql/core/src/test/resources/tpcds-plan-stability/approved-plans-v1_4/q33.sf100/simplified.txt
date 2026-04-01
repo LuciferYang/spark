@@ -41,11 +41,12 @@ TakeOrderedAndProject [total_sales,i_manufact_id]
                                         InputAdapter
                                           BroadcastExchange #4
                                             WholeStageCodegen (2)
-                                              Project [i_manufact_id]
-                                                Filter [i_category]
-                                                  ColumnarToRow
-                                                    InputAdapter
-                                                      Scan parquet spark_catalog.default.item [i_category,i_manufact_id]
+                                              HashAggregate [i_manufact_id]
+                                                Project [i_manufact_id]
+                                                  Filter [i_category]
+                                                    ColumnarToRow
+                                                      InputAdapter
+                                                        Scan parquet spark_catalog.default.item [i_category,i_manufact_id]
                             InputAdapter
                               BroadcastExchange #5
                                 WholeStageCodegen (4)

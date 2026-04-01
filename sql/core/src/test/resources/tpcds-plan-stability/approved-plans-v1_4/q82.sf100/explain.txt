@@ -1,10 +1,10 @@
 == Physical Plan ==
-TakeOrderedAndProject (28)
-+- * HashAggregate (27)
-   +- Exchange (26)
-      +- * HashAggregate (25)
-         +- * Project (24)
-            +- * SortMergeJoin Inner (23)
+TakeOrderedAndProject (29)
++- * HashAggregate (28)
+   +- Exchange (27)
+      +- * HashAggregate (26)
+         +- * Project (25)
+            +- * SortMergeJoin Inner (24)
                :- * Sort (16)
                :  +- Exchange (15)
                :     +- * Project (14)
@@ -21,12 +21,13 @@ TakeOrderedAndProject (28)
                :           :           +- * ColumnarToRow (7)
                :           :              +- Scan parquet spark_catalog.default.inventory (6)
                :           +- ReusedExchange (12)
-               +- * Sort (22)
-                  +- Exchange (21)
-                     +- * Project (20)
-                        +- * Filter (19)
-                           +- * ColumnarToRow (18)
-                              +- Scan parquet spark_catalog.default.store_sales (17)
+               +- * Sort (23)
+                  +- Exchange (22)
+                     +- * HashAggregate (21)
+                        +- * Project (20)
+                           +- * Filter (19)
+                              +- * ColumnarToRow (18)
+                                 +- Scan parquet spark_catalog.default.store_sales (17)
 
 
 (1) Scan parquet spark_catalog.default.item
@@ -80,7 +81,7 @@ Join condition: None
 Output [5]: [i_item_sk#1, i_item_id#2, i_item_desc#3, i_current_price#4, inv_date_sk#8]
 Input [6]: [i_item_sk#1, i_item_id#2, i_item_desc#3, i_current_price#4, inv_item_sk#6, inv_date_sk#8]
 
-(12) ReusedExchange [Reuses operator id: 33]
+(12) ReusedExchange [Reuses operator id: 34]
 Output [1]: [d_date_sk#10]
 
 (13) BroadcastHashJoin [codegen id : 3]
@@ -119,118 +120,125 @@ Condition : (isnotnull(ss_item_sk#11) AND might_contain(Subquery scalar-subquery
 Output [1]: [ss_item_sk#11]
 Input [2]: [ss_item_sk#11, ss_sold_date_sk#12]
 
-(21) Exchange
+(21) HashAggregate [codegen id : 5]
+Input [1]: [ss_item_sk#11]
+Keys [1]: [ss_item_sk#11]
+Functions: []
+Aggregate Attributes: []
+Results [1]: [ss_item_sk#11]
+
+(22) Exchange
 Input [1]: [ss_item_sk#11]
 Arguments: hashpartitioning(ss_item_sk#11, 5), ENSURE_REQUIREMENTS, [plan_id=4]
 
-(22) Sort [codegen id : 6]
+(23) Sort [codegen id : 6]
 Input [1]: [ss_item_sk#11]
 Arguments: [ss_item_sk#11 ASC NULLS FIRST], false, 0
 
-(23) SortMergeJoin [codegen id : 7]
+(24) SortMergeJoin [codegen id : 7]
 Left keys [1]: [i_item_sk#1]
 Right keys [1]: [ss_item_sk#11]
 Join type: Inner
 Join condition: None
 
-(24) Project [codegen id : 7]
+(25) Project [codegen id : 7]
 Output [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Input [5]: [i_item_sk#1, i_item_id#2, i_item_desc#3, i_current_price#4, ss_item_sk#11]
 
-(25) HashAggregate [codegen id : 7]
+(26) HashAggregate [codegen id : 7]
 Input [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Keys [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Functions: []
 Aggregate Attributes: []
 Results [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 
-(26) Exchange
+(27) Exchange
 Input [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Arguments: hashpartitioning(i_item_id#2, i_item_desc#3, i_current_price#4, 5), ENSURE_REQUIREMENTS, [plan_id=5]
 
-(27) HashAggregate [codegen id : 8]
+(28) HashAggregate [codegen id : 8]
 Input [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Keys [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Functions: []
 Aggregate Attributes: []
 Results [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 
-(28) TakeOrderedAndProject
+(29) TakeOrderedAndProject
 Input [3]: [i_item_id#2, i_item_desc#3, i_current_price#4]
 Arguments: 100, [i_item_id#2 ASC NULLS FIRST], [i_item_id#2, i_item_desc#3, i_current_price#4]
 
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 6 Hosting Expression = inv_date_sk#8 IN dynamicpruning#9
-BroadcastExchange (33)
-+- * Project (32)
-   +- * Filter (31)
-      +- * ColumnarToRow (30)
-         +- Scan parquet spark_catalog.default.date_dim (29)
+BroadcastExchange (34)
++- * Project (33)
+   +- * Filter (32)
+      +- * ColumnarToRow (31)
+         +- Scan parquet spark_catalog.default.date_dim (30)
 
 
-(29) Scan parquet spark_catalog.default.date_dim
+(30) Scan parquet spark_catalog.default.date_dim
 Output [2]: [d_date_sk#10, d_date#14]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_date), GreaterThanOrEqual(d_date,2000-05-25), LessThanOrEqual(d_date,2000-07-24), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_date:date>
 
-(30) ColumnarToRow [codegen id : 1]
+(31) ColumnarToRow [codegen id : 1]
 Input [2]: [d_date_sk#10, d_date#14]
 
-(31) Filter [codegen id : 1]
+(32) Filter [codegen id : 1]
 Input [2]: [d_date_sk#10, d_date#14]
 Condition : (((isnotnull(d_date#14) AND (d_date#14 >= 2000-05-25)) AND (d_date#14 <= 2000-07-24)) AND isnotnull(d_date_sk#10))
 
-(32) Project [codegen id : 1]
+(33) Project [codegen id : 1]
 Output [1]: [d_date_sk#10]
 Input [2]: [d_date_sk#10, d_date#14]
 
-(33) BroadcastExchange
+(34) BroadcastExchange
 Input [1]: [d_date_sk#10]
 Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=6]
 
 Subquery:2 Hosting operator id = 19 Hosting Expression = Subquery scalar-subquery#13, [id=#3]
-ObjectHashAggregate (40)
-+- Exchange (39)
-   +- ObjectHashAggregate (38)
-      +- * Project (37)
-         +- * Filter (36)
-            +- * ColumnarToRow (35)
-               +- Scan parquet spark_catalog.default.item (34)
+ObjectHashAggregate (41)
++- Exchange (40)
+   +- ObjectHashAggregate (39)
+      +- * Project (38)
+         +- * Filter (37)
+            +- * ColumnarToRow (36)
+               +- Scan parquet spark_catalog.default.item (35)
 
 
-(34) Scan parquet spark_catalog.default.item
+(35) Scan parquet spark_catalog.default.item
 Output [3]: [i_item_sk#1, i_current_price#4, i_manufact_id#5]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/item]
 PushedFilters: [IsNotNull(i_current_price), GreaterThanOrEqual(i_current_price,62.00), LessThanOrEqual(i_current_price,92.00), In(i_manufact_id, [129,270,423,821]), IsNotNull(i_item_sk)]
 ReadSchema: struct<i_item_sk:int,i_current_price:decimal(7,2),i_manufact_id:int>
 
-(35) ColumnarToRow [codegen id : 1]
+(36) ColumnarToRow [codegen id : 1]
 Input [3]: [i_item_sk#1, i_current_price#4, i_manufact_id#5]
 
-(36) Filter [codegen id : 1]
+(37) Filter [codegen id : 1]
 Input [3]: [i_item_sk#1, i_current_price#4, i_manufact_id#5]
 Condition : ((((isnotnull(i_current_price#4) AND (i_current_price#4 >= 62.00)) AND (i_current_price#4 <= 92.00)) AND i_manufact_id#5 IN (129,270,821,423)) AND isnotnull(i_item_sk#1))
 
-(37) Project [codegen id : 1]
+(38) Project [codegen id : 1]
 Output [1]: [i_item_sk#1]
 Input [3]: [i_item_sk#1, i_current_price#4, i_manufact_id#5]
 
-(38) ObjectHashAggregate
+(39) ObjectHashAggregate
 Input [1]: [i_item_sk#1]
 Keys: []
 Functions [1]: [partial_bloom_filter_agg(xxhash64(i_item_sk#1, 42), 239, 6582, 0, 0)]
 Aggregate Attributes [1]: [buf#15]
 Results [1]: [buf#16]
 
-(39) Exchange
+(40) Exchange
 Input [1]: [buf#16]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=7]
 
-(40) ObjectHashAggregate
+(41) ObjectHashAggregate
 Input [1]: [buf#16]
 Keys: []
 Functions [1]: [bloom_filter_agg(xxhash64(i_item_sk#1, 42), 239, 6582, 0, 0)]
