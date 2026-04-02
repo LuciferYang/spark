@@ -1,111 +1,69 @@
-WholeStageCodegen (18)
+WholeStageCodegen (6)
   BroadcastNestedLoopJoin
     BroadcastNestedLoopJoin
       BroadcastNestedLoopJoin
         BroadcastNestedLoopJoin
           BroadcastNestedLoopJoin
-            HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B1_LP,B1_CNT,B1_CNTD,sum,count,count,count]
-              InputAdapter
-                Exchange #1
-                  WholeStageCodegen (2)
-                    HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                      HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                        InputAdapter
-                          Exchange [ss_list_price] #2
-                            WholeStageCodegen (1)
-                              HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                                Project [ss_list_price]
-                                  Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                    ColumnarToRow
-                                      InputAdapter
-                                        Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+            Project
+              Subquery #1
+                WholeStageCodegen (3)
+                  Project [B1_LP,B1_CNT,B1_CNTD,B2_LP,B2_CNT,B2_CNTD,B3_LP,B3_CNT,B3_CNTD,B4_LP,B4_CNT,B4_CNTD,B5_LP,B5_CNT,B5_CNTD,B6_LP,B6_CNT,B6_CNTD]
+                    HashAggregate [first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count] [first(avg(unscaledvalue(spark_catalog.default.store_sales.ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(spark_catalog.default.store_sales.ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),first(avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),first(avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),first(avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),first(avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),first(avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter)) ignore nulls,first(count(ss_list_price) FILTER (WHERE propagatedFilter)L) ignore nulls,count(spark_catalog.default.store_sales.ss_list_price),B1_LP,B1_CNT,B1_CNTD,B2_LP,B2_CNT,B2_CNTD,B3_LP,B3_CNT,B3_CNTD,B4_LP,B4_CNT,B4_CNTD,B5_LP,B5_CNT,B5_CNTD,B6_LP,B6_CNT,B6_CNTD,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count]
+                      InputAdapter
+                        Exchange #1
+                          WholeStageCodegen (2)
+                            HashAggregate [avg(unscaledvalue(spark_catalog.default.store_sales.ss_list_price)) FILTER (WHERE propagatedFilter),gid,count(spark_catalog.default.store_sales.ss_list_price) FILTER (WHERE propagatedFilter),spark_catalog.default.store_sales.ss_list_price,propagatedFilter,avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),propagatedFilter,avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),propagatedFilter,avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),propagatedFilter,avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),propagatedFilter,avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),propagatedFilter] [first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count,first,valueSet,first,valueSet,count]
+                              HashAggregate [spark_catalog.default.store_sales.ss_list_price,gid,max,max,max,max,max,max,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count] [max(propagatedFilter),max(propagatedFilter),max(propagatedFilter),max(propagatedFilter),max(propagatedFilter),max(propagatedFilter),avg(unscaledvalue(spark_catalog.default.store_sales.ss_list_price)L),count(spark_catalog.default.store_sales.ss_list_price),avg(unscaledvalue(ss_list_price)L),count(ss_list_price),avg(unscaledvalue(ss_list_price)L),count(ss_list_price),avg(unscaledvalue(ss_list_price)L),count(ss_list_price),avg(unscaledvalue(ss_list_price)L),count(ss_list_price),avg(unscaledvalue(ss_list_price)L),count(ss_list_price),propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,avg(unscaledvalue(spark_catalog.default.store_sales.ss_list_price)) FILTER (WHERE propagatedFilter),count(spark_catalog.default.store_sales.ss_list_price) FILTER (WHERE propagatedFilter),avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),avg(unscaledvalue(ss_list_price)) FILTER (WHERE propagatedFilter),count(ss_list_price) FILTER (WHERE propagatedFilter),max,max,max,max,max,max,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count]
+                                InputAdapter
+                                  Exchange [spark_catalog.default.store_sales.ss_list_price,gid] #2
+                                    WholeStageCodegen (1)
+                                      HashAggregate [spark_catalog.default.store_sales.ss_list_price,gid,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,unscaledvalue(spark_catalog.default.store_sales.ss_list_price),propagatedFilter,spark_catalog.default.store_sales.ss_list_price,unscaledvalue(ss_list_price),propagatedFilter,ss_list_price,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter] [max,max,max,max,max,max,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count,max,max,max,max,max,max,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count,sum,count,count]
+                                        Expand [ss_list_price,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter,propagatedFilter]
+                                          Project [ss_list_price,ss_quantity,ss_coupon_amt,ss_wholesale_cost]
+                                            Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
+                                              ColumnarToRow
+                                                InputAdapter
+                                                  Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+              ReusedSubquery [mergedValue] #1
+              ReusedSubquery [mergedValue] #1
+              Scan OneRowRelation
             InputAdapter
               BroadcastExchange #3
-                WholeStageCodegen (5)
-                  HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B2_LP,B2_CNT,B2_CNTD,sum,count,count,count]
-                    InputAdapter
-                      Exchange #4
-                        WholeStageCodegen (4)
-                          HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                            HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                              InputAdapter
-                                Exchange [ss_list_price] #5
-                                  WholeStageCodegen (3)
-                                    HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                                      Project [ss_list_price]
-                                        Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                          ColumnarToRow
-                                            InputAdapter
-                                              Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+                WholeStageCodegen (1)
+                  Project
+                    ReusedSubquery [mergedValue] #1
+                    ReusedSubquery [mergedValue] #1
+                    ReusedSubquery [mergedValue] #1
+                    Scan OneRowRelation
           InputAdapter
-            BroadcastExchange #6
-              WholeStageCodegen (8)
-                HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B3_LP,B3_CNT,B3_CNTD,sum,count,count,count]
-                  InputAdapter
-                    Exchange #7
-                      WholeStageCodegen (7)
-                        HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                          HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                            InputAdapter
-                              Exchange [ss_list_price] #8
-                                WholeStageCodegen (6)
-                                  HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                                    Project [ss_list_price]
-                                      Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                        ColumnarToRow
-                                          InputAdapter
-                                            Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+            BroadcastExchange #4
+              WholeStageCodegen (2)
+                Project
+                  ReusedSubquery [mergedValue] #1
+                  ReusedSubquery [mergedValue] #1
+                  ReusedSubquery [mergedValue] #1
+                  Scan OneRowRelation
         InputAdapter
-          BroadcastExchange #9
-            WholeStageCodegen (11)
-              HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B4_LP,B4_CNT,B4_CNTD,sum,count,count,count]
-                InputAdapter
-                  Exchange #10
-                    WholeStageCodegen (10)
-                      HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                        HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                          InputAdapter
-                            Exchange [ss_list_price] #11
-                              WholeStageCodegen (9)
-                                HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                                  Project [ss_list_price]
-                                    Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                      ColumnarToRow
-                                        InputAdapter
-                                          Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+          BroadcastExchange #5
+            WholeStageCodegen (3)
+              Project
+                ReusedSubquery [mergedValue] #1
+                ReusedSubquery [mergedValue] #1
+                ReusedSubquery [mergedValue] #1
+                Scan OneRowRelation
       InputAdapter
-        BroadcastExchange #12
-          WholeStageCodegen (14)
-            HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B5_LP,B5_CNT,B5_CNTD,sum,count,count,count]
-              InputAdapter
-                Exchange #13
-                  WholeStageCodegen (13)
-                    HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                      HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                        InputAdapter
-                          Exchange [ss_list_price] #14
-                            WholeStageCodegen (12)
-                              HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                                Project [ss_list_price]
-                                  Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                    ColumnarToRow
-                                      InputAdapter
-                                        Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+        BroadcastExchange #6
+          WholeStageCodegen (4)
+            Project
+              ReusedSubquery [mergedValue] #1
+              ReusedSubquery [mergedValue] #1
+              ReusedSubquery [mergedValue] #1
+              Scan OneRowRelation
     InputAdapter
-      BroadcastExchange #15
-        WholeStageCodegen (17)
-          HashAggregate [sum,count,count,count] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),B6_LP,B6_CNT,B6_CNTD,sum,count,count,count]
-            InputAdapter
-              Exchange #16
-                WholeStageCodegen (16)
-                  HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),count(ss_list_price),sum,count,count,count,sum,count,count,count]
-                    HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                      InputAdapter
-                        Exchange [ss_list_price] #17
-                          WholeStageCodegen (15)
-                            HashAggregate [ss_list_price] [avg(UnscaledValue(ss_list_price)),count(ss_list_price),sum,count,count,sum,count,count]
-                              Project [ss_list_price]
-                                Filter [ss_quantity,ss_list_price,ss_coupon_amt,ss_wholesale_cost]
-                                  ColumnarToRow
-                                    InputAdapter
-                                      Scan parquet spark_catalog.default.store_sales [ss_quantity,ss_wholesale_cost,ss_list_price,ss_coupon_amt,ss_sold_date_sk]
+      BroadcastExchange #7
+        WholeStageCodegen (5)
+          Project
+            ReusedSubquery [mergedValue] #1
+            ReusedSubquery [mergedValue] #1
+            ReusedSubquery [mergedValue] #1
+            Scan OneRowRelation
