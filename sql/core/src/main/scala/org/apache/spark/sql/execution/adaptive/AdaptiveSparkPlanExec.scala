@@ -125,6 +125,7 @@ case class AdaptiveSparkPlanExec(
       AdjustShuffleExchangePosition,
       ValidateSparkPlan,
       ReplaceHashWithSortAgg,
+      CombineAdjacentAggregation,
       // `SortKeyReordering` needs the SMJ/Sort pairs `EnsureRequirements` materializes, and must
       // run before `RemoveRedundantSorts` (it only rewrites direct `SortExec` children).
       SortKeyReordering(context.session),

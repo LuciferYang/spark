@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.dynamicpruning
 
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeSeq, BindReferences, DynamicPruningExpression, DynamicPruningSubquery, Expression, Literal}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
-import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Project}
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.DYNAMIC_PRUNING_SUBQUERY
@@ -83,7 +83,9 @@ case class PlanDynamicPruningFilters(sparkSession: SparkSession) extends Rule[Sp
           // we need to apply an aggregate on the buildPlan in order to be column pruned
           val aliases = broadcastKeyIndices.map(idx =>
             Alias(buildKeys(idx), buildKeys(idx).toString)())
-          val aggregate = Aggregate(aliases, aliases, buildPlan)
+          val project = Project(aliases, buildPlan)
+          val aggregate = Aggregate(
+            aliases.map(a => a.toAttribute), aliases.map(a => a.toAttribute), project)
           val sparkPlan = QueryExecution.prepareExecutedPlan(sparkSession, aggregate)
           val values = SubqueryExec(name, sparkPlan)
           DynamicPruningExpression(InSubqueryExec(value, values, exprId))
