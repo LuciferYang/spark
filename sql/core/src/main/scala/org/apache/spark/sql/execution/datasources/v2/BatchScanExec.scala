@@ -108,7 +108,6 @@ case class BatchScanExec(
           // no validation is needed as the data source did not report any specific partitioning
           newPartitions.toSeq.map(Some)
       }
-
     } else {
       (originalPartitioning match {
         case k: KeyedPartitioning =>

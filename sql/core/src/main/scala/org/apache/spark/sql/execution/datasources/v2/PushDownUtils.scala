@@ -32,7 +32,7 @@ import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownF
 import org.apache.spark.sql.execution.{ScalarSubquery => ExecScalarSubquery}
 import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.internal.connector.{PartitionPredicateField, PartitionPredicateImpl, SupportsPushDownCatalystFilters}
+import org.apache.spark.sql.internal.connector.{PartitionPredicateField, PartitionPredicateImpl, SupportsPushDownCatalystFilters, SupportsRuntimeCatalystFilters}
 import org.apache.spark.sql.sources
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.util.ArrayImplicits.SparkArrayOps
@@ -146,6 +146,11 @@ object PushDownUtils extends Logging {
       table: Table,
       output: Seq[AttributeReference]): Boolean = {
     scan match {
+      case s: SupportsRuntimeCatalystFilters if runtimeFilters.nonEmpty =>
+        // Catalyst-expression runtime filtering takes precedence over V2 predicate translation
+        // for scans that opt in (e.g. file-source DPP via SPARK-30628).
+        s.filter(runtimeFilters)
+        true
       case filterableScan: SupportsRuntimeV2Filtering if runtimeFilters.nonEmpty =>
         // Push down translatable runtime filters.
         val filtersToTranslated = runtimeFilters.flatMap { f =>
