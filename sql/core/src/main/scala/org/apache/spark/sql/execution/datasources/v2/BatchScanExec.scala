@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, SinglePa
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
+import org.apache.spark.sql.internal.connector.SupportsRuntimeCatalystFilters
 import org.apache.spark.util.ArrayImplicits._
 
 /**
@@ -61,21 +62,31 @@ case class BatchScanExec(
 
   // Visible for testing
   @transient private[sql] lazy val filteredPartitions: Seq[Option[InputPartition]] = {
-    val dataSourceFilters = runtimeFilters.flatMap {
-      case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
-      case f => DataSourceV2Strategy.translateScalarSubqueryFilterV2(f)
+    val originalPartitioning = scan match {
+      case s: SupportsRuntimeCatalystFilters =>
+        s.filter(runtimeFilters)
+        Some(outputPartitioning)
+      case s: SupportsRuntimeV2Filtering =>
+        val dataSourceFilters = runtimeFilters.flatMap {
+          case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
+          case f => DataSourceV2Strategy.translateScalarSubqueryFilterV2(f)
+        }
+        if (dataSourceFilters.nonEmpty) {
+          s.filter(dataSourceFilters.toArray)
+          Some(outputPartitioning)
+        } else {
+          None
+        }
+      case _ =>
+        None
     }
 
-    val originalPartitioning = outputPartitioning
-    if (dataSourceFilters.nonEmpty) {
-      // the cast is safe as runtime filters are only assigned if the scan can be filtered
-      val filterableScan = scan.asInstanceOf[SupportsRuntimeV2Filtering]
-      filterableScan.filter(dataSourceFilters.toArray)
+    originalPartitioning.map { partitioning =>
 
       // call toBatch again to get filtered partitions
       val newPartitions = scan.toBatch.planInputPartitions()
 
-      originalPartitioning match {
+      partitioning match {
         case k: KeyedPartitioning =>
           if (newPartitions.exists(!_.isInstanceOf[HasPartitionKey])) {
             throw new SparkException("Data source must have preserved the original partitioning " +
@@ -116,8 +127,8 @@ case class BatchScanExec(
           newPartitions.toSeq.map(Some)
       }
 
-    } else {
-      (originalPartitioning match {
+    }.getOrElse {
+      (outputPartitioning match {
         case k: KeyedPartitioning =>
           inputPartitions.sortBy(_.asInstanceOf[HasPartitionKey].partitionKey())(k.keyRowOrdering)
 

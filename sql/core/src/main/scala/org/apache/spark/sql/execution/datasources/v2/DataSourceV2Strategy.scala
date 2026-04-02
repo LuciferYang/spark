@@ -27,7 +27,7 @@ import org.apache.spark.internal.LogKeys.EXPR
 import org.apache.spark.sql.catalyst.analysis.{ResolvedIdentifier, ResolvedNamespace, ResolvedPartitionSpec, ResolvedPersistentView, ResolvedTable, ResolvedTempView}
 import org.apache.spark.sql.catalyst.catalog.CatalogUtils
 import org.apache.spark.sql.catalyst.expressions
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, DynamicPruning, Expression, NamedExpression, Not, Or, PredicateHelper, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, DynamicPruning, Expression, Literal, NamedExpression, Not, Or, PredicateHelper, SubqueryExpression}
 import org.apache.spark.sql.catalyst.expressions.Literal.TrueLiteral
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -765,6 +765,18 @@ private[sql] object DataSourceV2Strategy extends Logging {
       }
       val literals = values.map(LiteralValue(_, in.child.dataType))
       Some(new Predicate("IN", FieldReference(name) +: literals))
+
+    case expr: Expression if expr.exists(_.isInstanceOf[ExecScalarSubquery]) =>
+      val resolvedExpr = expr.transform {
+        case s: ExecScalarSubquery =>
+          Literal(s.eval(null), s.dataType)
+      }
+      resolvedExpr match {
+        case PushablePredicate(predicate) =>
+          Some(predicate)
+        case _ =>
+          None
+      }
 
     case other =>
       logWarning(log"Can't translate ${MDC(EXPR, other)} to source filter, unsupported expression")
