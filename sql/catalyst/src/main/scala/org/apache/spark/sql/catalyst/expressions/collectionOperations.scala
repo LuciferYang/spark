@@ -32,7 +32,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.trees.{BinaryLike, UnaryLike}
-import org.apache.spark.sql.catalyst.trees.TreePattern.{ARRAY_DISTINCT, ARRAY_EXCEPT, ARRAY_INTERSECT, ARRAY_UNION, ARRAYS_OVERLAP, ARRAYS_ZIP, CONCAT, MAP_FROM_ENTRIES, TreePattern}
+import org.apache.spark.sql.catalyst.trees.TreePattern.{ARRAY_CONTAINS, ARRAY_DISTINCT, ARRAY_EXCEPT, ARRAY_INTERSECT, ARRAY_UNION, ARRAYS_OVERLAP, ARRAYS_ZIP, CONCAT, MAP_FROM_ENTRIES, TreePattern}
 import org.apache.spark.sql.catalyst.types.{DataTypeUtils, PhysicalDataType, PhysicalIntegralType}
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._
@@ -1462,6 +1462,8 @@ case class ArrayContains(left: Expression, right: Expression)
   extends BinaryExpression with ImplicitCastInputTypes with Predicate
   with QueryErrorsBase {
   override def nullIntolerant: Boolean = true
+
+  final override val nodePatterns: Seq[TreePattern] = Seq(ARRAY_CONTAINS)
 
   @transient private lazy val ordering: Ordering[Any] =
     TypeUtils.getInterpretedOrdering(right.dataType)
