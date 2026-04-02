@@ -21,6 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeMap, Expression, If, Literal, NamedExpression, Or}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.plans.{Cross, Inner}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, Join, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.internal.SQLConf
@@ -416,24 +417,27 @@ class PlanMerger(
           }
 
         case (np: Join, cp: Join) if np.joinType == cp.joinType && np.hint == cp.hint =>
-          // Filter propagation across joins is not yet supported.
-          tryMergePlans(np.left, cp.left, false).flatMap {
-            case TryMergeResult(mergedLeft, leftNPMapping, None, None) =>
-              tryMergePlans(np.right, cp.right, false).flatMap {
-                case TryMergeResult(mergedRight, rightNPMapping, None, None) =>
+          // Allow filter propagation through Inner/Cross joins only.
+          // For outer/semi/anti joins, filters below affect null-padding
+          // and cardinality in ways that cannot be undone by aggregate
+          // FILTER clauses above.
+          val joinFP = filterPropagationSupported &&
+            (np.joinType == Inner || np.joinType == Cross)
+          tryMergePlans(np.left, cp.left, joinFP).flatMap {
+            case TryMergeResult(mergedLeft, leftNPMapping, leftNPFilter, leftCPFilter) =>
+              tryMergePlans(np.right, cp.right, joinFP).flatMap {
+                case TryMergeResult(mergedRight, rightNPMapping, rightNPFilter, rightCPFilter) =>
                   val npMapping = leftNPMapping ++ rightNPMapping
                   val mappedNPCondition = np.condition.map(mapAttributes(_, npMapping))
-                  // Comparing the canonicalized form is required to ignore different forms of the
-                  // same expression and `AttributeReference.qualifier`s in `cp.condition`.
                   if (mappedNPCondition.map(_.canonicalized) == cp.condition.map(_.canonicalized)) {
                     val mergedPlan = cp.withNewChildren(Seq(mergedLeft, mergedRight))
-                    Some(TryMergeResult(mergedPlan, npMapping))
+                    val combinedNPFilter = leftNPFilter.orElse(rightNPFilter)
+                    val combinedCPFilter = leftCPFilter.orElse(rightCPFilter)
+                    Some(TryMergeResult(mergedPlan, npMapping, combinedNPFilter, combinedCPFilter))
                   } else {
                     None
                   }
-                case _ => None
               }
-            case _ => None
           }
 
         // Otherwise merging is not possible.
