@@ -23,6 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeMap, BinaryArithmetic, BinaryComparison, Expression, Literal, NamedExpression, Or, UnaryExpression, Unevaluable}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.plans.{Cross, Inner}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, Join, LogicalPlan, Project}
 import org.apache.spark.sql.connector.catalog.SupportsRead
 import org.apache.spark.sql.connector.read.SupportsMerge
@@ -437,23 +438,67 @@ class PlanMerger extends Logging {
         case (np: Join, cp: Join)
             if np.joinType == cp.joinType &&
               np.hint == cp.hint =>
-          // Filter propagation is not allowed through joins
-          tryMergePlans(np.left, cp.left, false).flatMap {
-            case (mergedLeft, leftOutputMap, None, None, _) =>
-              tryMergePlans(np.right, cp.right, false).flatMap {
-                case (mergedRight, rightOutputMap, None, None, _) =>
-                  val outputMap = leftOutputMap ++ rightOutputMap
-                  val mappedNewCondition = np.condition.map(mapAttributes(_, outputMap))
-                  if (mappedNewCondition.map(_.canonicalized) ==
-                    cp.condition.map(_.canonicalized)) {
-                    val mergedPlan = cp.withNewChildren(Seq(mergedLeft, mergedRight))
-                    Some(mergedPlan, outputMap, None, None, None)
+          // Allow filter propagation through Inner/Cross
+          // joins only. For outer/semi/anti joins, filters
+          // below affect null-padding and cardinality in
+          // ways that cannot be undone by aggregate FILTER
+          // clauses above.
+          val joinFP = filterPropagationSupported &&
+            (np.joinType == Inner ||
+              np.joinType == Cross)
+          tryMergePlans(
+            np.left, cp.left, joinFP
+          ).flatMap {
+            case (mergedLeft, leftOutputMap,
+                leftNewFilter, leftMergedFilter,
+                leftCost) =>
+              tryMergePlans(
+                np.right, cp.right, joinFP
+              ).flatMap {
+                case (mergedRight, rightOutputMap,
+                    rightNewFilter, rightMergedFilter,
+                    rightCost) =>
+                  val outputMap =
+                    leftOutputMap ++ rightOutputMap
+                  val mappedNewCond =
+                    np.condition.map(
+                      mapAttributes(_, outputMap))
+                  if (mappedNewCond
+                      .map(_.canonicalized) ==
+                      cp.condition
+                        .map(_.canonicalized)) {
+                    val mergedPlan =
+                      cp.withNewChildren(
+                        Seq(mergedLeft, mergedRight))
+                    // Combine filters from both sides
+                    val newFilter =
+                      (leftNewFilter.toSeq ++
+                        rightNewFilter.toSeq)
+                        .reduceOption(And)
+                    val mergedFilter =
+                      (leftMergedFilter.toSeq ++
+                        rightMergedFilter.toSeq)
+                        .reduceOption(And)
+                    // Combine costs additively
+                    val mergeCost =
+                      (leftCost, rightCost) match {
+                        case (Some(l), Some(r)) =>
+                          Some(l + r)
+                        case (Some(l), None) =>
+                          Some(l)
+                        case (None, Some(r)) =>
+                          Some(r)
+                        case _ =>
+                          if (joinFP) Some(0d)
+                          else None
+                      }
+                    Some(mergedPlan, outputMap,
+                      newFilter, mergedFilter,
+                      mergeCost)
                   } else {
                     None
                   }
-                case _ => None
               }
-            case _ => None
           }
 
         // Merge V2 data source scans via SupportsMerge interface.
