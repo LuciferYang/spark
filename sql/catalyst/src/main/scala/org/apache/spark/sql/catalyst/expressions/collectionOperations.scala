@@ -33,6 +33,8 @@ import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.trees.{BinaryLike, UnaryLike}
 import org.apache.spark.sql.catalyst.trees.TreePattern.{
+  ARRAY_CONTAINS,
+  ARRAYS_OVERLAP,
   ARRAYS_ZIP,
   CONCAT,
   MAP_FROM_ENTRIES,
@@ -1468,6 +1470,8 @@ case class ArrayContains(left: Expression, right: Expression)
   with QueryErrorsBase {
   override def nullIntolerant: Boolean = true
 
+  final override val nodePatterns: Seq[TreePattern] = Seq(ARRAY_CONTAINS)
+
   @transient private lazy val ordering: Ordering[Any] =
     TypeUtils.getInterpretedOrdering(right.dataType)
 
@@ -1810,6 +1814,8 @@ case class ArrayAppend(left: Expression, right: Expression) extends ArrayPendBas
 case class ArraysOverlap(left: Expression, right: Expression)
   extends BinaryArrayExpressionWithImplicitCast with Predicate {
   override def nullIntolerant: Boolean = true
+
+  final override val nodePatterns: Seq[TreePattern] = Seq(ARRAYS_OVERLAP)
 
   override def checkInputDataTypes(): TypeCheckResult = super.checkInputDataTypes() match {
     case TypeCheckResult.TypeCheckSuccess =>
