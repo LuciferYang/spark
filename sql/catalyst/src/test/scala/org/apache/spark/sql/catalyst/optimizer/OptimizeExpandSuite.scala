@@ -162,11 +162,12 @@ class OptimizeExpandSuite extends PlanTest {
     }
   }
 
-  test("expression-based distinct: pre-aggregate groups by leaf attributes, not expression") {
-    // For COUNT(DISTINCT col1 + col2), the pre-aggregate groups by the leaf attributes
-    // (col1, col2) rather than the expression (col1 + col2). This means dedup is less
-    // effective (more groups than strictly necessary) but still correct -- fewer rows
-    // are eliminated, but no rows are incorrectly removed.
+  test("skips when distinct expression is composite (col1 + col2)") {
+    // For COUNT(DISTINCT col1 + col2), the pre-aggregate would group by leaf
+    // attributes (col1, col2) rather than the expression (col1 + col2). This
+    // inflates the Cartesian product (e.g. col1 x col2 >> col1+col2 values),
+    // making dedup ineffective and causing performance regression. The rule
+    // should skip this case entirely.
     withSQLConf(SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "2") {
       val query = testRelation
         .groupBy($"key")(
@@ -174,21 +175,8 @@ class OptimizeExpandSuite extends PlanTest {
           countDistinct($"col3").as("cd3"))
         .analyze
       val optimized = Optimize.execute(query)
-      assert(hasPreAggBeforeExpand(optimized),
-        "Should still apply optimization for expression-based distinct")
-      val preAgg = optimized.collect {
-        case e: Expand => e.child
-      }.head.asInstanceOf[Aggregate]
-      val groupByNames = preAgg.groupingExpressions
-        .collect { case a: Attribute => a.name }.toSet
-      // Groups by leaf attributes col1, col2 (not by the expression col1 + col2).
-      // This means the pre-aggregate has 4 group-by columns (key, col1, col2, col3)
-      // instead of the ideal 3 (key, col1+col2, col3). Dedup is less effective --
-      // e.g. rows (key=1, col1=1, col2=2) and (key=1, col1=2, col2=1) won't be
-      // deduped even though col1+col2 is the same -- but correctness is preserved.
-      assert(groupByNames === Set("key", "col1", "col2", "col3"),
-        "Pre-aggregate should group by leaf attributes (key, col1, col2, col3), " +
-          s"not the expression. Actual: $groupByNames")
+      assert(!hasPreAggBeforeExpand(optimized),
+        "Should skip optimization for expression-based distinct")
     }
   }
 }

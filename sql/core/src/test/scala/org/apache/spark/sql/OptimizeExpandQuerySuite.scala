@@ -178,10 +178,11 @@ class OptimizeExpandQuerySuite
     }
   }
 
-  test("correctness: expression-based distinct (col1 + col2)") {
-    // Pre-aggregate groups by leaf attributes (col1, col2), not the expression (col1 + col2).
-    // Use data where different (col1, col2) pairs produce the same col1 + col2
-    // (e.g. (1,2) and (2,1) both give 3) so the "less effective dedup" actually matters.
+  test("skips optimization for expression-based distinct (col1 + col2)") {
+    // Composite distinct expressions cause the pre-aggregate to group by
+    // leaf attributes, inflating the Cartesian product. The rule should
+    // skip this case. Verify no pre-aggregate is inserted and results
+    // are still correct.
     withTempView("t") {
       spark.range(10000)
         .selectExpr(
@@ -203,7 +204,15 @@ class OptimizeExpandQuerySuite
       }
       withSQLConf(
         SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "2") {
-        checkAnswer(spark.sql(sqlText), expected.toSeq)
+        val df = spark.sql(sqlText)
+        // Verify optimization is skipped
+        val hasPreAgg = df.queryExecution.optimizedPlan.collect {
+          case e: Expand => e.child.isInstanceOf[Aggregate]
+        }.exists(identity)
+        assert(!hasPreAgg,
+          "Should skip optimization for expression-based distinct")
+        // Verify correctness
+        checkAnswer(df, expected.toSeq)
       }
     }
   }

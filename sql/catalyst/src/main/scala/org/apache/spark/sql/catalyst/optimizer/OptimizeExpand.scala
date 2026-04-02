@@ -43,6 +43,14 @@ import org.apache.spark.sql.internal.SQLConf
  *  - No non-distinct aggregates or FILTER clauses on distinct
  *    aggregates (checked via `expand.producedAttributes` being
  *    a subset of the inner aggregate's GROUP BY)
+ *  - Distinct expressions do not inflate the pre-aggregate's
+ *    group-by beyond the inner aggregate's. When a composite
+ *    expression like `col1 + col2` introduces new leaf attributes
+ *    not already referenced by other distinct columns, the
+ *    pre-aggregate's Cartesian product grows and dedup becomes
+ *    ineffective. However, composites that share leaf attributes
+ *    with other distinct columns (e.g. `col1 + col2` alongside
+ *    `col1 - col2`) are allowed.
  *  - The Expand child is not already an Aggregate (idempotency)
  *
  * Controlled by `spark.sql.optimizer.optimizeExpandRatio`
@@ -76,12 +84,21 @@ object OptimizeExpand extends Rule[LogicalPlan] {
   }
 
   /**
-   * Returns true if the Expand is safe to optimize: it must be
-   * the output of [[RewriteDistinctAggregates]] (has gid in
-   * GROUP BY), and all Expand-produced attributes must be in
-   * the inner GROUP BY. The subset check rejects non-distinct
-   * aggregates and FILTER clauses, which produce extra Expand
-   * output columns not consumed by the GROUP BY.
+   * Returns true if the Expand is safe and beneficial to optimize.
+   *
+   * Safety: the Expand must be the output of
+   * [[RewriteDistinctAggregates]] (has gid in GROUP BY), and all
+   * Expand-produced attributes must be in the inner GROUP BY.
+   * The subset check rejects non-distinct aggregates and FILTER
+   * clauses, which produce extra Expand output columns not
+   * consumed by the GROUP BY.
+   *
+   * Performance: the pre-aggregate's group-by column count must
+   * not exceed the inner aggregate's (minus gid). When distinct
+   * expressions are composite (e.g. `col1 + col2`), the
+   * pre-aggregate groups by leaf attributes instead of the
+   * expression, inflating the Cartesian product and making dedup
+   * ineffective or harmful.
    */
   private def canOptimize(
       innerAgg: Aggregate,
@@ -95,7 +112,18 @@ object OptimizeExpand extends Rule[LogicalPlan] {
 
     val innerGroupByAttrs = AttributeSet(
       innerAgg.groupingExpressions.flatMap(_.references))
-    expand.producedAttributes.subsetOf(innerGroupByAttrs)
+    if (!expand.producedAttributes.subsetOf(innerGroupByAttrs)) return false
+
+    // Reject composite distinct expressions (e.g., col1 + col2).
+    // The pre-aggregate groups by leaf attributes from the child that
+    // the Expand references. For simple column refs, this matches the
+    // inner aggregate's group-by count (minus gid). For composite
+    // expressions, the leaf attribute count exceeds it because each
+    // expression fans out into multiple attributes, inflating the
+    // Cartesian product and making dedup ineffective.
+    val preAggSize = expand.child.output.count(expand.references.contains)
+    val innerGroupBySize = innerAgg.groupingExpressions.size - 1 // minus gid
+    preAggSize <= innerGroupBySize
   }
 
   /**
