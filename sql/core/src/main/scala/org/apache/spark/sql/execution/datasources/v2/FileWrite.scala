@@ -36,9 +36,12 @@ import org.apache.spark.sql.connector.expressions.{Expressions, SortDirection}
 import org.apache.spark.sql.connector.expressions.{SortOrder => V2SortOrder}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, RequiresDistributionAndOrdering, Write}
+import org.apache.spark.sql.connector.write.streaming.StreamingWrite
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.datasources.{BasicWriteJobStatsTracker, DataSource, OutputWriterFactory, V1WritesUtils, WriteJobDescription}
 import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.execution.streaming.ManifestFileCommitProtocol
+import org.apache.spark.sql.execution.streaming.sinks.{FileStreamSink, FileStreamSinkLog}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.util.SchemaUtils
@@ -133,6 +136,39 @@ trait FileWrite extends Write
 
     committer.setupJob(job)
     new FileBatchWrite(job, description, committer)
+  }
+
+  override def toStreaming: StreamingWrite = {
+    val sparkSession = SparkSession.active
+    validateInputs(sparkSession.sessionState.conf)
+    val outPath = new Path(paths.head)
+    val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
+    val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
+
+    val fs = outPath.getFileSystem(hadoopConf)
+    val qualifiedPath = outPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+    if (!fs.exists(qualifiedPath)) {
+      fs.mkdirs(qualifiedPath)
+    }
+
+    // Metadata log (same location/format as V1 FileStreamSink)
+    val logPath = FileStreamSink.getMetadataLogPath(fs, qualifiedPath,
+      sparkSession.sessionState.conf)
+    val retention = caseSensitiveMap.get("retention").map(
+      org.apache.spark.util.Utils.timeStringAsMs)
+    val fileLog = new FileStreamSinkLog(
+      FileStreamSinkLog.VERSION, sparkSession, logPath.toString, retention)
+
+    val job = getJobInstance(hadoopConf, outPath)
+    val committer = new ManifestFileCommitProtocol(
+      java.util.UUID.randomUUID().toString, paths.head)
+    // Placeholder batchId to satisfy setupJob()'s require(fileLog != null)
+    committer.setupManifestOptions(fileLog, 0L)
+
+    val description = createWriteJobDescription(
+      sparkSession, hadoopConf, job, paths.head, options.asScala.toMap)
+
+    new FileStreamingWrite(job, description, committer, fileLog)
   }
 
   /**
