@@ -84,7 +84,7 @@ Input [3]: [d_date_sk#5, d_week_seq#6, d_day_name#7]
 
 (6) Filter [codegen id : 1]
 Input [3]: [d_date_sk#5, d_week_seq#6, d_day_name#7]
-Condition : ((isnotnull(d_date_sk#5) AND isnotnull(d_week_seq#6)) AND might_contain(Subquery scalar-subquery#8, [id=#1], xxhash64(d_week_seq#6, 42)))
+Condition : ((isnotnull(d_date_sk#5) AND isnotnull(d_week_seq#6)) AND might_contain(Subquery scalar-subquery#8, [id=#1].bloomFilter, xxhash64(d_week_seq#6, 42)))
 
 (7) BroadcastExchange
 Input [3]: [d_date_sk#5, d_week_seq#6, d_day_name#7]
@@ -205,11 +205,11 @@ Input [3]: [d_date_sk#58, d_week_seq#59, d_day_name#60]
 
 (32) Filter [codegen id : 7]
 Input [3]: [d_date_sk#58, d_week_seq#59, d_day_name#60]
-Condition : ((isnotnull(d_date_sk#58) AND isnotnull(d_week_seq#59)) AND might_contain(Subquery scalar-subquery#61, [id=#5], xxhash64(d_week_seq#59, 42)))
+Condition : ((isnotnull(d_date_sk#58) AND isnotnull(d_week_seq#59)) AND might_contain(ReusedSubquery Subquery scalar-subquery#8, [id=#1].bloomFilter, xxhash64(d_week_seq#59, 42)))
 
 (33) BroadcastExchange
 Input [3]: [d_date_sk#58, d_week_seq#59, d_day_name#60]
-Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=6]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=5]
 
 (34) BroadcastHashJoin [codegen id : 8]
 Left keys [1]: [sold_date_sk#56]
@@ -222,31 +222,31 @@ Output [3]: [sales_price#57, d_week_seq#59, d_day_name#60]
 Input [5]: [sold_date_sk#56, sales_price#57, d_date_sk#58, d_week_seq#59, d_day_name#60]
 
 (36) Scan parquet spark_catalog.default.catalog_sales
-Output [2]: [cs_ext_sales_price#62, cs_sold_date_sk#63]
+Output [2]: [cs_ext_sales_price#61, cs_sold_date_sk#62]
 Batched: true
 Location: InMemoryFileIndex []
-PartitionFilters: [isnotnull(cs_sold_date_sk#63)]
+PartitionFilters: [isnotnull(cs_sold_date_sk#62)]
 ReadSchema: struct<cs_ext_sales_price:decimal(7,2)>
 
 (37) ColumnarToRow [codegen id : 10]
-Input [2]: [cs_ext_sales_price#62, cs_sold_date_sk#63]
+Input [2]: [cs_ext_sales_price#61, cs_sold_date_sk#62]
 
 (38) Project [codegen id : 10]
-Output [2]: [cs_sold_date_sk#63 AS sold_date_sk#64, cs_ext_sales_price#62 AS sales_price#65]
-Input [2]: [cs_ext_sales_price#62, cs_sold_date_sk#63]
+Output [2]: [cs_sold_date_sk#62 AS sold_date_sk#63, cs_ext_sales_price#61 AS sales_price#64]
+Input [2]: [cs_ext_sales_price#61, cs_sold_date_sk#62]
 
 (39) ReusedExchange [Reuses operator id: 33]
-Output [3]: [d_date_sk#66, d_week_seq#67, d_day_name#68]
+Output [3]: [d_date_sk#65, d_week_seq#66, d_day_name#67]
 
 (40) BroadcastHashJoin [codegen id : 10]
-Left keys [1]: [sold_date_sk#64]
-Right keys [1]: [d_date_sk#66]
+Left keys [1]: [sold_date_sk#63]
+Right keys [1]: [d_date_sk#65]
 Join type: Inner
 Join condition: None
 
 (41) Project [codegen id : 10]
-Output [3]: [sales_price#65, d_week_seq#67, d_day_name#68]
-Input [5]: [sold_date_sk#64, sales_price#65, d_date_sk#66, d_week_seq#67, d_day_name#68]
+Output [3]: [sales_price#64, d_week_seq#66, d_day_name#67]
+Input [5]: [sold_date_sk#63, sales_price#64, d_date_sk#65, d_week_seq#66, d_day_name#67]
 
 (42) Union
 
@@ -254,91 +254,92 @@ Input [5]: [sold_date_sk#64, sales_price#65, d_date_sk#66, d_week_seq#67, d_day_
 Input [3]: [sales_price#57, d_week_seq#59, d_day_name#60]
 Keys [1]: [d_week_seq#59]
 Functions [7]: [partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Sunday   ) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Monday   ) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Tuesday  ) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Wednesday) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Thursday ) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Friday   ) THEN sales_price#57 END)), partial_sum(UnscaledValue(CASE WHEN (d_day_name#60 = Saturday ) THEN sales_price#57 END))]
-Aggregate Attributes [7]: [sum#69, sum#70, sum#71, sum#72, sum#73, sum#74, sum#75]
-Results [8]: [d_week_seq#59, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81, sum#82]
+Aggregate Attributes [7]: [sum#68, sum#69, sum#70, sum#71, sum#72, sum#73, sum#74]
+Results [8]: [d_week_seq#59, sum#75, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81]
 
 (44) Exchange
-Input [8]: [d_week_seq#59, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81, sum#82]
-Arguments: hashpartitioning(d_week_seq#59, 5), ENSURE_REQUIREMENTS, [plan_id=7]
+Input [8]: [d_week_seq#59, sum#75, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81]
+Arguments: hashpartitioning(d_week_seq#59, 5), ENSURE_REQUIREMENTS, [plan_id=6]
 
 (45) HashAggregate [codegen id : 13]
-Input [8]: [d_week_seq#59, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81, sum#82]
+Input [8]: [d_week_seq#59, sum#75, sum#76, sum#77, sum#78, sum#79, sum#80, sum#81]
 Keys [1]: [d_week_seq#59]
 Functions [7]: [sum(UnscaledValue(CASE WHEN (d_day_name#60 = Sunday   ) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Monday   ) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Tuesday  ) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Wednesday) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Thursday ) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Friday   ) THEN sales_price#57 END)), sum(UnscaledValue(CASE WHEN (d_day_name#60 = Saturday ) THEN sales_price#57 END))]
 Aggregate Attributes [7]: [sum(UnscaledValue(CASE WHEN (d_day_name#60 = Sunday   ) THEN sales_price#57 END))#30, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Monday   ) THEN sales_price#57 END))#31, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Tuesday  ) THEN sales_price#57 END))#32, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Wednesday) THEN sales_price#57 END))#33, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Thursday ) THEN sales_price#57 END))#34, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Friday   ) THEN sales_price#57 END))#35, sum(UnscaledValue(CASE WHEN (d_day_name#60 = Saturday ) THEN sales_price#57 END))#36]
-Results [8]: [d_week_seq#59, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Sunday   ) THEN sales_price#57 END))#30,17,2) AS sun_sales#83, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Monday   ) THEN sales_price#57 END))#31,17,2) AS mon_sales#84, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Tuesday  ) THEN sales_price#57 END))#32,17,2) AS tue_sales#85, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Wednesday) THEN sales_price#57 END))#33,17,2) AS wed_sales#86, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Thursday ) THEN sales_price#57 END))#34,17,2) AS thu_sales#87, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Friday   ) THEN sales_price#57 END))#35,17,2) AS fri_sales#88, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Saturday ) THEN sales_price#57 END))#36,17,2) AS sat_sales#89]
+Results [8]: [d_week_seq#59, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Sunday   ) THEN sales_price#57 END))#30,17,2) AS sun_sales#82, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Monday   ) THEN sales_price#57 END))#31,17,2) AS mon_sales#83, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Tuesday  ) THEN sales_price#57 END))#32,17,2) AS tue_sales#84, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Wednesday) THEN sales_price#57 END))#33,17,2) AS wed_sales#85, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Thursday ) THEN sales_price#57 END))#34,17,2) AS thu_sales#86, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Friday   ) THEN sales_price#57 END))#35,17,2) AS fri_sales#87, MakeDecimal(sum(UnscaledValue(CASE WHEN (d_day_name#60 = Saturday ) THEN sales_price#57 END))#36,17,2) AS sat_sales#88]
 
 (46) Scan parquet spark_catalog.default.date_dim
-Output [2]: [d_week_seq#90, d_year#91]
+Output [2]: [d_week_seq#89, d_year#90]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2002), IsNotNull(d_week_seq)]
 ReadSchema: struct<d_week_seq:int,d_year:int>
 
 (47) ColumnarToRow [codegen id : 12]
-Input [2]: [d_week_seq#90, d_year#91]
+Input [2]: [d_week_seq#89, d_year#90]
 
 (48) Filter [codegen id : 12]
-Input [2]: [d_week_seq#90, d_year#91]
-Condition : ((isnotnull(d_year#91) AND (d_year#91 = 2002)) AND isnotnull(d_week_seq#90))
+Input [2]: [d_week_seq#89, d_year#90]
+Condition : ((isnotnull(d_year#90) AND (d_year#90 = 2002)) AND isnotnull(d_week_seq#89))
 
 (49) Project [codegen id : 12]
-Output [1]: [d_week_seq#90]
-Input [2]: [d_week_seq#90, d_year#91]
+Output [1]: [d_week_seq#89]
+Input [2]: [d_week_seq#89, d_year#90]
 
 (50) BroadcastExchange
-Input [1]: [d_week_seq#90]
-Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=8]
+Input [1]: [d_week_seq#89]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=7]
 
 (51) BroadcastHashJoin [codegen id : 13]
 Left keys [1]: [d_week_seq#59]
-Right keys [1]: [d_week_seq#90]
+Right keys [1]: [d_week_seq#89]
 Join type: Inner
 Join condition: None
 
 (52) Project [codegen id : 13]
-Output [8]: [d_week_seq#59 AS d_week_seq2#92, sun_sales#83 AS sun_sales2#93, mon_sales#84 AS mon_sales2#94, tue_sales#85 AS tue_sales2#95, wed_sales#86 AS wed_sales2#96, thu_sales#87 AS thu_sales2#97, fri_sales#88 AS fri_sales2#98, sat_sales#89 AS sat_sales2#99]
-Input [9]: [d_week_seq#59, sun_sales#83, mon_sales#84, tue_sales#85, wed_sales#86, thu_sales#87, fri_sales#88, sat_sales#89, d_week_seq#90]
+Output [8]: [d_week_seq#59 AS d_week_seq2#91, sun_sales#82 AS sun_sales2#92, mon_sales#83 AS mon_sales2#93, tue_sales#84 AS tue_sales2#94, wed_sales#85 AS wed_sales2#95, thu_sales#86 AS thu_sales2#96, fri_sales#87 AS fri_sales2#97, sat_sales#88 AS sat_sales2#98]
+Input [9]: [d_week_seq#59, sun_sales#82, mon_sales#83, tue_sales#84, wed_sales#85, thu_sales#86, fri_sales#87, sat_sales#88, d_week_seq#89]
 
 (53) BroadcastExchange
-Input [8]: [d_week_seq2#92, sun_sales2#93, mon_sales2#94, tue_sales2#95, wed_sales2#96, thu_sales2#97, fri_sales2#98, sat_sales2#99]
-Arguments: HashedRelationBroadcastMode(List(cast((input[0, int, true] - 53) as bigint)),false), [plan_id=9]
+Input [8]: [d_week_seq2#91, sun_sales2#92, mon_sales2#93, tue_sales2#94, wed_sales2#95, thu_sales2#96, fri_sales2#97, sat_sales2#98]
+Arguments: HashedRelationBroadcastMode(List(cast((input[0, int, true] - 53) as bigint)),false), [plan_id=8]
 
 (54) BroadcastHashJoin [codegen id : 14]
 Left keys [1]: [d_week_seq1#46]
-Right keys [1]: [(d_week_seq2#92 - 53)]
+Right keys [1]: [(d_week_seq2#91 - 53)]
 Join type: Inner
 Join condition: None
 
 (55) Project [codegen id : 14]
-Output [8]: [d_week_seq1#46, round((sun_sales1#47 / sun_sales2#93), 2) AS round((sun_sales1 / sun_sales2), 2)#100, round((mon_sales1#48 / mon_sales2#94), 2) AS round((mon_sales1 / mon_sales2), 2)#101, round((tue_sales1#49 / tue_sales2#95), 2) AS round((tue_sales1 / tue_sales2), 2)#102, round((wed_sales1#50 / wed_sales2#96), 2) AS round((wed_sales1 / wed_sales2), 2)#103, round((thu_sales1#51 / thu_sales2#97), 2) AS round((thu_sales1 / thu_sales2), 2)#104, round((fri_sales1#52 / fri_sales2#98), 2) AS round((fri_sales1 / fri_sales2), 2)#105, round((sat_sales1#53 / sat_sales2#99), 2) AS round((sat_sales1 / sat_sales2), 2)#106]
-Input [16]: [d_week_seq1#46, sun_sales1#47, mon_sales1#48, tue_sales1#49, wed_sales1#50, thu_sales1#51, fri_sales1#52, sat_sales1#53, d_week_seq2#92, sun_sales2#93, mon_sales2#94, tue_sales2#95, wed_sales2#96, thu_sales2#97, fri_sales2#98, sat_sales2#99]
+Output [8]: [d_week_seq1#46, round((sun_sales1#47 / sun_sales2#92), 2) AS round((sun_sales1 / sun_sales2), 2)#99, round((mon_sales1#48 / mon_sales2#93), 2) AS round((mon_sales1 / mon_sales2), 2)#100, round((tue_sales1#49 / tue_sales2#94), 2) AS round((tue_sales1 / tue_sales2), 2)#101, round((wed_sales1#50 / wed_sales2#95), 2) AS round((wed_sales1 / wed_sales2), 2)#102, round((thu_sales1#51 / thu_sales2#96), 2) AS round((thu_sales1 / thu_sales2), 2)#103, round((fri_sales1#52 / fri_sales2#97), 2) AS round((fri_sales1 / fri_sales2), 2)#104, round((sat_sales1#53 / sat_sales2#98), 2) AS round((sat_sales1 / sat_sales2), 2)#105]
+Input [16]: [d_week_seq1#46, sun_sales1#47, mon_sales1#48, tue_sales1#49, wed_sales1#50, thu_sales1#51, fri_sales1#52, sat_sales1#53, d_week_seq2#91, sun_sales2#92, mon_sales2#93, tue_sales2#94, wed_sales2#95, thu_sales2#96, fri_sales2#97, sat_sales2#98]
 
 (56) Exchange
-Input [8]: [d_week_seq1#46, round((sun_sales1 / sun_sales2), 2)#100, round((mon_sales1 / mon_sales2), 2)#101, round((tue_sales1 / tue_sales2), 2)#102, round((wed_sales1 / wed_sales2), 2)#103, round((thu_sales1 / thu_sales2), 2)#104, round((fri_sales1 / fri_sales2), 2)#105, round((sat_sales1 / sat_sales2), 2)#106]
-Arguments: rangepartitioning(d_week_seq1#46 ASC NULLS FIRST, 5), ENSURE_REQUIREMENTS, [plan_id=10]
+Input [8]: [d_week_seq1#46, round((sun_sales1 / sun_sales2), 2)#99, round((mon_sales1 / mon_sales2), 2)#100, round((tue_sales1 / tue_sales2), 2)#101, round((wed_sales1 / wed_sales2), 2)#102, round((thu_sales1 / thu_sales2), 2)#103, round((fri_sales1 / fri_sales2), 2)#104, round((sat_sales1 / sat_sales2), 2)#105]
+Arguments: rangepartitioning(d_week_seq1#46 ASC NULLS FIRST, 5), ENSURE_REQUIREMENTS, [plan_id=9]
 
 (57) Sort [codegen id : 15]
-Input [8]: [d_week_seq1#46, round((sun_sales1 / sun_sales2), 2)#100, round((mon_sales1 / mon_sales2), 2)#101, round((tue_sales1 / tue_sales2), 2)#102, round((wed_sales1 / wed_sales2), 2)#103, round((thu_sales1 / thu_sales2), 2)#104, round((fri_sales1 / fri_sales2), 2)#105, round((sat_sales1 / sat_sales2), 2)#106]
+Input [8]: [d_week_seq1#46, round((sun_sales1 / sun_sales2), 2)#99, round((mon_sales1 / mon_sales2), 2)#100, round((tue_sales1 / tue_sales2), 2)#101, round((wed_sales1 / wed_sales2), 2)#102, round((thu_sales1 / thu_sales2), 2)#103, round((fri_sales1 / fri_sales2), 2)#104, round((sat_sales1 / sat_sales2), 2)#105]
 Arguments: [d_week_seq1#46 ASC NULLS FIRST], true, 0
 
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 6 Hosting Expression = Subquery scalar-subquery#8, [id=#1]
-ObjectHashAggregate (64)
-+- Exchange (63)
-   +- ObjectHashAggregate (62)
-      +- * Project (61)
-         +- * Filter (60)
-            +- * ColumnarToRow (59)
-               +- Scan parquet spark_catalog.default.date_dim (58)
+* Project (65)
++- ObjectHashAggregate (64)
+   +- Exchange (63)
+      +- ObjectHashAggregate (62)
+         +- * Project (61)
+            +- * Filter (60)
+               +- * ColumnarToRow (59)
+                  +- Scan parquet spark_catalog.default.date_dim (58)
 
 
 (58) Scan parquet spark_catalog.default.date_dim
 Output [2]: [d_week_seq#44, d_year#45]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
-PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_week_seq)]
+PushedFilters: [IsNotNull(d_year), IsNotNull(d_week_seq), Or(EqualTo(d_year,2001),EqualTo(d_year,2002))]
 ReadSchema: struct<d_week_seq:int,d_year:int>
 
 (59) ColumnarToRow [codegen id : 1]
@@ -346,74 +347,34 @@ Input [2]: [d_week_seq#44, d_year#45]
 
 (60) Filter [codegen id : 1]
 Input [2]: [d_week_seq#44, d_year#45]
-Condition : ((isnotnull(d_year#45) AND (d_year#45 = 2001)) AND isnotnull(d_week_seq#44))
+Condition : ((isnotnull(d_year#45) AND isnotnull(d_week_seq#44)) AND ((d_year#45 = 2001) OR (d_year#45 = 2002)))
 
 (61) Project [codegen id : 1]
-Output [1]: [d_week_seq#44]
+Output [3]: [d_week_seq#44, ((isnotnull(d_year#45) AND (d_year#45 = 2001)) AND isnotnull(d_week_seq#44)) AS propagatedFilter#106, ((isnotnull(d_year#45) AND (d_year#45 = 2002)) AND isnotnull(d_week_seq#44)) AS propagatedFilter#107]
 Input [2]: [d_week_seq#44, d_year#45]
 
 (62) ObjectHashAggregate
-Input [1]: [d_week_seq#44]
+Input [3]: [d_week_seq#44, propagatedFilter#106, propagatedFilter#107]
 Keys: []
-Functions [1]: [partial_bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)]
-Aggregate Attributes [1]: [buf#107]
-Results [1]: [buf#108]
+Functions [2]: [partial_bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0) FILTER (WHERE propagatedFilter#106), partial_bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0) FILTER (WHERE propagatedFilter#107)]
+Aggregate Attributes [2]: [buf#108, buf#109]
+Results [2]: [buf#110, buf#111]
 
 (63) Exchange
-Input [1]: [buf#108]
-Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=11]
+Input [2]: [buf#110, buf#111]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=10]
 
 (64) ObjectHashAggregate
-Input [1]: [buf#108]
+Input [2]: [buf#110, buf#111]
 Keys: []
-Functions [1]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#109]
-Results [1]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#109 AS bloomFilter#110]
+Functions [2]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0), bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)]
+Aggregate Attributes [2]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#112, bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#113]
+Results [2]: [bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#112 AS bloomFilter#114, bloom_filter_agg(xxhash64(d_week_seq#44, 42), 362, 9656, 0, 0)#113 AS bloomFilter#115]
 
-Subquery:2 Hosting operator id = 32 Hosting Expression = Subquery scalar-subquery#61, [id=#5]
-ObjectHashAggregate (71)
-+- Exchange (70)
-   +- ObjectHashAggregate (69)
-      +- * Project (68)
-         +- * Filter (67)
-            +- * ColumnarToRow (66)
-               +- Scan parquet spark_catalog.default.date_dim (65)
+(65) Project [codegen id : 2]
+Output [1]: [named_struct(bloomFilter, bloomFilter#114, bloomFilter, bloomFilter#115) AS mergedValue#116]
+Input [2]: [bloomFilter#114, bloomFilter#115]
 
-
-(65) Scan parquet spark_catalog.default.date_dim
-Output [2]: [d_week_seq#90, d_year#91]
-Batched: true
-Location [not included in comparison]/{warehouse_dir}/date_dim]
-PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2002), IsNotNull(d_week_seq)]
-ReadSchema: struct<d_week_seq:int,d_year:int>
-
-(66) ColumnarToRow [codegen id : 1]
-Input [2]: [d_week_seq#90, d_year#91]
-
-(67) Filter [codegen id : 1]
-Input [2]: [d_week_seq#90, d_year#91]
-Condition : ((isnotnull(d_year#91) AND (d_year#91 = 2002)) AND isnotnull(d_week_seq#90))
-
-(68) Project [codegen id : 1]
-Output [1]: [d_week_seq#90]
-Input [2]: [d_week_seq#90, d_year#91]
-
-(69) ObjectHashAggregate
-Input [1]: [d_week_seq#90]
-Keys: []
-Functions [1]: [partial_bloom_filter_agg(xxhash64(d_week_seq#90, 42), 362, 9656, 0, 0)]
-Aggregate Attributes [1]: [buf#111]
-Results [1]: [buf#112]
-
-(70) Exchange
-Input [1]: [buf#112]
-Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=12]
-
-(71) ObjectHashAggregate
-Input [1]: [buf#112]
-Keys: []
-Functions [1]: [bloom_filter_agg(xxhash64(d_week_seq#90, 42), 362, 9656, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(d_week_seq#90, 42), 362, 9656, 0, 0)#113]
-Results [1]: [bloom_filter_agg(xxhash64(d_week_seq#90, 42), 362, 9656, 0, 0)#113 AS bloomFilter#114]
+Subquery:2 Hosting operator id = 32 Hosting Expression = ReusedSubquery Subquery scalar-subquery#8, [id=#1]
 
 

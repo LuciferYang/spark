@@ -1592,6 +1592,14 @@ object SQLConf {
     .booleanConf
     .createWithDefault(false)
 
+  val IGNORE_PUSHED_DATA_FILTERS = buildConf("spark.sql.ignorePushedDataFilters")
+    .internal()
+    .doc("If true, when merging scans, ignore differences in pushed data filters.")
+    .version("4.2.0")
+    .withBindingPolicy(ConfigBindingPolicy.SESSION)
+    .booleanConf
+    .createWithDefault(false)
+
   val PARQUET_WRITE_LEGACY_FORMAT = buildConf("spark.sql.parquet.writeLegacyFormat")
     .doc("If true, data will be written in a way of Spark 1.4 and earlier. For example, decimal " +
       "values will be written in Apache Parquet's fixed-length byte array format, which other " +
@@ -2632,6 +2640,32 @@ object SQLConf {
     .version("3.0.0")
     .booleanConf
     .createWithDefault(true)
+
+  val PLAN_MERGE_FILTER_PROPAGATION_ENABLED =
+    buildConf("spark.sql.planMerge.filterPropagation.enabled")
+      .internal()
+      .doc(
+        "When set to true different filters can be " +
+        "propagated up to aggregates.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val PLAN_MERGE_FILTER_PROPAGATION_MAX_COST =
+    buildConf("spark.sql.planMerge.filterPropagation.maxCost")
+      .internal()
+      .doc(
+        "The maximum allowed additional cost of merging. " +
+        "By setting this value to -1 filter propagation " +
+        "is always allowed.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .doubleConf
+      .checkValue(
+        c => c >= 0 || c == -1,
+        "The maximum allowed cost must not be negative")
+      .createWithDefault(100)
 
   val REMOVE_REDUNDANT_PROJECTS_ENABLED = buildConf("spark.sql.execution.removeRedundantProjects")
     .internal()
@@ -7521,6 +7555,8 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
     getConf(PARQUET_FILTER_PUSHDOWN_INFILTERTHRESHOLD)
 
   def parquetAggregatePushDown: Boolean = getConf(PARQUET_AGGREGATE_PUSHDOWN_ENABLED)
+
+  def ignorePushedDataFilters: Boolean = getConf(IGNORE_PUSHED_DATA_FILTERS)
 
   def orcFilterPushDown: Boolean = getConf(ORC_FILTER_PUSHDOWN_ENABLED)
 

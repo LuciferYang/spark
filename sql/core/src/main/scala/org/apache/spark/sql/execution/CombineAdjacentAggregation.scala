@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.catalyst.expressions.aggregate.Complete
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Complete}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.internal.SQLConf
@@ -52,21 +52,37 @@ object CombineAdjacentAggregation extends Rule[SparkPlan] {
       case finalAgg @ HashAggregateExec(_, _, _, _, _, _, _, _, partialAgg: HashAggregateExec)
         if ReplaceHashWithSortAgg.isPartialAgg(partialAgg, finalAgg) =>
         finalAgg.copy(
-          aggregateExpressions = finalAgg.aggregateExpressions.map(_.copy(mode = Complete)),
+          aggregateExpressions = combineAggExpressions(
+            finalAgg.aggregateExpressions, partialAgg.aggregateExpressions),
           child = partialAgg.child)
 
       case finalAgg @ SortAggregateExec(_, _, _, _, _, _, _, _, partialAgg: SortAggregateExec)
         if ReplaceHashWithSortAgg.isPartialAgg(partialAgg, finalAgg) =>
         finalAgg.copy(
-          aggregateExpressions = finalAgg.aggregateExpressions.map(_.copy(mode = Complete)),
+          aggregateExpressions = combineAggExpressions(
+            finalAgg.aggregateExpressions, partialAgg.aggregateExpressions),
           child = partialAgg.child)
 
       case finalAgg @ ObjectHashAggregateExec(_, _, _, _, _, _, _, _,
       partialAgg: ObjectHashAggregateExec)
         if ReplaceHashWithSortAgg.isPartialAgg(partialAgg, finalAgg) =>
         finalAgg.copy(
-          aggregateExpressions = finalAgg.aggregateExpressions.map(_.copy(mode = Complete)),
+          aggregateExpressions = combineAggExpressions(
+            finalAgg.aggregateExpressions, partialAgg.aggregateExpressions),
           child = partialAgg.child)
+    }
+  }
+
+  /**
+   * Combine aggregate expressions from the final and partial aggregates into Complete mode.
+   * Restores any filter conditions from the partial aggregate that were stripped by
+   * `mayRemoveAggFilters` when setting the Final mode.
+   */
+  private def combineAggExpressions(
+      finalAggExprs: Seq[AggregateExpression],
+      partialAggExprs: Seq[AggregateExpression]): Seq[AggregateExpression] = {
+    finalAggExprs.zip(partialAggExprs).map { case (finalExpr, partialExpr) =>
+      finalExpr.copy(mode = Complete, filter = partialExpr.filter)
     }
   }
 }
