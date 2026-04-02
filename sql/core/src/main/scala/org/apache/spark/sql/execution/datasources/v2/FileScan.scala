@@ -29,17 +29,19 @@ import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, Expr
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
+import org.apache.spark.sql.connector.expressions.{FieldReference, NamedReference}
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, Scan, Statistics, SupportsReportStatistics}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.internal.connector.SupportsMetadata
+import org.apache.spark.sql.internal.connector.{SupportsMetadata, SupportsRuntimeCatalystFilters}
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.Utils
 
 trait FileScan extends Scan
-  with Batch with SupportsReportStatistics with SupportsMetadata with Logging {
+  with Batch with SupportsReportStatistics with SupportsMetadata
+  with SupportsRuntimeCatalystFilters with Logging {
   /**
    * Returns whether a file with `path` could be split or not.
    */
@@ -72,6 +74,16 @@ trait FileScan extends Scan
    * Returns the data filters that can be use for file listing
    */
   def dataFilters: Seq[Expression]
+
+  @transient var runtimeFilters: Seq[Expression] = Seq.empty
+
+  override def filterAttributes(): Array[NamedReference] = {
+    readPartitionSchema.fields.map(f => FieldReference.column(f.name))
+  }
+
+  override def filter(filters: Seq[Expression]): Unit = {
+    runtimeFilters = filters
+  }
 
   /**
    * If a file with `path` is unsplittable, return the unsplittable reason,
@@ -132,7 +144,7 @@ trait FileScan extends Scan
   }
 
   protected def partitions: Seq[FilePartition] = {
-    val selectedPartitions = fileIndex.listFiles(partitionFilters, dataFilters)
+    val selectedPartitions = fileIndex.listFiles(partitionFilters ++ runtimeFilters, dataFilters)
     val maxSplitBytes = FilePartition.maxSplitBytes(sparkSession, selectedPartitions)
     val partitionAttributes = toAttributes(fileIndex.partitionSchema)
     val attributeMap = partitionAttributes.map(a => normalizeName(a.name) -> a).toMap

@@ -52,7 +52,7 @@ private case class ReaderState(reader: PartitionReader[_], iterator: MetricsIter
 // columnar scan.
 class DataSourceRDD(
     sc: SparkContext,
-    @transient private val inputPartitions: Seq[Seq[InputPartition]],
+    @transient private[sql] val inputPartitions: Seq[Seq[InputPartition]],
     partitionReaderFactory: PartitionReaderFactory,
     columnarReads: Boolean,
     customMetrics: Map[String, SQLMetric])
