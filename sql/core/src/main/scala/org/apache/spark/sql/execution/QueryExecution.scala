@@ -767,6 +767,7 @@ object QueryExecution {
       // `ReplaceHashWithSortAgg` needs to be added after `EnsureRequirements` to guarantee the
       // sort order of each node is checked to be valid.
       ReplaceHashWithSortAgg,
+      CombineAdjacentAggregation,
       // `SortKeyReordering` needs the SMJ/Sort pairs `EnsureRequirements` materializes, and must
       // run before `RemoveRedundantSorts` (it only rewrites direct `SortExec` children).
       SortKeyReordering(sparkSession),

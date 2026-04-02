@@ -1,55 +1,54 @@
 == Physical Plan ==
-TakeOrderedAndProject (51)
-+- * HashAggregate (50)
-   +- * HashAggregate (49)
-      +- Union (48)
-         :- * HashAggregate (29)
-         :  +- Exchange (28)
-         :     +- * HashAggregate (27)
-         :        +- * Project (26)
-         :           +- * BroadcastHashJoin Inner BuildRight (25)
-         :              :- * Project (20)
-         :              :  +- * BroadcastHashJoin Inner BuildRight (19)
-         :              :     :- * Project (17)
-         :              :     :  +- * BroadcastHashJoin Inner BuildRight (16)
-         :              :     :     :- * Project (10)
-         :              :     :     :  +- * BroadcastHashJoin Inner BuildRight (9)
-         :              :     :     :     :- * Filter (3)
-         :              :     :     :     :  +- * ColumnarToRow (2)
-         :              :     :     :     :     +- Scan parquet spark_catalog.default.web_sales (1)
-         :              :     :     :     +- BroadcastExchange (8)
-         :              :     :     :        +- * Project (7)
-         :              :     :     :           +- * Filter (6)
-         :              :     :     :              +- * ColumnarToRow (5)
-         :              :     :     :                 +- Scan parquet spark_catalog.default.ship_mode (4)
-         :              :     :     +- BroadcastExchange (15)
-         :              :     :        +- * Project (14)
-         :              :     :           +- * Filter (13)
-         :              :     :              +- * ColumnarToRow (12)
-         :              :     :                 +- Scan parquet spark_catalog.default.time_dim (11)
-         :              :     +- ReusedExchange (18)
-         :              +- BroadcastExchange (24)
-         :                 +- * Filter (23)
-         :                    +- * ColumnarToRow (22)
-         :                       +- Scan parquet spark_catalog.default.warehouse (21)
-         +- * HashAggregate (47)
-            +- Exchange (46)
-               +- * HashAggregate (45)
-                  +- * Project (44)
-                     +- * BroadcastHashJoin Inner BuildRight (43)
-                        :- * Project (41)
-                        :  +- * BroadcastHashJoin Inner BuildRight (40)
-                        :     :- * Project (38)
-                        :     :  +- * BroadcastHashJoin Inner BuildRight (37)
-                        :     :     :- * Project (35)
-                        :     :     :  +- * BroadcastHashJoin Inner BuildRight (34)
-                        :     :     :     :- * Filter (32)
-                        :     :     :     :  +- * ColumnarToRow (31)
-                        :     :     :     :     +- Scan parquet spark_catalog.default.catalog_sales (30)
-                        :     :     :     +- ReusedExchange (33)
-                        :     :     +- ReusedExchange (36)
-                        :     +- ReusedExchange (39)
-                        +- ReusedExchange (42)
+TakeOrderedAndProject (50)
++- * HashAggregate (49)
+   +- Union (48)
+      :- * HashAggregate (29)
+      :  +- Exchange (28)
+      :     +- * HashAggregate (27)
+      :        +- * Project (26)
+      :           +- * BroadcastHashJoin Inner BuildRight (25)
+      :              :- * Project (20)
+      :              :  +- * BroadcastHashJoin Inner BuildRight (19)
+      :              :     :- * Project (17)
+      :              :     :  +- * BroadcastHashJoin Inner BuildRight (16)
+      :              :     :     :- * Project (10)
+      :              :     :     :  +- * BroadcastHashJoin Inner BuildRight (9)
+      :              :     :     :     :- * Filter (3)
+      :              :     :     :     :  +- * ColumnarToRow (2)
+      :              :     :     :     :     +- Scan parquet spark_catalog.default.web_sales (1)
+      :              :     :     :     +- BroadcastExchange (8)
+      :              :     :     :        +- * Project (7)
+      :              :     :     :           +- * Filter (6)
+      :              :     :     :              +- * ColumnarToRow (5)
+      :              :     :     :                 +- Scan parquet spark_catalog.default.ship_mode (4)
+      :              :     :     +- BroadcastExchange (15)
+      :              :     :        +- * Project (14)
+      :              :     :           +- * Filter (13)
+      :              :     :              +- * ColumnarToRow (12)
+      :              :     :                 +- Scan parquet spark_catalog.default.time_dim (11)
+      :              :     +- ReusedExchange (18)
+      :              +- BroadcastExchange (24)
+      :                 +- * Filter (23)
+      :                    +- * ColumnarToRow (22)
+      :                       +- Scan parquet spark_catalog.default.warehouse (21)
+      +- * HashAggregate (47)
+         +- Exchange (46)
+            +- * HashAggregate (45)
+               +- * Project (44)
+                  +- * BroadcastHashJoin Inner BuildRight (43)
+                     :- * Project (41)
+                     :  +- * BroadcastHashJoin Inner BuildRight (40)
+                     :     :- * Project (38)
+                     :     :  +- * BroadcastHashJoin Inner BuildRight (37)
+                     :     :     :- * Project (35)
+                     :     :     :  +- * BroadcastHashJoin Inner BuildRight (34)
+                     :     :     :     :- * Filter (32)
+                     :     :     :     :  +- * ColumnarToRow (31)
+                     :     :     :     :     +- Scan parquet spark_catalog.default.catalog_sales (30)
+                     :     :     :     +- ReusedExchange (33)
+                     :     :     +- ReusedExchange (36)
+                     :     +- ReusedExchange (39)
+                     +- ReusedExchange (42)
 
 
 (1) Scan parquet spark_catalog.default.web_sales
@@ -131,7 +130,7 @@ Join condition: None
 Output [5]: [ws_warehouse_sk#3, ws_quantity#4, ws_ext_sales_price#5, ws_net_paid#6, ws_sold_date_sk#7]
 Input [7]: [ws_sold_time_sk#1, ws_warehouse_sk#3, ws_quantity#4, ws_ext_sales_price#5, ws_net_paid#6, ws_sold_date_sk#7, t_time_sk#11]
 
-(18) ReusedExchange [Reuses operator id: 55]
+(18) ReusedExchange [Reuses operator id: 54]
 Output [3]: [d_date_sk#13, d_year#14, d_moy#15]
 
 (19) BroadcastHashJoin [codegen id : 5]
@@ -231,7 +230,7 @@ Join condition: None
 Output [5]: [cs_warehouse_sk#123, cs_quantity#124, cs_sales_price#125, cs_net_paid_inc_tax#126, cs_sold_date_sk#127]
 Input [7]: [cs_sold_time_sk#121, cs_warehouse_sk#123, cs_quantity#124, cs_sales_price#125, cs_net_paid_inc_tax#126, cs_sold_date_sk#127, t_time_sk#129]
 
-(39) ReusedExchange [Reuses operator id: 55]
+(39) ReusedExchange [Reuses operator id: 54]
 Output [3]: [d_date_sk#130, d_year#131, d_moy#132]
 
 (40) BroadcastHashJoin [codegen id : 11]
@@ -280,45 +279,38 @@ Results [32]: [w_warehouse_name#134, w_warehouse_sq_ft#135, w_city#136, w_county
 (49) HashAggregate [codegen id : 13]
 Input [32]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, jan_sales#97, feb_sales#98, mar_sales#99, apr_sales#100, may_sales#101, jun_sales#102, jul_sales#103, aug_sales#104, sep_sales#105, oct_sales#106, nov_sales#107, dec_sales#108, jan_net#109, feb_net#110, mar_net#111, apr_net#112, may_net#113, jun_net#114, jul_net#115, aug_net#116, sep_net#117, oct_net#118, nov_net#119, dec_net#120]
 Keys [8]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96]
-Functions [36]: [partial_sum(jan_sales#97), partial_sum(feb_sales#98), partial_sum(mar_sales#99), partial_sum(apr_sales#100), partial_sum(may_sales#101), partial_sum(jun_sales#102), partial_sum(jul_sales#103), partial_sum(aug_sales#104), partial_sum(sep_sales#105), partial_sum(oct_sales#106), partial_sum(nov_sales#107), partial_sum(dec_sales#108), partial_sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), partial_sum(jan_net#109), partial_sum(feb_net#110), partial_sum(mar_net#111), partial_sum(apr_net#112), partial_sum(may_net#113), partial_sum(jun_net#114), partial_sum(jul_net#115), partial_sum(aug_net#116), partial_sum(sep_net#117), partial_sum(oct_net#118), partial_sum(nov_net#119), partial_sum(dec_net#120)]
-Aggregate Attributes [72]: [sum#238, isEmpty#239, sum#240, isEmpty#241, sum#242, isEmpty#243, sum#244, isEmpty#245, sum#246, isEmpty#247, sum#248, isEmpty#249, sum#250, isEmpty#251, sum#252, isEmpty#253, sum#254, isEmpty#255, sum#256, isEmpty#257, sum#258, isEmpty#259, sum#260, isEmpty#261, sum#262, isEmpty#263, sum#264, isEmpty#265, sum#266, isEmpty#267, sum#268, isEmpty#269, sum#270, isEmpty#271, sum#272, isEmpty#273, sum#274, isEmpty#275, sum#276, isEmpty#277, sum#278, isEmpty#279, sum#280, isEmpty#281, sum#282, isEmpty#283, sum#284, isEmpty#285, sum#286, isEmpty#287, sum#288, isEmpty#289, sum#290, isEmpty#291, sum#292, isEmpty#293, sum#294, isEmpty#295, sum#296, isEmpty#297, sum#298, isEmpty#299, sum#300, isEmpty#301, sum#302, isEmpty#303, sum#304, isEmpty#305, sum#306, isEmpty#307, sum#308, isEmpty#309]
-Results [80]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, sum#310, isEmpty#311, sum#312, isEmpty#313, sum#314, isEmpty#315, sum#316, isEmpty#317, sum#318, isEmpty#319, sum#320, isEmpty#321, sum#322, isEmpty#323, sum#324, isEmpty#325, sum#326, isEmpty#327, sum#328, isEmpty#329, sum#330, isEmpty#331, sum#332, isEmpty#333, sum#334, isEmpty#335, sum#336, isEmpty#337, sum#338, isEmpty#339, sum#340, isEmpty#341, sum#342, isEmpty#343, sum#344, isEmpty#345, sum#346, isEmpty#347, sum#348, isEmpty#349, sum#350, isEmpty#351, sum#352, isEmpty#353, sum#354, isEmpty#355, sum#356, isEmpty#357, sum#358, isEmpty#359, sum#360, isEmpty#361, sum#362, isEmpty#363, sum#364, isEmpty#365, sum#366, isEmpty#367, sum#368, isEmpty#369, sum#370, isEmpty#371, sum#372, isEmpty#373, sum#374, isEmpty#375, sum#376, isEmpty#377, sum#378, isEmpty#379, sum#380, isEmpty#381]
-
-(50) HashAggregate [codegen id : 13]
-Input [80]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, sum#310, isEmpty#311, sum#312, isEmpty#313, sum#314, isEmpty#315, sum#316, isEmpty#317, sum#318, isEmpty#319, sum#320, isEmpty#321, sum#322, isEmpty#323, sum#324, isEmpty#325, sum#326, isEmpty#327, sum#328, isEmpty#329, sum#330, isEmpty#331, sum#332, isEmpty#333, sum#334, isEmpty#335, sum#336, isEmpty#337, sum#338, isEmpty#339, sum#340, isEmpty#341, sum#342, isEmpty#343, sum#344, isEmpty#345, sum#346, isEmpty#347, sum#348, isEmpty#349, sum#350, isEmpty#351, sum#352, isEmpty#353, sum#354, isEmpty#355, sum#356, isEmpty#357, sum#358, isEmpty#359, sum#360, isEmpty#361, sum#362, isEmpty#363, sum#364, isEmpty#365, sum#366, isEmpty#367, sum#368, isEmpty#369, sum#370, isEmpty#371, sum#372, isEmpty#373, sum#374, isEmpty#375, sum#376, isEmpty#377, sum#378, isEmpty#379, sum#380, isEmpty#381]
-Keys [8]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96]
 Functions [36]: [sum(jan_sales#97), sum(feb_sales#98), sum(mar_sales#99), sum(apr_sales#100), sum(may_sales#101), sum(jun_sales#102), sum(jul_sales#103), sum(aug_sales#104), sum(sep_sales#105), sum(oct_sales#106), sum(nov_sales#107), sum(dec_sales#108), sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0)))), sum(jan_net#109), sum(feb_net#110), sum(mar_net#111), sum(apr_net#112), sum(may_net#113), sum(jun_net#114), sum(jul_net#115), sum(aug_net#116), sum(sep_net#117), sum(oct_net#118), sum(nov_net#119), sum(dec_net#120)]
-Aggregate Attributes [36]: [sum(jan_sales#97)#382, sum(feb_sales#98)#383, sum(mar_sales#99)#384, sum(apr_sales#100)#385, sum(may_sales#101)#386, sum(jun_sales#102)#387, sum(jul_sales#103)#388, sum(aug_sales#104)#389, sum(sep_sales#105)#390, sum(oct_sales#106)#391, sum(nov_sales#107)#392, sum(dec_sales#108)#393, sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#394, sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#395, sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#396, sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#397, sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#398, sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#399, sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#400, sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#401, sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#402, sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#403, sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#404, sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#405, sum(jan_net#109)#406, sum(feb_net#110)#407, sum(mar_net#111)#408, sum(apr_net#112)#409, sum(may_net#113)#410, sum(jun_net#114)#411, sum(jul_net#115)#412, sum(aug_net#116)#413, sum(sep_net#117)#414, sum(oct_net#118)#415, sum(nov_net#119)#416, sum(dec_net#120)#417]
-Results [44]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, sum(jan_sales#97)#382 AS jan_sales#418, sum(feb_sales#98)#383 AS feb_sales#419, sum(mar_sales#99)#384 AS mar_sales#420, sum(apr_sales#100)#385 AS apr_sales#421, sum(may_sales#101)#386 AS may_sales#422, sum(jun_sales#102)#387 AS jun_sales#423, sum(jul_sales#103)#388 AS jul_sales#424, sum(aug_sales#104)#389 AS aug_sales#425, sum(sep_sales#105)#390 AS sep_sales#426, sum(oct_sales#106)#391 AS oct_sales#427, sum(nov_sales#107)#392 AS nov_sales#428, sum(dec_sales#108)#393 AS dec_sales#429, sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#394 AS jan_sales_per_sq_foot#430, sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#395 AS feb_sales_per_sq_foot#431, sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#396 AS mar_sales_per_sq_foot#432, sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#397 AS apr_sales_per_sq_foot#433, sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#398 AS may_sales_per_sq_foot#434, sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#399 AS jun_sales_per_sq_foot#435, sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#400 AS jul_sales_per_sq_foot#436, sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#401 AS aug_sales_per_sq_foot#437, sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#402 AS sep_sales_per_sq_foot#438, sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#403 AS oct_sales_per_sq_foot#439, sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#404 AS nov_sales_per_sq_foot#440, sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#405 AS dec_sales_per_sq_foot#441, sum(jan_net#109)#406 AS jan_net#442, sum(feb_net#110)#407 AS feb_net#443, sum(mar_net#111)#408 AS mar_net#444, sum(apr_net#112)#409 AS apr_net#445, sum(may_net#113)#410 AS may_net#446, sum(jun_net#114)#411 AS jun_net#447, sum(jul_net#115)#412 AS jul_net#448, sum(aug_net#116)#413 AS aug_net#449, sum(sep_net#117)#414 AS sep_net#450, sum(oct_net#118)#415 AS oct_net#451, sum(nov_net#119)#416 AS nov_net#452, sum(dec_net#120)#417 AS dec_net#453]
+Aggregate Attributes [36]: [sum(jan_sales#97)#238, sum(feb_sales#98)#239, sum(mar_sales#99)#240, sum(apr_sales#100)#241, sum(may_sales#101)#242, sum(jun_sales#102)#243, sum(jul_sales#103)#244, sum(aug_sales#104)#245, sum(sep_sales#105)#246, sum(oct_sales#106)#247, sum(nov_sales#107)#248, sum(dec_sales#108)#249, sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#250, sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#251, sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#252, sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#253, sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#254, sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#255, sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#256, sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#257, sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#258, sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#259, sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#260, sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#261, sum(jan_net#109)#262, sum(feb_net#110)#263, sum(mar_net#111)#264, sum(apr_net#112)#265, sum(may_net#113)#266, sum(jun_net#114)#267, sum(jul_net#115)#268, sum(aug_net#116)#269, sum(sep_net#117)#270, sum(oct_net#118)#271, sum(nov_net#119)#272, sum(dec_net#120)#273]
+Results [44]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, sum(jan_sales#97)#238 AS jan_sales#274, sum(feb_sales#98)#239 AS feb_sales#275, sum(mar_sales#99)#240 AS mar_sales#276, sum(apr_sales#100)#241 AS apr_sales#277, sum(may_sales#101)#242 AS may_sales#278, sum(jun_sales#102)#243 AS jun_sales#279, sum(jul_sales#103)#244 AS jul_sales#280, sum(aug_sales#104)#245 AS aug_sales#281, sum(sep_sales#105)#246 AS sep_sales#282, sum(oct_sales#106)#247 AS oct_sales#283, sum(nov_sales#107)#248 AS nov_sales#284, sum(dec_sales#108)#249 AS dec_sales#285, sum((jan_sales#97 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#250 AS jan_sales_per_sq_foot#286, sum((feb_sales#98 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#251 AS feb_sales_per_sq_foot#287, sum((mar_sales#99 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#252 AS mar_sales_per_sq_foot#288, sum((apr_sales#100 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#253 AS apr_sales_per_sq_foot#289, sum((may_sales#101 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#254 AS may_sales_per_sq_foot#290, sum((jun_sales#102 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#255 AS jun_sales_per_sq_foot#291, sum((jul_sales#103 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#256 AS jul_sales_per_sq_foot#292, sum((aug_sales#104 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#257 AS aug_sales_per_sq_foot#293, sum((sep_sales#105 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#258 AS sep_sales_per_sq_foot#294, sum((oct_sales#106 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#259 AS oct_sales_per_sq_foot#295, sum((nov_sales#107 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#260 AS nov_sales_per_sq_foot#296, sum((dec_sales#108 / cast(w_warehouse_sq_ft#18 as decimal(10,0))))#261 AS dec_sales_per_sq_foot#297, sum(jan_net#109)#262 AS jan_net#298, sum(feb_net#110)#263 AS feb_net#299, sum(mar_net#111)#264 AS mar_net#300, sum(apr_net#112)#265 AS apr_net#301, sum(may_net#113)#266 AS may_net#302, sum(jun_net#114)#267 AS jun_net#303, sum(jul_net#115)#268 AS jul_net#304, sum(aug_net#116)#269 AS aug_net#305, sum(sep_net#117)#270 AS sep_net#306, sum(oct_net#118)#271 AS oct_net#307, sum(nov_net#119)#272 AS nov_net#308, sum(dec_net#120)#273 AS dec_net#309]
 
-(51) TakeOrderedAndProject
-Input [44]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, jan_sales#418, feb_sales#419, mar_sales#420, apr_sales#421, may_sales#422, jun_sales#423, jul_sales#424, aug_sales#425, sep_sales#426, oct_sales#427, nov_sales#428, dec_sales#429, jan_sales_per_sq_foot#430, feb_sales_per_sq_foot#431, mar_sales_per_sq_foot#432, apr_sales_per_sq_foot#433, may_sales_per_sq_foot#434, jun_sales_per_sq_foot#435, jul_sales_per_sq_foot#436, aug_sales_per_sq_foot#437, sep_sales_per_sq_foot#438, oct_sales_per_sq_foot#439, nov_sales_per_sq_foot#440, dec_sales_per_sq_foot#441, jan_net#442, feb_net#443, mar_net#444, apr_net#445, may_net#446, jun_net#447, jul_net#448, aug_net#449, sep_net#450, oct_net#451, nov_net#452, dec_net#453]
-Arguments: 100, [w_warehouse_name#17 ASC NULLS FIRST], [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, jan_sales#418, feb_sales#419, mar_sales#420, apr_sales#421, may_sales#422, jun_sales#423, jul_sales#424, aug_sales#425, sep_sales#426, oct_sales#427, nov_sales#428, dec_sales#429, jan_sales_per_sq_foot#430, feb_sales_per_sq_foot#431, mar_sales_per_sq_foot#432, apr_sales_per_sq_foot#433, may_sales_per_sq_foot#434, jun_sales_per_sq_foot#435, jul_sales_per_sq_foot#436, aug_sales_per_sq_foot#437, sep_sales_per_sq_foot#438, oct_sales_per_sq_foot#439, nov_sales_per_sq_foot#440, dec_sales_per_sq_foot#441, jan_net#442, feb_net#443, mar_net#444, apr_net#445, may_net#446, jun_net#447, jul_net#448, aug_net#449, sep_net#450, oct_net#451, nov_net#452, dec_net#453]
+(50) TakeOrderedAndProject
+Input [44]: [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, jan_sales#274, feb_sales#275, mar_sales#276, apr_sales#277, may_sales#278, jun_sales#279, jul_sales#280, aug_sales#281, sep_sales#282, oct_sales#283, nov_sales#284, dec_sales#285, jan_sales_per_sq_foot#286, feb_sales_per_sq_foot#287, mar_sales_per_sq_foot#288, apr_sales_per_sq_foot#289, may_sales_per_sq_foot#290, jun_sales_per_sq_foot#291, jul_sales_per_sq_foot#292, aug_sales_per_sq_foot#293, sep_sales_per_sq_foot#294, oct_sales_per_sq_foot#295, nov_sales_per_sq_foot#296, dec_sales_per_sq_foot#297, jan_net#298, feb_net#299, mar_net#300, apr_net#301, may_net#302, jun_net#303, jul_net#304, aug_net#305, sep_net#306, oct_net#307, nov_net#308, dec_net#309]
+Arguments: 100, [w_warehouse_name#17 ASC NULLS FIRST], [w_warehouse_name#17, w_warehouse_sq_ft#18, w_city#19, w_county#20, w_state#21, w_country#22, ship_carriers#95, year#96, jan_sales#274, feb_sales#275, mar_sales#276, apr_sales#277, may_sales#278, jun_sales#279, jul_sales#280, aug_sales#281, sep_sales#282, oct_sales#283, nov_sales#284, dec_sales#285, jan_sales_per_sq_foot#286, feb_sales_per_sq_foot#287, mar_sales_per_sq_foot#288, apr_sales_per_sq_foot#289, may_sales_per_sq_foot#290, jun_sales_per_sq_foot#291, jul_sales_per_sq_foot#292, aug_sales_per_sq_foot#293, sep_sales_per_sq_foot#294, oct_sales_per_sq_foot#295, nov_sales_per_sq_foot#296, dec_sales_per_sq_foot#297, jan_net#298, feb_net#299, mar_net#300, apr_net#301, may_net#302, jun_net#303, jul_net#304, aug_net#305, sep_net#306, oct_net#307, nov_net#308, dec_net#309]
 
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 1 Hosting Expression = ws_sold_date_sk#7 IN dynamicpruning#8
-BroadcastExchange (55)
-+- * Filter (54)
-   +- * ColumnarToRow (53)
-      +- Scan parquet spark_catalog.default.date_dim (52)
+BroadcastExchange (54)
++- * Filter (53)
+   +- * ColumnarToRow (52)
+      +- Scan parquet spark_catalog.default.date_dim (51)
 
 
-(52) Scan parquet spark_catalog.default.date_dim
+(51) Scan parquet spark_catalog.default.date_dim
 Output [3]: [d_date_sk#13, d_year#14, d_moy#15]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
 
-(53) ColumnarToRow [codegen id : 1]
+(52) ColumnarToRow [codegen id : 1]
 Input [3]: [d_date_sk#13, d_year#14, d_moy#15]
 
-(54) Filter [codegen id : 1]
+(53) Filter [codegen id : 1]
 Input [3]: [d_date_sk#13, d_year#14, d_moy#15]
 Condition : ((isnotnull(d_year#14) AND (d_year#14 = 2001)) AND isnotnull(d_date_sk#13))
 
-(55) BroadcastExchange
+(54) BroadcastExchange
 Input [3]: [d_date_sk#13, d_year#14, d_moy#15]
 Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=6]
 
