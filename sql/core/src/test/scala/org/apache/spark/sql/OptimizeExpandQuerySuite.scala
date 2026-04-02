@@ -177,4 +177,34 @@ class OptimizeExpandQuerySuite
       }
     }
   }
+
+  test("correctness: expression-based distinct (col1 + col2)") {
+    // Pre-aggregate groups by leaf attributes (col1, col2), not the expression (col1 + col2).
+    // Use data where different (col1, col2) pairs produce the same col1 + col2
+    // (e.g. (1,2) and (2,1) both give 3) so the "less effective dedup" actually matters.
+    withTempView("t") {
+      spark.range(10000)
+        .selectExpr(
+          "id % 100 as key",
+          "cast(id % 7 as int) as col1",
+          "cast(id % 11 as int) as col2",
+          "cast(id % 20 as int) as col3")
+        .createOrReplaceTempView("t")
+
+      val sqlText =
+        """SELECT key,
+          |  count(distinct col1 + col2),
+          |  count(distinct col3)
+          |FROM t GROUP BY key""".stripMargin
+
+      val expected = withSQLConf(
+        SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "-1") {
+        spark.sql(sqlText).collect()
+      }
+      withSQLConf(
+        SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "2") {
+        checkAnswer(spark.sql(sqlText), expected.toSeq)
+      }
+    }
+  }
 }

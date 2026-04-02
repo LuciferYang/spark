@@ -161,4 +161,34 @@ class OptimizeExpandSuite extends PlanTest {
         "Pre-aggregate should include distinct col2")
     }
   }
+
+  test("expression-based distinct: pre-aggregate groups by leaf attributes, not expression") {
+    // For COUNT(DISTINCT col1 + col2), the pre-aggregate groups by the leaf attributes
+    // (col1, col2) rather than the expression (col1 + col2). This means dedup is less
+    // effective (more groups than strictly necessary) but still correct -- fewer rows
+    // are eliminated, but no rows are incorrectly removed.
+    withSQLConf(SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "2") {
+      val query = testRelation
+        .groupBy($"key")(
+          countDistinct($"col1" + $"col2").as("cd_expr"),
+          countDistinct($"col3").as("cd3"))
+        .analyze
+      val optimized = Optimize.execute(query)
+      assert(hasPreAggBeforeExpand(optimized),
+        "Should still apply optimization for expression-based distinct")
+      val preAgg = optimized.collect {
+        case e: Expand => e.child
+      }.head.asInstanceOf[Aggregate]
+      val groupByNames = preAgg.groupingExpressions
+        .collect { case a: Attribute => a.name }.toSet
+      // Groups by leaf attributes col1, col2 (not by the expression col1 + col2).
+      // This means the pre-aggregate has 4 group-by columns (key, col1, col2, col3)
+      // instead of the ideal 3 (key, col1+col2, col3). Dedup is less effective --
+      // e.g. rows (key=1, col1=1, col2=2) and (key=1, col1=2, col2=1) won't be
+      // deduped even though col1+col2 is the same -- but correctness is preserved.
+      assert(groupByNames === Set("key", "col1", "col2", "col3"),
+        "Pre-aggregate should group by leaf attributes (key, col1, col2, col3), " +
+          s"not the expression. Actual: $groupByNames")
+    }
+  }
 }
