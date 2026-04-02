@@ -2691,6 +2691,15 @@ object SQLConf {
     .booleanConf
     .createWithDefault(false)
 
+  val COMBINE_ADJACENT_AGGREGATION_ENABLED =
+    buildConf("spark.sql.execution.combineAdjacentAggregation")
+      .internal()
+      .doc("When true, combine adjacent aggregation with `Partial` and `Final` to `Complete` mode.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
   val USE_PARTITION_EVALUATOR = buildConf("spark.sql.execution.usePartitionEvaluator")
     .internal()
     .doc("When true, use PartitionEvaluator to execute SQL operators.")
