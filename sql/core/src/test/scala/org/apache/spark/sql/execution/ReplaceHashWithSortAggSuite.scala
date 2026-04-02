@@ -92,7 +92,7 @@ abstract class ReplaceHashWithSortAggSuiteBase
              |)
              |GROUP BY key
            """.stripMargin
-        checkAggs(query, 0, 1, 2, 0)
+        checkAggs(query, 0, 1, 1, 0)
       }
     }
   }
@@ -114,7 +114,7 @@ abstract class ReplaceHashWithSortAggSuiteBase
              |)
              |GROUP BY key
            """.stripMargin
-        checkAggs(query, 2, 0, 2, 0)
+        checkAggs(query, 1, 0, 1, 0)
       }
     }
   }

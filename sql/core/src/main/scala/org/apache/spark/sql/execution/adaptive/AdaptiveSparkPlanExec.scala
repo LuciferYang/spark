@@ -131,6 +131,7 @@ case class AdaptiveSparkPlanExec(
       AdjustShuffleExchangePosition,
       ValidateSparkPlan,
       ReplaceHashWithSortAgg,
+      CombineAdjacentAggregation,
       RemoveRedundantSorts,
       RemoveRedundantWindowGroupLimits,
       DisableUnnecessaryBucketedScan,
