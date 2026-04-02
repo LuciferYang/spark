@@ -31,14 +31,17 @@ object TreePattern extends Enumeration  {
   val AND: Value = Value
   val ARRAYS_OVERLAP: Value = Value
   val ARRAYS_ZIP: Value = Value
+  val ARRAY_CONTAINS: Value = Value
   val ARRAY_DISTINCT: Value = Value
   val ARRAY_EXCEPT: Value = Value
   val ARRAY_INTERSECT: Value = Value
   val ARRAY_UNION: Value = Value
+  val AT_LEAST_N_NON_NULLS: Value = Value
   val ATTRIBUTE_REFERENCE: Value = Value
   val AVERAGE: Value = Value
   val BINARY_ARITHMETIC: Value = Value
   val BINARY_COMPARISON: Value = Value
+  val BLOOM_FILTER: Value = Value
   val CASE_WHEN: Value = Value
   val CAST: Value = Value
   val COALESCE: Value = Value
@@ -100,6 +103,7 @@ object TreePattern extends Enumeration  {
   val SESSION_WINDOW: Value = Value
   val SQL_FUNCTION_EXPRESSION: Value = Value
   val SQL_SCALAR_FUNCTION: Value = Value
+  val STRING_PREDICATE: Value = Value
   val SUM: Value = Value
   val TEMP_RESOLVED_COLUMN: Value = Value
   val TIME_WINDOW: Value = Value
