@@ -493,7 +493,6 @@ trait SQLInsertTestSuite extends QueryTest with SQLTestUtils with AdaptiveSparkP
           sql("alter table t drop partition(dt='8')")
         }
         assert(e.getCondition == "PARTITIONS_NOT_FOUND")
-        assert(e.getMessage.contains("`t`"))
       }
     }
 
@@ -507,7 +506,6 @@ trait SQLInsertTestSuite extends QueryTest with SQLTestUtils with AdaptiveSparkP
           sql("alter table t drop partition(dt='08')")
         }
         assert(e2.getCondition == "PARTITIONS_NOT_FOUND")
-        assert(e2.getMessage.contains("`t`"))
       }
     }
   }

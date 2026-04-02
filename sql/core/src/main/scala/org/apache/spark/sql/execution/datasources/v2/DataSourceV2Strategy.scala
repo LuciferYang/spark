@@ -76,7 +76,10 @@ class DataSourceV2Strategy(session: SparkSession)
           ft.fileIndex.refresh()
           syncNewPartitionsToCatalog(ft)
           val path = new Path(ft.fileIndex.rootPaths.head.toUri)
-          val fs = path.getFileSystem(hadoopConf)
+          val fsConf = session.sessionState.newHadoopConfWithOptions(
+            scala.jdk.CollectionConverters.MapHasAsScala(
+              r.options.asCaseSensitiveMap).asScala.toMap)
+          val fs = path.getFileSystem(fsConf)
           cacheManager.recacheByPath(session, path, fs)
         case _ =>
           cacheManager.recacheByPlan(session, r)

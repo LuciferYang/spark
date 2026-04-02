@@ -24,6 +24,7 @@ import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, Aggr
 import org.apache.spark.sql.execution.RowToColumnConverter
 import org.apache.spark.sql.execution.datasources.v2.V2ColumnUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StructField, StructType}
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 
@@ -43,12 +44,22 @@ object AggregatePushDownUtils {
 
     var finalSchema = new StructType()
 
+    val caseSensitive = SQLConf.get.caseSensitiveAnalysis
+
     def getStructFieldForCol(colName: String): StructField = {
-      schema.apply(colName)
+      if (caseSensitive) {
+        schema.apply(colName)
+      } else {
+        schema.find(_.name.equalsIgnoreCase(colName)).getOrElse(schema.apply(colName))
+      }
     }
 
     def isPartitionCol(colName: String) = {
-      partitionNames.contains(colName)
+      if (caseSensitive) {
+        partitionNames.contains(colName)
+      } else {
+        partitionNames.exists(_.equalsIgnoreCase(colName))
+      }
     }
 
     def processMinOrMax(agg: AggregateFunc): Boolean = {
