@@ -186,13 +186,16 @@ object MergeSubplans extends Rule[LogicalPlan] {
           removeReferences(mergedPlan.plan, subplansByLevel)
         }
         if (mergedPlan.merged) {
+          val cleanedPlan =
+            removePropagatedFilters(planWithoutReferences)
           CTERelationDef(
             Project(
               Seq(Alias(
                 CreateNamedStruct(
-                  planWithoutReferences.output.flatMap(a => Seq(Literal(a.name), a))),
+                  cleanedPlan.output.flatMap(
+                    a => Seq(Literal(a.name), a))),
                 "mergedValue")()),
-              planWithoutReferences),
+              cleanedPlan),
             underSubquery = true)
         } else {
           planWithoutReferences
@@ -283,6 +286,12 @@ object MergeSubplans extends Rule[LogicalPlan] {
     }
 
     (planWithReferences, level)
+  }
+
+  private def removePropagatedFilters(plan: LogicalPlan) = {
+    plan.transformAllExpressions {
+      case pf: PropagatedFilter => pf.child
+    }
   }
 
   private def getPlanMerger(planMergers: ArrayBuffer[PlanMerger], level: Int) = {
