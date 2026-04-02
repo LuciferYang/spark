@@ -37,7 +37,7 @@ class DataSourceRDDPartition(val index: Int, val inputPartitions: Seq[InputParti
 // columnar scan.
 class DataSourceRDD(
     sc: SparkContext,
-    @transient private val inputPartitions: Seq[Seq[InputPartition]],
+    @transient private[sql] val inputPartitions: Seq[Seq[InputPartition]],
     partitionReaderFactory: PartitionReaderFactory,
     columnarReads: Boolean,
     customMetrics: Map[String, SQLMetric])
