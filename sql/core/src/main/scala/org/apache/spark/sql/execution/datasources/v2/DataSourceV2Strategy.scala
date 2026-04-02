@@ -409,6 +409,31 @@ class DataSourceV2Strategy(session: SparkSession)
             v1, v2Write.getClass.getName, classOf[V1Write].getName)
       }
 
+    // SPARK-56304: skip write if target partition already exists
+    case OverwriteByExpression(
+        r: DataSourceV2Relation, _, query, writeOptions, _, _, Some(write), _)
+        if writeOptions.getOrElse("ifPartitionNotExists", "false") == "true"
+          && r.table.isInstanceOf[FileTable] =>
+      val ft = r.table.asInstanceOf[FileTable]
+      val prefix = "__staticPartition."
+      val staticSpec = writeOptions
+        .filter(_._1.startsWith(prefix))
+        .map { case (k, v) => k.stripPrefix(prefix) -> v }
+      // Check filesystem for partition existence
+      val partPath = ft.partitionSchema().fieldNames
+        .flatMap(col => staticSpec.get(col).map(v => s"$col=$v"))
+        .mkString("/")
+      val rootPath = ft.fileIndex.rootPaths.head
+      val hadoopConf = session.sessionState.newHadoopConf()
+      val fs = rootPath.getFileSystem(hadoopConf)
+      val targetPath = new Path(rootPath, partPath)
+      if (partPath.nonEmpty && fs.exists(targetPath)) {
+        LocalTableScanExec(Nil, Nil, None) :: Nil
+      } else {
+        OverwriteByExpressionExec(
+          planLater(query), refreshCache(r), write) :: Nil
+      }
+
     case OverwriteByExpression(
         r: DataSourceV2Relation, _, query, _, _, _, Some(write), _) =>
       OverwriteByExpressionExec(planLater(query), refreshCache(r), write) :: Nil

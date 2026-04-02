@@ -1159,14 +1159,16 @@ class Analyzer(
         throw QueryCompilationErrors.unsupportedInsertReplaceOnOrUsing(
           i.table.asInstanceOf[DataSourceV2Relation].table.name())
 
-      case i: InsertIntoStatement
-          if i.table.isInstanceOf[DataSourceV2Relation] &&
-            i.query.resolved &&
-            i.replaceCriteriaOpt.isEmpty =>
-        val r = i.table.asInstanceOf[DataSourceV2Relation]
-        // ifPartitionNotExists is append with validation, but validation is not supported
+      case i @ InsertIntoStatement(r: DataSourceV2Relation, _, _, _, _, _, _, _, _)
+          if i.query.resolved && i.replaceCriteriaOpt.isEmpty =>
+        // SPARK-56304: allow ifPartitionNotExists for tables that
+        // support partition management and overwrite-by-filter
         if (i.ifPartitionNotExists) {
-          throw QueryCompilationErrors.unsupportedIfNotExistsError(r.table.name)
+          val caps = r.table.capabilities
+          if (!caps.contains(TableCapability.OVERWRITE_BY_FILTER) ||
+              !r.table.isInstanceOf[SupportsPartitionManagement]) {
+            throw QueryCompilationErrors.unsupportedIfNotExistsError(r.table.name)
+          }
         }
 
         // Create a project if this is an INSERT INTO BY NAME query.
@@ -1209,17 +1211,27 @@ class Analyzer(
               withSchemaEvolution = i.withSchemaEvolution)
           }
         } else {
+          val extraOpts = if (i.ifPartitionNotExists) {
+            Map("ifPartitionNotExists" -> "true") ++
+              staticPartitions.map { case (k, v) =>
+                s"__staticPartition.$k" -> v
+              }
+          } else {
+            Map.empty[String, String]
+          }
           if (isByName) {
             OverwriteByExpression.byName(
               table = r,
               df = query,
               deleteExpr = staticDeleteExpression(r, staticPartitions),
+              writeOptions = extraOpts,
               withSchemaEvolution = i.withSchemaEvolution)
           } else {
             OverwriteByExpression.byPosition(
               table = r,
               query = query,
               deleteExpr = staticDeleteExpression(r, staticPartitions),
+              writeOptions = extraOpts,
               withSchemaEvolution = i.withSchemaEvolution)
           }
         }

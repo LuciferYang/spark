@@ -723,6 +723,32 @@ class FileDataSourceV2WriteSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("SPARK-56304: INSERT OVERWRITE IF NOT EXISTS skips when partition exists") {
+    withTable("t") {
+      sql("CREATE TABLE t (id BIGINT, part INT)" +
+        " USING parquet PARTITIONED BY (part)")
+      sql("INSERT INTO t VALUES (1, 1), (2, 2)")
+      // IF NOT EXISTS: partition part=1 exists, should skip
+      sql("INSERT OVERWRITE TABLE t PARTITION(part=1) IF NOT EXISTS" +
+        " SELECT 999")
+      checkAnswer(
+        sql("SELECT * FROM t ORDER BY part"),
+        Seq(Row(1, 1), Row(2, 2)))
+      // Without IF NOT EXISTS: partition part=1 is replaced
+      sql("INSERT OVERWRITE TABLE t PARTITION(part=1)" +
+        " SELECT 999")
+      checkAnswer(
+        sql("SELECT * FROM t ORDER BY part"),
+        Seq(Row(999, 1), Row(2, 2)))
+      // IF NOT EXISTS: partition part=3 does not exist, should write
+      sql("INSERT OVERWRITE TABLE t PARTITION(part=3) IF NOT EXISTS" +
+        " SELECT 300")
+      checkAnswer(
+        sql("SELECT * FROM t ORDER BY part"),
+        Seq(Row(999, 1), Row(2, 2), Row(300, 3)))
+    }
+  }
+
   test("SELECT FROM format.path uses V2 path") {
     Seq("parquet", "orc", "json").foreach { format =>
       withTempPath { path =>
