@@ -65,7 +65,7 @@ private case class ReaderState(reader: PartitionReader[_], iterator: MetricsIter
  */
 class DataSourceRDD(
     sc: SparkContext,
-    @transient private val inputPartitions: Seq[Option[InputPartition]],
+    @transient val inputPartitions: Seq[Option[InputPartition]],
     partitionReaderFactory: PartitionReaderFactory,
     columnarReads: Boolean,
     customMetrics: Map[String, SQLMetric])
