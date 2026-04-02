@@ -436,6 +436,67 @@ class MergeSubplansSuite extends PlanTest {
     comparePlans(Optimize.execute(originalQuery.analyze), originalQuery.analyze)
   }
 
+  test("Merge subqueries with filter propagation through inner join") {
+    // Two subqueries with same inner join structure but different filters on left child.
+    // Filter propagation should merge them into one plan with FILTER clauses.
+    val subquery1 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 1)
+      .join(testRelation.as("t2"), Inner, Some($"t1.b" === $"t2.b"))
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a"))
+      .analyze)
+    val subquery2 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 2)
+      .join(testRelation.as("t2"), Inner, Some($"t1.b" === $"t2.b"))
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a2"))
+      .analyze)
+    val originalQuery = testRelation.select(subquery1, subquery2)
+    val optimized = Optimize.execute(originalQuery.analyze)
+    // Should merge via filter propagation through inner join
+    assert(optimized.collect { case _: WithCTE => true }.nonEmpty,
+      "Expected subqueries to merge via filter propagation through inner join")
+  }
+
+  test("Merge subqueries with filter propagation through cross join") {
+    val subquery1 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 1)
+      .join(testRelation.as("t2"), Cross)
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a"))
+      .analyze)
+    val subquery2 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 2)
+      .join(testRelation.as("t2"), Cross)
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a2"))
+      .analyze)
+    val originalQuery = testRelation.select(subquery1, subquery2)
+    val optimized = Optimize.execute(originalQuery.analyze)
+    // Should merge via filter propagation through cross join
+    assert(optimized.collect { case _: WithCTE => true }.nonEmpty,
+      "Expected subqueries to merge via filter propagation through cross join")
+  }
+
+  test("Do not merge subqueries with filter propagation through outer join") {
+    // Same outer join type on both subqueries, but different filters on left child.
+    // Filter propagation must NOT pass through outer joins.
+    val subquery1 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 1)
+      .join(testRelation.as("t2"), LeftOuter, Some($"t1.b" === $"t2.b"))
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a"))
+      .analyze)
+    val subquery2 = ScalarSubquery(testRelation.as("t1")
+      .where($"t1.a" > 2)
+      .join(testRelation.as("t2"), LeftOuter, Some($"t1.b" === $"t2.b"))
+      .select($"t1.a".as("a_out"))
+      .groupBy()(sum($"a_out").as("sum_a2"))
+      .analyze)
+    val originalQuery = testRelation.select(subquery1, subquery2)
+    comparePlans(Optimize.execute(originalQuery.analyze), originalQuery.analyze)
+  }
+
   test("Do not merge subqueries with nondeterministic elements") {
     val subquery1 = ScalarSubquery(testRelation.select(($"a" + rand(0)).as("rand_a")))
     val subquery2 = ScalarSubquery(testRelation.select(($"b" + rand(0)).as("rand_b")))
