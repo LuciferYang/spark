@@ -91,6 +91,9 @@ case class TextScan(
 
   override def hashCode(): Int = super.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): TextScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): TextScan =
     copy(disableBucketedScan = disable)
 

@@ -589,7 +589,8 @@ abstract class FileTable(
 object FileTable {
   private val CAPABILITIES = util.EnumSet.of(
     BATCH_READ, BATCH_WRITE, TRUNCATE,
-    OVERWRITE_BY_FILTER, OVERWRITE_DYNAMIC)
+    OVERWRITE_BY_FILTER, OVERWRITE_DYNAMIC,
+    MICRO_BATCH_READ)
 
   /** Option key for injecting stored row count from ANALYZE TABLE into FileScan. */
   val NUM_ROWS_KEY: String = "__numRows"

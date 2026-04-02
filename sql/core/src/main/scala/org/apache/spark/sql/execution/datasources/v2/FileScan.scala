@@ -18,6 +18,8 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import java.util.{Locale, OptionalLong}
 
+import scala.jdk.CollectionConverters._
+
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
@@ -31,6 +33,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjectio
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.connector.read._
+import org.apache.spark.sql.connector.read.streaming.MicroBatchStream
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources._
@@ -108,6 +111,9 @@ trait FileScan extends Scan
       bucketColumns.size == spec.bucketColumnNames.size
     }
   }
+
+  /** Returns a copy of this scan with a different file index. Default is a no-op. */
+  def withFileIndex(newFileIndex: PartitioningAwareFileIndex): FileScan = this
 
   /** Returns a copy of this scan with bucketed scan disabled. Default is a no-op. */
   def withDisableBucketedScan(disable: Boolean): FileScan = this
@@ -301,6 +307,19 @@ trait FileScan extends Scan
     Option(options.get(FileTable.NUM_ROWS_KEY)).map(_.toLong)
 
   override def toBatch: Batch = this
+
+  override def toMicroBatchStream(checkpointLocation: String): MicroBatchStream = {
+    new FileMicroBatchStream(
+      sparkSession,
+      fileIndex,
+      this,
+      fileIndex.rootPaths.head.toString,
+      this.getClass.getSimpleName.replace("Scan", "").toLowerCase(Locale.ROOT),
+      readSchema(),
+      readPartitionSchema.fieldNames.toSeq,
+      checkpointLocation,
+      options.asCaseSensitiveMap.asScala.toMap)
+  }
 
   override def readSchema(): StructType =
     StructType(readDataSchema.fields ++ readPartitionSchema.fields)

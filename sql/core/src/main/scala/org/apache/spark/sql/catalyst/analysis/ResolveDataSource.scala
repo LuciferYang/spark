@@ -43,6 +43,24 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 /** Resolves the relations created from the DataFrameReader and DataStreamReader APIs. */
 class ResolveDataSource(sparkSession: SparkSession) extends Rule[LogicalPlan] {
 
+  /**
+   * Returns true if the provider is a FileDataSourceV2 AND the provider's short name or
+   * class name is in USE_V1_SOURCE_LIST. When true, streaming falls back to V1.
+   */
+  private def isV1FileSource(provider: TableProvider): Boolean = {
+    provider.isInstanceOf[FileDataSourceV2] && {
+      val v1Sources = sparkSession.sessionState.conf
+        .getConf(org.apache.spark.sql.internal.SQLConf.USE_V1_SOURCE_LIST)
+        .toLowerCase(Locale.ROOT).split(",").map(_.trim)
+      val shortName = provider match {
+        case d: org.apache.spark.sql.sources.DataSourceRegister => d.shortName()
+        case _ => ""
+      }
+      v1Sources.contains(shortName.toLowerCase(Locale.ROOT)) ||
+        v1Sources.contains(provider.getClass.getCanonicalName.toLowerCase(Locale.ROOT))
+    }
+  }
+
   override def apply(plan: LogicalPlan): LogicalPlan = plan.resolveOperatorsUp {
     case UnresolvedDataSource(source, userSpecifiedSchema, extraOptions, false, paths) =>
       // Batch data source created from DataFrameReader
@@ -92,8 +110,7 @@ class ResolveDataSource(sparkSession: SparkSession) extends Rule[LogicalPlan] {
         case _ => None
       }
       ds match {
-        // file source v2 does not support streaming yet.
-        case provider: TableProvider if !provider.isInstanceOf[FileDataSourceV2] =>
+        case provider: TableProvider if !isV1FileSource(provider) =>
           val sessionOptions = DataSourceV2Utils.extractSessionConfigs(
             source = provider, conf = sparkSession.sessionState.conf)
           val finalOptions =
@@ -153,8 +170,7 @@ class ResolveDataSource(sparkSession: SparkSession) extends Rule[LogicalPlan] {
         case _ => None
       }
       ds match {
-        // file source v2 does not support streaming yet.
-        case provider: TableProvider if !provider.isInstanceOf[FileDataSourceV2] =>
+        case provider: TableProvider if !isV1FileSource(provider) =>
           val sessionOptions = DataSourceV2Utils.extractSessionConfigs(
             source = provider, conf = sparkSession.sessionState.conf)
           val finalOptions =

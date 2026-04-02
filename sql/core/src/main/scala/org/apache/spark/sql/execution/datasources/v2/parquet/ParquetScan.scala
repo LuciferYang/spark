@@ -202,6 +202,9 @@ case class ParquetScan(
 
   override def hashCode(): Int = getClass.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): ParquetScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): ParquetScan =
     copy(disableBucketedScan = disable)
 

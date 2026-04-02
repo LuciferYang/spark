@@ -98,6 +98,9 @@ case class OrcScan(
 
   override def hashCode(): Int = getClass.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): OrcScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): OrcScan =
     copy(disableBucketedScan = disable)
 

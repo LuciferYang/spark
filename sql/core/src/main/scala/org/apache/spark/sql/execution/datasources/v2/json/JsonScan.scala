@@ -99,6 +99,9 @@ case class JsonScan(
 
   override def hashCode(): Int = super.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): JsonScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): JsonScan =
     copy(disableBucketedScan = disable)
 

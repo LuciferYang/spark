@@ -32,7 +32,7 @@ import org.apache.hadoop.util.Progressable
 import org.scalatest.PrivateMethodTester
 import org.scalatest.time.SpanSugar._
 
-import org.apache.spark.SparkUnsupportedOperationException
+import org.apache.spark.{SparkConf, SparkUnsupportedOperationException}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.paths.SparkPath.{fromUrlString => sp}
 import org.apache.spark.sql._
@@ -234,6 +234,11 @@ abstract class FileStreamSourceTest
 class FileStreamSourceSuite extends FileStreamSourceTest {
 
   import testImplicits._
+
+  // Force V1 file source path for these tests, which specifically test FileStreamSource (V1).
+  // V2 streaming reads are tested in FileStreamV2ReadSuite.
+  override protected def sparkConf: SparkConf =
+    super.sparkConf.set(SQLConf.USE_V1_SOURCE_LIST, "csv,json,orc,text,parquet,avro")
 
   override val streamingTimeout = 80.seconds
 

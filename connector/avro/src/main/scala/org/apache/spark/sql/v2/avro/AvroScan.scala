@@ -76,6 +76,9 @@ case class AvroScan(
 
   override def hashCode(): Int = super.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): AvroScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): AvroScan =
     copy(disableBucketedScan = disable)
 

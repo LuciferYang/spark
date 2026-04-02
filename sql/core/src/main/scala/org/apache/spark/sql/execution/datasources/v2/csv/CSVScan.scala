@@ -106,6 +106,9 @@ case class CSVScan(
 
   override def hashCode(): Int = super.hashCode()
 
+  override def withFileIndex(newFI: PartitioningAwareFileIndex): CSVScan =
+    copy(fileIndex = newFI)
+
   override def withDisableBucketedScan(disable: Boolean): CSVScan =
     copy(disableBucketedScan = disable)
 
