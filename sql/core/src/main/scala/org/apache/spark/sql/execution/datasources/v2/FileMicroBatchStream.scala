@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.connector.read.{InputPartition, PartitionReaderFactory}
 import org.apache.spark.sql.connector.read.streaming
 import org.apache.spark.sql.connector.read.streaming.{MicroBatchStream, ReadAllAvailable, ReadLimit, ReadMaxBytes, ReadMaxFiles, SupportsAdmissionControl, SupportsTriggerAvailableNow}
+import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.{InMemoryFileIndex, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.streaming.runtime.{FileStreamOptions, FileStreamSource, FileStreamSourceLog, FileStreamSourceOffset, MetadataLogFileIndex, SerializedOffset}
 import org.apache.spark.sql.execution.streaming.runtime.FileStreamSource.FileEntry
@@ -73,6 +74,9 @@ class FileMicroBatchStream(
   private val qualifiedBasePath: Path = {
     fs.makeQualified(new Path(path)) // can contain glob patterns
   }
+
+  private val sourceCleaner: Option[FileStreamSource.FileStreamSourceCleaner] =
+    FileStreamSource.FileStreamSourceCleaner(fs, qualifiedBasePath, sourceOptions, hadoopConf)
 
   private val metadataLog =
     new FileStreamSourceLog(FileStreamSourceLog.VERSION, sparkSession, metadataPath)
@@ -151,11 +155,19 @@ class FileMicroBatchStream(
   }
 
   override def commit(end: streaming.Offset): Unit = {
-    // no-op for now
+    val logOffset = FileStreamSourceOffset(
+      end.asInstanceOf[org.apache.spark.sql.execution.streaming.Offset]).logOffset
+
+    sourceCleaner.foreach { cleaner =>
+      val files = metadataLog.get(Some(logOffset), Some(logOffset)).flatMap(_._2)
+      val validFileEntries = files.filter(_.batchId == logOffset)
+      logDebug(s"completed file entries: ${validFileEntries.mkString(",")}")
+      validFileEntries.foreach(cleaner.clean)
+    }
   }
 
   override def stop(): Unit = {
-    // no-op for now
+    sourceCleaner.foreach(_.stop())
   }
 
   // ---------------------------------------------------------------------------
@@ -370,8 +382,14 @@ class FileMicroBatchStream(
       CaseInsensitiveMap(options), None).allFiles()
   }
 
-  private def setSourceHasMetadata(newValue: Option[Boolean]): Unit = {
-    sourceHasMetadata = newValue
+  private def setSourceHasMetadata(newValue: Option[Boolean]): Unit = newValue match {
+    case Some(true) =>
+      if (sourceCleaner.isDefined) {
+        throw QueryExecutionErrors.cleanUpSourceFilesUnsupportedError()
+      }
+      sourceHasMetadata = Some(true)
+    case _ =>
+      sourceHasMetadata = newValue
   }
 
   /**
