@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparabl
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.catalog.functions.Reducer
 import org.apache.spark.sql.connector.read._
+import org.apache.spark.sql.internal.connector.SupportsRuntimeCatalystFilters
 import org.apache.spark.util.ArrayImplicits._
 
 /**
@@ -61,17 +62,27 @@ case class BatchScanExec(
     batch.planInputPartitions().toImmutableArraySeq
 
   @transient private lazy val filteredPartitions: Seq[Seq[InputPartition]] = {
+    // First check if the scan supports Catalyst-level runtime filters (e.g., FileScan with DPP)
+    val catalystFiltered = scan match {
+      case s: SupportsRuntimeCatalystFilters if runtimeFilters.nonEmpty =>
+        s.filter(runtimeFilters)
+        true
+      case _ => false
+    }
+
     val dataSourceFilters = runtimeFilters.flatMap {
       case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
       case _ => None
     }
 
-    if (dataSourceFilters.nonEmpty) {
+    if (catalystFiltered || dataSourceFilters.nonEmpty) {
       val originalPartitioning = outputPartitioning
 
-      // the cast is safe as runtime filters are only assigned if the scan can be filtered
-      val filterableScan = scan.asInstanceOf[SupportsRuntimeV2Filtering]
-      filterableScan.filter(dataSourceFilters.toArray)
+      if (!catalystFiltered && dataSourceFilters.nonEmpty) {
+        // the cast is safe as runtime filters are only assigned if the scan can be filtered
+        val filterableScan = scan.asInstanceOf[SupportsRuntimeV2Filtering]
+        filterableScan.filter(dataSourceFilters.toArray)
+      }
 
       // call toBatch again to get filtered partitions
       val newPartitions = scan.toBatch.planInputPartitions()
