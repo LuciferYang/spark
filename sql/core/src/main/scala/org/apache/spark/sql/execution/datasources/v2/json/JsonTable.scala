@@ -38,7 +38,8 @@ case class JsonTable(
     fallbackFileFormat: Class[_ <: FileFormat])
   extends FileTable(sparkSession, options, paths, userSpecifiedSchema) {
   override def newScanBuilder(options: CaseInsensitiveStringMap): JsonScanBuilder =
-    JsonScanBuilder(sparkSession, fileIndex, schema, dataSchema, mergedOptions(options))
+    JsonScanBuilder(sparkSession, fileIndex, schema, dataSchema, mergedOptions(options),
+      bucketSpec)
 
   override def inferSchema(files: Seq[FileStatus]): Option[StructType] = {
     val parsedOptions = new JSONOptionsInRead(

@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.avro.AvroOptions
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.connector.read.PartitionReaderFactory
 import org.apache.spark.sql.execution.datasources.PartitioningAwareFileIndex
@@ -31,6 +32,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 case class AvroScan(
     sparkSession: SparkSession,
@@ -41,7 +43,11 @@ case class AvroScan(
     options: CaseInsensitiveStringMap,
     pushedFilters: Array[Filter],
     partitionFilters: Seq[Expression] = Seq.empty,
-    dataFilters: Seq[Expression] = Seq.empty) extends FileScan {
+    dataFilters: Seq[Expression] = Seq.empty,
+    override val bucketSpec: Option[BucketSpec] = None,
+    override val disableBucketedScan: Boolean = false,
+    override val optionalBucketSet: Option[BitSet] = None,
+    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
   override def isSplitable(path: Path): Boolean = true
 
   override def createReaderFactory(): PartitionReaderFactory = {
@@ -69,6 +75,12 @@ case class AvroScan(
   }
 
   override def hashCode(): Int = super.hashCode()
+
+  override def withDisableBucketedScan(disable: Boolean): AvroScan =
+    copy(disableBucketedScan = disable)
+
+  override def withNumCoalescedBuckets(n: Option[Int]): AvroScan =
+    copy(optionalNumCoalescedBuckets = n)
 
   override def getMetaData(): Map[String, String] = {
     super.getMetaData() ++ Map("PushedFilters" -> seqToString(pushedFilters.toImmutableArraySeq))

@@ -21,6 +21,7 @@ import scala.jdk.CollectionConverters._
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExprUtils}
 import org.apache.spark.sql.catalyst.json.JSONOptionsInRead
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -34,6 +35,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 case class JsonScan(
     sparkSession: SparkSession,
@@ -44,7 +46,11 @@ case class JsonScan(
     options: CaseInsensitiveStringMap,
     pushedFilters: Array[Filter],
     partitionFilters: Seq[Expression] = Seq.empty,
-    dataFilters: Seq[Expression] = Seq.empty)
+    dataFilters: Seq[Expression] = Seq.empty,
+    override val bucketSpec: Option[BucketSpec] = None,
+    override val disableBucketedScan: Boolean = false,
+    override val optionalBucketSet: Option[BitSet] = None,
+    override val optionalNumCoalescedBuckets: Option[Int] = None)
   extends TextBasedFileScan(sparkSession, options) {
 
   private val parsedOptions = new JSONOptionsInRead(
@@ -92,6 +98,12 @@ case class JsonScan(
   }
 
   override def hashCode(): Int = super.hashCode()
+
+  override def withDisableBucketedScan(disable: Boolean): JsonScan =
+    copy(disableBucketedScan = disable)
+
+  override def withNumCoalescedBuckets(n: Option[Int]): JsonScan =
+    copy(optionalNumCoalescedBuckets = n)
 
   override def getMetaData(): Map[String, String] = {
     super.getMetaData() ++ Map("PushedFilters" -> pushedFilters.mkString("[", ", ", "]"))

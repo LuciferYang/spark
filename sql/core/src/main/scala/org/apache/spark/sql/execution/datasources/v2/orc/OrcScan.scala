@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.PartitionReaderFactory
@@ -34,6 +35,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 case class OrcScan(
     sparkSession: SparkSession,
@@ -46,7 +48,11 @@ case class OrcScan(
     pushedAggregate: Option[Aggregation] = None,
     pushedFilters: Array[Filter],
     partitionFilters: Seq[Expression] = Seq.empty,
-    dataFilters: Seq[Expression] = Seq.empty) extends FileScan {
+    dataFilters: Seq[Expression] = Seq.empty,
+    override val bucketSpec: Option[BucketSpec] = None,
+    override val disableBucketedScan: Boolean = false,
+    override val optionalBucketSet: Option[BitSet] = None,
+    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
   override def isSplitable(path: Path): Boolean = {
     // If aggregate is pushed down, only the file footer will be read once,
     // so file should not be split across multiple tasks.
@@ -91,6 +97,12 @@ case class OrcScan(
   }
 
   override def hashCode(): Int = getClass.hashCode()
+
+  override def withDisableBucketedScan(disable: Boolean): OrcScan =
+    copy(disableBucketedScan = disable)
+
+  override def withNumCoalescedBuckets(n: Option[Int]): OrcScan =
+    copy(optionalNumCoalescedBuckets = n)
 
   lazy private val (pushedAggregationsStr, pushedGroupByStr) = if (pushedAggregate.nonEmpty) {
     (seqToString(pushedAggregate.get.aggregateExpressions.toImmutableArraySeq),

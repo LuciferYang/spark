@@ -69,6 +69,9 @@ abstract class FileTable(
   // partition locations. Set by V2SessionCatalog.loadTable.
   private[v2] var useCatalogFileIndex: Boolean = false
 
+  /** BucketSpec from the catalog table, if available. */
+  def bucketSpec: Option[BucketSpec] = catalogTable.flatMap(_.bucketSpec)
+
   lazy val fileIndex: PartitioningAwareFileIndex = {
     val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
     // Hadoop Configurations are case sensitive.

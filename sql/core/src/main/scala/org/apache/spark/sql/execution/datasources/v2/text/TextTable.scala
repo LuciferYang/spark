@@ -34,7 +34,8 @@ case class TextTable(
     fallbackFileFormat: Class[_ <: FileFormat])
   extends FileTable(sparkSession, options, paths, userSpecifiedSchema) {
   override def newScanBuilder(options: CaseInsensitiveStringMap): TextScanBuilder =
-    TextScanBuilder(sparkSession, fileIndex, schema, dataSchema, mergedOptions(options))
+    TextScanBuilder(sparkSession, fileIndex, schema, dataSchema, mergedOptions(options),
+      bucketSpec)
 
   override def inferSchema(files: Seq[FileStatus]): Option[StructType] =
     Some(StructType(Array(StructField("value", StringType))))

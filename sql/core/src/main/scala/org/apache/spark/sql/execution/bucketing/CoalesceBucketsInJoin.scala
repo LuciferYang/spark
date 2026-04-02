@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, PartitioningCollection}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, FileScan}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNestedLoopJoinExec, ShuffledHashJoinExec, ShuffledJoin, SortMergeJoinExec}
 
 /**
@@ -44,6 +45,11 @@ object CoalesceBucketsInJoin extends Rule[SparkPlan] {
     plan transformUp {
       case f: FileSourceScanExec if f.relation.bucketSpec.nonEmpty =>
         f.copy(optionalNumCoalescedBuckets = Some(numCoalescedBuckets))
+      case b: BatchScanExec => b.scan match {
+        case fs: FileScan if fs.bucketSpec.nonEmpty =>
+          b.copy(scan = fs.withNumCoalescedBuckets(Some(numCoalescedBuckets)))
+        case _ => b
+      }
     }
   }
 
@@ -120,6 +126,10 @@ object ExtractJoinWithBuckets {
     case j: BroadcastNestedLoopJoinExec =>
       if (j.buildSide == BuildLeft) hasScanOperation(j.right) else hasScanOperation(j.left)
     case f: FileSourceScanExec => f.relation.bucketSpec.nonEmpty
+    case b: BatchScanExec => b.scan match {
+      case fs: FileScan => fs.bucketSpec.nonEmpty
+      case _ => false
+    }
     case _ => false
   }
 
@@ -128,6 +138,11 @@ object ExtractJoinWithBuckets {
       case f: FileSourceScanExec if f.relation.bucketSpec.nonEmpty &&
           f.optionalNumCoalescedBuckets.isEmpty =>
         f.relation.bucketSpec.get
+      case b: BatchScanExec
+          if b.scan.isInstanceOf[FileScan] &&
+             b.scan.asInstanceOf[FileScan].bucketSpec.nonEmpty &&
+             b.scan.asInstanceOf[FileScan].optionalNumCoalescedBuckets.isEmpty =>
+        b.scan.asInstanceOf[FileScan].bucketSpec.get
     }
   }
 

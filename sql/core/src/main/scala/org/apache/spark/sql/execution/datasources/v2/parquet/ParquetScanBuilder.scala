@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.v2.parquet
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.{SupportsPushDownAggregates, SupportsPushDownVariantExtractions, VariantExtraction}
@@ -37,8 +38,9 @@ case class ParquetScanBuilder(
     fileIndex: PartitioningAwareFileIndex,
     schema: StructType,
     dataSchema: StructType,
-    options: CaseInsensitiveStringMap)
-  extends FileScanBuilder(sparkSession, fileIndex, dataSchema)
+    options: CaseInsensitiveStringMap,
+    override val bucketSpec: Option[BucketSpec] = None)
+  extends FileScanBuilder(sparkSession, fileIndex, dataSchema, bucketSpec)
     with SupportsPushDownAggregates
     with SupportsPushDownVariantExtractions {
   lazy val hadoopConf = {
@@ -117,8 +119,10 @@ case class ParquetScanBuilder(
     if (pushedAggregations.isEmpty) {
       finalSchema = readDataSchema()
     }
+    val optBucketSet = computeBucketSet()
     ParquetScan(sparkSession, hadoopConf, fileIndex, dataSchema, finalSchema,
       readPartitionSchema(), pushedDataFilters, options, pushedAggregations,
-      partitionFilters, dataFilters, pushedVariantExtractions)
+      partitionFilters, dataFilters, pushedVariantExtractions,
+      bucketSpec = bucketSpec, optionalBucketSet = optBucketSet)
   }
 }

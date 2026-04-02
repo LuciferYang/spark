@@ -64,14 +64,14 @@ import org.apache.spark.util.collection.BitSet
 object FileSourceStrategy extends Strategy with PredicateHelper with Logging {
 
   // should prune buckets iff num buckets is greater than 1 and there is only one bucket column
-  private def shouldPruneBuckets(bucketSpec: Option[BucketSpec]): Boolean = {
+  private[sql] def shouldPruneBuckets(bucketSpec: Option[BucketSpec]): Boolean = {
     bucketSpec match {
       case Some(spec) => spec.bucketColumnNames.length == 1 && spec.numBuckets > 1
       case None => false
     }
   }
 
-  private def getExpressionBuckets(
+  private[sql] def getExpressionBuckets(
       expr: Expression,
       bucketColumnName: String,
       numBuckets: Int): BitSet = {
@@ -123,7 +123,7 @@ object FileSourceStrategy extends Strategy with PredicateHelper with Logging {
     }
   }
 
-  private def genBucketSet(
+  private[sql] def genBucketSet(
       normalizedFilters: Seq[Expression],
       bucketSpec: BucketSpec): Option[BitSet] = {
     if (normalizedFilters.isEmpty) {

@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.ParquetInputFormat
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.{PartitionReaderFactory, VariantExtraction}
@@ -35,6 +36,7 @@ import org.apache.spark.sql.types.{BooleanType, DataType, StructField, StructTyp
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 case class ParquetScan(
     sparkSession: SparkSession,
@@ -48,7 +50,11 @@ case class ParquetScan(
     pushedAggregate: Option[Aggregation] = None,
     partitionFilters: Seq[Expression] = Seq.empty,
     dataFilters: Seq[Expression] = Seq.empty,
-    pushedVariantExtractions: Array[VariantExtraction] = Array.empty) extends FileScan {
+    pushedVariantExtractions: Array[VariantExtraction] = Array.empty,
+    override val bucketSpec: Option[BucketSpec] = None,
+    override val disableBucketedScan: Boolean = false,
+    override val optionalBucketSet: Option[BitSet] = None,
+    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
   override def isSplitable(path: Path): Boolean = {
     // If aggregate is pushed down, only the file footer will be read once,
     // so file should not be split across multiple tasks.
@@ -195,6 +201,12 @@ case class ParquetScan(
   }
 
   override def hashCode(): Int = getClass.hashCode()
+
+  override def withDisableBucketedScan(disable: Boolean): ParquetScan =
+    copy(disableBucketedScan = disable)
+
+  override def withNumCoalescedBuckets(n: Option[Int]): ParquetScan =
+    copy(optionalNumCoalescedBuckets = n)
 
   lazy private val (pushedAggregationsStr, pushedGroupByStr) = if (pushedAggregate.nonEmpty) {
     (seqToString(pushedAggregate.get.aggregateExpressions.toImmutableArraySeq),

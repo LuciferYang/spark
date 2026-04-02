@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.v2.orc
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.SupportsPushDownAggregates
 import org.apache.spark.sql.execution.datasources.{AggregatePushDownUtils, PartitioningAwareFileIndex}
@@ -36,8 +37,9 @@ case class OrcScanBuilder(
     fileIndex: PartitioningAwareFileIndex,
     schema: StructType,
     dataSchema: StructType,
-    options: CaseInsensitiveStringMap)
-  extends FileScanBuilder(sparkSession, fileIndex, dataSchema)
+    options: CaseInsensitiveStringMap,
+    override val bucketSpec: Option[BucketSpec] = None)
+  extends FileScanBuilder(sparkSession, fileIndex, dataSchema, bucketSpec)
   with SupportsPushDownAggregates {
 
   lazy val hadoopConf = {
@@ -59,9 +61,10 @@ case class OrcScanBuilder(
     if (pushedAggregations.isEmpty) {
       finalSchema = readDataSchema()
     }
+    val optBucketSet = computeBucketSet()
     OrcScan(sparkSession, hadoopConf, fileIndex, dataSchema, finalSchema,
       readPartitionSchema(), options, pushedAggregations, pushedDataFilters, partitionFilters,
-      dataFilters)
+      dataFilters, bucketSpec = bucketSpec, optionalBucketSet = optBucketSet)
   }
 
   override def pushDataFilters(dataFilters: Array[Filter]): Array[Filter] = {

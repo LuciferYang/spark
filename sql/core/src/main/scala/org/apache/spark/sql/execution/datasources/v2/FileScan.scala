@@ -25,6 +25,7 @@ import org.apache.spark.internal.LogKeys.{PATH, REASON}
 import org.apache.spark.internal.config.IO_WARNING_LARGEFILETHRESHOLD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.SQLConfHelper
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, ExpressionSet}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.plans.QueryPlan
@@ -39,6 +40,7 @@ import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.Utils
+import org.apache.spark.util.collection.BitSet
 
 trait FileScan extends Scan
   with Batch
@@ -81,6 +83,38 @@ trait FileScan extends Scan
    */
   def dataFilters: Seq[Expression]
 
+  /** Optional bucket specification from the catalog table. */
+  def bucketSpec: Option[BucketSpec] = None
+
+  /** When true, disables bucketed scan. Set by DisableUnnecessaryBucketedScan. */
+  def disableBucketedScan: Boolean = false
+
+  /** Optional set of bucket IDs to scan (bucket pruning). None = scan all. */
+  def optionalBucketSet: Option[BitSet] = None
+
+  /** Optional coalesced bucket count. Set by CoalesceBucketsInJoin. */
+  def optionalNumCoalescedBuckets: Option[Int] = None
+
+  /**
+   * Whether this scan actually uses bucketed read.
+   * Mirrors V1 FileSourceScanExec.bucketedScan.
+   */
+  lazy val bucketedScan: Boolean = {
+    conf.bucketingEnabled && bucketSpec.isDefined && !disableBucketedScan && {
+      val spec = bucketSpec.get
+      val resolver = sparkSession.sessionState.conf.resolver
+      val bucketColumns = spec.bucketColumnNames.flatMap(n =>
+        readSchema().fields.find(f => resolver(f.name, n)))
+      bucketColumns.size == spec.bucketColumnNames.size
+    }
+  }
+
+  /** Returns a copy of this scan with bucketed scan disabled. Default is a no-op. */
+  def withDisableBucketedScan(disable: Boolean): FileScan = this
+
+  /** Returns a copy of this scan with the given coalesced bucket count. Default is a no-op. */
+  def withNumCoalescedBuckets(numCoalescedBuckets: Option[Int]): FileScan = this
+
   /**
    * If a file with `path` is unsplittable, return the unsplittable reason,
    * otherwise return `None`.
@@ -108,7 +142,11 @@ trait FileScan extends Scan
     case f: FileScan =>
       fileIndex == f.fileIndex && readSchema == f.readSchema &&
         normalizedPartitionFilters == f.normalizedPartitionFilters &&
-        normalizedDataFilters == f.normalizedDataFilters
+        normalizedDataFilters == f.normalizedDataFilters &&
+        bucketSpec == f.bucketSpec &&
+        disableBucketedScan == f.disableBucketedScan &&
+        optionalBucketSet == f.optionalBucketSet &&
+        optionalNumCoalescedBuckets == f.optionalNumCoalescedBuckets
 
     case _ => false
   }
@@ -133,17 +171,26 @@ trait FileScan extends Scan
     val locationDesc =
       fileIndex.getClass.getSimpleName +
         Utils.buildLocationMetadata(fileIndex.rootPaths, maxMetadataValueLength)
-    Map(
+    val base = Map(
       "Format" -> s"${this.getClass.getSimpleName.replace("Scan", "").toLowerCase(Locale.ROOT)}",
       "ReadSchema" -> readDataSchema.catalogString,
       "PartitionFilters" -> seqToString(partitionFilters),
       "DataFilters" -> seqToString(dataFilters),
       "Location" -> locationDesc)
+    if (bucketedScan) {
+      base ++ Map(
+        "BucketSpec" -> bucketSpec.get.toString,
+        "BucketedScan" -> "true")
+    } else {
+      base
+    }
   }
 
   protected def partitions: Seq[FilePartition] = {
     val selectedPartitions = fileIndex.listFiles(partitionFilters, dataFilters)
-    val maxSplitBytes = FilePartition.maxSplitBytes(sparkSession, selectedPartitions)
+    // For bucketed scans, use Long.MaxValue to avoid splitting bucket files across partitions.
+    val maxSplitBytes = if (bucketedScan) Long.MaxValue
+      else FilePartition.maxSplitBytes(sparkSession, selectedPartitions)
     val partitionAttributes = toAttributes(fileIndex.partitionSchema)
     val attributeMap = partitionAttributes.map(a => normalizeName(a.name) -> a).toMap
     val readPartitionAttributes = readPartitionSchema.map { readField =>
@@ -173,16 +220,53 @@ trait FileScan extends Scan
       }.toArray.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
     }
 
-    if (splitFiles.length == 1) {
-      val path = splitFiles(0).toPath
-      if (!isSplitable(path) && splitFiles(0).length >
-        SessionStateHelper.getSparkConf(sparkSession).get(IO_WARNING_LARGEFILETHRESHOLD)) {
-        logWarning(log"Loading one large unsplittable file ${MDC(PATH, path.toString)} with only " +
-          log"one partition, the reason is: ${MDC(REASON, getFileUnSplittableReason(path))}")
+    if (bucketedScan) {
+      createBucketedPartitions(splitFiles)
+    } else {
+      if (splitFiles.length == 1) {
+        val path = splitFiles(0).toPath
+        if (!isSplitable(path) && splitFiles(0).length >
+          SessionStateHelper.getSparkConf(sparkSession).get(IO_WARNING_LARGEFILETHRESHOLD)) {
+          logWarning(
+            log"Loading one large unsplittable file ${MDC(PATH, path.toString)} with only " +
+            log"one partition, the reason is: ${MDC(REASON, getFileUnSplittableReason(path))}")
+        }
+      }
+
+      FilePartition.getFilePartitions(sparkSession, splitFiles, maxSplitBytes)
+    }
+  }
+
+  /**
+   * Groups split files by bucket ID and applies bucket pruning and coalescing.
+   * Mirrors V1 FileSourceScanExec.createBucketedReadRDD.
+   */
+  private def createBucketedPartitions(
+      splitFiles: Seq[PartitionedFile]): Seq[FilePartition] = {
+    val spec = bucketSpec.get
+    val filesGroupedToBuckets = splitFiles.groupBy { f =>
+      BucketingUtils.getBucketId(new Path(f.toPath.toString).getName)
+        .getOrElse(throw new IllegalStateException(s"Invalid bucket file: ${f.toPath}"))
+    }
+    val prunedFilesGroupedToBuckets = optionalBucketSet match {
+      case Some(bucketSet) =>
+        filesGroupedToBuckets.filter { case (id, _) => bucketSet.get(id) }
+      case None => filesGroupedToBuckets
+    }
+    optionalNumCoalescedBuckets.map { numCoalescedBuckets =>
+      val coalescedBuckets = prunedFilesGroupedToBuckets.groupBy(_._1 % numCoalescedBuckets)
+      Seq.tabulate(numCoalescedBuckets) { bucketId =>
+        val files = coalescedBuckets.get(bucketId)
+          .map(_.values.flatten.toArray)
+          .getOrElse(Array.empty)
+        FilePartition(bucketId, files)
+      }
+    }.getOrElse {
+      Seq.tabulate(spec.numBuckets) { bucketId =>
+        FilePartition(bucketId,
+          prunedFilesGroupedToBuckets.getOrElse(bucketId, Seq.empty).toArray)
       }
     }
-
-    FilePartition.getFilePartitions(sparkSession, splitFiles, maxSplitBytes)
   }
 
   override def planInputPartitions(): Array[InputPartition] = {

@@ -21,6 +21,7 @@ import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, ClusteredDistrib
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, ProjectExec, SortExec, SparkPlan}
 import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, FileScan}
 import org.apache.spark.sql.execution.exchange.Exchange
 
 /**
@@ -109,6 +110,19 @@ object DisableUnnecessaryBucketedScan extends Rule[SparkPlan] {
         } else {
           scan
         }
+      case batchScan: BatchScanExec =>
+        batchScan.scan match {
+          case fileScan: FileScan if fileScan.bucketedScan =>
+            if (!withInterestingPartition || (withExchange && withAllowedNode)) {
+              val newScan = fileScan.withDisableBucketedScan(true)
+              val nonBucketedBatchScan = batchScan.copy(scan = newScan)
+              batchScan.logicalLink.foreach(nonBucketedBatchScan.setLogicalLink)
+              nonBucketedBatchScan
+            } else {
+              batchScan
+            }
+          case _ => batchScan  // BatchScanExec is a leaf node, no children to traverse
+        }
       case o =>
         o.mapChildren(disableBucketWithInterestingPartition(
           _,
@@ -143,6 +157,10 @@ object DisableUnnecessaryBucketedScan extends Rule[SparkPlan] {
   def apply(plan: SparkPlan): SparkPlan = {
     lazy val hasBucketedScan = plan.exists {
       case scan: FileSourceScanExec => scan.bucketedScan
+      case batchScan: BatchScanExec => batchScan.scan match {
+        case fileScan: FileScan => fileScan.bucketedScan
+        case _ => false
+      }
       case _ => false
     }
 

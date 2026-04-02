@@ -19,18 +19,21 @@ package org.apache.spark.sql.execution.datasources.v2
 import scala.collection.mutable
 
 import org.apache.spark.sql.{sources, SparkSession}
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Expression, PythonUDF, SubqueryExpression}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{ScanBuilder, SupportsPushDownRequiredColumns}
-import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils, PartitioningAwareFileIndex, PartitioningUtils}
+import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils, FileSourceStrategy, PartitioningAwareFileIndex, PartitioningUtils}
 import org.apache.spark.sql.internal.connector.SupportsPushDownCatalystFilters
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.collection.BitSet
 
 abstract class FileScanBuilder(
     sparkSession: SparkSession,
     fileIndex: PartitioningAwareFileIndex,
-    dataSchema: StructType)
+    dataSchema: StructType,
+    val bucketSpec: Option[BucketSpec] = None)
   extends ScanBuilder
     with SupportsPushDownRequiredColumns
     with SupportsPushDownCatalystFilters {
@@ -103,4 +106,16 @@ abstract class FileScanBuilder(
 
   val partitionNameSet: Set[String] =
     partitionSchema.fields.map(PartitioningUtils.getColName(_, isCaseSensitive)).toSet
+
+  /**
+   * Computes the optional bucket set for bucket pruning based on pushed data filters.
+   * Returns None if bucket pruning is not applicable or no buckets can be pruned.
+   */
+  protected def computeBucketSet(): Option[BitSet] = {
+    bucketSpec match {
+      case Some(spec) if FileSourceStrategy.shouldPruneBuckets(Some(spec)) =>
+        FileSourceStrategy.genBucketSet(dataFilters, spec)
+      case _ => None
+    }
+  }
 }

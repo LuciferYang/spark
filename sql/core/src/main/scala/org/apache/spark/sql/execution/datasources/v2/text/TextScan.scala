@@ -21,6 +21,7 @@ import scala.jdk.CollectionConverters._
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.connector.read.PartitionReaderFactory
 import org.apache.spark.sql.errors.QueryCompilationErrors
@@ -30,6 +31,7 @@ import org.apache.spark.sql.execution.datasources.v2.TextBasedFileScan
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.util.collection.BitSet
 
 case class TextScan(
     sparkSession: SparkSession,
@@ -39,7 +41,11 @@ case class TextScan(
     readPartitionSchema: StructType,
     options: CaseInsensitiveStringMap,
     partitionFilters: Seq[Expression] = Seq.empty,
-    dataFilters: Seq[Expression] = Seq.empty)
+    dataFilters: Seq[Expression] = Seq.empty,
+    override val bucketSpec: Option[BucketSpec] = None,
+    override val disableBucketedScan: Boolean = false,
+    override val optionalBucketSet: Option[BitSet] = None,
+    override val optionalNumCoalescedBuckets: Option[Int] = None)
   extends TextBasedFileScan(sparkSession, options) {
 
   private val optionsAsScala = options.asScala.toMap
@@ -84,4 +90,10 @@ case class TextScan(
   }
 
   override def hashCode(): Int = super.hashCode()
+
+  override def withDisableBucketedScan(disable: Boolean): TextScan =
+    copy(disableBucketedScan = disable)
+
+  override def withNumCoalescedBuckets(n: Option[Int]): TextScan =
+    copy(optionalNumCoalescedBuckets = n)
 }

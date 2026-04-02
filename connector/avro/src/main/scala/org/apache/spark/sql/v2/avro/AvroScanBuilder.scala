@@ -18,6 +18,7 @@ package org.apache.spark.sql.v2.avro
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.StructFilters
+import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.execution.datasources.PartitioningAwareFileIndex
 import org.apache.spark.sql.execution.datasources.v2.FileScanBuilder
 import org.apache.spark.sql.sources.Filter
@@ -29,10 +30,12 @@ case class AvroScanBuilder (
     fileIndex: PartitioningAwareFileIndex,
     schema: StructType,
     dataSchema: StructType,
-    options: CaseInsensitiveStringMap)
-  extends FileScanBuilder(sparkSession, fileIndex, dataSchema) {
+    options: CaseInsensitiveStringMap,
+    override val bucketSpec: Option[BucketSpec] = None)
+  extends FileScanBuilder(sparkSession, fileIndex, dataSchema, bucketSpec) {
 
   override def build(): AvroScan = {
+    val optBucketSet = computeBucketSet()
     AvroScan(
       sparkSession,
       fileIndex,
@@ -42,7 +45,9 @@ case class AvroScanBuilder (
       options,
       pushedDataFilters,
       partitionFilters,
-      dataFilters)
+      dataFilters,
+      bucketSpec = bucketSpec,
+      optionalBucketSet = optBucketSet)
   }
 
   override def pushDataFilters(dataFilters: Array[Filter]): Array[Filter] = {

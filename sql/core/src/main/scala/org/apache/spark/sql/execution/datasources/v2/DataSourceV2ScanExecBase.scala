@@ -21,7 +21,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Expression, RowOrdering, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical
-import org.apache.spark.sql.catalyst.plans.physical.KeyedPartitioning
+import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, KeyedPartitioning}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, PartitionReaderFactory, Scan}
 import org.apache.spark.sql.execution.{ExplainUtils, LeafExecNode, SQLExecution}
@@ -90,16 +90,29 @@ trait DataSourceV2ScanExecBase extends LeafExecNode {
   }
 
   override def outputPartitioning: physical.Partitioning = {
-    keyGroupedPartitioning match {
-      case Some(exprs) if conf.v2BucketingEnabled && KeyedPartitioning.supportsExpressions(exprs) &&
-          inputPartitions.nonEmpty && inputPartitions.forall(_.isInstanceOf[HasPartitionKey]) =>
-        val dataTypes = exprs.map(_.dataType)
-        val rowOrdering = RowOrdering.createNaturalAscendingOrdering(dataTypes)
-        val partitionKeys =
-          inputPartitions.map(_.asInstanceOf[HasPartitionKey].partitionKey()).sorted(rowOrdering)
-        KeyedPartitioning(exprs, partitionKeys)
+    scan match {
+      case fileScan: FileScan if fileScan.bucketedScan =>
+        val spec = fileScan.bucketSpec.get
+        val resolver = conf.resolver
+        val bucketColumns = spec.bucketColumnNames.flatMap(n =>
+          output.find(a => resolver(a.name, n)))
+        val numPartitions = fileScan.optionalNumCoalescedBuckets.getOrElse(spec.numBuckets)
+        HashPartitioning(bucketColumns, numPartitions)
       case _ =>
-        super.outputPartitioning
+        keyGroupedPartitioning match {
+          case Some(exprs) if conf.v2BucketingEnabled &&
+              KeyedPartitioning.supportsExpressions(exprs) &&
+              inputPartitions.nonEmpty &&
+              inputPartitions.forall(_.isInstanceOf[HasPartitionKey]) =>
+            val dataTypes = exprs.map(_.dataType)
+            val rowOrdering = RowOrdering.createNaturalAscendingOrdering(dataTypes)
+            val partitionKeys = inputPartitions
+              .map(_.asInstanceOf[HasPartitionKey].partitionKey())
+              .sorted(rowOrdering)
+            KeyedPartitioning(exprs, partitionKeys)
+          case _ =>
+            super.outputPartitioning
+        }
     }
   }
 
@@ -110,6 +123,12 @@ trait DataSourceV2ScanExecBase extends LeafExecNode {
    * `spark.sql.sources.v2.bucketing.partitionKeyOrdering.enabled` is on, each partition
    * contains rows where the key expressions evaluate to a single constant value, so the data
    * is trivially sorted by those expressions within the partition.
+   *
+   * Note: V2 bucketed file scans (FileScan with bucketedScan=true) do NOT report
+   * outputOrdering here. V1 (FileSourceScanExec) reports sort ordering under
+   * LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING only when each bucket has exactly one file
+   * and no coalescing is active. V2 cannot cheaply check those conditions at planning time,
+   * so it conservatively relies on the default behavior.
    */
   override def outputOrdering: Seq[SortOrder] = {
     (ordering, outputPartitioning) match {
