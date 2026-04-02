@@ -5698,6 +5698,23 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
+  val COMBINE_JOINED_AGGREGATES_ENABLED =
+    buildConf("spark.sql.optimizer.combineJoinedAggregates.enabled")
+      .doc("When true, we attempt to eliminate join by combine aggregates " +
+        "to reduce the scan times and avoid shuffle.")
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(false)
+
+  val MAX_TREE_NODE_NUM_OF_PREDICATE =
+    buildConf("spark.sql.optimizer.combineJoinedAggregates.maxTreeNodeNumOfPredicate")
+      .doc("Maximum tree node number of predicate. If tree node number of predicate exceeds the" +
+        "limit, CombineJoinedAggregates will not merging the aggregates connected with join.")
+      .version("4.2.0")
+      .intConf
+      .checkValue(_ > 0, "The threshold of tree node numbers should be positive")
+      .createWithDefault(10)
+
   /**
    * Holds information about keys that have been deprecated.
    *
@@ -6708,6 +6725,11 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
   def legacyCodingErrorAction: Boolean = getConf(SQLConf.LEGACY_CODING_ERROR_ACTION)
 
   def legacyEvalCurrentTime: Boolean = getConf(SQLConf.LEGACY_EVAL_CURRENT_TIME)
+
+  def combineJoinedAggregatesEnabled: Boolean =
+    getConf(SQLConf.COMBINE_JOINED_AGGREGATES_ENABLED)
+
+  def maxTreeNodeNumOfPredicate: Int = getConf(SQLConf.MAX_TREE_NODE_NUM_OF_PREDICATE)
 
   /** ********************** SQLConf functionality methods ************ */
 
