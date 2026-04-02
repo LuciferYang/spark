@@ -17,15 +17,14 @@
 
 package org.apache.spark.sql.execution.dynamicpruning
 
-import org.apache.spark.sql.catalyst.expressions
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeSeq, BindReferences, DynamicPruningExpression, DynamicPruningSubquery, Expression, ListQuery, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeSeq, BindReferences, DynamicPruningExpression, DynamicPruningSubquery, Expression, Literal}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
-import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Project}
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.DYNAMIC_PRUNING_SUBQUERY
 import org.apache.spark.sql.classic.SparkSession
-import org.apache.spark.sql.execution.{InSubqueryExec, QueryExecution, SparkPlan, SubqueryBroadcastExec}
+import org.apache.spark.sql.execution.{InSubqueryExec, QueryExecution, SparkPlan, SubqueryBroadcastExec, SubqueryExec}
 import org.apache.spark.sql.execution.exchange.BroadcastExchangeExec
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.internal.SQLConf
@@ -85,9 +84,13 @@ case class PlanDynamicPruningFilters(sparkSession: SparkSession) extends Rule[Sp
           // we need to apply an aggregate on the buildPlan in order to be column pruned
           val aliases = broadcastKeyIndices.map(idx =>
             Alias(buildKeys(idx), buildKeys(idx).toString)())
-          val aggregate = Aggregate(aliases, aliases, buildPlan)
-          DynamicPruningExpression(expressions.InSubquery(
-            Seq(value), ListQuery(aggregate, numCols = aggregate.output.length)))
+          val project = Project(aliases, buildPlan)
+          val aggregate = Aggregate(
+            aliases.map(a => a.toAttribute), aliases.map(a => a.toAttribute), project)
+          val sparkPlan = QueryExecution.prepareExecutedPlan(sparkSession, aggregate)
+          val name = s"dynamicpruning#${exprId.id}"
+          val values = SubqueryExec(name, sparkPlan)
+          DynamicPruningExpression(InSubqueryExec(value, values, exprId))
         }
     }
   }
