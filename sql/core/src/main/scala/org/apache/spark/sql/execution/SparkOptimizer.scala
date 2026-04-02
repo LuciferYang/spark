@@ -34,6 +34,17 @@ class SparkOptimizer(
     experimentalMethods: ExperimentalMethods)
   extends Optimizer(catalogManager) {
 
+  // After MergeSubplans with filter propagation, PropagatedFilter wrappers in
+  // the plan cause BooleanSimplification to produce a different (simplified) plan
+  // on a second pass, making the batch non-idempotent.
+  override protected val excludedOnceBatches: Set[String] =
+    Set(
+      "PartitionPruning",
+      "RewriteSubquery",
+      "Extract Python UDFs",
+      "Infer Filters",
+      "Cleanup filters that cannot be pushed down")
+
   override def earlyScanPushDownRules: Seq[Rule[LogicalPlan]] =
     // TODO: move SchemaPruning into catalyst
     Seq(
@@ -61,8 +72,8 @@ class SparkOptimizer(
       new RowLevelOperationRuntimeGroupFiltering(OptimizeSubqueries)),
     Batch("InjectRuntimeFilter", FixedPoint(1),
       InjectRuntimeFilter),
-    Batch("MergeScalarSubqueries", Once,
-      MergeScalarSubqueries,
+    Batch("MergeSubplans", Once,
+      MergeSubplans,
       RewriteDistinctAggregates),
     Batch("Pushdown Filters from PartitionPruning", fixedPoint,
       PushDownPredicates),

@@ -70,6 +70,7 @@ object TreePattern extends Enumeration  {
   val MAP_OBJECTS: Value = Value
   val MULTI_ALIAS: Value = Value
   val NEW_INSTANCE: Value = Value
+  val NO_GROUPING_AGGREGATE_REFERENCE: Value = Value
   val NOT: Value = Value
   val NULL_CHECK: Value = Value
   val NULL_LITERAL: Value = Value

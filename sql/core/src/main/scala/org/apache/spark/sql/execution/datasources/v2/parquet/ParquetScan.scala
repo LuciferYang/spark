@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.execution.datasources.v2.parquet
 
+import java.util.Optional
+
 import scala.jdk.CollectionConverters._
 
 import org.apache.hadoop.conf.Configuration
@@ -23,9 +25,10 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.ParquetInputFormat
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{And, Expression, Or}
+import org.apache.spark.sql.connector.catalog.SupportsRead
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
-import org.apache.spark.sql.connector.read.PartitionReaderFactory
+import org.apache.spark.sql.connector.read.{PartitionReaderFactory, SupportsMerge}
 import org.apache.spark.sql.execution.datasources.{AggregatePushDownUtils, PartitioningAwareFileIndex}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetOptions, ParquetReadSupport, ParquetWriteSupport}
 import org.apache.spark.sql.execution.datasources.v2.FileScan
@@ -47,7 +50,8 @@ case class ParquetScan(
     options: CaseInsensitiveStringMap,
     pushedAggregate: Option[Aggregation] = None,
     partitionFilters: Seq[Expression] = Seq.empty,
-    dataFilters: Seq[Expression] = Seq.empty) extends FileScan {
+    dataFilters: Seq[Expression] = Seq.empty)
+    extends FileScan with SupportsMerge {
   override def isSplitable(path: Path): Boolean = {
     // If aggregate is pushed down, only the file footer will be read once,
     // so file should not be split across multiple tasks.
@@ -107,6 +111,14 @@ case class ParquetScan(
       new ParquetOptions(options.asCaseSensitiveMap.asScala.toMap, sqlConf))
   }
 
+  private def pushedDownAggEqual(p: ParquetScan) = {
+    if (pushedAggregate.nonEmpty && p.pushedAggregate.nonEmpty) {
+      AggregatePushDownUtils.equivalentAggregations(pushedAggregate.get, p.pushedAggregate.get)
+    } else {
+      pushedAggregate.isEmpty && p.pushedAggregate.isEmpty
+    }
+  }
+
   override def equals(obj: Any): Boolean = obj match {
     case p: ParquetScan =>
       val pushedDownAggEqual = if (pushedAggregate.nonEmpty && p.pushedAggregate.nonEmpty) {
@@ -133,4 +145,65 @@ case class ParquetScan(
       Map("PushedAggregation" -> pushedAggregationsStr) ++
       Map("PushedGroupBy" -> pushedGroupByStr)
   }
+
+
+  def sameScan(o: ParquetScan): Boolean =
+    fileIndex == o.fileIndex && options == o.options && dataSchema == o.dataSchema &&
+      normalizedPartitionFilters == o.normalizedPartitionFilters
+
+  def sameScanStrictly(o: ParquetScan): Boolean = sameScan(o) &&
+    equivalentFilters(pushedFilters, o.pushedFilters) &&
+    pushedDownAggEqual(o) &&
+    normalizedDataFilters == o.normalizedDataFilters
+
+  def buildSameScan(o: ParquetScan, table: SupportsRead): Optional[SupportsMerge] = {
+    // Reject merge if pushed aggregates differ — the merged scan
+    // cannot correctly compute two different aggregations.
+    if (!pushedDownAggEqual(o)) return Optional.empty()
+    val builder = table.newScanBuilder(options) match {
+      case pb: ParquetScanBuilder => pb
+      case _ => return Optional.empty()
+    }
+    pushedAggregate.foreach(builder.pushAggregation)
+
+    // Merge filter predicates: OR them together if both present,
+    // or return empty (no filter) if either side has no filter.
+    def mergePlanFilters(
+        f1: Seq[Expression],
+        f2: Seq[Expression]): Seq[Expression] =
+      if (f1.nonEmpty && f2.nonEmpty) {
+        Seq(Or(f1.reduce(And), f2.reduce(And)))
+      } else {
+        Seq.empty
+      }
+
+    val dataFilter = mergePlanFilters(dataFilters, o.dataFilters)
+    val partFilter = mergePlanFilters(partitionFilters, o.partitionFilters)
+    builder.pushFilters(dataFilter ++ partFilter)
+    builder.pruneColumns(readSchema().merge(o.readSchema()))
+    val scan = builder.build().asInstanceOf[ParquetScan]
+    Optional.of(scan)
+  }
+
+  def buildSameScanStrictly(o: ParquetScan, table: SupportsRead): Optional[SupportsMerge] = {
+    val builder = table.newScanBuilder(options) match {
+      case pb: ParquetScanBuilder => pb
+      case _ => return Optional.empty()
+    }
+    pushedAggregate.foreach(builder.pushAggregation)
+    builder.pushFilters(dataFilters ++ partitionFilters)
+    builder.pruneColumns(readSchema().merge(o.readSchema()))
+    val scan = builder.build().asInstanceOf[ParquetScan]
+    Optional.of(scan)
+  }
+
+  override def mergeWith(other: SupportsMerge, table: SupportsRead): Optional[SupportsMerge] =
+    other match {
+      case o: ParquetScan if sameScan(o) &&
+        sparkSession.sessionState.conf.ignorePushedDataFilters =>
+        buildSameScan(o, table)
+      case o: ParquetScan if sameScanStrictly(o) =>
+        buildSameScanStrictly(o, table)
+      case _ => Optional.empty()
+    }
 }
