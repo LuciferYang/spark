@@ -179,10 +179,6 @@ class OptimizeExpandQuerySuite
   }
 
   test("skips optimization for expression-based distinct (col1 + col2)") {
-    // Composite distinct expressions cause the pre-aggregate to group by
-    // leaf attributes, inflating the Cartesian product. The rule should
-    // skip this case. Verify no pre-aggregate is inserted and results
-    // are still correct.
     withTempView("t") {
       spark.range(10000)
         .selectExpr(

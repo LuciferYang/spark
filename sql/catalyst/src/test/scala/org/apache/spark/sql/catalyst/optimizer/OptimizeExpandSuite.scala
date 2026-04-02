@@ -163,11 +163,8 @@ class OptimizeExpandSuite extends PlanTest {
   }
 
   test("skips when distinct expression is composite (col1 + col2)") {
-    // For COUNT(DISTINCT col1 + col2), the pre-aggregate would group by leaf
-    // attributes (col1, col2) rather than the expression (col1 + col2). This
-    // inflates the Cartesian product (e.g. col1 x col2 >> col1+col2 values),
-    // making dedup ineffective and causing performance regression. The rule
-    // should skip this case entirely.
+    // col1 + col2 fans out into leaf attributes (col1, col2), inflating
+    // the pre-aggregate's Cartesian product beyond effective dedup.
     withSQLConf(SQLConf.OPTIMIZE_EXPAND_RATIO.key -> "2") {
       val query = testRelation
         .groupBy($"key")(
