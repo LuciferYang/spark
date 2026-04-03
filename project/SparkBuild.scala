@@ -100,7 +100,6 @@ object SparkBuild extends PomBuild {
   import BuildCommons._
   import sbtunidoc.GenJavadocPlugin
   import sbtunidoc.GenJavadocPlugin.autoImport._
-  import scala.collection.mutable.Map
 
   lazy val checkJavaVersion = taskKey[Unit]("Check Java Version")
   lazy val checkJavaVersionSettings: Seq[Setting[?]] = Seq(
@@ -126,7 +125,8 @@ object SparkBuild extends PomBuild {
     (Test / compile) := ((Test / compile) dependsOn checkJavaVersion).value
   )
 
-  val projectsMap: Map[String, Seq[Setting[_]]] = Map.empty
+  val projectsMap: scala.collection.mutable.Map[String, Seq[Setting[_]]] =
+    scala.collection.mutable.Map.empty
 
   override val profiles = {
     val profiles = Properties.envOrNone("SBT_MAVEN_PROFILES")
@@ -425,9 +425,6 @@ object SparkBuild extends PomBuild {
 
   enable(Core.settings)(core)
 
-  /* Unsafe settings */
-  enable(Unsafe.settings)(unsafe)
-
   /*
    * Set up tasks to copy dependencies during packaging. This step can be disabled in the command
    * line, so that dev/mima can run without trying to copy these files again and potentially
@@ -464,8 +461,6 @@ object SparkBuild extends PomBuild {
 
   /* Protobuf settings */
   enable(SparkProtobuf.settings)(protobuf)
-
-  enable(DockerIntegrationTests.settings)(dockerIntegrationTests)
 
   enable(KubernetesIntegrationTests.settings)(kubernetesIntegrationTests)
 
@@ -1071,15 +1066,6 @@ object SparkProtobuf {
   }
 }
 
-object Unsafe {
-  lazy val settings = Seq()
-}
-
-
-object DockerIntegrationTests {
-  // This serves to override the override specified in DependencyOverrides:
-  lazy val settings = Seq()
-}
 
 /**
  * These settings run the Kubernetes integration tests.
