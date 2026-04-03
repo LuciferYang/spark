@@ -1520,49 +1520,55 @@ object Unidoc {
   import sbtunidoc.JavaUnidocPlugin.autoImport._
   import sbtunidoc.ScalaUnidocPlugin.autoImport._
 
+  private val ignoredPathSegments = Set(
+    "org/apache/spark/deploy",
+    "org/apache/spark/examples",
+    "org/apache/spark/internal",
+    "org/apache/spark/memory",
+    "org/apache/spark/network",
+    "org/apache/spark/rpc",
+    "org/apache/spark/executor",
+    "org/apache/spark/ExecutorAllocationClient",
+    "org/apache/spark/scheduler/cluster/CoarseGrainedSchedulerBackend",
+    "python",
+    "org/apache/spark/kafka010",
+    "org/apache/spark/types/variant",
+    "org/apache/spark/ui/flamegraph",
+    "org/apache/spark/util/collection",
+    "org/apache/spark/util/io",
+    "org/apache/spark/util/kvstore",
+    "org/apache/spark/sql/artifact",
+    "org/apache/spark/sql/avro",
+    "org/apache/spark/sql/catalyst",
+    "org/apache/spark/sql/connect/",
+    "org/apache/spark/sql/classic/",
+    "org/apache/spark/sql/execution",
+    "org/apache/spark/sql/internal",
+    "org/apache/spark/sql/metricview",
+    "org/apache/spark/sql/pipelines",
+    "org/apache/spark/sql/scripting",
+    "org/apache/spark/sql/ml",
+    "org/apache/spark/sql/hive",
+    "org/apache/spark/sql/catalog/v2/utils",
+    "org/apache/spark/errors",
+    "org/apache/spark/sql/errors",
+    "org/apache/hive",
+    "org/apache/spark/sql/v2/avro",
+    "SSLOptions"
+  )
+
+  private def shouldIgnoreUndocumented(f: File): Boolean = {
+    val path = f.getCanonicalPath
+    f.getName.contains("$") ||
+      ignoredPathSegments.exists(path.contains) ||
+      (path.contains("org/apache/spark/shuffle") &&
+        !path.contains("org/apache/spark/shuffle/api")) ||
+      (path.contains("org/apache/spark/unsafe") &&
+        !path.contains("org/apache/spark/unsafe/types/CalendarInterval"))
+  }
+
   protected def ignoreUndocumentedPackages(packages: Seq[Seq[File]]): Seq[Seq[File]] = {
-    packages
-      .map(_.filterNot(_.getName.contains("$")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/deploy")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/examples")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/internal")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/memory")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/network")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/rpc")))
-      .map(_.filterNot(f =>
-        f.getCanonicalPath.contains("org/apache/spark/shuffle") &&
-        !f.getCanonicalPath.contains("org/apache/spark/shuffle/api")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/executor")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/ExecutorAllocationClient")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/scheduler/cluster/CoarseGrainedSchedulerBackend")))
-      .map(_.filterNot(f =>
-        f.getCanonicalPath.contains("org/apache/spark/unsafe") &&
-        !f.getCanonicalPath.contains("org/apache/spark/unsafe/types/CalendarInterval")))
-      .map(_.filterNot(_.getCanonicalPath.contains("python")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/kafka010")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/types/variant")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/ui/flamegraph")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/util/collection")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/util/io")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/util/kvstore")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/artifact")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/avro")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/catalyst")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/connect/")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/classic/")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/execution")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/internal")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/metricview")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/pipelines")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/scripting")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/ml")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/hive")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/catalog/v2/utils")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/errors")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/errors")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/hive")))
-      .map(_.filterNot(_.getCanonicalPath.contains("org/apache/spark/sql/v2/avro")))
-      .map(_.filterNot(_.getCanonicalPath.contains("SSLOptions")))
+    packages.map(_.filterNot(shouldIgnoreUndocumented))
   }
 
   private def ignoreClasspaths(classpaths: Seq[Classpath]): Seq[Classpath] = {
