@@ -153,7 +153,10 @@ object SparkBuild extends PomBuild {
 
   Properties.envOrNone("SBT_MAVEN_PROPERTIES") match {
     case Some(v) =>
-      v.split("(\\s+|,)").filterNot(_.isEmpty).map(_.split("=")).foreach(x => System.setProperty(x(0), x(1)))
+      v.split("(\\s+|,)").filterNot(_.isEmpty).foreach { prop =>
+        val idx = prop.indexOf('=')
+        if (idx > 0) System.setProperty(prop.substring(0, idx), prop.substring(idx + 1))
+      }
     case _ =>
   }
 
@@ -192,9 +195,11 @@ object SparkBuild extends PomBuild {
         require(contents.contains(k), s"Could not rewrite '$k' in original scalastyle config.")
         contents = contents.replace(k, v)
       }
-      new PrintWriter(out) {
-        write(contents)
-        close()
+      val pw = new PrintWriter(out)
+      try {
+        pw.write(contents)
+      } finally {
+        pw.close()
       }
       out
     } finally {
@@ -1463,9 +1468,12 @@ object PySparkAssembly {
 
   private def zipRecursive(source: File, destZipFile: File) = {
     val destOutput = new ZipOutputStream(new FileOutputStream(destZipFile))
-    addFilesToZipStream("", source, destOutput)
-    destOutput.flush()
-    destOutput.close()
+    try {
+      addFilesToZipStream("", source, destOutput)
+      destOutput.flush()
+    } finally {
+      destOutput.close()
+    }
   }
 
   private def addFilesToZipStream(parent: String, source: File, output: ZipOutputStream): Unit = {
@@ -1477,16 +1485,19 @@ object PySparkAssembly {
     } else {
       val in = new FileInputStream(source)
       output.putNextEntry(new ZipEntry(parent + source.getName()))
-      val buf = new Array[Byte](8192)
-      var n = 0
-      while (n != -1) {
-        n = in.read(buf)
-        if (n != -1) {
-          output.write(buf, 0, n)
+      try {
+        val buf = new Array[Byte](8192)
+        var n = 0
+        while (n != -1) {
+          n = in.read(buf)
+          if (n != -1) {
+            output.write(buf, 0, n)
+          }
         }
+        output.closeEntry()
+      } finally {
+        in.close()
       }
-      output.closeEntry()
-      in.close()
     }
   }
 
