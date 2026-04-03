@@ -393,6 +393,32 @@ object SparkBuild extends PomBuild {
     PB.protocVersion := protoVersion,
   )
 
+  // Shared assembly settings used by SparkConnectCommon, SparkConnect, SparkConnectJdbc,
+  // SparkConnectClient, and SparkProtobuf.
+  lazy val commonAssemblySettings: Seq[Setting[_]] = Seq(
+    (assembly / test) := {},
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
+  )
+
+  val defaultAssemblyMergeStrategy: Setting[_] =
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
+
+  // Shared protoc executable settings used by Core, SQL, SparkProtobuf, and SparkConnectCommon.
+  def protocExecutableSettings: Seq[Setting[_]] = {
+    sys.props.get("spark.protoc.executable.path") match {
+      case Some(path) => Seq(PB.protocExecutable := file(path))
+      case None => Seq.empty
+    }
+  }
+
   def enable(settings: Seq[Setting[_]])(projectRef: ProjectRef) = {
     val existingSettings = projectsMap.getOrElse(projectRef.project, Seq[Setting[_]]())
     projectsMap += (projectRef.project -> (existingSettings ++ settings))
@@ -655,22 +681,13 @@ object Core {
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
     )
-  ) ++ {
-    val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
-    if (sparkProtocExecPath.isDefined) {
-      Seq(
-        PB.protocExecutable := file(sparkProtocExecPath.get)
-      )
-    } else {
-      Seq.empty
-    }
-  }
+  ) ++ SparkBuild.protocExecutableSettings
 }
 
 object SparkConnectCommon {
   import BuildCommons.protoVersion
 
-  lazy val settings = Seq(
+  lazy val settings = SparkBuild.commonAssemblySettings ++ Seq(SparkBuild.defaultAssemblyMergeStrategy) ++ Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
     PB.protocVersion := BuildCommons.protoVersion,
@@ -709,13 +726,6 @@ object SparkConnectCommon {
       )
     },
 
-    (assembly / test) := { },
-
-    (assembly / logLevel) := Level.Info,
-
-    // Exclude `scala-library` from assembly.
-    (assembly / assemblyPackageScala / assembleArtifact) := false,
-
     // Exclude `pmml-model-*.jar`, `scala-collection-compat_*.jar`,`jsr305-*.jar` and
     // `netty-*.jar` and `unused-1.0.0.jar` from assembly.
     (assembly / assemblyExcludedJars) := {
@@ -725,15 +735,6 @@ object SparkConnectCommon {
         name.startsWith("pmml-model-") || name.startsWith("scala-collection-compat_") ||
           name.startsWith("jsr305-") || name.startsWith("netty-") || name == "unused-1.0.0.jar"
       }
-    },
-
-    (assembly / assemblyMergeStrategy) := {
-      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") => MergeStrategy.filterDistinctLines
-      // Drop all proto files that are not needed as artifacts of the build.
-      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
-      case _ => MergeStrategy.first
     }
   ) ++ {
     val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
@@ -761,7 +762,7 @@ object SparkConnectCommon {
 object SparkConnect {
   import BuildCommons.protoVersion
 
-  lazy val settings = Seq(
+  lazy val settings = SparkBuild.commonAssemblySettings ++ Seq(SparkBuild.defaultAssemblyMergeStrategy) ++ Seq(
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
     libraryDependencies ++= {
@@ -791,13 +792,6 @@ object SparkConnect {
         "com.google.protobuf" % "protobuf-java" % protoVersion
       )
     },
-
-    (assembly / test) := { },
-
-    (assembly / logLevel) := Level.Info,
-
-    // Exclude `scala-library` from assembly.
-    (assembly / assemblyPackageScala / assembleArtifact) := false,
 
     // SPARK-46733: Include `spark-connect-*.jar`, `unused-*.jar`, `annotations-*.jar`,
     // `grpc-*.jar`, `protobuf-*.jar`, `gson-*.jar`, `animal-sniffer-annotations-*.jar`,
@@ -829,16 +823,7 @@ object SparkConnect {
       ShadeRule.rename("com.google.rpc.**" -> "org.sparkproject.connect.google_protos.rpc.@1").inAll,
       ShadeRule.rename("com.google.shopping.**" -> "org.sparkproject.connect.google_protos.shopping.@1").inAll,
       ShadeRule.rename("com.google.type.**" -> "org.sparkproject.connect.google_protos.type.@1").inAll
-    ),
-
-    (assembly / assemblyMergeStrategy) := {
-      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") => MergeStrategy.filterDistinctLines
-      // Drop all proto files that are not needed as artifacts of the build.
-      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
-      case _ => MergeStrategy.first
-    }
+    )
   )
 }
 
@@ -846,7 +831,7 @@ object SparkConnectJdbc {
   import BuildCommons.protoVersion
   val buildTestDeps = TaskKey[Unit]("buildTestDeps", "Build needed dependencies for test.")
 
-  lazy val settings = Seq(
+  lazy val settings = SparkBuild.commonAssemblySettings ++ Seq(SparkBuild.defaultAssemblyMergeStrategy) ++ Seq(
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
     libraryDependencies ++= {
@@ -881,13 +866,6 @@ object SparkConnectJdbc {
     testOnly := ((Test / testOnly) dependsOn (buildTestDeps)).evaluated,
 
     (Test / javaOptions) += "-Darrow.memory.debug.allocator=true",
-
-    (assembly / test) := { },
-
-    (assembly / logLevel) := Level.Info,
-
-    // Exclude `scala-library` from assembly.
-    (assembly / assemblyPackageScala / assembleArtifact) := false,
 
     // Only include `spark-connect-client-jdbc-*.jar` in assembly.
     // This needs to be consistent with the content of `maven-shade-plugin`.
@@ -906,16 +884,7 @@ object SparkConnectJdbc {
       ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
       ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
       ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
-    ),
-
-    (assembly / assemblyMergeStrategy) := {
-      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") => MergeStrategy.filterDistinctLines
-      // Drop all proto files that are not needed as artifacts of the build.
-      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
-      case _ => MergeStrategy.first
-    }
+    )
   )
 }
 
@@ -923,7 +892,7 @@ object SparkConnectClient {
   import BuildCommons.protoVersion
   val buildTestDeps = TaskKey[Unit]("buildTestDeps", "Build needed dependencies for test.")
 
-  lazy val settings = Seq(
+  lazy val settings = SparkBuild.commonAssemblySettings ++ Seq(SparkBuild.defaultAssemblyMergeStrategy) ++ Seq(
     // For some reason the resolution from the imported Maven build does not work for some
     // of these dependendencies that we need to shade later on.
     libraryDependencies ++= {
@@ -958,13 +927,6 @@ object SparkConnectClient {
     testOnly := ((Test / testOnly) dependsOn (buildTestDeps)).evaluated,
 
     (Test / javaOptions) += "-Darrow.memory.debug.allocator=true",
-
-    (assembly / test) := { },
-
-    (assembly / logLevel) := Level.Info,
-
-    // Exclude `scala-library` from assembly.
-    (assembly / assemblyPackageScala / assembleArtifact) := false,
 
     // Exclude `pmml-model-*.jar`, `scala-collection-compat_*.jar`, `jspecify-*.jar`,
     // `error_prone_annotations-*.jar`, `listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar`,
@@ -987,23 +949,14 @@ object SparkConnectClient {
       ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
       ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
       ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
-    ),
-
-    (assembly / assemblyMergeStrategy) := {
-      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") => MergeStrategy.filterDistinctLines
-      // Drop all proto files that are not needed as artifacts of the build.
-      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
-      case _ => MergeStrategy.first
-    }
+    )
   )
 }
 
 object SparkProtobuf {
   import BuildCommons.protoVersion
 
-  lazy val settings = Seq(
+  lazy val settings = SparkBuild.commonAssemblySettings ++ Seq(SparkBuild.defaultAssemblyMergeStrategy) ++ Seq(
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
     PB.protocVersion := BuildCommons.protoVersion,
@@ -1025,13 +978,6 @@ object SparkProtobuf {
       // Maven, which create one descriptor file for each proto file.
     ),
 
-    (assembly / test) := { },
-
-    (assembly / logLevel) := Level.Info,
-
-    // Exclude `scala-library` from assembly.
-    (assembly / assemblyPackageScala / assembleArtifact) := false,
-
     // SPARK-52227: Include `spark-protobuf-*.jar`, `unused-*.jar`,`protobuf-*.jar`in assembly.
     // This needs to be consistent with the content of `maven-shade-plugin`.
     (assembly / assemblyExcludedJars) := {
@@ -1045,25 +991,7 @@ object SparkProtobuf {
     (assembly / assemblyShadeRules) := Seq(
       ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_protobuf.protobuf.@1").inAll,
     ),
-
-    (assembly / assemblyMergeStrategy) := {
-      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
-      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") => MergeStrategy.filterDistinctLines
-      // Drop all proto files that are not needed as artifacts of the build.
-      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
-      case _ => MergeStrategy.first
-    },
-  ) ++ {
-    val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
-    if (sparkProtocExecPath.isDefined) {
-      Seq(
-        PB.protocExecutable := file(sparkProtocExecPath.get)
-      )
-    } else {
-      Seq.empty
-    }
-  }
+  ) ++ SparkBuild.protocExecutableSettings
 }
 
 
@@ -1318,16 +1246,7 @@ object SQL {
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
     )
-  ) ++ {
-    val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
-    if (sparkProtocExecPath.isDefined) {
-      Seq(
-        PB.protocExecutable := file(sparkProtocExecPath.get)
-      )
-    } else {
-      Seq.empty
-    }
-  }
+  ) ++ SparkBuild.protocExecutableSettings
 }
 
 object Hive {
