@@ -62,7 +62,7 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-connect-shims_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
-            <scope>compile</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
            <groupId>org.apache.commons</groupId>
