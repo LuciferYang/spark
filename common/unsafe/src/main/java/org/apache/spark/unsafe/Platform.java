@@ -17,323 +17,383 @@
 
 package org.apache.spark.unsafe;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
-import sun.misc.Unsafe;
-
+/**
+ * Platform-dependent memory access backed by the Foreign Function & Memory (FFM) API.
+ * <p>
+ * This implementation requires Java 25+ and replaces the previous {@code sun.misc.Unsafe}-based
+ * implementation. All public method signatures are preserved for backward compatibility.
+ * <p>
+ * Runtime requirements:
+ * <ul>
+ *   <li>{@code --enable-native-access=ALL-UNNAMED} (or the appropriate module name)</li>
+ * </ul>
+ */
+@SuppressWarnings("restricted")
 public final class Platform {
 
-  private static final Unsafe _UNSAFE;
+  // ==================== Native memory access ====================
 
-  public static final int BOOLEAN_ARRAY_OFFSET;
+  /**
+   * A MemorySegment covering the entire native address space, equivalent to
+   * Unsafe's unrestricted memory access model. Individual accesses are bounds-checked
+   * against [0, Long.MAX_VALUE), which is always satisfied for valid malloc'd addresses.
+   */
+  private static final MemorySegment NATIVE =
+    MemorySegment.ofAddress(0).reinterpret(Long.MAX_VALUE);
 
-  public static final int BYTE_ARRAY_OFFSET;
+  // ==================== Array base offset constants ====================
 
-  public static final int SHORT_ARRAY_OFFSET;
+  // These are backward-compatible sentinel values used by all callers.
+  // Callers compute: ARRAY_OFFSET + position, then pass to get/put methods.
+  // Internally we subtract HEAP_HEADER_BYTES to recover the zero-based position
+  // for MemorySegment.ofArray(), which always starts addressing at element 0.
+  //
+  // The value 16 matches HotSpot's array object header size on 64-bit JVMs
+  // (8-byte mark word + 4-byte compressed klass pointer + 4-byte array length),
+  // but correctness does NOT depend on this — it is a symmetric add/subtract.
+  private static final int HEAP_HEADER_BYTES = 16;
 
-  public static final int INT_ARRAY_OFFSET;
+  public static final int BOOLEAN_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  public static final int LONG_ARRAY_OFFSET;
+  public static final int BYTE_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  public static final int FLOAT_ARRAY_OFFSET;
+  public static final int SHORT_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  public static final int DOUBLE_ARRAY_OFFSET;
+  public static final int INT_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  private static final boolean unaligned;
+  public static final int LONG_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  // Split java.version on non-digit chars:
-  private static final int majorVersion =
-    Integer.parseInt(System.getProperty("java.version").split("\\D+")[0]);
+  public static final int FLOAT_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  // Access fields and constructors once and store them, for performance:
-  private static final Constructor<?> DBB_CONSTRUCTOR;
-  private static final Field DBB_CLEANER_FIELD;
-  private static final Method CLEANER_CREATE_METHOD;
+  public static final int DOUBLE_ARRAY_OFFSET = HEAP_HEADER_BYTES;
+
+  // ==================== ValueLayouts ====================
+
+  // Use UNALIGNED variants for cross-type access patterns
+  // (e.g., reading an int from a byte[] at an arbitrary byte offset).
+  private static final ValueLayout.OfByte LAYOUT_BYTE = ValueLayout.JAVA_BYTE;
+  private static final ValueLayout.OfBoolean LAYOUT_BOOLEAN = ValueLayout.JAVA_BOOLEAN;
+  private static final ValueLayout.OfShort LAYOUT_SHORT = ValueLayout.JAVA_SHORT_UNALIGNED;
+  private static final ValueLayout.OfInt LAYOUT_INT = ValueLayout.JAVA_INT_UNALIGNED;
+  private static final ValueLayout.OfLong LAYOUT_LONG = ValueLayout.JAVA_LONG_UNALIGNED;
+  private static final ValueLayout.OfFloat LAYOUT_FLOAT = ValueLayout.JAVA_FLOAT_UNALIGNED;
+  private static final ValueLayout.OfDouble LAYOUT_DOUBLE = ValueLayout.JAVA_DOUBLE_UNALIGNED;
+
+  // ==================== Linker handles for malloc / free ====================
+
+  private static final MethodHandle MALLOC;
+  private static final MethodHandle FREE;
 
   static {
-    // At the end of this block, CLEANER_CREATE_METHOD should be non-null iff it's possible to use
-    // reflection to invoke it, which is not necessarily possible by default in Java 9+.
-    // Code below can test for null to see whether to use it.
-
     try {
-      Class<?> cls = Class.forName("java.nio.DirectByteBuffer");
-      Constructor<?> constructor = (majorVersion < 21) ?
-        cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE) :
-        cls.getDeclaredConstructor(Long.TYPE, Long.TYPE);
-      Field cleanerField = cls.getDeclaredField("cleaner");
-      if (!constructor.trySetAccessible()) {
-        constructor = null;
-      }
-      if (!cleanerField.trySetAccessible()) {
-        cleanerField = null;
-      }
-      // Have to set these values no matter what:
-      DBB_CONSTRUCTOR = constructor;
-      DBB_CLEANER_FIELD = cleanerField;
+      Linker linker = Linker.nativeLinker();
+      SymbolLookup stdlib = linker.defaultLookup();
 
-      // no point continuing if the above failed:
-      if (DBB_CONSTRUCTOR != null && DBB_CLEANER_FIELD != null) {
-        Class<?> cleanerClass = Class.forName("jdk.internal.ref.Cleaner");
-        Method createMethod = cleanerClass.getMethod("create", Object.class, Runnable.class);
-        // Accessing jdk.internal.ref.Cleaner should actually fail by default in JDK 9+,
-        // unfortunately, unless the user has allowed access with something like
-        // --add-opens java.base/jdk.internal.ref=ALL-UNNAMED  If not, we can't use the Cleaner
-        // hack below. It doesn't break, just means the user might run into the default JVM limit
-        // on off-heap memory and increase it or set the flag above. This tests whether it's
-        // available:
-        try {
-          createMethod.invoke(null, null, null);
-        } catch (IllegalAccessException e) {
-          // Don't throw an exception, but can't log here?
-          createMethod = null;
-        }
-        CLEANER_CREATE_METHOD = createMethod;
-      } else {
-        CLEANER_CREATE_METHOD = null;
-      }
-    } catch (ClassNotFoundException | NoSuchMethodException | NoSuchFieldException e) {
-      // These are all fatal in any Java version - rethrow (have to wrap as this is a static block)
-      throw new IllegalStateException(e);
-    } catch (InvocationTargetException ite) {
-      throw new IllegalStateException(ite.getCause());
+      MALLOC = linker.downcallHandle(
+        stdlib.find("malloc").orElseThrow(),
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+
+      FREE = linker.downcallHandle(
+        stdlib.find("free").orElseThrow(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+    } catch (Throwable e) {
+      throw new ExceptionInInitializerError(e);
     }
   }
 
+  // ==================== Unaligned access capability ====================
+
+  private static final boolean unaligned;
+
+  static {
+    String arch = System.getProperty("os.arch", "");
+    if (arch.equals("ppc64le") || arch.equals("ppc64") || arch.equals("s390x")) {
+      unaligned = true;
+    } else {
+      unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64|aarch64)$");
+    }
+  }
+
+  // ==================== Public API ====================
+
   // Visible for testing
   public static boolean cleanerCreateMethodIsDefined() {
-    return CLEANER_CREATE_METHOD != null;
+    // With FFM-based allocateDirectBuffer, direct buffer allocation
+    // with automatic cleanup is always supported.
+    return true;
   }
 
   /**
-   * @return true when running JVM is having sun's Unsafe package available in it and underlying
-   *         system having unaligned-access capability.
+   * @return true when the underlying system supports unaligned memory access.
    */
   public static boolean unaligned() {
     return unaligned;
   }
 
+  // -------------------- Element access --------------------
+
   public static int getInt(Object object, long offset) {
-    return _UNSAFE.getInt(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_INT, offset);
+    }
+    return heapSegment(object).get(LAYOUT_INT, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putInt(Object object, long offset, int value) {
-    _UNSAFE.putInt(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_INT, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_INT, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
   public static boolean getBoolean(Object object, long offset) {
-    return _UNSAFE.getBoolean(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_BOOLEAN, offset);
+    }
+    // MemorySegment.ofArray(boolean[]) is not available; use direct array access.
+    if (object instanceof boolean[] ba) {
+      return ba[(int) (offset - BOOLEAN_ARRAY_OFFSET)];
+    }
+    return heapSegment(object).get(LAYOUT_BOOLEAN, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putBoolean(Object object, long offset, boolean value) {
-    _UNSAFE.putBoolean(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_BOOLEAN, offset, value);
+      return;
+    }
+    if (object instanceof boolean[] ba) {
+      ba[(int) (offset - BOOLEAN_ARRAY_OFFSET)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_BOOLEAN, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static byte getByte(Object object, long offset) {
-    return _UNSAFE.getByte(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_BYTE, offset);
+    }
+    return heapSegment(object).get(LAYOUT_BYTE, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putByte(Object object, long offset, byte value) {
-    _UNSAFE.putByte(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_BYTE, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_BYTE, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
   public static short getShort(Object object, long offset) {
-    return _UNSAFE.getShort(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_SHORT, offset);
+    }
+    return heapSegment(object).get(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putShort(Object object, long offset, short value) {
-    _UNSAFE.putShort(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_SHORT, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
   public static long getLong(Object object, long offset) {
-    return _UNSAFE.getLong(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_LONG, offset);
+    }
+    return heapSegment(object).get(LAYOUT_LONG, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putLong(Object object, long offset, long value) {
-    _UNSAFE.putLong(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_LONG, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_LONG, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
   public static float getFloat(Object object, long offset) {
-    return _UNSAFE.getFloat(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_FLOAT, offset);
+    }
+    return heapSegment(object).get(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putFloat(Object object, long offset, float value) {
-    _UNSAFE.putFloat(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_FLOAT, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
   public static double getDouble(Object object, long offset) {
-    return _UNSAFE.getDouble(object, offset);
+    if (object == null) {
+      return NATIVE.get(LAYOUT_DOUBLE, offset);
+    }
+    return heapSegment(object).get(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putDouble(Object object, long offset, double value) {
-    _UNSAFE.putDouble(object, offset, value);
+    if (object == null) {
+      NATIVE.set(LAYOUT_DOUBLE, offset, value);
+    } else {
+      heapSegment(object).set(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES, value);
+    }
   }
 
+  // getObjectVolatile / putObjectVolatile: removed.
+  // Codebase analysis confirms zero usages outside Platform.java itself.
+  // If needed in the future, use java.lang.invoke.VarHandle.
+
   public static Object getObjectVolatile(Object object, long offset) {
-    return _UNSAFE.getObjectVolatile(object, offset);
+    throw new UnsupportedOperationException(
+      "getObjectVolatile is not supported in the FFM-based Platform. Use VarHandle instead.");
   }
 
   public static void putObjectVolatile(Object object, long offset, Object value) {
-    _UNSAFE.putObjectVolatile(object, offset, value);
+    throw new UnsupportedOperationException(
+      "putObjectVolatile is not supported in the FFM-based Platform. Use VarHandle instead.");
   }
 
+  // -------------------- Memory allocation --------------------
+
   public static long allocateMemory(long size) {
-    return _UNSAFE.allocateMemory(size);
+    try {
+      MemorySegment result = (MemorySegment) MALLOC.invokeExact(size);
+      long addr = result.address();
+      if (addr == 0) {
+        throw new OutOfMemoryError("Unable to allocate " + size + " bytes");
+      }
+      return addr;
+    } catch (OutOfMemoryError e) {
+      throw e;
+    } catch (Throwable t) {
+      throw new RuntimeException("Failed to allocate memory", t);
+    }
   }
 
   public static void freeMemory(long address) {
-    _UNSAFE.freeMemory(address);
+    try {
+      FREE.invokeExact(MemorySegment.ofAddress(address));
+    } catch (Throwable t) {
+      throw new RuntimeException("Failed to free memory at address " + address, t);
+    }
   }
 
   public static long reallocateMemory(long address, long oldSize, long newSize) {
-    long newMemory = _UNSAFE.allocateMemory(newSize);
-    copyMemory(null, address, null, newMemory, oldSize);
+    long newMemory = allocateMemory(newSize);
+    MemorySegment.copy(NATIVE, address, NATIVE, newMemory, oldSize);
     freeMemory(address);
     return newMemory;
   }
 
+  // -------------------- DirectByteBuffer allocation --------------------
+
   /**
-   * Allocate a DirectByteBuffer, potentially bypassing the JVM's MaxDirectMemorySize limit.
+   * Allocate a DirectByteBuffer, bypassing the JVM's MaxDirectMemorySize limit.
+   * Uses {@link Arena#ofAuto()} so the native memory is released when the returned
+   * ByteBuffer becomes unreachable (GC-triggered).
    */
   public static ByteBuffer allocateDirectBuffer(int size) {
-    try {
-      if (CLEANER_CREATE_METHOD == null) {
-        // Can't set a Cleaner (see comments on field), so need to allocate via normal Java APIs
-        try {
-          return ByteBuffer.allocateDirect(size);
-        } catch (OutOfMemoryError oome) {
-          // checkstyle.off: RegexpSinglelineJava
-          throw new OutOfMemoryError("Failed to allocate direct buffer (" + oome.getMessage() +
-              "); try increasing -XX:MaxDirectMemorySize=... to, for example, your heap size");
-          // checkstyle.on: RegexpSinglelineJava
-        }
-      }
-      // Otherwise, use internal JDK APIs to allocate a DirectByteBuffer while ignoring the JVM's
-      // MaxDirectMemorySize limit (the default limit is too low and we do not want to
-      // require users to increase it).
-      long memory = allocateMemory(size);
-      ByteBuffer buffer = (ByteBuffer) DBB_CONSTRUCTOR.newInstance(memory, size);
-      try {
-        DBB_CLEANER_FIELD.set(buffer,
-            CLEANER_CREATE_METHOD.invoke(null, buffer, (Runnable) () -> freeMemory(memory)));
-      } catch (IllegalAccessException | InvocationTargetException e) {
-        freeMemory(memory);
-        throw new IllegalStateException(e);
-      }
-      return buffer;
-    } catch (Exception e) {
-      throwException(e);
-    }
-    throw new IllegalStateException("unreachable");
+    Arena arena = Arena.ofAuto();
+    MemorySegment segment = arena.allocate(size, 1);
+    return segment.asByteBuffer().order(ByteOrder.nativeOrder());
   }
 
+  // -------------------- Bulk memory operations --------------------
+
   public static void setMemory(Object object, long offset, long size, byte value) {
-    _UNSAFE.setMemory(object, offset, size, value);
+    if (object == null) {
+      NATIVE.asSlice(offset, size).fill(value);
+    } else {
+      long pos = offset - HEAP_HEADER_BYTES;
+      heapSegment(object).asSlice(pos, size).fill(value);
+    }
   }
 
   public static void setMemory(long address, byte value, long size) {
-    _UNSAFE.setMemory(address, size, value);
+    NATIVE.asSlice(address, size).fill(value);
   }
 
   public static void copyMemory(
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
-    // Check if dstOffset is before or after srcOffset to determine if we should copy
-    // forward or backwards. This is necessary in case src and dst overlap.
-    if (dstOffset < srcOffset) {
-      while (length > 0) {
-        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-        length -= size;
-        srcOffset += size;
-        dstOffset += size;
-      }
-    } else {
-      srcOffset += length;
-      dstOffset += length;
-      while (length > 0) {
-        long size = Math.min(length, UNSAFE_COPY_THRESHOLD);
-        srcOffset -= size;
-        dstOffset -= size;
-        _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
-        length -= size;
-      }
+    if (length == 0) return;
 
+    MemorySegment srcSeg;
+    long srcPos;
+    if (src == null) {
+      srcSeg = NATIVE;
+      srcPos = srcOffset;
+    } else {
+      srcSeg = heapSegment(src);
+      srcPos = srcOffset - HEAP_HEADER_BYTES;
     }
+
+    MemorySegment dstSeg;
+    long dstPos;
+    if (dst == null) {
+      dstSeg = NATIVE;
+      dstPos = dstOffset;
+    } else {
+      dstSeg = heapSegment(dst);
+      dstPos = dstOffset - HEAP_HEADER_BYTES;
+    }
+
+    // MemorySegment.copy handles overlapping regions correctly
+    // (copies as if through a temporary buffer when src and dst overlap).
+    MemorySegment.copy(srcSeg, srcPos, dstSeg, dstPos, length);
   }
+
+  // -------------------- Utility --------------------
 
   /**
    * Raises an exception bypassing compiler checks for checked exceptions.
+   * Uses generics erasure (sneaky throw) instead of Unsafe.throwException.
    */
   public static void throwException(Throwable t) {
-    _UNSAFE.throwException(t);
+    sneakyThrow(t);
   }
+
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> void sneakyThrow(Throwable t) throws E {
+    throw (E) t;
+  }
+
+  // ==================== Internal helpers ====================
 
   /**
-   * Limits the number of bytes to copy per {@link Unsafe#copyMemory(long, long, long)} to
-   * allow safepoint polling during a large copy.
+   * Creates a MemorySegment view of the given heap array object.
+   * <p>
+   * In hot loops, the JIT compiler is expected to:
+   * <ol>
+   *   <li>Profile the dominant type (typically byte[]) and eliminate dead branches</li>
+   *   <li>Scalar-replace the MemorySegment object via escape analysis</li>
+   *   <li>Compile the {@code segment.get()} call to a direct array load instruction</li>
+   * </ol>
    */
-  private static final long UNSAFE_COPY_THRESHOLD = 1024L * 1024L;
-
-  static {
-    sun.misc.Unsafe unsafe;
-    try {
-      Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-      unsafeField.setAccessible(true);
-      unsafe = (sun.misc.Unsafe) unsafeField.get(null);
-    } catch (Throwable cause) {
-      unsafe = null;
-    }
-    _UNSAFE = unsafe;
-
-    if (_UNSAFE != null) {
-      BOOLEAN_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(boolean[].class);
-      BYTE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(byte[].class);
-      SHORT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(short[].class);
-      INT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(int[].class);
-      LONG_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(long[].class);
-      FLOAT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(float[].class);
-      DOUBLE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(double[].class);
-    } else {
-      BOOLEAN_ARRAY_OFFSET = 0;
-      BYTE_ARRAY_OFFSET = 0;
-      SHORT_ARRAY_OFFSET = 0;
-      INT_ARRAY_OFFSET = 0;
-      LONG_ARRAY_OFFSET = 0;
-      FLOAT_ARRAY_OFFSET = 0;
-      DOUBLE_ARRAY_OFFSET = 0;
-    }
-  }
-
-  // This requires `_UNSAFE`.
-  static {
-    boolean _unaligned;
-    String arch = System.getProperty("os.arch", "");
-    if (arch.equals("ppc64le") || arch.equals("ppc64") || arch.equals("s390x")) {
-      // Since java.nio.Bits.unaligned() doesn't return true on ppc (See JDK-8165231), but
-      // ppc64 and ppc64le support it
-      _unaligned = true;
-    } else {
-      try {
-        Class<?> bitsClass =
-          Class.forName("java.nio.Bits", false, ClassLoader.getSystemClassLoader());
-        if (_UNSAFE != null) {
-          Field unalignedField = bitsClass.getDeclaredField("UNALIGNED");
-          _unaligned = _UNSAFE.getBoolean(
-            _UNSAFE.staticFieldBase(unalignedField), _UNSAFE.staticFieldOffset(unalignedField));
-        } else {
-          Method unalignedMethod = bitsClass.getDeclaredMethod("unaligned");
-          unalignedMethod.setAccessible(true);
-          _unaligned = Boolean.TRUE.equals(unalignedMethod.invoke(null));
-        }
-      } catch (Throwable t) {
-        // We at least know x86 and x64 support unaligned access.
-        //noinspection DynamicRegexReplaceableByCompiledPattern
-        _unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64|aarch64)$");
-      }
-    }
-    unaligned = _unaligned;
+  private static MemorySegment heapSegment(Object obj) {
+    if (obj instanceof byte[] ba) return MemorySegment.ofArray(ba);
+    if (obj instanceof int[] ia) return MemorySegment.ofArray(ia);
+    if (obj instanceof long[] la) return MemorySegment.ofArray(la);
+    if (obj instanceof short[] sa) return MemorySegment.ofArray(sa);
+    if (obj instanceof float[] fa) return MemorySegment.ofArray(fa);
+    if (obj instanceof double[] da) return MemorySegment.ofArray(da);
+    if (obj instanceof char[] ca) return MemorySegment.ofArray(ca);
+    throw new UnsupportedOperationException(
+      "Unsupported heap object type: " + obj.getClass().getName());
   }
 }
