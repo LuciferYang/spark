@@ -1152,14 +1152,17 @@ object NetworkCommon {
       ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
     ),
 
-    // Include only unused, guava, and failureaccess (matching root pom artifactSet).
+    // Include guava, failureaccess, unused (matching root pom artifactSet) plus
+    // network-common's own packageBin so the assembly jar is a drop-in replacement
+    // for the original jar (mirrors Maven shade behaviour).
     (assembly / assemblyExcludedJars) := {
       val cp = (assembly / fullClasspath).value
       cp filter { v =>
         val name = v.data.getName
         !(name.startsWith("guava-") ||
           name.startsWith("failureaccess-") ||
-          name == "unused-1.0.0.jar")
+          name == "unused-1.0.0.jar" ||
+          name.startsWith("spark-network-common"))
       }
     },
 
@@ -1336,8 +1339,6 @@ object DependencyOverrides {
         SbtPomKeys.effectivePom.value.getProperties.get("slf4j.version").asInstanceOf[String]
       val xzVersion =
         SbtPomKeys.effectivePom.value.getProperties.get("xz.version").asInstanceOf[String]
-      val gsonVersion =
-        SbtPomKeys.effectivePom.value.getProperties.get("gson.version").asInstanceOf[String]
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.code.gson" % "gson" % gsonVersion,
@@ -1879,6 +1880,9 @@ object CopyDependencies {
       val fid = (LocalProject("connect") / assembly).value
       val fidClient = (LocalProject("connect-client-jvm") / assembly).value
       val fidProtobuf = (LocalProject("protobuf") / assembly).value
+      // network-common assembly includes shaded Guava/failureaccess classes that the
+      // connect server assembly references via org.sparkproject.guava.* at runtime.
+      val fidNetworkCommon = (LocalProject("network-common") / assembly).value
       val noProvidedSparkJars: Boolean = sys.env.getOrElse("NO_PROVIDED_SPARK_JARS", "1") == "1" ||
         sys.env.getOrElse("NO_PROVIDED_SPARK_JARS", "true")
           .toLowerCase(Locale.getDefault()) == "true"
@@ -1906,6 +1910,11 @@ object CopyDependencies {
             if (!noProvidedSparkJars) {
               Files.copy(fidProtobuf.toPath, destJar.toPath)
             }
+          } else if (jar.getName.contains("spark-network-common")) {
+            // Use shaded network-common assembly jar which contains both
+            // network-common's own classes and shaded Guava/failureaccess classes
+            // (mirrors Maven shade behaviour).
+            Files.copy(fidNetworkCommon.toPath, destJar.toPath)
           } else {
             Files.copy(jar.toPath(), destJar.toPath())
           }
