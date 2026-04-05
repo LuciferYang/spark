@@ -628,6 +628,35 @@ class CodeGenerationSuite extends SparkFunSuite with ExpressionEvalHelper {
 
     CodeGenerator.compile(new CodeAndComment(code, Map.empty))
   }
+
+  test("SPARK-XXXXX: Janino #208 StackMap corruption with do-while unconditional continue") {
+    // https://github.com/janino-compiler/janino/issues/208
+    //
+    // Bug: UnitCompiler.compile2(DoStatement) does not call saveLocalVariables()/
+    // restoreLocalVariables() when the loop body cannot complete normally (unconditional
+    // continue/break). Local variables declared inside the loop leak into the StackMap frame.
+    // When subsequent code reuses the same slots with a different type layout, Janino's
+    // updateLocalVariableInCurrentStackMap() triggers ArrayIndexOutOfBoundsException.
+    //
+    // Scenario: A Coalesce variant that optimizes codegen by skipping null checks for
+    // non-nullable children, generating an unconditional `continue` instead of the standard
+    // `if (!isNull) { continue; }`. When this expression (LongType) is projected alongside
+    // an IntegerType column, the slot type mismatch (long -> int) triggers the bug.
+    //
+    // This test fails on Janino 3.1.9; fixed in Janino 3.1.12.
+    val coalesceExpr = NullCheckOptimizedCoalesce(Seq(
+      BoundReference(0, LongType, nullable = true),
+      Literal(42L)
+    ))
+    val intExpr = BoundReference(1, IntegerType, nullable = true)
+    val projection = GenerateMutableProjection.generate(Seq(coalesceExpr, intExpr))
+    val row = new GenericInternalRow(2)
+    row.setNullAt(0)
+    row.setInt(1, 7)
+    val result = projection(row)
+    assert(result.getLong(0) === 42L)
+    assert(result.getInt(1) === 7)
+  }
 }
 
 case class HugeCodeIntExpression(value: Int) extends LeafExpression {
@@ -653,4 +682,106 @@ case class HugeCodeIntExpression(value: Int) extends LeafExpression {
        """.stripMargin
     ev.copy(code = code)
   }
+}
+
+/**
+ * A Coalesce variant that optimizes codegen by skipping null checks for non-nullable children.
+ *
+ * Standard [[Coalesce]] generates `if (!isNull) { continue; }` for every child, even when
+ * the child is guaranteed non-null (e.g., a [[Literal]]). This expression omits the null check
+ * for non-nullable children, generating an unconditional `continue` instead:
+ *
+ * {{{
+ *   do {
+ *     // nullable child: boolean isNull_0 (1-slot) + long value_0 (2-slot)
+ *     boolean isNull_0 = input.isNullAt(0);
+ *     long value_0 = isNull_0 ? -1L : input.getLong(0);
+ *     if (!isNull_0) { ... continue; }        // conditional - OK
+ *
+ *     // non-nullable child (e.g., Literal):
+ *     result = 42L;
+ *     continue;                                // unconditional - TRIGGERS BUG
+ *   } while (false);
+ *   // post-loop validation: int + boolean + long (different slot layout)
+ *   int validOrdinal = ...;
+ *   boolean validIsNull = ...;
+ *   long validValue = ...;
+ * }}}
+ *
+ * The unconditional `continue` makes the do-while body unable to complete normally per JLS 14.22.
+ * This exposes Janino issue #208: `UnitCompiler.compile2(DoStatement)` skips
+ * `saveLocalVariables()`/`restoreLocalVariables()`, so the local variable slots (boolean + long)
+ * leak into the StackMap frame. The post-loop validation declares locals with a different type
+ * layout (int + boolean + long) at the same slot positions, causing
+ * `updateLocalVariableInCurrentStackMap()` to throw ArrayIndexOutOfBoundsException.
+ *
+ * Fixed in Janino 3.1.11 (commit 535ec8c2).
+ */
+case class NullCheckOptimizedCoalesce(children: Seq[Expression]) extends Expression {
+
+  override def nullable: Boolean = children.forall(_.nullable)
+
+  override def dataType: DataType = children.head.dataType
+
+  override def eval(input: InternalRow): Any = {
+    var result: Any = null
+    val iter = children.iterator
+    while (iter.hasNext && result == null) {
+      result = iter.next().eval(input)
+    }
+    result
+  }
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    ev.isNull = JavaCode.isNullGlobal(ctx.addMutableState(CodeGenerator.JAVA_BOOLEAN, ev.isNull))
+
+    val evals = children.map { e =>
+      val eval = e.genCode(ctx)
+      if (e.nullable) {
+        s"""
+           |${eval.code}
+           |if (!${eval.isNull}) {
+           |  ${ev.isNull} = false;
+           |  ${ev.value} = ${eval.value};
+           |  continue;
+           |}
+         """.stripMargin
+      } else {
+        // Optimization: child is guaranteed non-null, skip the null check.
+        // This produces an unconditional `continue` that triggers Janino #208.
+        s"""
+           |${eval.code}
+           |${ev.isNull} = false;
+           |${ev.value} = ${eval.value};
+           |continue;
+         """.stripMargin
+      }
+    }
+
+    // Post-loop validation: check result and compute a validation ordinal.
+    // This declares local variables (int + boolean + long) at the same slot positions
+    // previously occupied by the do-while's variables (boolean + long), creating
+    // the type layout mismatch that exposes Janino #208.
+    val validOrdinal = ctx.freshName("validOrdinal")
+    val validIsNull = ctx.freshName("validIsNull")
+    val validValue = ctx.freshName("validValue")
+
+    val resultType = CodeGenerator.javaType(dataType)
+    ev.copy(code =
+      code"""
+         |${ev.isNull} = true;
+         |$resultType ${ev.value} = ${CodeGenerator.defaultValue(dataType)};
+         |do {
+         |  ${evals.mkString("\n")}
+         |} while (false);
+         |int $validOrdinal = ${ev.isNull} ? -1 : 0;
+         |boolean $validIsNull = ${ev.isNull};
+         |long $validValue = ${ev.value};
+         |${ev.value} = $validValue;
+       """.stripMargin)
+  }
+
+  override protected def withNewChildrenInternal(
+      newChildren: IndexedSeq[Expression]): NullCheckOptimizedCoalesce =
+    copy(children = newChildren)
 }
