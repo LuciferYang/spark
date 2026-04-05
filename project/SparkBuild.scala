@@ -420,6 +420,10 @@ object SparkBuild extends PomBuild {
 
   enable(Core.settings)(core)
 
+  enable(NetworkCommon.settings)(networkCommon)
+
+  enable(Streaming.settings)(streaming)
+
   /* Unsafe settings */
   enable(Unsafe.settings)(unsafe)
 
@@ -434,6 +438,9 @@ object SparkBuild extends PomBuild {
 
   /* Enable Assembly for all assembly projects */
   assemblyProjects.foreach(enable(Assembly.settings))
+
+  /* network-yarn specific shade rules (uber-jar with jackson + netty + parent rules) */
+  enable(NetworkYarn.settings)(networkYarn)
 
   /* Package pyspark artifacts in a separate zip file for YARN. */
   enable(PySparkAssembly.settings)(assembly)
@@ -654,7 +661,49 @@ object Core {
     // Core uses protoc-jar-maven-plugin which outputs to target/generated-sources.
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
-    )
+    ),
+
+    // Shade rules matching Maven core/pom.xml: jetty, guava, protobuf
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
+      ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_core.protobuf.@1").inAll
+    ),
+
+    // Include only specific jetty, protobuf, and unused jars in shaded jar
+    // (matching Maven core/pom.xml artifactSet includes exactly).
+    // Note: guava/failureaccess are NOT included because they are provided scope in Maven.
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      // Explicit list of jetty artifacts matching Maven core/pom.xml artifactSet
+      val jettyArtifacts = Set(
+        "jetty-io", "jetty-http", "jetty-client", "jetty-security",
+        "jetty-util", "jetty-server", "jetty-session",
+        "jetty-ee10-proxy", "jetty-ee10-servlet", "jetty-ee10-servlets", "jetty-ee10-plus",
+        "jetty-compression-server", "jetty-compression-common", "jetty-compression-gzip"
+      )
+      cp filter { v =>
+        val name = v.data.getName
+        val isJetty = jettyArtifacts.exists(a => name.startsWith(a + "-"))
+        !(isJetty ||
+          name.startsWith("protobuf-java-") ||
+          name == "unused-1.0.0.jar")
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
   ) ++ {
     val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
     if (sparkProtocExecPath.isDefined) {
@@ -814,6 +863,10 @@ object SparkConnect {
     },
 
     (assembly / assemblyShadeRules) := Seq(
+      // Keep Guava relocation consistent with network-common / core to ensure correct
+      // runtime linkage (matches Maven connect/server/pom.xml).
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
       ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.grpc.@1").inAll,
       ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.connect.protobuf.@1").inAll,
       ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.android_annotation.@1").inAll,
@@ -913,12 +966,16 @@ object SparkConnectJdbc {
     },
 
     (assembly / assemblyShadeRules) := Seq(
-      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.client.io.grpc.@1").inAll,
-      ShadeRule.rename("com.google.**" -> "org.sparkproject.connect.client.com.google.@1").inAll,
-      ShadeRule.rename("io.netty.**" -> "org.sparkproject.connect.client.io.netty.@1").inAll,
-      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
-      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
-      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
+      // Guava relocated separately to connect.guava (must precede com.google.** catch-all).
+      // Matches Maven sql/connect/client/jdbc/pom.xml relocation rules.
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.connect.guava.@1").inAll,
+      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.io.grpc.@1").inAll,
+      ShadeRule.rename("com.google.**" -> "org.sparkproject.com.google.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.io.perfmark.@1").inAll,
+      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.org.codehaus.@1").inAll,
+      ShadeRule.rename("org.apache.arrow.**" -> "org.sparkproject.org.apache.arrow.@1").inAll,
+      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.android.annotation.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {
@@ -994,12 +1051,16 @@ object SparkConnectClient {
     },
 
     (assembly / assemblyShadeRules) := Seq(
-      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.client.io.grpc.@1").inAll,
-      ShadeRule.rename("com.google.**" -> "org.sparkproject.connect.client.com.google.@1").inAll,
-      ShadeRule.rename("io.netty.**" -> "org.sparkproject.connect.client.io.netty.@1").inAll,
-      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
-      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
-      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
+      // Guava relocated separately to connect.guava (must precede com.google.** catch-all).
+      // Matches Maven sql/connect/client/jvm/pom.xml relocation rules.
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.connect.guava.@1").inAll,
+      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.io.grpc.@1").inAll,
+      ShadeRule.rename("com.google.**" -> "org.sparkproject.com.google.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.io.perfmark.@1").inAll,
+      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.org.codehaus.@1").inAll,
+      ShadeRule.rename("org.apache.arrow.**" -> "org.sparkproject.org.apache.arrow.@1").inAll,
+      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.android.annotation.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {
@@ -1077,6 +1138,77 @@ object SparkProtobuf {
       Seq.empty
     }
   }
+}
+
+object NetworkCommon {
+  lazy val settings = Seq(
+    // Shade rules matching root pom.xml inherited configuration.
+    // network-common declares guava/failureaccess as compile scope, so Maven shades them.
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    ),
+
+    // Include only unused, guava, and failureaccess (matching root pom artifactSet).
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        val name = v.data.getName
+        !(name.startsWith("guava-") ||
+          name.startsWith("failureaccess-") ||
+          name == "unused-1.0.0.jar")
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
+  )
+}
+
+object Streaming {
+  lazy val settings = Seq(
+    // Shade rules inherited from root pom.xml (streaming only adds shadeTestJar=true).
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    ),
+
+    // Only include unused jar (matching root pom artifactSet: unused, guava, failureaccess, jpmml).
+    // streaming depends on guava as provided scope, so only unused is actually included.
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        v.data.getName != "unused-1.0.0.jar"
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
+  )
 }
 
 object Unsafe {
@@ -1204,6 +1336,8 @@ object DependencyOverrides {
         SbtPomKeys.effectivePom.value.getProperties.get("slf4j.version").asInstanceOf[String]
       val xzVersion =
         SbtPomKeys.effectivePom.value.getProperties.get("xz.version").asInstanceOf[String]
+      val gsonVersion =
+        SbtPomKeys.effectivePom.value.getProperties.get("gson.version").asInstanceOf[String]
       Seq(
         "com.google.guava" % "guava" % guavaVersion,
         "com.google.code.gson" % "gson" % gsonVersion,
@@ -1347,7 +1481,34 @@ object SQL {
     // sql/core uses protoc-jar-maven-plugin which outputs to target/generated-sources.
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
-    )
+    ),
+
+    // Shade rules matching Maven sql/core/pom.xml (combine.self=override):
+    // Only bytecode reference rewrite, no actual class packaging.
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_core.protobuf.@1").inAll
+    ),
+
+    // Only include unused jar (matching Maven artifactSet).
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        v.data.getName != "unused-1.0.0.jar"
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
   ) ++ {
     val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
     if (sparkProtocExecPath.isDefined) {
@@ -1427,6 +1588,26 @@ object YARN {
     test := ((Test / test) dependsOn (buildTestDeps)).value,
 
     testOnly := ((Test / testOnly) dependsOn (buildTestDeps)).evaluated
+  )
+}
+
+object NetworkYarn {
+  lazy val settings = Seq(
+    // Shade rules matching Maven network-yarn/pom.xml:
+    // jackson + netty (module-specific) + parent inherited rules (jetty, guava, guava.thirdparty,
+    // pmml, jpmml). This is an uber-jar that includes all dependencies.
+    (assembly / assemblyShadeRules) := Seq(
+      ShadeRule.rename("com.fasterxml.jackson.**" -> "org.sparkproject.com.fasterxml.jackson.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+      ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    )
+    // Note: uber-jar mode — assemblyExcludedJars not set (include all deps).
+    // Note: native .so/.jnilib renaming for netty is handled by Maven antrun plugin
+    // and may need a separate SBT task in the future.
   )
 }
 
