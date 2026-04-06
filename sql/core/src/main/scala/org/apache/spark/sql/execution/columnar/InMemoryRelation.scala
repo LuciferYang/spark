@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.columnar
 
-import com.esotericsoftware.kryo.{DefaultSerializer, Kryo, Serializer => KryoSerializer}
-import com.esotericsoftware.kryo.io.{Input => KryoInput, Output => KryoOutput}
+import com.esotericsoftware.kryo.kryo5.{DefaultSerializer, Kryo, Serializer => KryoSerializer}
+import com.esotericsoftware.kryo.kryo5.io.{Input => KryoInput, Output => KryoOutput}
 
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.network.util.JavaUtils
@@ -76,7 +76,7 @@ class DefaultCachedBatchKryoSerializer extends KryoSerializer[DefaultCachedBatch
   }
 
   override def read(
-      kryo: Kryo, input: KryoInput, cls: Class[DefaultCachedBatch]): DefaultCachedBatch = {
+      kryo: Kryo, input: KryoInput, cls: Class[_ <: DefaultCachedBatch]): DefaultCachedBatch = {
     val numRows = input.readInt()
     val length = input.readInt()
     SparkException.require(length != Kryo.NULL, "INVALID_KRYO_SERIALIZER_NO_DATA",

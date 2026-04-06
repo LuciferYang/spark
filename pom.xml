@@ -148,8 +148,8 @@
     <jakartaservlet.version>6.0.0</jakartaservlet.version>
     <!-- SPARK-46938: Required by Hive / LibThrift libs -->
     <javaxservlet.version>4.0.1</javaxservlet.version>
-    <chill.version>0.10.0</chill.version>
     <kryo.version>4.0.3</kryo.version>
+    <kryo5.version>5.6.2</kryo5.version>
     <ivy.version>2.5.3</ivy.version>
     <oro.version>2.0.8</oro.version>
     <!--
@@ -480,35 +480,9 @@
         <version>1.2.0</version>
       </dependency>
       <dependency>
-        <groupId>com.twitter</groupId>
-        <artifactId>chill_${scala.binary.version}</artifactId>
-        <version>${chill.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.xbean</groupId>
-            <artifactId>xbean-asm7-shaded</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.esotericsoftware</groupId>
-            <artifactId>kryo-shaded</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.twitter</groupId>
-        <artifactId>chill-java</artifactId>
-        <version>${chill.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.esotericsoftware</groupId>
-            <artifactId>kryo-shaded</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.esotericsoftware</groupId>
-        <artifactId>kryo-shaded</artifactId>
-        <version>${kryo.version}</version>
+        <groupId>com.esotericsoftware.kryo</groupId>
+        <artifactId>kryo5</artifactId>
+        <version>${kryo5.version}</version>
         <exclusions>
           <exclusion>
             <groupId>org.objenesis</groupId>
@@ -516,8 +490,15 @@
           </exclusion>
         </exclusions>
       </dependency>
+      <!-- Hive 2.3.x depends on kryo-shaded (Kryo 4.x, com.esotericsoftware.kryo namespace).
+           Pin to 4.0.3 so it coexists with Spark's kryo5 (com.esotericsoftware.kryo5 namespace). -->
+      <dependency>
+        <groupId>com.esotericsoftware</groupId>
+        <artifactId>kryo-shaded</artifactId>
+        <version>${kryo.version}</version>
+      </dependency>
       <!--
-        SPARK-51806: Kryo 4.0.x depends on objenesis 2.5.1, while Spark currently
+        SPARK-51806: Kryo 5.6.2 depends on objenesis 3.4, while Spark currently
         depends on objenesis 3.5. Here, it is uniformly defined as version 3.5.
         -->
       <dependency>
@@ -2408,10 +2389,6 @@
           <exclusion>
             <groupId>${hive.group}</groupId>
             <artifactId>hive-storage-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId> com.esotericsoftware</groupId>
-            <artifactId>kryo-shaded</artifactId>
           </exclusion>
         </exclusions>
       </dependency>

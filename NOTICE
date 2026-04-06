@@ -28,6 +28,14 @@ support authentication, and encryption and decryption of data sent across the ne
 services.
 
 
+Chill
+Copyright 2012 Twitter, Inc.
+
+This product includes code derived from the Twitter Chill project
+(https://github.com/twitter/chill), which is licensed under the
+Apache License 2.0.
+
+
 Metrics
 Copyright 2010-2013 Coda Hale and Yammer, Inc.
 

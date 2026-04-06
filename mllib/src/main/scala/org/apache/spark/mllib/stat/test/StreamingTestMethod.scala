@@ -22,11 +22,11 @@ import java.io.Serializable
 import scala.language.implicitConversions
 import scala.math.pow
 
-import com.twitter.chill.MeatLocker
 import org.apache.commons.math3.stat.descriptive.StatisticalSummaryValues
 import org.apache.commons.math3.stat.inference.TTest
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.serializer.kryo.MeatLocker
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.util.StatCounter
 

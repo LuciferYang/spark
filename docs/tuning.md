@@ -62,8 +62,8 @@ nodes but also when serializing RDDs to disk.  The only reason Kryo is not the d
 registration requirement, but we recommend trying it in any network-intensive application.
 Since Spark 2.0.0, we internally use Kryo serializer when shuffling RDDs with simple types, arrays of simple types, or string type.
 
-Spark automatically includes Kryo serializers for the many commonly-used core Scala classes covered
-in the AllScalaRegistrar from the [Twitter chill](https://github.com/twitter/chill) library.
+Spark automatically includes Kryo serializers for many commonly-used core Scala classes covered
+in the AllScalaRegistrar (originally derived from the [Twitter chill](https://github.com/twitter/chill) library).
 
 To register your own custom classes with Kryo, use the `registerKryoClasses` method.
 

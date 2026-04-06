@@ -1034,20 +1034,6 @@ project, hosted at https://code.google.com/p/json-simple/.
 The JSON simple jar file is licensed under the Apache 2.0 License.
 
 
-Chill is a set of Scala extensions for Kryo.
-Copyright 2012 Twitter, Inc.
-
-Third Party Dependencies:
-
-Kryo 2.17
-BSD 3-Clause License
-http://code.google.com/p/kryo
-
-Commons-Codec 1.7
-Apache Public License 2.0
-http://hadoop.apache.org
-
-
 
 Breeze is distributed under an Apache License V2.0 (See LICENSE)
 

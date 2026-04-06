@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql
 
-import com.esotericsoftware.kryo.Kryo
-import com.esotericsoftware.kryo.io.Input
+import com.esotericsoftware.kryo.kryo5.Kryo
+import com.esotericsoftware.kryo.kryo5.io.Input
 
 import org.apache.spark.{SparkConf, SparkIllegalArgumentException}
 import org.apache.spark.serializer.KryoSerializer

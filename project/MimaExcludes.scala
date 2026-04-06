@@ -35,6 +35,18 @@ object MimaExcludes {
 
   // Exclude rules for 4.2.x from 4.1.0
   lazy val v42excludes = v41excludes ++ Seq(
+    // [SPARK-XXXXX][CORE] Upgrade Kryo from 4.x to 5.x
+    // The kryo5 artifact uses com.esotericsoftware.kryo5.* namespace instead of
+    // com.esotericsoftware.kryo.*, which changes method signatures in Kryo-related classes.
+    ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.spark.serializer.KryoRegistrator.registerClasses"),
+    ProblemFilters.exclude[ReversedMissingMethodProblem]("org.apache.spark.serializer.KryoRegistrator.registerClasses"),
+    ProblemFilters.exclude[MissingTypesProblem]("org.apache.spark.serializer.JavaIterableWrapperSerializer"),
+    ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.spark.serializer.JavaIterableWrapperSerializer.write"),
+    ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.spark.serializer.JavaIterableWrapperSerializer.read"),
+    ProblemFilters.exclude[MissingTypesProblem]("org.apache.spark.serializer.KryoSerializer$PoolWrapper"),
+    ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.serializer.KryoSerializer#PoolWrapper.borrow"),
+    ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.serializer.KryoSerializer#PoolWrapper.release"),
+    ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.serializer.KryoSerializer#PoolWrapper.run"),
     // [SQL] SafeJsonSerializer.safeMapToJValue: second parameter widened from Function1 to
     // Function2 so the key is passed to the value serializer (progress.scala). Binary-incompatible
     // vs spark-sql-api 4.0.0; not part of the public supported API (private[streaming] package).

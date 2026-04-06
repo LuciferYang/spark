@@ -32,7 +32,7 @@ import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.classTag
 
-import com.esotericsoftware.kryo.KryoException
+import com.esotericsoftware.kryo.kryo5.KryoException
 import org.mockito.{ArgumentCaptor, ArgumentMatchers => mc}
 import org.mockito.Mockito.{atLeastOnce, doAnswer, mock, never, spy, times, verify, when}
 import org.scalatest.PrivateMethodTester

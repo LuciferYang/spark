@@ -22,7 +22,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 import scala.jdk.CollectionConverters._
 import scala.util.{Random, Try}
 
-import com.esotericsoftware.kryo.Kryo
+import com.esotericsoftware.kryo.kryo5.Kryo
 
 import org.apache.spark.internal.config._
 import org.apache.spark.internal.config.History._

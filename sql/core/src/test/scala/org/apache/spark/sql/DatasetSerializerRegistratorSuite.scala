@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql
 
-import com.esotericsoftware.kryo.{Kryo, Serializer}
-import com.esotericsoftware.kryo.io.{Input, Output}
+import com.esotericsoftware.kryo.kryo5.{Kryo, Serializer}
+import com.esotericsoftware.kryo.kryo5.io.{Input, Output}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.config.Kryo._
@@ -63,7 +63,7 @@ class ZeroKryoDataSerializer extends Serializer[KryoData] {
     output.writeInt(0)
   }
 
-  override def read(kryo: Kryo, input: Input, aClass: Class[KryoData]): KryoData = {
+  override def read(kryo: Kryo, input: Input, aClass: Class[_ <: KryoData]): KryoData = {
     KryoData(input.readInt())
   }
 }

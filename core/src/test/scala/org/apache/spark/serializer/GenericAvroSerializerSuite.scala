@@ -20,7 +20,7 @@ package org.apache.spark.serializer
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.ByteBuffer
 
-import com.esotericsoftware.kryo.io.{Input, Output}
+import com.esotericsoftware.kryo.kryo5.io.{Input, Output}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.avro.generic.GenericData.{Array => AvroArray, EnumSymbol, Fixed, Record}
 

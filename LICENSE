@@ -218,6 +218,14 @@ connector/spark-ganglia-lgpl/src/main/java/com/codahale/metrics/ganglia/GangliaR
 core/src/main/resources/org/apache/spark/ui/static/d3-flamegraph.min.js
 core/src/main/resources/org/apache/spark/ui/static/d3-flamegraph.css
 mllib-local/src/main/scala/scala/collection/compat/package.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/AllScalaRegistrar.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/KryoBase.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/MeatLocker.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/RichKryo.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/ScalaKryoInstantiator.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/ScalaSerializers.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/TupleSerializers.scala
+core/src/main/scala/org/apache/spark/serializer/kryo/package.scala
 
 Python Software Foundation License
 ----------------------------------

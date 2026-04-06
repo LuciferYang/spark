@@ -19,8 +19,8 @@ package org.apache.spark.sql.execution.joins
 
 import java.io._
 
-import com.esotericsoftware.kryo.{Kryo, KryoSerializable}
-import com.esotericsoftware.kryo.io.{Input, Output}
+import com.esotericsoftware.kryo.kryo5.{Kryo, KryoSerializable}
+import com.esotericsoftware.kryo.kryo5.io.{Input, Output}
 
 import org.apache.spark.{SparkConf, SparkEnv, SparkUnsupportedOperationException}
 import org.apache.spark.internal.config.{BUFFER_PAGESIZE, MEMORY_OFFHEAP_ENABLED}

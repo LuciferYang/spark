@@ -224,8 +224,6 @@ com.squareup.okhttp3:logging-interceptor
 com.squareup.okhttp3:okhttp
 com.squareup.okio:okio
 com.tdunning:json
-com.twitter:chill-java
-com.twitter:chill_2.13
 com.univocity:univocity-parsers
 com.zaxxer:HikariCP
 commons-cli:commons-cli
@@ -446,9 +444,7 @@ python/pyspark/errors/exceptions/tblib.py
 
 BSD 3-Clause
 ------------
-com.esotericsoftware:kryo-shaded
-com.esotericsoftware:minlog
-com.esotericsoftware:reflectasm
+com.esotericsoftware.kryo:kryo5
 com.google.protobuf:protobuf-java
 com.thoughtworks.paranamer:paranamer
 net.sf.py4j:py4j

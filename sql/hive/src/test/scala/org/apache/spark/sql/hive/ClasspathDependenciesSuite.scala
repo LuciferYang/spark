@@ -62,7 +62,7 @@ class ClasspathDependenciesSuite extends SparkFunSuite {
   }
 
   test("kryo") {
-    assertLoads("com.esotericsoftware.kryo.Kryo")
+    assertLoads("com.esotericsoftware.kryo.kryo5.Kryo")
   }
 
   test("hive-common") {

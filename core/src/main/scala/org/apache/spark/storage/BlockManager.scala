@@ -34,7 +34,7 @@ import scala.util.{Failure, Random, Success, Try}
 import scala.util.control.NonFatal
 
 import com.codahale.metrics.{MetricRegistry, MetricSet}
-import com.esotericsoftware.kryo.KryoException
+import com.esotericsoftware.kryo.kryo5.KryoException
 import com.google.common.cache.CacheBuilder
 
 import org.apache.spark._

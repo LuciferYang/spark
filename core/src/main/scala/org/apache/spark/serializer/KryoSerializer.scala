@@ -28,12 +28,12 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-import com.esotericsoftware.kryo.{Kryo, KryoException, Serializer => KryoClassSerializer}
-import com.esotericsoftware.kryo.io.{Input => KryoInput, Output => KryoOutput}
-import com.esotericsoftware.kryo.io.{UnsafeInput => KryoUnsafeInput, UnsafeOutput => KryoUnsafeOutput}
-import com.esotericsoftware.kryo.pool.{KryoCallback, KryoFactory, KryoPool}
-import com.esotericsoftware.kryo.serializers.{JavaSerializer => KryoJavaSerializer}
-import com.twitter.chill.{AllScalaRegistrar, EmptyScalaKryoInstantiator}
+import com.esotericsoftware.kryo.kryo5.{Kryo, KryoException, Serializer => KryoClassSerializer}
+import com.esotericsoftware.kryo.kryo5.io.{Input => KryoInput, Output => KryoOutput}
+import com.esotericsoftware.kryo.kryo5.serializers.{JavaSerializer => KryoJavaSerializer}
+import com.esotericsoftware.kryo.kryo5.unsafe.{UnsafeInput => KryoUnsafeInput,
+  UnsafeOutput => KryoUnsafeOutput}
+import com.esotericsoftware.kryo.kryo5.util.Pool
 import org.apache.avro.generic.{GenericContainer, GenericData, GenericRecord}
 import org.roaringbitmap.RoaringBitmap
 
@@ -46,6 +46,7 @@ import org.apache.spark.internal.config.Kryo._
 import org.apache.spark.internal.io.FileCommitProtocol._
 import org.apache.spark.network.util.ByteUnit
 import org.apache.spark.scheduler.{CompressedMapStatus, HighlyCompressedMapStatus}
+import org.apache.spark.serializer.kryo.{AllScalaRegistrar, EmptyScalaKryoInstantiator}
 import org.apache.spark.storage._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{BoundedPriorityQueue, ByteBufferInputStream, NextIterator, SerializableConfiguration, SerializableJobConf, Utils}
@@ -108,34 +109,25 @@ class KryoSerializer(conf: SparkConf)
     }
 
   @transient
-  private lazy val factory: KryoFactory = new KryoFactory() {
-    override def create: Kryo = {
-      newKryo()
-    }
-  }
+  private[serializer] lazy val internalPool: PoolWrapper = new PoolWrapper
 
-  private class PoolWrapper extends KryoPool {
-    private var pool: KryoPool = getPool
+  private[serializer] class PoolWrapper {
+    private var pool: Pool[Kryo] = createPool()
 
-    override def borrow(): Kryo = pool.borrow()
+    def obtain(): Kryo = pool.obtain()
 
-    override def release(kryo: Kryo): Unit = pool.release(kryo)
-
-    override def run[T](kryoCallback: KryoCallback[T]): T = pool.run(kryoCallback)
+    def free(kryo: Kryo): Unit = pool.free(kryo)
 
     def reset(): Unit = {
-      pool = getPool
+      pool = createPool()
     }
 
-    private def getPool: KryoPool = {
-      new KryoPool.Builder(factory).softReferences.build
+    private def createPool(): Pool[Kryo] = {
+      new Pool[Kryo](true, false) {
+        override def create(): Kryo = newKryo()
+      }
     }
   }
-
-  @transient
-  private lazy val internalPool = new PoolWrapper
-
-  def pool: KryoPool = internalPool
 
   def newKryo(): Kryo = {
     val instantiator = new EmptyScalaKryoInstantiator
@@ -198,11 +190,24 @@ class KryoSerializer(conf: SparkConf)
       }
     }
 
-    // Register Chill's classes; we do this after our ranges and the user's own classes to let
-    // our code override the generic serializers in Chill for things like Seq
+    // Register Scala collection serializers; we do this after our ranges and the user's own
+    // classes to let our code override the generic serializers for things like Seq
     new AllScalaRegistrar().apply(kryo)
 
-    // Register types missed by Chill.
+    // Register Kryo 5's ClosureSerializer for JVM lambda/closure classes.
+    // On Java 15+, lambda classes are "hidden classes" whose field offsets cannot be obtained
+    // by Unsafe, causing Kryo 5's default FieldSerializer (which uses UnsafeField) to fail.
+    // ClosureSerializer uses the SerializedLambda mechanism (writeReplace/readResolve) instead,
+    // which works correctly for Serializable closures (including all Scala-compiled lambdas).
+    // Kryo's getRegistration() automatically routes hidden/synthetic closure classes to this
+    // registration via its isClosure() check.
+    kryo.register(classOf[Array[AnyRef]])
+    kryo.register(classOf[Class[_]])
+    kryo.register(
+      classOf[com.esotericsoftware.kryo.kryo5.serializers.ClosureSerializer.Closure],
+      new com.esotericsoftware.kryo.kryo5.serializers.ClosureSerializer())
+
+    // Register types missed by the registrar.
     // scalastyle:off
     kryo.register(classOf[Array[Tuple1[Any]]])
     kryo.register(classOf[Array[Tuple2[Any, Any]]])
@@ -322,7 +327,7 @@ class KryoDeserializationStream(
       return false
     }
 
-    val eof = input.eof()
+    val eof = input.end()
     if (eof) close()
     !eof
   }
@@ -405,7 +410,7 @@ private[spark] class KryoSerializerInstance(
    */
   private[serializer] def borrowKryo(): Kryo = {
     if (usePool) {
-      val kryo = ks.pool.borrow()
+      val kryo = ks.internalPool.obtain()
       kryo.reset()
       kryo
     } else {
@@ -430,7 +435,7 @@ private[spark] class KryoSerializerInstance(
    */
   private[serializer] def releaseKryo(kryo: Kryo): Unit = {
     if (usePool) {
-      ks.pool.release(kryo)
+      ks.internalPool.free(kryo)
     } else {
       if (cachedKryo == null) {
         cachedKryo = kryo
@@ -443,7 +448,7 @@ private[spark] class KryoSerializerInstance(
   private lazy val input = if (useUnsafe) new KryoUnsafeInput() else new KryoInput()
 
   override def serialize[T: ClassTag](t: T): ByteBuffer = {
-    output.clear()
+    output.reset()
     val kryo = borrowKryo()
     try {
       kryo.writeClassAndObject(output, t)
@@ -560,7 +565,8 @@ private[serializer] object KryoSerializer {
       override def write(kryo: Kryo, output: KryoOutput, bitmap: RoaringBitmap): Unit = {
         bitmap.serialize(new KryoOutputObjectOutputBridge(kryo, output))
       }
-      override def read(kryo: Kryo, input: KryoInput, cls: Class[RoaringBitmap]): RoaringBitmap = {
+      override def read(kryo: Kryo, input: KryoInput,
+          cls: Class[_ <: RoaringBitmap]): RoaringBitmap = {
         val ret = new RoaringBitmap
         ret.deserialize(new KryoInputObjectInputBridge(kryo, input))
         ret
@@ -715,7 +721,7 @@ private[spark] class KryoOutputObjectOutputBridge(
  * Kryo deserializes this into an AbstractCollection, which unfortunately doesn't work.
  */
 private class JavaIterableWrapperSerializer
-  extends com.esotericsoftware.kryo.Serializer[java.lang.Iterable[_]] {
+  extends com.esotericsoftware.kryo.kryo5.Serializer[java.lang.Iterable[_]] {
 
   import JavaIterableWrapperSerializer._
 
@@ -729,7 +735,7 @@ private class JavaIterableWrapperSerializer
     }
   }
 
-  override def read(kryo: Kryo, in: KryoInput, clz: Class[java.lang.Iterable[_]])
+  override def read(kryo: Kryo, in: KryoInput, clz: Class[_ <: java.lang.Iterable[_]])
     : java.lang.Iterable[_] = {
     kryo.readClassAndObject(in) match {
       case scalaIterable: Iterable[_] => scalaIterable.asJava
