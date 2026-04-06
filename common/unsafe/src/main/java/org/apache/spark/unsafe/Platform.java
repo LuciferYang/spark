@@ -35,9 +35,16 @@ import java.nio.ByteOrder;
  * This implementation requires Java 25+ and replaces the previous {@code sun.misc.Unsafe}-based
  * implementation. All public method signatures are preserved for backward compatibility.
  * <p>
- * On-heap access uses {@link VarHandle} for byte[] (the dominant base object type in Spark)
- * and direct array indexing for same-type arrays, avoiding the per-call overhead of
- * {@code MemorySegment.ofArray()} which the JIT cannot always eliminate.
+ * On-heap access strategy (in priority order):
+ * <ol>
+ *   <li>{@code byte[]} — uses {@link VarHandle} from
+ *       {@code MethodHandles.byteArrayViewVarHandle()} for multi-byte types,
+ *       or direct array indexing for single-byte access. This is the dominant
+ *       path in Spark (UnsafeRow stores everything in byte[]).</li>
+ *   <li>Same-type arrays (e.g., reading int from int[]) — uses
+ *       {@code MethodHandles.arrayElementVarHandle()} for JIT-friendly access.</li>
+ *   <li>Fallback — uses {@code MemorySegment.ofArray()} for rare cross-type patterns.</li>
+ * </ol>
  * <p>
  * Runtime requirements:
  * <ul>
@@ -94,20 +101,34 @@ public final class Platform {
 
   // ==================== VarHandles for on-heap byte[] access ====================
 
-  // These are static final, so the JIT treats them as constants and compiles
-  // VarHandle.get/set calls down to a single array load/store instruction.
-  // byteArrayViewVarHandle interprets a byte[] as a view of the target type
+  // byteArrayViewVarHandle: interprets a byte[] as a view of the target type
   // at an arbitrary byte offset, matching the Unsafe (base, offset) semantics.
-  private static final VarHandle VH_SHORT =
+  // Static final → JIT treats as constant → compiles to a single array load/store.
+  private static final VarHandle VH_SHORT_ON_BYTES =
     MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.nativeOrder());
-  private static final VarHandle VH_INT =
+  private static final VarHandle VH_INT_ON_BYTES =
     MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.nativeOrder());
-  private static final VarHandle VH_LONG =
+  private static final VarHandle VH_LONG_ON_BYTES =
     MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
-  private static final VarHandle VH_FLOAT =
+  private static final VarHandle VH_FLOAT_ON_BYTES =
     MethodHandles.byteArrayViewVarHandle(float[].class, ByteOrder.nativeOrder());
-  private static final VarHandle VH_DOUBLE =
+  private static final VarHandle VH_DOUBLE_ON_BYTES =
     MethodHandles.byteArrayViewVarHandle(double[].class, ByteOrder.nativeOrder());
+
+  // ==================== VarHandles for same-type array access ====================
+
+  // arrayElementVarHandle: JIT-friendly element access by index.
+  // Avoids instanceof + manual bit-shift overhead of direct array indexing.
+  private static final VarHandle VH_SHORT_ARRAY =
+    MethodHandles.arrayElementVarHandle(short[].class);
+  private static final VarHandle VH_INT_ARRAY =
+    MethodHandles.arrayElementVarHandle(int[].class);
+  private static final VarHandle VH_LONG_ARRAY =
+    MethodHandles.arrayElementVarHandle(long[].class);
+  private static final VarHandle VH_FLOAT_ARRAY =
+    MethodHandles.arrayElementVarHandle(float[].class);
+  private static final VarHandle VH_DOUBLE_ARRAY =
+    MethodHandles.arrayElementVarHandle(double[].class);
 
   // ==================== Linker handles for malloc / free ====================
 
@@ -165,10 +186,10 @@ public final class Platform {
       return NATIVE.get(LAYOUT_INT, offset);
     }
     if (object instanceof byte[] ba) {
-      return (int) VH_INT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+      return (int) VH_INT_ON_BYTES.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
     }
     if (object instanceof int[] ia) {
-      return ia[(int) ((offset - INT_ARRAY_OFFSET) >> 2)];
+      return (int) VH_INT_ARRAY.get(ia, (int) ((offset - INT_ARRAY_OFFSET) >> 2));
     }
     return heapSegment(object).get(LAYOUT_INT, offset - HEAP_HEADER_BYTES);
   }
@@ -179,11 +200,11 @@ public final class Platform {
       return;
     }
     if (object instanceof byte[] ba) {
-      VH_INT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      VH_INT_ON_BYTES.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
       return;
     }
     if (object instanceof int[] ia) {
-      ia[(int) ((offset - INT_ARRAY_OFFSET) >> 2)] = value;
+      VH_INT_ARRAY.set(ia, (int) ((offset - INT_ARRAY_OFFSET) >> 2), value);
       return;
     }
     heapSegment(object).set(LAYOUT_INT, offset - HEAP_HEADER_BYTES, value);
@@ -245,10 +266,10 @@ public final class Platform {
       return NATIVE.get(LAYOUT_SHORT, offset);
     }
     if (object instanceof byte[] ba) {
-      return (short) VH_SHORT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+      return (short) VH_SHORT_ON_BYTES.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
     }
     if (object instanceof short[] sa) {
-      return sa[(int) ((offset - SHORT_ARRAY_OFFSET) >> 1)];
+      return (short) VH_SHORT_ARRAY.get(sa, (int) ((offset - SHORT_ARRAY_OFFSET) >> 1));
     }
     return heapSegment(object).get(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES);
   }
@@ -259,11 +280,11 @@ public final class Platform {
       return;
     }
     if (object instanceof byte[] ba) {
-      VH_SHORT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      VH_SHORT_ON_BYTES.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
       return;
     }
     if (object instanceof short[] sa) {
-      sa[(int) ((offset - SHORT_ARRAY_OFFSET) >> 1)] = value;
+      VH_SHORT_ARRAY.set(sa, (int) ((offset - SHORT_ARRAY_OFFSET) >> 1), value);
       return;
     }
     heapSegment(object).set(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES, value);
@@ -274,10 +295,10 @@ public final class Platform {
       return NATIVE.get(LAYOUT_LONG, offset);
     }
     if (object instanceof byte[] ba) {
-      return (long) VH_LONG.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+      return (long) VH_LONG_ON_BYTES.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
     }
     if (object instanceof long[] la) {
-      return la[(int) ((offset - LONG_ARRAY_OFFSET) >> 3)];
+      return (long) VH_LONG_ARRAY.get(la, (int) ((offset - LONG_ARRAY_OFFSET) >> 3));
     }
     return heapSegment(object).get(LAYOUT_LONG, offset - HEAP_HEADER_BYTES);
   }
@@ -288,11 +309,11 @@ public final class Platform {
       return;
     }
     if (object instanceof byte[] ba) {
-      VH_LONG.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      VH_LONG_ON_BYTES.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
       return;
     }
     if (object instanceof long[] la) {
-      la[(int) ((offset - LONG_ARRAY_OFFSET) >> 3)] = value;
+      VH_LONG_ARRAY.set(la, (int) ((offset - LONG_ARRAY_OFFSET) >> 3), value);
       return;
     }
     heapSegment(object).set(LAYOUT_LONG, offset - HEAP_HEADER_BYTES, value);
@@ -303,10 +324,10 @@ public final class Platform {
       return NATIVE.get(LAYOUT_FLOAT, offset);
     }
     if (object instanceof byte[] ba) {
-      return (float) VH_FLOAT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+      return (float) VH_FLOAT_ON_BYTES.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
     }
     if (object instanceof float[] fa) {
-      return fa[(int) ((offset - FLOAT_ARRAY_OFFSET) >> 2)];
+      return (float) VH_FLOAT_ARRAY.get(fa, (int) ((offset - FLOAT_ARRAY_OFFSET) >> 2));
     }
     return heapSegment(object).get(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES);
   }
@@ -317,11 +338,11 @@ public final class Platform {
       return;
     }
     if (object instanceof byte[] ba) {
-      VH_FLOAT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      VH_FLOAT_ON_BYTES.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
       return;
     }
     if (object instanceof float[] fa) {
-      fa[(int) ((offset - FLOAT_ARRAY_OFFSET) >> 2)] = value;
+      VH_FLOAT_ARRAY.set(fa, (int) ((offset - FLOAT_ARRAY_OFFSET) >> 2), value);
       return;
     }
     heapSegment(object).set(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES, value);
@@ -332,10 +353,10 @@ public final class Platform {
       return NATIVE.get(LAYOUT_DOUBLE, offset);
     }
     if (object instanceof byte[] ba) {
-      return (double) VH_DOUBLE.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+      return (double) VH_DOUBLE_ON_BYTES.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
     }
     if (object instanceof double[] da) {
-      return da[(int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3)];
+      return (double) VH_DOUBLE_ARRAY.get(da, (int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3));
     }
     return heapSegment(object).get(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES);
   }
@@ -346,11 +367,11 @@ public final class Platform {
       return;
     }
     if (object instanceof byte[] ba) {
-      VH_DOUBLE.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      VH_DOUBLE_ON_BYTES.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
       return;
     }
     if (object instanceof double[] da) {
-      da[(int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3)] = value;
+      VH_DOUBLE_ARRAY.set(da, (int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3), value);
       return;
     }
     heapSegment(object).set(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES, value);
