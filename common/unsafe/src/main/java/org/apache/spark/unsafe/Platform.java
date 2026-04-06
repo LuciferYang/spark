@@ -24,6 +24,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -32,6 +34,10 @@ import java.nio.ByteOrder;
  * <p>
  * This implementation requires Java 25+ and replaces the previous {@code sun.misc.Unsafe}-based
  * implementation. All public method signatures are preserved for backward compatibility.
+ * <p>
+ * On-heap access uses {@link VarHandle} for byte[] (the dominant base object type in Spark)
+ * and direct array indexing for same-type arrays, avoiding the per-call overhead of
+ * {@code MemorySegment.ofArray()} which the JIT cannot always eliminate.
  * <p>
  * Runtime requirements:
  * <ul>
@@ -55,8 +61,7 @@ public final class Platform {
 
   // These are backward-compatible sentinel values used by all callers.
   // Callers compute: ARRAY_OFFSET + position, then pass to get/put methods.
-  // Internally we subtract HEAP_HEADER_BYTES to recover the zero-based position
-  // for MemorySegment.ofArray(), which always starts addressing at element 0.
+  // Internally we subtract HEAP_HEADER_BYTES to recover the zero-based byte position.
   //
   // The value 16 matches HotSpot's array object header size on 64-bit JVMs
   // (8-byte mark word + 4-byte compressed klass pointer + 4-byte array length),
@@ -77,10 +82,8 @@ public final class Platform {
 
   public static final int DOUBLE_ARRAY_OFFSET = HEAP_HEADER_BYTES;
 
-  // ==================== ValueLayouts ====================
+  // ==================== ValueLayouts (for off-heap & fallback) ====================
 
-  // Use UNALIGNED variants for cross-type access patterns
-  // (e.g., reading an int from a byte[] at an arbitrary byte offset).
   private static final ValueLayout.OfByte LAYOUT_BYTE = ValueLayout.JAVA_BYTE;
   private static final ValueLayout.OfBoolean LAYOUT_BOOLEAN = ValueLayout.JAVA_BOOLEAN;
   private static final ValueLayout.OfShort LAYOUT_SHORT = ValueLayout.JAVA_SHORT_UNALIGNED;
@@ -88,6 +91,23 @@ public final class Platform {
   private static final ValueLayout.OfLong LAYOUT_LONG = ValueLayout.JAVA_LONG_UNALIGNED;
   private static final ValueLayout.OfFloat LAYOUT_FLOAT = ValueLayout.JAVA_FLOAT_UNALIGNED;
   private static final ValueLayout.OfDouble LAYOUT_DOUBLE = ValueLayout.JAVA_DOUBLE_UNALIGNED;
+
+  // ==================== VarHandles for on-heap byte[] access ====================
+
+  // These are static final, so the JIT treats them as constants and compiles
+  // VarHandle.get/set calls down to a single array load/store instruction.
+  // byteArrayViewVarHandle interprets a byte[] as a view of the target type
+  // at an arbitrary byte offset, matching the Unsafe (base, offset) semantics.
+  private static final VarHandle VH_SHORT =
+    MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.nativeOrder());
+  private static final VarHandle VH_INT =
+    MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.nativeOrder());
+  private static final VarHandle VH_LONG =
+    MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
+  private static final VarHandle VH_FLOAT =
+    MethodHandles.byteArrayViewVarHandle(float[].class, ByteOrder.nativeOrder());
+  private static final VarHandle VH_DOUBLE =
+    MethodHandles.byteArrayViewVarHandle(double[].class, ByteOrder.nativeOrder());
 
   // ==================== Linker handles for malloc / free ====================
 
@@ -128,8 +148,6 @@ public final class Platform {
 
   // Visible for testing
   public static boolean cleanerCreateMethodIsDefined() {
-    // With FFM-based allocateDirectBuffer, direct buffer allocation
-    // with automatic cleanup is always supported.
     return true;
   }
 
@@ -146,24 +164,40 @@ public final class Platform {
     if (object == null) {
       return NATIVE.get(LAYOUT_INT, offset);
     }
+    if (object instanceof byte[] ba) {
+      return (int) VH_INT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+    }
+    if (object instanceof int[] ia) {
+      return ia[(int) ((offset - INT_ARRAY_OFFSET) >> 2)];
+    }
     return heapSegment(object).get(LAYOUT_INT, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putInt(Object object, long offset, int value) {
     if (object == null) {
       NATIVE.set(LAYOUT_INT, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_INT, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      VH_INT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      return;
+    }
+    if (object instanceof int[] ia) {
+      ia[(int) ((offset - INT_ARRAY_OFFSET) >> 2)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_INT, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static boolean getBoolean(Object object, long offset) {
     if (object == null) {
       return NATIVE.get(LAYOUT_BOOLEAN, offset);
     }
-    // MemorySegment.ofArray(boolean[]) is not available; use direct array access.
     if (object instanceof boolean[] ba) {
       return ba[(int) (offset - BOOLEAN_ARRAY_OFFSET)];
+    }
+    if (object instanceof byte[] bytes) {
+      return bytes[(int) (offset - BYTE_ARRAY_OFFSET)] != 0;
     }
     return heapSegment(object).get(LAYOUT_BOOLEAN, offset - HEAP_HEADER_BYTES);
   }
@@ -177,6 +211,10 @@ public final class Platform {
       ba[(int) (offset - BOOLEAN_ARRAY_OFFSET)] = value;
       return;
     }
+    if (object instanceof byte[] bytes) {
+      bytes[(int) (offset - BYTE_ARRAY_OFFSET)] = (byte) (value ? 1 : 0);
+      return;
+    }
     heapSegment(object).set(LAYOUT_BOOLEAN, offset - HEAP_HEADER_BYTES, value);
   }
 
@@ -184,20 +222,33 @@ public final class Platform {
     if (object == null) {
       return NATIVE.get(LAYOUT_BYTE, offset);
     }
+    if (object instanceof byte[] ba) {
+      return ba[(int) (offset - BYTE_ARRAY_OFFSET)];
+    }
     return heapSegment(object).get(LAYOUT_BYTE, offset - HEAP_HEADER_BYTES);
   }
 
   public static void putByte(Object object, long offset, byte value) {
     if (object == null) {
       NATIVE.set(LAYOUT_BYTE, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_BYTE, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      ba[(int) (offset - BYTE_ARRAY_OFFSET)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_BYTE, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static short getShort(Object object, long offset) {
     if (object == null) {
       return NATIVE.get(LAYOUT_SHORT, offset);
+    }
+    if (object instanceof byte[] ba) {
+      return (short) VH_SHORT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+    }
+    if (object instanceof short[] sa) {
+      return sa[(int) ((offset - SHORT_ARRAY_OFFSET) >> 1)];
     }
     return heapSegment(object).get(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES);
   }
@@ -205,14 +256,28 @@ public final class Platform {
   public static void putShort(Object object, long offset, short value) {
     if (object == null) {
       NATIVE.set(LAYOUT_SHORT, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      VH_SHORT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      return;
+    }
+    if (object instanceof short[] sa) {
+      sa[(int) ((offset - SHORT_ARRAY_OFFSET) >> 1)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_SHORT, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static long getLong(Object object, long offset) {
     if (object == null) {
       return NATIVE.get(LAYOUT_LONG, offset);
+    }
+    if (object instanceof byte[] ba) {
+      return (long) VH_LONG.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+    }
+    if (object instanceof long[] la) {
+      return la[(int) ((offset - LONG_ARRAY_OFFSET) >> 3)];
     }
     return heapSegment(object).get(LAYOUT_LONG, offset - HEAP_HEADER_BYTES);
   }
@@ -220,14 +285,28 @@ public final class Platform {
   public static void putLong(Object object, long offset, long value) {
     if (object == null) {
       NATIVE.set(LAYOUT_LONG, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_LONG, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      VH_LONG.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      return;
+    }
+    if (object instanceof long[] la) {
+      la[(int) ((offset - LONG_ARRAY_OFFSET) >> 3)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_LONG, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static float getFloat(Object object, long offset) {
     if (object == null) {
       return NATIVE.get(LAYOUT_FLOAT, offset);
+    }
+    if (object instanceof byte[] ba) {
+      return (float) VH_FLOAT.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+    }
+    if (object instanceof float[] fa) {
+      return fa[(int) ((offset - FLOAT_ARRAY_OFFSET) >> 2)];
     }
     return heapSegment(object).get(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES);
   }
@@ -235,14 +314,28 @@ public final class Platform {
   public static void putFloat(Object object, long offset, float value) {
     if (object == null) {
       NATIVE.set(LAYOUT_FLOAT, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      VH_FLOAT.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      return;
+    }
+    if (object instanceof float[] fa) {
+      fa[(int) ((offset - FLOAT_ARRAY_OFFSET) >> 2)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_FLOAT, offset - HEAP_HEADER_BYTES, value);
   }
 
   public static double getDouble(Object object, long offset) {
     if (object == null) {
       return NATIVE.get(LAYOUT_DOUBLE, offset);
+    }
+    if (object instanceof byte[] ba) {
+      return (double) VH_DOUBLE.get(ba, (int) (offset - BYTE_ARRAY_OFFSET));
+    }
+    if (object instanceof double[] da) {
+      return da[(int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3)];
     }
     return heapSegment(object).get(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES);
   }
@@ -250,9 +343,17 @@ public final class Platform {
   public static void putDouble(Object object, long offset, double value) {
     if (object == null) {
       NATIVE.set(LAYOUT_DOUBLE, offset, value);
-    } else {
-      heapSegment(object).set(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES, value);
+      return;
     }
+    if (object instanceof byte[] ba) {
+      VH_DOUBLE.set(ba, (int) (offset - BYTE_ARRAY_OFFSET), value);
+      return;
+    }
+    if (object instanceof double[] da) {
+      da[(int) ((offset - DOUBLE_ARRAY_OFFSET) >> 3)] = value;
+      return;
+    }
+    heapSegment(object).set(LAYOUT_DOUBLE, offset - HEAP_HEADER_BYTES, value);
   }
 
   // getObjectVolatile / putObjectVolatile: removed.
@@ -333,6 +434,13 @@ public final class Platform {
     Object src, long srcOffset, Object dst, long dstOffset, long length) {
     if (length == 0) return;
 
+    // Fast path: both are byte[] — use System.arraycopy
+    if (src instanceof byte[] srcBa && dst instanceof byte[] dstBa) {
+      System.arraycopy(srcBa, (int) (srcOffset - BYTE_ARRAY_OFFSET),
+        dstBa, (int) (dstOffset - BYTE_ARRAY_OFFSET), (int) length);
+      return;
+    }
+
     MemorySegment srcSeg;
     long srcPos;
     if (src == null) {
@@ -377,13 +485,7 @@ public final class Platform {
 
   /**
    * Creates a MemorySegment view of the given heap array object.
-   * <p>
-   * In hot loops, the JIT compiler is expected to:
-   * <ol>
-   *   <li>Profile the dominant type (typically byte[]) and eliminate dead branches</li>
-   *   <li>Scalar-replace the MemorySegment object via escape analysis</li>
-   *   <li>Compile the {@code segment.get()} call to a direct array load instruction</li>
-   * </ol>
+   * Used as fallback for rare cross-type access patterns (e.g., reading an int from a short[]).
    */
   private static MemorySegment heapSegment(Object obj) {
     if (obj instanceof byte[] ba) return MemorySegment.ofArray(ba);
