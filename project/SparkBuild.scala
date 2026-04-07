@@ -425,6 +425,21 @@ object SparkBuild extends PomBuild {
 
   enable(Core.settings)(core)
 
+  enable(NetworkCommon.settings)(networkCommon)
+
+  enable(Streaming.settings)(streaming)
+
+  /*
+   * Self-shade-only modules: every Spark module that has a `com.google.common` (or
+   * jetty / pmml / jpmml) reference in its `src/main` needs Maven-equivalent bytecode
+   * relocation in its dist jar. The actual swap happens in [[CopyDependencies]].
+   */
+  enable(Catalyst.settings)(catalyst)
+  enable(NetworkShuffle.settings)(networkShuffle)
+  enable(KvStore.settings)(kvstore)
+  enable(Mllib.settings)(mllib)
+  enable(Kubernetes.settings)(kubernetes)
+
   /* Unsafe settings */
   enable(Unsafe.settings)(unsafe)
 
@@ -439,6 +454,9 @@ object SparkBuild extends PomBuild {
 
   /* Enable Assembly for all assembly projects */
   assemblyProjects.foreach(enable(Assembly.settings))
+
+  /* network-yarn specific shade rules (uber-jar with jackson + netty + parent rules) */
+  enable(NetworkYarn.settings)(networkYarn)
 
   /* Package pyspark artifacts in a separate zip file for YARN. */
   enable(PySparkAssembly.settings)(assembly)
@@ -645,6 +663,67 @@ object CommonUtils {
   )
 }
 
+/**
+ * Shared shade-rule infrastructure that mirrors Maven's parent `pom.xml` shade plugin
+ * inheritance. The parent pom installs `maven-shade-plugin` at top-level `<build><plugins>`
+ * (not `<pluginManagement>`), bound to `package` phase, so every child module inherits it.
+ * The two truly universal relocations are `com.google.common` and `com.google.thirdparty`
+ * (jetty / pmml / jpmml are localized to a few modules and stay module-specific). We keep
+ * the universal rules in [[commonShadeRules]] so a single edit propagates everywhere.
+ */
+object CommonShade {
+
+  // Universal Guava relocations applied to every Spark module that ships in dist/jars.
+  // `com.google.thirdparty` currently has zero `src/main` occurrences anywhere, but is
+  // kept here as a defensive rule mirroring the parent pom.
+  val commonShadeRules: Seq[com.eed3si9n.jarjarabrams.ShadeRule] = Seq(
+    ShadeRule.rename("com.google.common.**" -> "org.sparkproject.guava.@1").inAll,
+    ShadeRule.rename("com.google.thirdparty.**" -> "org.sparkproject.guava.thirdparty.@1").inAll
+  )
+
+  // Standard merge strategy used by every "self-shade-only" assembly. Mirrors the
+  // strategy already used module-by-module so the helper produces an identical result.
+  private val standardMergeStrategy: String => sbtassembly.MergeStrategy = {
+    case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+    case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+    case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+      MergeStrategy.filterDistinctLines
+    case _ => MergeStrategy.first
+  }
+
+  /**
+   * Settings for a "self-shade-only" assembly: the produced assembly jar contains the
+   * module's own classes (with shade rules applied to bytecode references) plus the
+   * `unused-1.0.0.jar` stub Maven also bundles, and nothing else. Used by
+   * [[CopyDependencies]] to swap the plain `package` jar in `dist/jars/` with this
+   * shaded variant, so the final shipped jar is byte-equivalent to Maven's.
+   *
+   * @param jarPrefix    the prefix of the module's own jar name (e.g. `"spark-catalyst_"`).
+   *                     The trailing underscore matters when there are sibling jars
+   *                     sharing a stem (e.g. `spark-streaming_` vs `spark-streaming-kafka-*`).
+   * @param extraRules   module-specific shade rules layered on top of [[commonShadeRules]].
+   */
+  def selfShadeOnlyAssemblySettings(
+      jarPrefix: String,
+      extraRules: Seq[com.eed3si9n.jarjarabrams.ShadeRule] = Nil): Seq[Setting[_]] = Seq(
+    (assembly / assemblyShadeRules) := commonShadeRules ++ extraRules,
+
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        val name = v.data.getName
+        !(name == "unused-1.0.0.jar" || name.startsWith(jarPrefix))
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := standardMergeStrategy,
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
+  )
+}
+
 object Core {
   import BuildCommons.protoVersion
   lazy val settings = Seq(
@@ -662,7 +741,51 @@ object Core {
     // Core uses protoc-jar-maven-plugin which outputs to target/generated-sources.
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
-    )
+    ),
+
+    // Shade rules matching Maven core/pom.xml: jetty + guava (common) + protobuf
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_core.protobuf.@1").inAll
+    ),
+
+    // Include only specific jetty, protobuf, and unused jars in shaded jar
+    // (matching Maven core/pom.xml artifactSet includes exactly), plus core's own
+    // packageBin output so the assembly jar is a drop-in replacement for the plain
+    // spark-core jar in the dist (otherwise it would just be jetty + protobuf with
+    // no core classes at all).
+    // Note: guava/failureaccess are NOT included because they are provided scope in Maven.
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      // Explicit list of jetty artifacts matching Maven core/pom.xml artifactSet
+      val jettyArtifacts = Set(
+        "jetty-io", "jetty-http", "jetty-client", "jetty-security",
+        "jetty-util", "jetty-server", "jetty-session",
+        "jetty-ee10-proxy", "jetty-ee10-servlet", "jetty-ee10-servlets", "jetty-ee10-plus",
+        "jetty-compression-server", "jetty-compression-common", "jetty-compression-gzip"
+      )
+      cp filter { v =>
+        val name = v.data.getName
+        val isJetty = jettyArtifacts.exists(a => name.startsWith(a + "-"))
+        !(isJetty ||
+          name.startsWith("protobuf-java-") ||
+          name == "unused-1.0.0.jar" ||
+          name.startsWith("spark-core_"))
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
   ) ++ {
     val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
     if (sparkProtocExecPath.isDefined) {
@@ -821,7 +944,9 @@ object SparkConnect {
       }
     },
 
-    (assembly / assemblyShadeRules) := Seq(
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
+      // Module-specific rules layered on top of CommonShade.commonShadeRules,
+      // matching Maven connect/server/pom.xml.
       ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.grpc.@1").inAll,
       ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.connect.protobuf.@1").inAll,
       ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.android_annotation.@1").inAll,
@@ -921,12 +1046,16 @@ object SparkConnectJdbc {
     },
 
     (assembly / assemblyShadeRules) := Seq(
-      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.client.io.grpc.@1").inAll,
-      ShadeRule.rename("com.google.**" -> "org.sparkproject.connect.client.com.google.@1").inAll,
-      ShadeRule.rename("io.netty.**" -> "org.sparkproject.connect.client.io.netty.@1").inAll,
-      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
-      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
-      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
+      // Guava relocated separately to connect.guava (must precede com.google.** catch-all).
+      // Matches Maven sql/connect/client/jdbc/pom.xml relocation rules.
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.connect.guava.@1").inAll,
+      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.io.grpc.@1").inAll,
+      ShadeRule.rename("com.google.**" -> "org.sparkproject.com.google.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.io.perfmark.@1").inAll,
+      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.org.codehaus.@1").inAll,
+      ShadeRule.rename("org.apache.arrow.**" -> "org.sparkproject.org.apache.arrow.@1").inAll,
+      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.android.annotation.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {
@@ -1002,12 +1131,16 @@ object SparkConnectClient {
     },
 
     (assembly / assemblyShadeRules) := Seq(
-      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.connect.client.io.grpc.@1").inAll,
-      ShadeRule.rename("com.google.**" -> "org.sparkproject.connect.client.com.google.@1").inAll,
-      ShadeRule.rename("io.netty.**" -> "org.sparkproject.connect.client.io.netty.@1").inAll,
-      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.connect.client.io.perfmark.@1").inAll,
-      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.connect.client.org.codehaus.@1").inAll,
-      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.connect.client.android.annotation.@1").inAll
+      // Guava relocated separately to connect.guava (must precede com.google.** catch-all).
+      // Matches Maven sql/connect/client/jvm/pom.xml relocation rules.
+      ShadeRule.rename("com.google.common.**" -> "org.sparkproject.connect.guava.@1").inAll,
+      ShadeRule.rename("io.grpc.**" -> "org.sparkproject.io.grpc.@1").inAll,
+      ShadeRule.rename("com.google.**" -> "org.sparkproject.com.google.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("io.perfmark.**" -> "org.sparkproject.io.perfmark.@1").inAll,
+      ShadeRule.rename("org.codehaus.**" -> "org.sparkproject.org.codehaus.@1").inAll,
+      ShadeRule.rename("org.apache.arrow.**" -> "org.sparkproject.org.apache.arrow.@1").inAll,
+      ShadeRule.rename("android.annotation.**" -> "org.sparkproject.android.annotation.@1").inAll
     ),
 
     (assembly / assemblyMergeStrategy) := {
@@ -1105,6 +1238,89 @@ object UDFWorkerProto {
       Seq.empty
     }
   }
+}
+
+object NetworkCommon {
+  lazy val settings = Seq(
+    // Shade rules matching root pom.xml inherited configuration.
+    // network-common declares guava/failureaccess as compile scope, so Maven shades them.
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    ),
+
+    // Include guava, failureaccess, unused (matching root pom artifactSet) plus
+    // network-common's own packageBin so the assembly jar is a drop-in replacement
+    // for the original jar (mirrors Maven shade behaviour).
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        val name = v.data.getName
+        !(name.startsWith("guava-") ||
+          name.startsWith("failureaccess-") ||
+          name == "unused-1.0.0.jar" ||
+          name.startsWith("spark-network-common"))
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
+  )
+}
+
+// Self-shade-only modules — every module here uses the same boilerplate shape, so
+// they all funnel through `CommonShade.selfShadeOnlyAssemblySettings`. Only modules
+// whose source code references a relocated package need to appear here. The trailing
+// underscore in `jarPrefix` matters when sibling jars share a stem (e.g.
+// `spark-streaming_` vs `spark-streaming-kafka-*`, `spark-hive_` vs
+// `spark-hive-thriftserver_`).
+
+object Streaming {
+  // streaming/src/main has one Guava import (RateLimiter.scala). Maven's root pom
+  // shade plugin (inherited via top-level <build><plugins>) rewrites it during the
+  // `package` phase; we mirror that on the SBT side.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-streaming_")
+}
+
+object Catalyst {
+  // 11 Guava imports across catalyst/src/main.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-catalyst_")
+}
+
+object NetworkShuffle {
+  // 5 Guava imports across common/network-shuffle/src/main.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-network-shuffle_")
+}
+
+object KvStore {
+  // 4 Guava imports across common/kvstore/src/main.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-kvstore_")
+}
+
+object Mllib {
+  // 4 Guava imports + 6 pmml/jpmml imports across mllib/src/main.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings(
+    "spark-mllib_",
+    extraRules = Seq(
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    )
+  )
+}
+
+object Kubernetes {
+  // 2 Guava imports across resource-managers/kubernetes/core/src/main.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-kubernetes_")
 }
 
 object Unsafe {
@@ -1375,7 +1591,36 @@ object SQL {
     // sql/core uses protoc-jar-maven-plugin which outputs to target/generated-sources.
     (Compile / PB.targets) := Seq(
       PB.gens.java -> target.value / "generated-sources"
-    )
+    ),
+
+    // Shade rules matching Maven sql/core/pom.xml (combine.self=override):
+    // Only bytecode reference rewrite, no actual class packaging.
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
+      ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_core.protobuf.@1").inAll
+    ),
+
+    // Matches Maven sql/core artifactSet (only `unused-1.0.0.jar`), plus sql/core's
+    // own packageBin output so the assembly jar is a drop-in replacement for the
+    // plain spark-sql jar in the dist (see CopyDependencies).
+    (assembly / assemblyExcludedJars) := {
+      val cp = (assembly / fullClasspath).value
+      cp filter { v =>
+        val name = v.data.getName
+        !(name == "unused-1.0.0.jar" || name.startsWith("spark-sql_"))
+      }
+    },
+
+    (assembly / assemblyMergeStrategy) := {
+      case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+      case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
+        MergeStrategy.filterDistinctLines
+      case _ => MergeStrategy.first
+    },
+
+    (assembly / test) := { },
+    (assembly / logLevel) := Level.Info,
+    (assembly / assemblyPackageScala / assembleArtifact) := false
   ) ++ {
     val sparkProtocExecPath = sys.props.get("spark.protoc.executable.path")
     if (sparkProtocExecPath.isDefined) {
@@ -1390,7 +1635,9 @@ object SQL {
 
 object Hive {
 
-  lazy val settings = Seq(
+  // sql/hive/src/main has 1 Guava import (HiveMetastoreCatalog.scala). Same self-shade
+  // pattern as the other modules so the dist jar matches Maven.
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings("spark-hive_") ++ Seq(
     // Specially disable assertions since some Hive tests fail them
     (Test / javaOptions) := (Test / javaOptions).value.filterNot(_ == "-ea"),
     // Hive tests need higher metaspace size
@@ -1419,7 +1666,15 @@ object Hive {
 }
 
 object HiveThriftServer {
-  lazy val settings = Seq(
+  // sql/hive-thriftserver/src/main has 1 jetty import; no Guava. Self-shade with the
+  // jetty rule layered on top of CommonShade.commonShadeRules (the latter is a no-op
+  // here, but kept for parity with the rest of the modules).
+  lazy val settings = CommonShade.selfShadeOnlyAssemblySettings(
+    "spark-hive-thriftserver_",
+    extraRules = Seq(
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll
+    )
+  ) ++ Seq(
     excludeDependencies ++= Seq(
       ExclusionRule("org.apache.hive", "hive-llap-common"),
       ExclusionRule("org.apache.hive", "hive-llap-client"))
@@ -1455,6 +1710,24 @@ object YARN {
     test := ((Test / test) dependsOn (buildTestDeps)).value,
 
     testOnly := ((Test / testOnly) dependsOn (buildTestDeps)).evaluated
+  )
+}
+
+object NetworkYarn {
+  lazy val settings = Seq(
+    // Shade rules matching Maven network-yarn/pom.xml:
+    // jackson + netty (module-specific) + parent inherited rules (jetty, guava, guava.thirdparty,
+    // pmml, jpmml). This is an uber-jar that includes all dependencies.
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
+      ShadeRule.rename("com.fasterxml.jackson.**" -> "org.sparkproject.com.fasterxml.jackson.@1").inAll,
+      ShadeRule.rename("io.netty.**" -> "org.sparkproject.io.netty.@1").inAll,
+      ShadeRule.rename("org.eclipse.jetty.**" -> "org.sparkproject.jetty.@1").inAll,
+      ShadeRule.rename("org.dmg.pmml.**" -> "org.sparkproject.dmg.pmml.@1").inAll,
+      ShadeRule.rename("org.jpmml.**" -> "org.sparkproject.jpmml.@1").inAll
+    )
+    // Note: uber-jar mode — assemblyExcludedJars not set (include all deps).
+    // Note: native .so/.jnilib renaming for netty is handled by Maven antrun plugin
+    // and may need a separate SBT task in the future.
   )
 }
 
@@ -1720,12 +1993,49 @@ object CopyDependencies {
         throw new IOException("Failed to create jars directory.")
       }
 
-      // For the SparkConnect build, we manually call the assembly target to
-      // produce the shaded Jar which happens automatically in the case of Maven.
-      // Later, when the dependencies are copied, we manually copy the shaded Jar only.
-      val fid = (LocalProject("connect") / assembly).value
+      // For every Spark module that ships in the dist and has bytecode references to
+      // a relocated package (com.google.common, jetty, pmml/jpmml, etc.), Maven's
+      // inherited shade plugin produces a shaded jar with the references rewritten.
+      // SBT's plain `package` task does not — so we run each module's `assembly` task
+      // (configured for self-shade-only via CommonShade.selfShadeOnlyAssemblySettings or
+      // its module-specific equivalent) and substitute the resulting jar in place of
+      // the plain jar in dist/jars/. The map below is the single source of truth: each
+      // entry maps "jarName.contains(prefix)" to the shaded assembly task value.
+      //
+      // The trailing underscore on prefixes that share a stem with sibling jars (e.g.
+      // `spark-streaming_` vs `spark-streaming-kafka-*`, `spark-hive_` vs
+      // `spark-hive-thriftserver_`) is load-bearing — without it the wrong jar gets
+      // matched. The first matching entry in iteration order wins; map entries are
+      // ordered most-specific-first to make this safe.
+      val fidConnect = (LocalProject("connect") / assembly).value
       val fidClient = (LocalProject("connect-client-jvm") / assembly).value
       val fidProtobuf = (LocalProject("protobuf") / assembly).value
+      // Optional / profile-gated projects (kubernetes, hive-thriftserver) may not be
+      // loaded under the default profile set. The `?.value` lookup returns `None` if
+      // the task is undefined for the current build, so we filter them out cleanly.
+      val fidKubernetesOpt = (LocalProject("kubernetes") / assembly).?.value
+      val fidHiveThriftServerOpt = (LocalProject("hive-thriftserver") / assembly).?.value
+      val baseShadedJarSwaps: Seq[(String, File)] = Seq(
+        // Spark Connect (special: bundles its own deps as an uber-jar):
+        "spark-connect_" -> fidConnect,
+        // network-common (bundles shaded guava/failureaccess + self):
+        "spark-network-common_" -> (LocalProject("network-common") / assembly).value,
+        // Self-shade-only modules — bytecode reference rewrite, no extra packaging:
+        "spark-core_" -> (LocalProject("core") / assembly).value,
+        "spark-sql_" -> (LocalProject("sql") / assembly).value,
+        "spark-catalyst_" -> (LocalProject("catalyst") / assembly).value,
+        "spark-network-shuffle_" -> (LocalProject("network-shuffle") / assembly).value,
+        "spark-kvstore_" -> (LocalProject("kvstore") / assembly).value,
+        "spark-mllib_" -> (LocalProject("mllib") / assembly).value,
+        "spark-streaming_" -> (LocalProject("streaming") / assembly).value,
+        "spark-hive_" -> (LocalProject("hive") / assembly).value
+      )
+      val optionalShadedJarSwaps: Seq[(String, File)] =
+        fidKubernetesOpt.map("spark-kubernetes_" -> _).toSeq ++
+        fidHiveThriftServerOpt.map("spark-hive-thriftserver_" -> _).toSeq
+      // Order: optional/most-specific first so `spark-hive-thriftserver_` is matched
+      // before `spark-hive_` when both are present.
+      val shadedJarSwaps: Seq[(String, File)] = optionalShadedJarSwaps ++ baseShadedJarSwaps
       val noProvidedSparkJars: Boolean = sys.env.getOrElse("NO_PROVIDED_SPARK_JARS", "1") == "1" ||
         sys.env.getOrElse("NO_PROVIDED_SPARK_JARS", "true")
           .toLowerCase(Locale.getDefault()) == "true"
@@ -1739,22 +2049,24 @@ object CopyDependencies {
             destJar.delete()
           }
 
-          if (jar.getName.contains("spark-connect-common")) {
+          val name = jar.getName
+          if (name.contains("spark-connect-common")) {
             // Don't copy the spark connect common JAR as it is shaded in the spark connect.
-          } else if (jar.getName.contains("connect-client-jdbc")) {
+          } else if (name.contains("connect-client-jdbc")) {
             // Do not place Spark Connect JDBC driver jar as it is not built-in.
-          } else if (jar.getName.contains("connect-client-jvm")) {
+          } else if (name.contains("connect-client-jvm")) {
             // Do not place Spark Connect client jars as it is not built-in.
-          } else if (noProvidedSparkJars && jar.getName.contains("spark-avro")) {
+          } else if (noProvidedSparkJars && name.contains("spark-avro")) {
             // Do not place Spark Avro jars as it is not built-in.
-          } else if (jar.getName.contains("spark-connect")) {
-            Files.copy(fid.toPath, destJar.toPath)
-          } else if (jar.getName.contains("spark-protobuf")) {
+          } else if (name.contains("spark-protobuf")) {
             if (!noProvidedSparkJars) {
               Files.copy(fidProtobuf.toPath, destJar.toPath)
             }
           } else {
-            Files.copy(jar.toPath(), destJar.toPath())
+            shadedJarSwaps.find { case (prefix, _) => name.contains(prefix) } match {
+              case Some((_, shadedJar)) => Files.copy(shadedJar.toPath, destJar.toPath)
+              case None => Files.copy(jar.toPath, destJar.toPath)
+            }
           }
         }
 
