@@ -48,7 +48,8 @@ case class CSVScanBuilder(
       partitionFilters,
       dataFilters,
       bucketSpec = bucketSpec,
-      optionalBucketSet = optBucketSet)
+      optionalBucketSet = optBucketSet,
+      requestedMetadataFields = requestedMetadataFields)
   }
 
   override def pushDataFilters(dataFilters: Array[Filter]): Array[Filter] = {

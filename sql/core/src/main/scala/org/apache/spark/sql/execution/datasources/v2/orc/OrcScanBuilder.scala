@@ -64,7 +64,8 @@ case class OrcScanBuilder(
     val optBucketSet = computeBucketSet()
     OrcScan(sparkSession, hadoopConf, fileIndex, dataSchema, finalSchema,
       readPartitionSchema(), options, pushedAggregations, pushedDataFilters, partitionFilters,
-      dataFilters, bucketSpec = bucketSpec, optionalBucketSet = optBucketSet)
+      dataFilters, bucketSpec = bucketSpec, optionalBucketSet = optBucketSet,
+      requestedMetadataFields = requestedMetadataFields)
   }
 
   override def pushDataFilters(dataFilters: Array[Filter]): Array[Filter] = {

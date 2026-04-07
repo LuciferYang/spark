@@ -23,10 +23,10 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Expression, PythonUDF, SubqueryExpression}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{ScanBuilder, SupportsPushDownRequiredColumns}
-import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils, FileSourceStrategy, PartitioningAwareFileIndex, PartitioningUtils}
+import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils, FileFormat, FileSourceStrategy, PartitioningAwareFileIndex, PartitioningUtils}
 import org.apache.spark.sql.internal.connector.SupportsPushDownCatalystFilters
 import org.apache.spark.sql.sources.Filter
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.util.collection.BitSet
 
 abstract class FileScanBuilder(
@@ -44,14 +44,28 @@ abstract class FileScanBuilder(
   protected var partitionFilters = Seq.empty[Expression]
   protected var dataFilters = Seq.empty[Expression]
   protected var pushedDataFilters = Array.empty[Filter]
+  // Populated by `pruneColumns` when the query references `_metadata.*`. Concrete
+  // builders pass this to their `Scan` so the reader factory can append metadata values.
+  protected var requestedMetadataFields: StructType = StructType(Seq.empty)
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
     // [SPARK-30107] While `requiredSchema` might have pruned nested columns,
     // the actual data schema of this scan is determined in `readDataSchema`.
     // File formats that don't support nested schema pruning,
     // use `requiredSchema` as a reference and prune only top-level columns.
-    this.requiredSchema = requiredSchema
+    //
+    // [SPARK-56335] Extract the `_metadata` struct (if present) so the format-specific
+    // scan can wrap its reader factory with metadata appending. The `_metadata` field is
+    // removed from `this.requiredSchema` so it does not leak into `readDataSchema`.
+    val (metaFields, dataFields) = requiredSchema.fields.partition(isMetadataField)
+    this.requestedMetadataFields = metaFields.headOption
+      .map(_.dataType.asInstanceOf[StructType])
+      .getOrElse(StructType(Seq.empty))
+    this.requiredSchema = StructType(dataFields)
   }
+
+  private def isMetadataField(field: StructField): Boolean =
+    field.name == FileFormat.METADATA_NAME
 
   protected def readDataSchema(): StructType = {
     val requiredNameSet = createRequiredNameSet()

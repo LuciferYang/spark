@@ -26,9 +26,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
-import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column,
-  SupportsPartitionManagement, SupportsRead, SupportsWrite,
-  Table, TableCapability}
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column, MetadataColumn, SupportsMetadataColumns, SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.expressions.filter.{AlwaysTrue, Predicate}
@@ -40,7 +38,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.streaming.runtime.MetadataLogFileIndex
 import org.apache.spark.sql.execution.streaming.sinks.FileStreamSink
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.{DataType, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.util.SchemaUtils
 import org.apache.spark.util.ArrayImplicits._
@@ -51,7 +49,7 @@ abstract class FileTable(
     paths: Seq[String],
     userSpecifiedSchema: Option[StructType])
   extends Table with SupportsRead with SupportsWrite
-    with SupportsPartitionManagement {
+    with SupportsPartitionManagement with SupportsMetadataColumns {
 
   import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
@@ -223,6 +221,21 @@ abstract class FileTable(
   override def properties: util.Map[String, String] = options.asCaseSensitiveMap
 
   override def capabilities: java.util.Set[TableCapability] = FileTable.CAPABILITIES
+
+  /**
+   * Exposes the `_metadata` struct column so V2 file scans match V1 parity for queries
+   * that reference `_metadata.*`. Formats override [[metadataSchemaFields]] to add
+   * format-specific sub-fields.
+   */
+  override def metadataColumns(): Array[MetadataColumn] = {
+    Array(FileMetadataColumn(FileFormat.METADATA_NAME, StructType(metadataSchemaFields)))
+  }
+
+  /**
+   * Sub-fields of the `_metadata` struct. Defaults to [[FileFormat.BASE_METADATA_FIELDS]];
+   * formats can override to expose more (e.g., Parquet's `row_index`, tracked in SPARK-56371).
+   */
+  protected def metadataSchemaFields: Seq[StructField] = FileFormat.BASE_METADATA_FIELDS
 
   /**
    * When possible, this method should return the schema of the given `files`.  When the format

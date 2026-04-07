@@ -26,7 +26,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.internal.LogKeys.{PATH, REASON}
 import org.apache.spark.internal.config.IO_WARNING_LARGEFILETHRESHOLD
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.SQLConfHelper
+import org.apache.spark.sql.catalyst.{FileSourceOptions, SQLConfHelper}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, ExpressionSet}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
@@ -75,6 +75,34 @@ trait FileScan extends Scan
   def readPartitionSchema: StructType
 
   def options: CaseInsensitiveStringMap
+
+  /**
+   * The pruned `_metadata` struct requested by the query, or empty if the query does not
+   * reference any metadata columns. Concrete scans typically receive this from their
+   * [[FileScanBuilder]] as a constructor argument and pass it to
+   * [[wrapWithMetadataIfNeeded]].
+   */
+  def requestedMetadataFields: StructType = StructType(Seq.empty)
+
+  /**
+   * Wraps the given [[FilePartitionReaderFactory]] with a metadata-appending decorator
+   * when the query references `_metadata.*`; otherwise returns `delegate` unchanged.
+   * `options` is forwarded to the wrapper so it can honor `ignoreCorruptFiles` /
+   * `ignoreMissingFiles` settings on the per-partition reader.
+   */
+  protected def wrapWithMetadataIfNeeded(
+      delegate: FilePartitionReaderFactory,
+      options: CaseInsensitiveStringMap): FilePartitionReaderFactory = {
+    if (requestedMetadataFields.isEmpty) {
+      delegate
+    } else {
+      new MetadataAppendingFilePartitionReaderFactory(
+        delegate,
+        new FileSourceOptions(options.asCaseSensitiveMap.asScala.toMap),
+        requestedMetadataFields,
+        FileFormat.BASE_METADATA_EXTRACTORS)
+    }
+  }
 
   /**
    * Returns the filters that can be use for partition pruning
@@ -183,12 +211,21 @@ trait FileScan extends Scan
       "PartitionFilters" -> seqToString(partitionFilters),
       "DataFilters" -> seqToString(dataFilters),
       "Location" -> locationDesc)
-    if (bucketedScan) {
+    val withBucket = if (bucketedScan) {
       base ++ Map(
         "BucketSpec" -> bucketSpec.get.toString,
         "BucketedScan" -> "true")
     } else {
       base
+    }
+    if (requestedMetadataFields.isEmpty) {
+      withBucket
+    } else {
+      // Surface the pruned `_metadata` sub-fields in EXPLAIN so users can confirm the
+      // scan is honoring their `_metadata.*` references.
+      val metaDesc =
+        s"[${FileFormat.METADATA_NAME}: ${requestedMetadataFields.catalogString}]"
+      withBucket + ("MetadataColumns" -> metaDesc)
     }
   }
 
@@ -321,8 +358,17 @@ trait FileScan extends Scan
       options.asCaseSensitiveMap.asScala.toMap)
   }
 
-  override def readSchema(): StructType =
-    StructType(readDataSchema.fields ++ readPartitionSchema.fields)
+  override def readSchema(): StructType = {
+    val base = StructType(readDataSchema.fields ++ readPartitionSchema.fields)
+    if (requestedMetadataFields.isEmpty) {
+      base
+    } else {
+      // Re-expose the pruned `_metadata` struct so V2 column pushdown can bind the
+      // downstream attribute reference back to the scan output. The wrapped reader
+      // factory is responsible for actually materializing the metadata values.
+      base.add(FileFormat.METADATA_NAME, requestedMetadataFields, nullable = false)
+    }
+  }
 
   // Returns whether the two given arrays of [[Filter]]s are equivalent.
   protected def equivalentFilters(a: Array[Filter], b: Array[Filter]): Boolean = {

@@ -45,7 +45,8 @@ case class TextScan(
     override val bucketSpec: Option[BucketSpec] = None,
     override val disableBucketedScan: Boolean = false,
     override val optionalBucketSet: Option[BitSet] = None,
-    override val optionalNumCoalescedBuckets: Option[Int] = None)
+    override val optionalNumCoalescedBuckets: Option[Int] = None,
+    override val requestedMetadataFields: StructType = StructType(Seq.empty))
   extends TextBasedFileScan(sparkSession, options) {
 
   private val optionsAsScala = options.asScala.toMap
@@ -72,15 +73,14 @@ case class TextScan(
 
   override def createReaderFactory(): PartitionReaderFactory = {
     verifyReadSchema(readDataSchema)
-    val hadoopConf = {
-      val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
-      // Hadoop Configurations are case sensitive.
-      sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
-    }
+    val caseSensitiveMap = options.asCaseSensitiveMap.asScala.toMap
+    // Hadoop Configurations are case sensitive.
+    val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(caseSensitiveMap)
     val broadcastedConf =
       SerializableConfiguration.broadcast(sparkSession.sparkContext, hadoopConf)
-    TextPartitionReaderFactory(conf, broadcastedConf, readDataSchema,
+    val baseFactory = TextPartitionReaderFactory(conf, broadcastedConf, readDataSchema,
       readPartitionSchema, textOptions)
+    wrapWithMetadataIfNeeded(baseFactory, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

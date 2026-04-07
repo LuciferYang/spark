@@ -123,6 +123,7 @@ case class ParquetScanBuilder(
     ParquetScan(sparkSession, hadoopConf, fileIndex, dataSchema, finalSchema,
       readPartitionSchema(), pushedDataFilters, options, pushedAggregations,
       partitionFilters, dataFilters, pushedVariantExtractions,
-      bucketSpec = bucketSpec, optionalBucketSet = optBucketSet)
+      bucketSpec = bucketSpec, optionalBucketSet = optBucketSet,
+      requestedMetadataFields = requestedMetadataFields)
   }
 }

@@ -52,7 +52,9 @@ case class OrcScan(
     override val bucketSpec: Option[BucketSpec] = None,
     override val disableBucketedScan: Boolean = false,
     override val optionalBucketSet: Option[BitSet] = None,
-    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
+    override val optionalNumCoalescedBuckets: Option[Int] = None,
+    override val requestedMetadataFields: StructType = StructType(Seq.empty))
+  extends FileScan {
   override def isSplitable(path: Path): Boolean = {
     // If aggregate is pushed down, only the file footer will be read once,
     // so file should not be split across multiple tasks.
@@ -79,9 +81,10 @@ case class OrcScan(
     }
     // The partition values are already truncated in `FileScan.partitions`.
     // We should use `readPartitionSchema` as the partition schema here.
-    OrcPartitionReaderFactory(conf, broadcastedConf,
+    val baseFactory = OrcPartitionReaderFactory(conf, broadcastedConf,
       dataSchema, readDataSchema, readPartitionSchema, pushedFilters, pushedAggregate,
       new OrcOptions(options.asScala.toMap, conf), memoryMode)
+    wrapWithMetadataIfNeeded(baseFactory, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

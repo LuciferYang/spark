@@ -36,6 +36,7 @@ case class TextScanBuilder(
   override def build(): TextScan = {
     val optBucketSet = computeBucketSet()
     TextScan(sparkSession, fileIndex, dataSchema, readDataSchema(), readPartitionSchema(), options,
-      partitionFilters, dataFilters, bucketSpec = bucketSpec, optionalBucketSet = optBucketSet)
+      partitionFilters, dataFilters, bucketSpec = bucketSpec, optionalBucketSet = optBucketSet,
+      requestedMetadataFields = requestedMetadataFields)
   }
 }

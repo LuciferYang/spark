@@ -54,7 +54,9 @@ case class ParquetScan(
     override val bucketSpec: Option[BucketSpec] = None,
     override val disableBucketedScan: Boolean = false,
     override val optionalBucketSet: Option[BitSet] = None,
-    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
+    override val optionalNumCoalescedBuckets: Option[Int] = None,
+    override val requestedMetadataFields: StructType = StructType(Seq.empty))
+  extends FileScan {
   override def isSplitable(path: Path): Boolean = {
     // If aggregate is pushed down, only the file footer will be read once,
     // so file should not be split across multiple tasks.
@@ -173,7 +175,7 @@ case class ParquetScan(
 
     val broadcastedConf =
       SerializableConfiguration.broadcast(sparkSession.sparkContext, hadoopConf)
-    ParquetPartitionReaderFactory(
+    val baseFactory = ParquetPartitionReaderFactory(
       conf,
       broadcastedConf,
       dataSchema,
@@ -182,6 +184,7 @@ case class ParquetScan(
       pushedFilters,
       pushedAggregate,
       new ParquetOptions(options.asCaseSensitiveMap.asScala.toMap, conf))
+    wrapWithMetadataIfNeeded(baseFactory, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

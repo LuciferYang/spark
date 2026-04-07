@@ -47,7 +47,9 @@ case class AvroScan(
     override val bucketSpec: Option[BucketSpec] = None,
     override val disableBucketedScan: Boolean = false,
     override val optionalBucketSet: Option[BitSet] = None,
-    override val optionalNumCoalescedBuckets: Option[Int] = None) extends FileScan {
+    override val optionalNumCoalescedBuckets: Option[Int] = None,
+    override val requestedMetadataFields: StructType = StructType(Seq.empty))
+  extends FileScan {
   override def isSplitable(path: Path): Boolean = true
 
   override def createReaderFactory(): PartitionReaderFactory = {
@@ -58,7 +60,7 @@ case class AvroScan(
     val parsedOptions = new AvroOptions(caseSensitiveMap, hadoopConf)
     // The partition values are already truncated in `FileScan.partitions`.
     // We should use `readPartitionSchema` as the partition schema here.
-    AvroPartitionReaderFactory(
+    val baseFactory = AvroPartitionReaderFactory(
       conf,
       broadcastedConf,
       dataSchema,
@@ -66,6 +68,7 @@ case class AvroScan(
       readPartitionSchema,
       parsedOptions,
       pushedFilters.toImmutableArraySeq)
+    wrapWithMetadataIfNeeded(baseFactory, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {
