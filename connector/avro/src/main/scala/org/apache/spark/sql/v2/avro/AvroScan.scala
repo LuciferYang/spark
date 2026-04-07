@@ -68,7 +68,7 @@ case class AvroScan(
       readPartitionSchema,
       parsedOptions,
       pushedFilters.toImmutableArraySeq)
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, readDataSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

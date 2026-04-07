@@ -84,7 +84,7 @@ case class OrcScan(
     val baseFactory = OrcPartitionReaderFactory(conf, broadcastedConf,
       dataSchema, readDataSchema, readPartitionSchema, pushedFilters, pushedAggregate,
       new OrcOptions(options.asScala.toMap, conf), memoryMode)
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, readDataSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

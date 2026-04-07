@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.FileStatus
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.FileFormat
-import org.apache.spark.sql.execution.datasources.parquet.ParquetUtils
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetUtils}
 import org.apache.spark.sql.execution.datasources.v2.FileTable
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -72,4 +72,11 @@ case class ParquetTable(
   }
 
   override def formatName: String = "Parquet"
+
+  // [SPARK-56371] Expose the Parquet-specific generated `row_index` field on the V2
+  // `_metadata` struct, mirroring V1 `ParquetFileFormat.metadataSchemaFields`. The field
+  // is backed by the internal `_tmp_metadata_row_index` column that the Parquet reader
+  // populates per row via `ParquetRowIndexUtil`.
+  override protected def metadataSchemaFields: Seq[StructField] =
+    super.metadataSchemaFields :+ ParquetFileFormat.ROW_INDEX_FIELD
 }

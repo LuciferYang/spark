@@ -184,7 +184,7 @@ case class ParquetScan(
       pushedFilters,
       pushedAggregate,
       new ParquetOptions(options.asCaseSensitiveMap.asScala.toMap, conf))
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, effectiveSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

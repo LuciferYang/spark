@@ -80,7 +80,7 @@ case class TextScan(
       SerializableConfiguration.broadcast(sparkSession.sparkContext, hadoopConf)
     val baseFactory = TextPartitionReaderFactory(conf, broadcastedConf, readDataSchema,
       readPartitionSchema, textOptions)
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, readDataSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

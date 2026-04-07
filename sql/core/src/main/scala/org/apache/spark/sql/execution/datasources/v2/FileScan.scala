@@ -28,7 +28,7 @@ import org.apache.spark.internal.config.IO_WARNING_LARGEFILETHRESHOLD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{FileSourceOptions, SQLConfHelper}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, ExpressionSet}
+import org.apache.spark.sql.catalyst.expressions.{AttributeSet, Expression, ExpressionSet, FileSourceGeneratedMetadataStructField}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
@@ -87,11 +87,13 @@ trait FileScan extends Scan
   /**
    * Wraps the given [[FilePartitionReaderFactory]] with a metadata-appending decorator
    * when the query references `_metadata.*`; otherwise returns `delegate` unchanged.
-   * `options` is forwarded to the wrapper so it can honor `ignoreCorruptFiles` /
-   * `ignoreMissingFiles` settings on the per-partition reader.
+   * `options` is forwarded so the wrapper can honor `ignoreCorruptFiles` /
+   * `ignoreMissingFiles`. `readDataSchema` is forwarded so the wrapper can locate
+   * (and project out) any internal columns appended for generated metadata sub-fields.
    */
   protected def wrapWithMetadataIfNeeded(
       delegate: FilePartitionReaderFactory,
+      readDataSchema: StructType,
       options: CaseInsensitiveStringMap): FilePartitionReaderFactory = {
     if (requestedMetadataFields.isEmpty) {
       delegate
@@ -100,6 +102,8 @@ trait FileScan extends Scan
         delegate,
         new FileSourceOptions(options.asCaseSensitiveMap.asScala.toMap),
         requestedMetadataFields,
+        readDataSchema,
+        readPartitionSchema,
         FileFormat.BASE_METADATA_EXTRACTORS)
     }
   }
@@ -205,9 +209,18 @@ trait FileScan extends Scan
     val locationDesc =
       fileIndex.getClass.getSimpleName +
         Utils.buildLocationMetadata(fileIndex.rootPaths, maxMetadataValueLength)
+    // Hide internal columns (e.g. Parquet's `_tmp_metadata_row_index`) from EXPLAIN's
+    // ReadSchema entry. They live in `readDataSchema` so the format reader populates
+    // them, but they are wrapper-internal and should not surface in user-facing plans.
+    val internalNames = requestedMetadataFields.fields.collect {
+      case FileSourceGeneratedMetadataStructField(_, internalName) => internalName
+    }.toSet
+    val visibleReadSchema =
+      if (internalNames.isEmpty) readDataSchema
+      else StructType(readDataSchema.fields.filterNot(f => internalNames.contains(f.name)))
     val base = Map(
       "Format" -> s"${this.getClass.getSimpleName.replace("Scan", "").toLowerCase(Locale.ROOT)}",
-      "ReadSchema" -> readDataSchema.catalogString,
+      "ReadSchema" -> visibleReadSchema.catalogString,
       "PartitionFilters" -> seqToString(partitionFilters),
       "DataFilters" -> seqToString(dataFilters),
       "Location" -> locationDesc)
@@ -359,7 +372,16 @@ trait FileScan extends Scan
   }
 
   override def readSchema(): StructType = {
-    val base = StructType(readDataSchema.fields ++ readPartitionSchema.fields)
+    // [SPARK-56371] Hide internal columns added for generated metadata sub-fields
+    // (e.g., Parquet's `_tmp_metadata_row_index`). They live inside `readDataSchema` so
+    // the format reader populates them, but they must not appear in the user-visible
+    // scan output: V2's `PushDownUtils.toOutputAttrs` looks them up by name in the
+    // relation output and would fail (the internal name is not a real column).
+    val internalNames = requestedMetadataFields.fields.collect {
+      case FileSourceGeneratedMetadataStructField(_, internalName) => internalName
+    }.toSet
+    val visibleData = readDataSchema.fields.filterNot(f => internalNames.contains(f.name))
+    val base = StructType(visibleData ++ readPartitionSchema.fields)
     if (requestedMetadataFields.isEmpty) {
       base
     } else {

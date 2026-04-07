@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.apache.spark.sql.{sources, SparkSession}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
-import org.apache.spark.sql.catalyst.expressions.{Expression, PythonUDF, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Expression, FileSourceGeneratedMetadataStructField, PythonUDF, SubqueryExpression}
 import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.read.{ScanBuilder, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, DataSourceUtils, FileFormat, FileSourceStrategy, PartitioningAwareFileIndex, PartitioningUtils}
@@ -57,11 +57,31 @@ abstract class FileScanBuilder(
     // [SPARK-56335] Extract the `_metadata` struct (if present) so the format-specific
     // scan can wrap its reader factory with metadata appending. The `_metadata` field is
     // removed from `this.requiredSchema` so it does not leak into `readDataSchema`.
+    //
+    // [SPARK-56371] When the metadata struct contains generated sub-fields (e.g.
+    // Parquet's `row_index` backed by `_tmp_metadata_row_index`), append the
+    // corresponding internal columns to `this.requiredSchema` so the format reader
+    // populates them. The metadata wrapper later projects them out of the visible
+    // output and weaves their values into the `_metadata` struct. Only formats that
+    // enable nested schema pruning currently surface generated metadata fields,
+    // because `readDataSchema()` reads from `requiredSchema` only on the nested path;
+    // the non-nested path filters from `dataSchema` and would silently drop the
+    // appended internal columns. Today only Parquet declares generated metadata
+    // fields, so this limitation is not reachable in practice.
     val (metaFields, dataFields) = requiredSchema.fields.partition(isMetadataField)
-    this.requestedMetadataFields = metaFields.headOption
+    val metaStruct = metaFields.headOption
       .map(_.dataType.asInstanceOf[StructType])
       .getOrElse(StructType(Seq.empty))
-    this.requiredSchema = StructType(dataFields)
+    this.requestedMetadataFields = metaStruct
+    // Internal columns must be nullable so the Parquet reader treats them as
+    // synthetic columns (added to `missingColumns`) instead of failing the
+    // required-column check in `VectorizedParquetRecordReader.checkColumn`. The
+    // wrapper restores the user-facing nullability inside the `_metadata` struct.
+    val internalCols = metaStruct.fields.collect {
+      case FileSourceGeneratedMetadataStructField(field, internalName) =>
+        StructField(internalName, field.dataType, nullable = true)
+    }
+    this.requiredSchema = StructType(dataFields ++ internalCols)
   }
 
   private def isMetadataField(field: StructField): Boolean =

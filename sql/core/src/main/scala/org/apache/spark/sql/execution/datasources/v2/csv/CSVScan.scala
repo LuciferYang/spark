@@ -97,7 +97,7 @@ case class CSVScan(
     val baseFactory = CSVPartitionReaderFactory(conf, broadcastedConf,
       dataSchema, readDataSchema, readPartitionSchema, parsedOptions,
       actualFilters.toImmutableArraySeq)
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, readDataSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {

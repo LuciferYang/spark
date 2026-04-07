@@ -90,7 +90,7 @@ case class JsonScan(
     val baseFactory = JsonPartitionReaderFactory(conf, broadcastedConf,
       dataSchema, readDataSchema, readPartitionSchema, parsedOptions,
       pushedFilters.toImmutableArraySeq)
-    wrapWithMetadataIfNeeded(baseFactory, options)
+    wrapWithMetadataIfNeeded(baseFactory, readDataSchema, options)
   }
 
   override def equals(obj: Any): Boolean = obj match {
