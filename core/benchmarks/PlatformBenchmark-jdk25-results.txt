@@ -3,13 +3,13 @@ Platform Byte Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Byte Access:                              Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putByte: On-heap                                     63             63           0       1593.3           0.6       1.0X
-putByte: Off-heap                                    40             40           0       2498.0           0.4       1.6X
-getByte: On-heap                                     67             67           0       1501.8           0.7       0.9X
-getByte: Off-heap                                    54             54           0       1867.2           0.5       1.2X
+putByte: On-heap                                     71             71           1       1413.8           0.7       1.0X
+putByte: Off-heap                                    45             45           0       2210.7           0.5       1.6X
+getByte: On-heap                                     75             75           0       1328.9           0.8       0.9X
+getByte: Off-heap                                    62             62           0       1610.8           0.6       1.1X
 
 
 ================================================================================================
@@ -17,13 +17,13 @@ Platform Short Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Short Access:                             Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putShort: On-heap                                    70             71           0       1419.0           0.7       1.0X
-putShort: Off-heap                                   50             50           0       2006.2           0.5       1.4X
-getShort: On-heap                                   104            105           1        959.2           1.0       0.7X
-getShort: Off-heap                                   61             61           0       1646.2           0.6       1.2X
+putShort: On-heap                                    79             80           0       1258.6           0.8       1.0X
+putShort: Off-heap                                   56             56           0       1783.0           0.6       1.4X
+getShort: On-heap                                   118            118           0        849.9           1.2       0.7X
+getShort: Off-heap                                   69             69           1       1455.9           0.7       1.2X
 
 
 ================================================================================================
@@ -31,13 +31,13 @@ Platform Int Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Int Access:                               Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putInt: On-heap                                      92             92           0       1084.0           0.9       1.0X
-putInt: Off-heap                                     50             50           0       1991.2           0.5       1.8X
-getInt: On-heap                                      94             94           0       1067.9           0.9       1.0X
-getInt: Off-heap                                     56             56           0       1781.4           0.6       1.6X
+putInt: On-heap                                     104            104           0        960.9           1.0       1.0X
+putInt: Off-heap                                     56             57           4       1780.7           0.6       1.9X
+getInt: On-heap                                     106            106           1        947.2           1.1       1.0X
+getInt: Off-heap                                     62             62           0       1610.4           0.6       1.7X
 
 
 ================================================================================================
@@ -45,13 +45,13 @@ Platform Long Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Long Access:                              Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putLong: On-heap                                     64             65           0       1554.1           0.6       1.0X
-putLong: Off-heap                                    41             42           1       2468.8           0.4       1.6X
-getLong: On-heap                                     65             65           0       1546.0           0.6       1.0X
-getLong: Off-heap                                    57             57           0       1766.5           0.6       1.1X
+putLong: On-heap                                     71             71           0       1408.4           0.7       1.0X
+putLong: Off-heap                                    40             40           0       2482.6           0.4       1.8X
+getLong: On-heap                                     71             71           0       1405.7           0.7       1.0X
+getLong: Off-heap                                    62             62           0       1613.3           0.6       1.1X
 
 
 ================================================================================================
@@ -59,13 +59,13 @@ Platform Float Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Float Access:                             Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putFloat: On-heap                                    71             71           0       1417.7           0.7       1.0X
-putFloat: Off-heap                                   55             55           0       1809.8           0.6       1.3X
-getFloat: On-heap                                    94             94           0       1066.8           0.9       0.8X
-getFloat: Off-heap                                   94             94           0       1067.1           0.9       0.8X
+putFloat: On-heap                                    80             80           0       1256.4           0.8       1.0X
+putFloat: Off-heap                                   62             62           0       1614.4           0.6       1.3X
+getFloat: On-heap                                   106            106           0        945.3           1.1       0.8X
+getFloat: Off-heap                                  106            106           0        945.7           1.1       0.8X
 
 
 ================================================================================================
@@ -73,13 +73,13 @@ Platform Double Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Double Access:                            Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putDouble: On-heap                                   72             73           6       1393.4           0.7       1.0X
-putDouble: Off-heap                                  57             57           1       1760.1           0.6       1.3X
-getDouble: On-heap                                   95             95           0       1051.9           1.0       0.8X
-getDouble: Off-heap                                  95             95           0       1055.3           0.9       0.8X
+putDouble: On-heap                                   80             80           0       1254.7           0.8       1.0X
+putDouble: Off-heap                                  62             62           0       1608.2           0.6       1.3X
+getDouble: On-heap                                  106            106           0        944.5           1.1       0.8X
+getDouble: Off-heap                                 106            106           0        944.7           1.1       0.8X
 
 
 ================================================================================================
@@ -87,13 +87,13 @@ Platform Boolean Access
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Boolean Access:                           Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-putBoolean: On-heap                                 122            122           0        819.2           1.2       1.0X
-putBoolean: Off-heap                                 62             62           0       1620.6           0.6       2.0X
-getBoolean: On-heap                                  80             80           0       1245.0           0.8       1.5X
-getBoolean: Off-heap                                 63             63           0       1592.1           0.6       1.9X
+putBoolean: On-heap                                 138            138           0        726.5           1.4       1.0X
+putBoolean: Off-heap                                 70             70           0       1435.7           0.7       2.0X
+getBoolean: On-heap                                  91             92           4       1098.7           0.9       1.5X
+getBoolean: Off-heap                                 71             71           1       1411.1           0.7       1.9X
 
 
 ================================================================================================
@@ -101,16 +101,16 @@ Platform Bulk Operations 4k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 4k Ints:                  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                      0              0           0          5.7         175.3       1.0X
-copyMemory: Heap -> Off-heap                          0              0           0          5.7         176.4       1.0X
-copyMemory: Off-heap -> Heap                          0              0           0          4.0         249.4       0.7X
-copyMemory: Heap -> Heap                              0              0           0          3.9         254.5       0.7X
-manual: Heap -> Heap                                  0              0           0          5.9         168.3       1.0X
-manual: Off-heap -> Heap                              0              0           0          3.1         327.5       0.5X
-setMemory: Off-heap                                   0              0           0          3.1         322.6       0.5X
+copyMemory: Off-heap -> Off-heap                      0              0           0          5.0         201.3       1.0X
+copyMemory: Heap -> Off-heap                          0              0           0          5.0         199.3       1.0X
+copyMemory: Off-heap -> Heap                          0              0           0          5.1         196.2       1.0X
+copyMemory: Heap -> Heap                              0              0           0          4.1         244.4       0.8X
+manual: Heap -> Heap                                  0              0           0          5.2         191.2       1.1X
+manual: Off-heap -> Heap                              0              0           0          2.7         366.6       0.5X
+setMemory: Off-heap                                   0              0           0          2.8         360.5       0.6X
 
 
 ================================================================================================
@@ -118,16 +118,16 @@ Platform Bulk Operations 16k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 16k Ints:                 Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                      0              0           0          0.8        1315.4       1.0X
-copyMemory: Heap -> Off-heap                          0              0           0          0.8        1292.4       1.0X
-copyMemory: Off-heap -> Heap                          0              0           0          0.8        1293.4       1.0X
-copyMemory: Heap -> Heap                              0              0           0          0.8        1320.5       1.0X
-manual: Heap -> Heap                                  0              0           0          0.6        1679.1       0.8X
-manual: Off-heap -> Heap                              0              0           0          0.8        1301.4       1.0X
-setMemory: Off-heap                                   0              0           0          0.8        1288.4       1.0X
+copyMemory: Off-heap -> Off-heap                      0              0           0          0.7        1454.1       1.0X
+copyMemory: Heap -> Off-heap                          0              0           0          0.7        1481.3       1.0X
+copyMemory: Off-heap -> Heap                          0              0           0          0.6        1579.3       0.9X
+copyMemory: Heap -> Heap                              0              0           0          0.7        1531.3       0.9X
+manual: Heap -> Heap                                  0              0           0          0.7        1451.2       1.0X
+manual: Off-heap -> Heap                              0              0           0          0.7        1447.1       1.0X
+setMemory: Off-heap                                   0              0           0          0.7        1451.1       1.0X
 
 
 ================================================================================================
@@ -135,16 +135,16 @@ Platform Bulk Operations 256k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 256k Ints:                Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                      0              0           0          0.0       35223.0       1.0X
-copyMemory: Heap -> Off-heap                          0              0           0          0.0       34076.9       1.0X
-copyMemory: Off-heap -> Heap                          0              0           0          0.0       34159.0       1.0X
-copyMemory: Heap -> Heap                              0              0           0          0.0       33940.6       1.0X
-manual: Heap -> Heap                                  0              0           0          0.0       34085.9       1.0X
-manual: Off-heap -> Heap                              0              0           0          0.0       34147.0       1.0X
-setMemory: Off-heap                                   0              0           0          0.0       20794.0       1.7X
+copyMemory: Off-heap -> Off-heap                      0              0           0          0.0       29779.7       1.0X
+copyMemory: Heap -> Off-heap                          0              0           0          0.0       31104.8       1.0X
+copyMemory: Off-heap -> Heap                          0              0           0          0.0       31440.1       0.9X
+copyMemory: Heap -> Heap                              0              0           0          0.0       31432.2       0.9X
+manual: Heap -> Heap                                  0              0           0          0.0       31684.7       0.9X
+manual: Off-heap -> Heap                              0              0           0          0.0       30414.7       1.0X
+setMemory: Off-heap                                   0              0           0          0.0       23921.9       1.2X
 
 
 ================================================================================================
@@ -152,16 +152,16 @@ Platform Bulk Operations 1m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 1m Ints:                  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                      1              1           0          0.0      137385.5       1.0X
-copyMemory: Heap -> Off-heap                          1              1           0          0.0      137189.2       1.0X
-copyMemory: Off-heap -> Heap                          1              1           0          0.0      136840.6       1.0X
-copyMemory: Heap -> Heap                              1              1           0          0.0      137013.3       1.0X
-manual: Heap -> Heap                                  1              1           0          0.0      137384.7       1.0X
-manual: Off-heap -> Heap                              1              1           0          0.0      137039.0       1.0X
-setMemory: Off-heap                                   1              1           0          0.0       82021.9       1.7X
+copyMemory: Off-heap -> Off-heap                      1              1           0          0.0      128710.5       1.0X
+copyMemory: Heap -> Off-heap                          1              1           0          0.0      129099.1       1.0X
+copyMemory: Off-heap -> Heap                          1              1           0          0.0      130229.7       1.0X
+copyMemory: Heap -> Heap                              1              1           0          0.0      128593.8       1.0X
+manual: Heap -> Heap                                  1              1           0          0.0      121252.3       1.1X
+manual: Off-heap -> Heap                              1              1           0          0.0      123112.0       1.0X
+setMemory: Off-heap                                   1              1           0          0.0       91728.8       1.4X
 
 
 ================================================================================================
@@ -169,16 +169,16 @@ Platform Bulk Operations 8m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 8m Ints:                  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                     13             14           0          0.0     1316216.4       1.0X
-copyMemory: Heap -> Off-heap                         17             18           1          0.0     1692491.3       0.8X
-copyMemory: Off-heap -> Heap                         17             18           0          0.0     1703724.4       0.8X
-copyMemory: Heap -> Heap                             17             18           0          0.0     1715463.5       0.8X
-manual: Heap -> Heap                                 17             18           0          0.0     1691247.6       0.8X
-manual: Off-heap -> Heap                             17             18           1          0.0     1702482.0       0.8X
-setMemory: Off-heap                                  12             14           1          0.0     1179941.1       1.1X
+copyMemory: Off-heap -> Off-heap                     15             16           0          0.0     1520932.5       1.0X
+copyMemory: Heap -> Off-heap                         15             16           0          0.0     1536985.6       1.0X
+copyMemory: Off-heap -> Heap                         16             17           0          0.0     1606782.4       0.9X
+copyMemory: Heap -> Heap                             16             17           0          0.0     1588407.9       1.0X
+manual: Heap -> Heap                                 15             16           1          0.0     1538555.9       1.0X
+manual: Off-heap -> Heap                             16             17           0          0.0     1601984.3       0.9X
+setMemory: Off-heap                                   9              9           0          0.0      880641.2       1.7X
 
 
 ================================================================================================
@@ -186,16 +186,16 @@ Platform Bulk Operations 32m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Bulk Operations 32m Ints:                 Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-copyMemory: Off-heap -> Off-heap                     79             81           2          0.0     7932222.3       1.0X
-copyMemory: Heap -> Off-heap                         88             91           2          0.0     8809759.2       0.9X
-copyMemory: Off-heap -> Heap                         89             92           2          0.0     8853841.0       0.9X
-copyMemory: Heap -> Heap                             85             88           2          0.0     8477909.9       0.9X
-manual: Heap -> Heap                                 86             89           2          0.0     8563498.7       0.9X
-manual: Off-heap -> Heap                             87             91           2          0.0     8733879.5       0.9X
-setMemory: Off-heap                                  64             66           1          0.0     6354133.4       1.2X
+copyMemory: Off-heap -> Off-heap                     71             72           1          0.0     7123867.5       1.0X
+copyMemory: Heap -> Off-heap                         78             80           1          0.0     7828125.4       0.9X
+copyMemory: Off-heap -> Heap                         80             82           1          0.0     8027600.1       0.9X
+copyMemory: Heap -> Heap                             76             78           2          0.0     7568639.5       0.9X
+manual: Heap -> Heap                                 72             76           2          0.0     7219817.4       1.0X
+manual: Off-heap -> Heap                             73             75           2          0.0     7314742.6       1.0X
+setMemory: Off-heap                                  39             40           1          0.0     3882752.8       1.8X
 
 
 ================================================================================================
@@ -203,12 +203,12 @@ Platform Memory Allocation 4k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 4k Ints:                Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0      50000.0           0.0       1.0X
-freeMemory                                            0              0           0      50000.0           0.0       1.0X
-reallocateMemory: double in size                      0              0           0       8000.0           0.1       0.2X
+allocateMemory                                        0              0           0      66666.7           0.0       1.0X
+freeMemory                                            0              0           0      50000.0           0.0       0.8X
+reallocateMemory: double in size                      0              0           0       6666.7           0.2       0.1X
 
 
 ================================================================================================
@@ -216,12 +216,12 @@ Platform Memory Allocation 16k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 16k Ints:               Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0      40816.3           0.0       1.0X
-freeMemory                                            0              0           0      50000.0           0.0       1.2X
-reallocateMemory: double in size                      0              0           0       1457.7           0.7       0.0X
+allocateMemory                                        0              0           0      40000.0           0.0       1.0X
+freeMemory                                            0              0           0      50000.0           0.0       1.3X
+reallocateMemory: double in size                      0              0           0       1256.3           0.8       0.0X
 
 
 ================================================================================================
@@ -229,12 +229,12 @@ Platform Memory Allocation 256k Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 256k Ints:              Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0      40816.3           0.0       1.0X
-freeMemory                                            0              0           0      50000.0           0.0       1.2X
-reallocateMemory: double in size                      0              0           0         67.3          14.9       0.0X
+allocateMemory                                        0              0           0      40000.0           0.0       1.0X
+freeMemory                                            0              0           0      50000.0           0.0       1.3X
+reallocateMemory: double in size                      0              0           0         58.1          17.2       0.0X
 
 
 ================================================================================================
@@ -242,12 +242,12 @@ Platform Memory Allocation 1m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 1m Ints:                Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0      50000.0           0.0       1.0X
-freeMemory                                            0              0           0      50000.0           0.0       1.0X
-reallocateMemory: double in size                      0              0           0         17.8          56.3       0.0X
+allocateMemory                                        0              0           0      40000.0           0.0       1.0X
+freeMemory                                            0              0           0      50000.0           0.0       1.3X
+reallocateMemory: double in size                      0              0           0         15.6          64.0       0.0X
 
 
 ================================================================================================
@@ -255,12 +255,12 @@ Platform Memory Allocation 8m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 8m Ints:                Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0        548.4           1.8       1.0X
-freeMemory                                            0              0           0        363.0           2.8       0.7X
-reallocateMemory: double in size                      2              2           0          0.9        1109.6       0.0X
+allocateMemory                                        0              0           0        469.9           2.1       1.0X
+freeMemory                                            0              0           0        346.1           2.9       0.7X
+reallocateMemory: double in size                      2              2           0          1.0         979.6       0.0X
 
 
 ================================================================================================
@@ -268,11 +268,11 @@ Platform Memory Allocation 32m Ints
 ================================================================================================
 
 OpenJDK 64-Bit Server VM 25.0.2+10-LTS on Linux 6.17.0-1008-azure
-AMD EPYC 7763 64-Core Processor
+AMD EPYC 9V74 80-Core Processor
 Memory Allocation 32m Ints:               Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-allocateMemory                                        0              0           0        490.4           2.0       1.0X
-freeMemory                                            0              0           0        306.2           3.3       0.6X
-reallocateMemory: double in size                     11             11           0          0.2        5500.1       0.0X
+allocateMemory                                        0              0           0        468.8           2.1       1.0X
+freeMemory                                            0              0           0        295.0           3.4       0.6X
+reallocateMemory: double in size                      9              9           0          0.2        4491.3       0.0X
 
 
