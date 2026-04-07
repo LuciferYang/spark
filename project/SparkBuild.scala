@@ -683,11 +683,15 @@ object CommonShade {
 
   // Standard merge strategy used by every "self-shade-only" assembly. Mirrors the
   // strategy already used module-by-module so the helper produces an identical result.
+  // The `.proto` discard matches Maven's behaviour (shade plugin drops .proto files
+  // during packaging) and guards against leaking proto descriptors from a module's
+  // classpath into its dist jar.
   private val standardMergeStrategy: String => sbtassembly.MergeStrategy = {
     case m if m.toLowerCase(Locale.ROOT).endsWith("manifest.mf") => MergeStrategy.discard
     case m if m.toLowerCase(Locale.ROOT).matches("meta-inf.*\\.sf$") => MergeStrategy.discard
     case m if m.toLowerCase(Locale.ROOT).startsWith("meta-inf/services/") =>
       MergeStrategy.filterDistinctLines
+    case m if m.toLowerCase(Locale.ROOT).endsWith(".proto") => MergeStrategy.discard
     case _ => MergeStrategy.first
   }
 
@@ -722,6 +726,71 @@ object CommonShade {
     (assembly / logLevel) := Level.Info,
     (assembly / assemblyPackageScala / assembleArtifact) := false
   )
+
+  /**
+   * Rewrite an existing jar file in place, applying the given shade rules to every
+   * `.class` entry's bytecode. Non-class entries and directory entries are copied
+   * verbatim. The manifest is not modified.
+   *
+   * Used by modules where the normal `assembly` + `CopyDependencies` swap pattern
+   * cannot be used because the module's `Compile / packageBin` is already customized
+   * for another purpose (currently: `examples`, whose packageBin depends on `copyDeps`
+   * and writes straight to the dist `jars/` directory). For those modules we let
+   * packageBin run normally and then post-process the output file with this helper
+   * so the shipped jar is byte-equivalent to Maven's.
+   */
+  def shadeJarInPlace(
+      jarFile: File,
+      rules: Seq[com.eed3si9n.jarjarabrams.ShadeRule],
+      log: Logger): Unit = {
+    import java.util.jar.{JarFile, JarEntry, JarOutputStream}
+    import java.io.{FileOutputStream}
+    import com.eed3si9n.jarjarabrams.Shader
+    import scala.jdk.CollectionConverters._
+
+    if (rules.isEmpty) return
+    val bytecodeShader = Shader.bytecodeShader(rules, verbose = false, skipManifest = true)
+    val tempFile = File.createTempFile("spark-shade-", ".jar")
+    val jf = new JarFile(jarFile)
+    try {
+      val out = new JarOutputStream(new FileOutputStream(tempFile))
+      try {
+        jf.entries.asScala.foreach { entry =>
+          val in = jf.getInputStream(entry)
+          try {
+            val bytes = in.readAllBytes()
+            if (entry.isDirectory) {
+              out.putNextEntry(new JarEntry(entry.getName))
+              out.closeEntry()
+            } else if (entry.getName.endsWith(".class")) {
+              bytecodeShader(bytes, entry.getName) match {
+                case Some((newBytes, newName)) =>
+                  if (newName != entry.getName) {
+                    log.debug(s"Shaded ${entry.getName} -> $newName in ${jarFile.getName}")
+                  }
+                  out.putNextEntry(new JarEntry(newName))
+                  out.write(newBytes)
+                  out.closeEntry()
+                case None =>
+                  log.debug(s"Shade rule discarded ${entry.getName} in ${jarFile.getName}")
+              }
+            } else {
+              out.putNextEntry(new JarEntry(entry.getName))
+              out.write(bytes)
+              out.closeEntry()
+            }
+          } finally {
+            in.close()
+          }
+        }
+      } finally {
+        out.close()
+      }
+    } finally {
+      jf.close()
+    }
+    Files.move(tempFile.toPath, jarFile.toPath, StandardCopyOption.REPLACE_EXISTING)
+  }
 }
 
 object Core {
@@ -1196,7 +1265,11 @@ object SparkProtobuf {
       }
     },
 
-    (assembly / assemblyShadeRules) := Seq(
+    // No `com.google.common` imports in connector/protobuf today, so the Guava rules
+    // from `commonShadeRules` are a no-op here — but we include them defensively to
+    // mirror Maven's parent-inherited shade configuration, so that future Guava
+    // imports don't silently diverge from Maven's output.
+    (assembly / assemblyShadeRules) := CommonShade.commonShadeRules ++ Seq(
       ShadeRule.rename("com.google.protobuf.**" -> "org.sparkproject.spark_protobuf.protobuf.@1").inAll,
     ),
 
@@ -2129,7 +2202,22 @@ object CopyDependencies {
       }.value
     },
     (Compile / packageBin / crossTarget) := destPath.value,
-    (Compile / packageBin) := (Compile / packageBin).dependsOn(copyDeps).value
+    (Compile / packageBin) := {
+      val plain = (Compile / packageBin).dependsOn(copyDeps).value
+      // For the `examples` module, the jar that lands in `examples/target/scala-*/jars/`
+      // is the project's own packageBin output (written directly via crossTarget above)
+      // rather than a swap from the CopyDependencies map. `examples/src/main` has
+      // `com.google.common` imports (JavaPageRank, JavaCustomReceiver) that Maven's
+      // inherited shade plugin rewrites during `package`. We mirror that here by
+      // post-processing the plain packageBin output with the same rules.
+      // (`assembly` module has no source references to relocated packages, so this
+      // is a no-op for it — but we call the helper unconditionally and let its
+      // `rules.isEmpty` / `newName == entry.getName` short-circuits handle that.)
+      if (moduleName.value == "spark-examples") {
+        CommonShade.shadeJarInPlace(plain, CommonShade.commonShadeRules, streams.value.log)
+      }
+      plain
+    }
   )
 
 }
