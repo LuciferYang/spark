@@ -67,24 +67,30 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   }
 
   /**
-   * Checks if `PushdownPredicatesAndPruneColumnsForCTEDef` pushed divergent
-   * predicates into the CTE definition. When different CTE references have
-   * different filter predicates, the per-reference predicates are stored in
-   * `originalPlanWithPredicates`. If multiple distinct predicates exist,
-   * caching would block per-reference predicate pushdown.
+   * The previous heuristic skipped caching whenever multiple references had
+   * syntactically distinct predicates. That is too conservative:
+   * `PushdownPredicatesAndPruneColumnsForCTEDef` already combines per-reference
+   * predicates with `OR` and pushes the combined predicate into the CTE body
+   * BEFORE this rule runs (see `pushdownPredicatesAndAttributes`, which calls
+   * `newPreds.reduce(Or)` and wraps the body in a `Filter`). The per-reference
+   * filters then sit ABOVE the cache, so caching does not block pushdown.
    *
-   * This works because `CleanUpTempCTEInfo` has been moved to run AFTER
-   * this rule in `SparkOptimizer`, so `originalPlanWithPredicates` is still
-   * available.
+   * Skipping in that case actively hurts queries like TPC-DS q24a/q24b/q64
+   * where multiple references use different non-correlated filter constants:
+   * the EMR reference cluster caches them, we should too.
+   *
+   * The original concern (q1/q31/q39a regression risk noted in the design doc)
+   * is about CORRELATED outer references inside scalar subqueries: those
+   * specialise per outer row and benefit more from per-call evaluation than
+   * from a shared materialisation. Correlated references do NOT appear in
+   * `originalPlanWithPredicates._2` at all (they are not pushed down by
+   * `PushdownPredicatesAndPruneColumnsForCTEDef`), so checking that field
+   * for divergence cannot detect them in either direction. A proper
+   * correlated-reference detector belongs in a separate method; for now we
+   * accept the existing q1/q31 regression risk in exchange for getting the
+   * non-correlated case right.
    */
-  private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = {
-    cteDef.originalPlanWithPredicates match {
-      case Some((_, predicates)) if predicates.size > 1 =>
-        val hashes = predicates.map(_.semanticHash()).distinct
-        hashes.size > 1
-      case _ => false
-    }
-  }
+  private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = false
 
   /**
    * Returns true if the CTE plan contains at least one expensive operator

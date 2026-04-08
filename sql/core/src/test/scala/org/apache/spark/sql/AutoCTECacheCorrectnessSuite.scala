@@ -118,11 +118,15 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("hasDivergentPredicates: skips caching when refs have truly divergent predicates") {
+  test("hasDivergentPredicates: caches when refs have non-correlated divergent predicates") {
     prepareData()
     withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
-      // Each reference has a clearly different filter. Caching would block
-      // per-reference pushdown, so the heuristic should skip.
+      // Each reference has a different non-correlated filter. The previous
+      // heuristic skipped caching here, but `PushdownPredicatesAndPruneColumnsForCTEDef`
+      // already ORs the per-reference filters and pushes the combined predicate
+      // into the CTE body, so caching does NOT block pushdown - the per-reference
+      // filters sit above the cache. The EMR reference cluster caches q24a/q64
+      // which have exactly this shape, and we should match.
       val sql =
         """WITH cte AS (
           |  SELECT key, sum(value) as total, rand() as r
@@ -134,9 +138,10 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
           |  WHERE a.key + 100 = b.key""".stripMargin
 
       spark.sql(sql).collect()
-      assert(cachedEntries == 0,
-        "Should skip caching when references have genuinely different predicates " +
-        "so per-reference pushdown is preserved")
+      assert(cachedEntries >= 1,
+        "Should cache when references have non-correlated divergent filters; " +
+        "the OR-combined predicate is already pushed into the body, so the " +
+        "per-reference filters above the cache preserve pushdown semantics.")
     }
   }
 
@@ -187,6 +192,91 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
       assert(cachedEntries >= 1,
         "Auto-CTE should still fire when the CTE body contains a subquery that " +
         "SPARK-40193 could merge; rule ordering in SparkOptimizer must allow it")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Deterministic CTE caching tests (TPC-DS shape)
+  // ---------------------------------------------------------------------------
+  // The existing AutoCTECacheSuite uses rand() in every test query to make CTEs
+  // non-deterministic, which is the only condition that bypasses InlineCTE's
+  // unconditional deterministic-CTE inlining. Real TPC-DS queries are
+  // deterministic, so without an InlineCTE carve-out the entire feature is dead
+  // code on real workloads. These tests use deterministic CTEs to catch that
+  // regression and verify the fix.
+
+  test("deterministic multi-ref CTE with identical filters is cached") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total, count(*) as cnt
+          |  FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total, b.cnt
+          |FROM agg a JOIN agg b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "Deterministic multi-ref CTE with expensive body must be cached, " +
+        "not inlined by InlineCTE")
+    }
+  }
+
+  test("deterministic multi-ref CTE with different filters is cached (q64-shape)") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Mimics q64's cs1/cs2 self-join: same CTE referenced twice with
+      // different non-correlated filters on a group-by key.
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, col1, sum(value) as total, count(*) as cnt
+          |  FROM auto_cte_corr_test GROUP BY key, col1
+          |)
+          |SELECT a.key, a.total, b.total FROM
+          |  (SELECT key, total FROM agg WHERE col1 = 1) a
+          |  JOIN
+          |  (SELECT key, total FROM agg WHERE col1 = 2) b
+          |  ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "Deterministic multi-ref CTE with non-correlated divergent filters " +
+        "must be cached. PushdownPredicatesAndPruneColumnsForCTEDef already " +
+        "ORs the per-reference filters into the body, so caching does not " +
+        "block pushdown.")
+    }
+  }
+
+  test("nested deterministic CTE (q64-shape: outer CTE references inner CTE)") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Mimics q64's cs_ui (single-ref, inlinable) inside cross_sales
+      // (multi-ref, cache-eligible). The inner CTE should be inlined into
+      // the outer CTE's body, then the outer CTE should be cached.
+      val sql =
+        """WITH inner_cte AS (
+          |  SELECT key, col1, sum(value) as inner_total
+          |  FROM auto_cte_corr_test
+          |  GROUP BY key, col1
+          |  HAVING sum(value) > 0
+          |),
+          |outer_cte AS (
+          |  SELECT key, col1, inner_total, count(*) as outer_cnt
+          |  FROM inner_cte
+          |  GROUP BY key, col1, inner_total
+          |)
+          |SELECT a.key, a.outer_cnt, b.outer_cnt FROM
+          |  (SELECT key, outer_cnt FROM outer_cte WHERE col1 = 1) a
+          |  JOIN
+          |  (SELECT key, outer_cnt FROM outer_cte WHERE col1 = 2) b
+          |  ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "Nested CTE: inner_cte should be inlined into outer_cte, then " +
+        "outer_cte (multi-ref) should be cached. q64 has this exact shape " +
+        "with cs_ui inside cross_sales.")
     }
   }
 

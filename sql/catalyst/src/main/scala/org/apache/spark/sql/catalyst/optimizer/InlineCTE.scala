@@ -22,9 +22,10 @@ import scala.collection.mutable
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
 import org.apache.spark.sql.catalyst.expressions.{Alias, OuterReference, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.logical.{CTERelationDef, CTERelationRef, Join, JoinHint, LogicalPlan, Project, Subquery, UnionLoop, WithCTE}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, CTERelationDef, CTERelationRef, Join, JoinHint, LogicalPlan, Project, Sort, Subquery, UnionLoop, Window, WithCTE}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{CTE, PLAN_EXPRESSION}
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * Inlines CTE definitions into corresponding references if either of the conditions satisfies:
@@ -55,7 +56,21 @@ case class InlineCTE(
     }
   }
 
-  private def shouldInline(cteDef: CTERelationDef, refCount: Int): Boolean = alwaysInline || {
+  private def shouldInline(cteDef: CTERelationDef, refCount: Int): Boolean = {
+    if (alwaysInline) return true
+
+    // When auto-CTE caching is enabled, do not inline a multi-reference CTE that
+    // has an expensive body (Join / Aggregate / Sort / Window). Such CTEs are
+    // candidates for `ReplaceCTERefWithCache` to materialize as `InMemoryRelation`.
+    // Without this carve-out, every deterministic CTE is inlined here and the
+    // auto-cache rule has nothing left to materialize on real workloads (TPC-DS
+    // CTEs are virtually all deterministic).
+    if (refCount > 1 &&
+        SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
+        isAutoCacheEligible(cteDef.child)) {
+      return false
+    }
+
     // We do not need to check enclosed `CTERelationRef`s for `deterministic` or `OuterReference`,
     // because:
     // 1) It is fine to inline a CTE if it references another CTE that is non-deterministic;
@@ -63,6 +78,18 @@ case class InlineCTE(
     refCount == 1 ||
       cteDef.deterministic ||
       cteDef.child.exists(_.expressions.exists(_.isInstanceOf[OuterReference]))
+  }
+
+  /**
+   * Mirrors `ReplaceCTERefWithCache.isExpensiveEnough`. Kept here so InlineCTE
+   * does not have to depend on the sql/core module.
+   */
+  private def isAutoCacheEligible(plan: LogicalPlan): Boolean = plan.exists {
+    case _: Join => true
+    case _: Aggregate => true
+    case _: Sort => true
+    case _: Window => true
+    case _ => false
   }
 
   /**
