@@ -5738,6 +5738,22 @@ object SQLConf {
       .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
       .createWithDefaultString("-1")
 
+  val AUTO_CTE_CACHE_MIN_SIZE_BYTES =
+    buildConf("spark.sql.auto.cte.cache.minSizeBytes")
+      .doc(
+        "Minimum estimated size (in bytes) of a CTE body required for it to " +
+        "be considered for auto-caching. CTEs whose `LogicalPlan.stats.sizeInBytes` " +
+        "is below this threshold are inlined as before, even if they contain " +
+        "an otherwise-expensive operator (Join / Aggregate / Sort / Window). " +
+        "This guards against caching CTEs that are structurally complex but " +
+        "operate on tiny inputs (e.g. `SELECT * FROM small_dim ORDER BY x`). " +
+        "When stats are unavailable the structural gate alone applies. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("1m")
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +

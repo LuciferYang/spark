@@ -35,6 +35,12 @@ import org.apache.spark.sql.test.SharedSparkSession
  */
 class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
 
+  // Disable the size-based gate for the existing tests so they only exercise
+  // the structural gate. The stats gate is exercised explicitly by the tests
+  // in the "stats gate" section below.
+  override protected def sparkConf: org.apache.spark.SparkConf =
+    super.sparkConf.set(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key, "0")
+
   override protected def afterEach(): Unit = {
     try {
       spark.sharedState.autoCTECacheManager.clearAll(spark)
@@ -57,9 +63,16 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
   override def afterAll(): Unit = {
     try {
       spark.sql("DROP TABLE IF EXISTS auto_cte_corr_test")
+      spark.sql("DROP TABLE IF EXISTS auto_cte_tiny_test")
     } finally {
       super.afterAll()
     }
+  }
+
+  private def prepareTinyData(): Unit = {
+    spark.range(10)
+      .selectExpr("id", "id as key", "cast(id as double) as value")
+      .write.mode("overwrite").saveAsTable("auto_cte_tiny_test")
   }
 
   private def cachedEntries: Int =
@@ -487,6 +500,188 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
         s"q2 should reuse q1's cache via sameResult() match, not create a new entry. " +
         s"before=$afterQ1 after=$afterQ2 - sameResult() match is broken, " +
         s"possibly due to asymmetric rewriting by SPARK-40193 or another optimizer rule")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stats-based gate tests (AUTO_CTE_CACHE_MIN_SIZE_BYTES)
+  // ---------------------------------------------------------------------------
+  // The suite-level sparkConf above sets minSizeBytes=0, so the existing tests
+  // only exercise the structural gate. The tests in this section explicitly
+  // set the threshold to verify the size-based gate.
+
+  test("stats gate: tiny CTE with Sort-only is NOT cached when threshold is non-zero") {
+    prepareTinyData()
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      // Threshold set high enough that the 10-row CTE cannot clear it.
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "1048576") {
+      val sql =
+        """WITH tiny AS (
+          |  SELECT key, value FROM auto_cte_tiny_test ORDER BY key
+          |)
+          |SELECT a.key, b.value FROM tiny a JOIN tiny b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "Tiny CTE that passes the structural gate (Sort) but fails the stats " +
+        "gate (sizeInBytes < threshold) must NOT be cached. Otherwise we waste " +
+        "memory materialising small CTEs that are cheaper to recompute inline.")
+    }
+  }
+
+  test("stats gate: large CTE IS cached when threshold is small") {
+    prepareData()
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      // Threshold low enough that the 10000-row CTE clears it easily.
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "1024") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total + b.total FROM agg a JOIN agg b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "Large CTE with expensive body must be cached when stats clear the " +
+        "configured threshold. Both gates pass.")
+    }
+  }
+
+  test("stats gate: tiny CTE IS cached when threshold is zero (suite default)") {
+    // Sanity test confirming the suite-level minSizeBytes=0 override works:
+    // the structural gate alone is enough.
+    prepareTinyData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total FROM auto_cte_tiny_test GROUP BY key
+          |)
+          |SELECT a.key, a.total + b.total FROM agg a JOIN agg b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "With minSizeBytes=0 the stats gate is effectively disabled; tiny " +
+        "structurally-expensive CTEs should still cache.")
+    }
+  }
+
+  test("stats gate: scan-only CTE is NOT cached even when stats are huge") {
+    prepareData()
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "0") {
+      // Scan-only: structural gate fails regardless of size. Confirms that the
+      // structural gate is checked BEFORE the stats gate, not replaced by it.
+      val sql =
+        """WITH scan_only AS (
+          |  SELECT key, value FROM auto_cte_corr_test WHERE key < 50
+          |)
+          |SELECT a.key, b.value FROM scan_only a JOIN scan_only b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "Scan-only CTE must remain non-cacheable; the structural gate is " +
+        "checked first and short-circuits before the stats gate.")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // O(1) plan-index tests (recordAccessByPlan)
+  // ---------------------------------------------------------------------------
+  // The previous implementation iterated the entire Guava cache on every
+  // recordAccessByPlan call, doing sameResult comparisons one entry at a time.
+  // The new implementation maintains a secondary ConcurrentHashMap keyed on
+  // canonicalized plans for O(1) average-case lookup. These tests verify the
+  // index is built, used, and cleaned up correctly.
+
+  test("plan index: trackEntry populates the index") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val mgr = spark.sharedState.autoCTECacheManager
+      val before = mgr.planIndexSize
+      // Run a query that will cache one CTE
+      spark.sql(
+        """WITH agg AS (SELECT key, sum(value) as t FROM auto_cte_corr_test GROUP BY key)
+          |SELECT a.key FROM agg a JOIN agg b ON a.key = b.key""".stripMargin).collect()
+      val after = mgr.planIndexSize
+      assert(after > before,
+        s"Plan index should grow when an entry is tracked: before=$before after=$after")
+      assert(after == mgr.numEntries,
+        s"Plan index size should match cache size for distinct plans: " +
+        s"index=$after cache=${mgr.numEntries}")
+    }
+  }
+
+  test("plan index: cross-query reuse hits the index without re-tracking") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val mgr = spark.sharedState.autoCTECacheManager
+      val cteBody =
+        """WITH agg AS (SELECT key, sum(value) as t FROM auto_cte_corr_test GROUP BY key)"""
+      // Both queries must reference the SAME set of CTE columns. Column
+      // pruning can otherwise produce different cached plans for what looks
+      // like the same CTE body, defeating cross-query reuse.
+      val q1 = s"$cteBody\nSELECT a.t + b.t FROM agg a JOIN agg b ON a.key = b.key"
+      val q2 = s"$cteBody\nSELECT a.t * b.t FROM agg a JOIN agg b ON a.key = b.key"
+
+      spark.sql(q1).collect()
+      val cacheAfter1 = mgr.numEntries
+      val indexAfter1 = mgr.planIndexSize
+      assert(cacheAfter1 > 0, "First query should populate the cache")
+
+      spark.sql(q2).collect()
+      val cacheAfter2 = mgr.numEntries
+      val indexAfter2 = mgr.planIndexSize
+      assert(cacheAfter2 == cacheAfter1,
+        s"Cross-query reuse should not grow the cache: before=$cacheAfter1 after=$cacheAfter2")
+      assert(indexAfter2 == indexAfter1,
+        s"Cross-query reuse should not grow the plan index: " +
+        s"before=$indexAfter1 after=$indexAfter2. The index key (built from " +
+        s"`QueryExecution.normalize(plan).canonicalized`) must match what " +
+        s"`CacheManager.lookupCachedData` uses, otherwise the second query " +
+        s"will silently re-track an already-cached entry.")
+    }
+  }
+
+  test("plan index: clearAll empties both the cache and the index") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val mgr = spark.sharedState.autoCTECacheManager
+      spark.sql(
+        """WITH agg AS (SELECT key, sum(value) as t FROM auto_cte_corr_test GROUP BY key)
+          |SELECT a.key FROM agg a JOIN agg b ON a.key = b.key""".stripMargin).collect()
+      assert(mgr.numEntries > 0)
+      assert(mgr.planIndexSize > 0)
+      mgr.clearAll(spark)
+      assert(mgr.numEntries == 0,
+        s"clearAll should empty the cache; left ${mgr.numEntries}")
+      assert(mgr.planIndexSize == 0,
+        s"clearAll should empty the plan index; left ${mgr.planIndexSize}")
+    }
+  }
+
+  test("plan index: TTL eviction also cleans the index via removalListener") {
+    import org.apache.spark.sql.execution.AutoCTECacheManager
+    // Manager with a 1 ms TTL so we can deterministically trigger eviction.
+    val shortMgr = new AutoCTECacheManager(ttlMs = 1, maxSizeBytes = -1)
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val plan = spark.sql(
+        "SELECT key, sum(value) FROM auto_cte_corr_test GROUP BY key")
+        .queryExecution.optimizedPlan
+      shortMgr.trackEntry(99L, plan)
+      assert(shortMgr.numEntries == 1)
+      assert(shortMgr.planIndexSize == 1)
+      Thread.sleep(20)
+      shortMgr.evictStaleEntries(spark)
+      assert(shortMgr.numEntries == 0,
+        s"TTL eviction should drain the cache; left ${shortMgr.numEntries}")
+      assert(shortMgr.planIndexSize == 0,
+        "TTL eviction's removalListener should also clean up the plan index; " +
+        s"left ${shortMgr.planIndexSize} buckets")
     }
   }
 }

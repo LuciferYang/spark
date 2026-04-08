@@ -111,9 +111,17 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = false
 
   /**
-   * Returns true if the CTE plan contains at least one expensive operator
-   * (Join, Aggregate, Sort, Window). Simple scan-only CTEs are cheap to
-   * recompute and caching them wastes memory.
+   * Returns true if the CTE plan is expensive enough to be worth materialising
+   * as an `InMemoryRelation`. Two gates, both must pass:
+   *
+   *   1. Structural: contains a Join / Aggregate / Sort / Window. Pure
+   *      scan-only CTEs are cheap to recompute.
+   *   2. Stats: estimated `sizeInBytes` is at least
+   *      `AUTO_CTE_CACHE_MIN_SIZE_BYTES`. Guards against caching CTEs that
+   *      look complex but operate on tiny inputs (e.g.
+   *      `SELECT * FROM small_dim ORDER BY x`). When stats are unavailable
+   *      the structural gate alone applies (`Throwable` fallback returns
+   *      `true`).
    *
    * IMPORTANT: This predicate MUST stay in lock-step with
    * `org.apache.spark.sql.catalyst.optimizer.InlineCTE.isAutoCacheEligible`
@@ -122,19 +130,32 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * this rule can materialise it. If the two diverge, InlineCTE may either
    * inline a CTE this rule would have cached (lost optimisation) or keep a
    * CTE this rule then refuses (no-op InlineCTE skip + ReplaceCTERefWithRepartition
-   * fallback).
+   * fallback - which produces an unresolved plan because the multi-ref CTE
+   * has not been deduplicated).
    *
    * The predicate is duplicated rather than shared because sql/catalyst
    * cannot depend on sql/core. Reviewers must manually keep the two copies
-   * in sync; there is no test that catches a divergence directly.
+   * in sync; there is no test that catches a divergence directly. The two
+   * call sites can see slightly different stats (InlineCTE runs earlier,
+   * before predicate pushdown shrinks the body) - for clearly tiny vs
+   * clearly large CTEs the divergence is irrelevant; for borderline cases
+   * the structural gate is the primary signal.
    */
   private def isExpensiveEnough(plan: LogicalPlan): Boolean = {
-    plan.exists {
+    val structurallyExpensive = plan.exists {
       case _: Join => true
       case _: Aggregate => true
       case _: Sort => true
       case _: Window => true
       case _ => false
+    }
+    if (!structurallyExpensive) return false
+
+    val threshold = conf.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
+    try {
+      plan.stats.sizeInBytes.toLong >= threshold
+    } catch {
+      case _: Throwable => true
     }
   }
 
@@ -234,12 +255,46 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
   // Pending uncache plans from eviction -- processed by evictStaleEntries
   private val pendingUncache = new java.util.concurrent.ConcurrentLinkedQueue[LogicalPlan]()
 
+  /**
+   * Secondary index from canonicalized plan to the cteIds that materialised it.
+   * Used by `recordAccessByPlan` for O(1) lookup instead of an O(n) scan over
+   * the entire Guava cache. The key is `LogicalPlan.canonicalized`, which
+   * normalises exprIds and operand orderings so that semantically-equal
+   * plans hash equal (same contract that `LogicalPlan.sameResult` relies on).
+   *
+   * The value set is a `ConcurrentHashMap.KeySetView` so that the index is
+   * thread-safe with the rest of the cache. Multiple cteIds can map to the
+   * same canonicalized plan in two cases:
+   *   1. Two CTE definitions with identical bodies in different queries -
+   *      cross-query reuse will collapse them via the Guava cache, but the
+   *      index keeps both ids until eviction.
+   *   2. Hash collisions between semantically-different plans (extremely
+   *      rare; `recordAccessByPlan` still verifies via `cache.getIfPresent`).
+   */
+  private val planIndex: java.util.concurrent.ConcurrentHashMap[
+      LogicalPlan,
+      java.util.Set[java.lang.Long]] =
+    new java.util.concurrent.ConcurrentHashMap()
+
   private val cache: Cache[java.lang.Long, AutoCTEEntry] = {
     val builder = CacheBuilder.newBuilder()
       .removalListener((notification: RemovalNotification[java.lang.Long, AutoCTEEntry]) => {
         if (notification.wasEvicted()) {
           val entry = notification.getValue
           pendingUncache.add(entry.plan)
+          // Clean up the secondary index. Use indexKey to match the
+          // normalization used by trackEntry/recordAccessByPlan; using raw
+          // canonicalized would leave the bucket orphaned forever.
+          // If a removed cteId leaves its bucket empty, drop the bucket
+          // entirely so the index does not grow without bound.
+          val key = indexKey(entry.plan)
+          val ids = planIndex.get(key)
+          if (ids != null) {
+            ids.remove(notification.getKey)
+            if (ids.isEmpty) {
+              planIndex.remove(key, ids)
+            }
+          }
           logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
         }
       })
@@ -264,24 +319,67 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
     builder.build()
   }
 
+  /**
+   * Computes the index key for a plan. MUST use the same normalization as
+   * `CacheManager.lookupCachedData` (which calls `QueryExecution.normalize`),
+   * otherwise `recordAccessByPlan` may fail to find an entry that
+   * `cacheManager.lookupCachedData` did find - leading to a TTL refresh
+   * being silently dropped.
+   *
+   * The result is a `LogicalPlan` whose `equals`/`hashCode` are structural
+   * (case-class semantics) over the canonicalized form, so it is safe to use
+   * directly as a `ConcurrentHashMap` key.
+   */
+  private def indexKey(plan: LogicalPlan): LogicalPlan = {
+    QueryExecution.normalize(SparkSession.active, plan).canonicalized
+  }
+
   def trackEntry(cteId: Long, plan: LogicalPlan): Unit = {
     cache.put(cteId, AutoCTEEntry(plan = plan, tableName = s"auto_cte_$cteId"))
+    // Maintain the secondary index. computeIfAbsent is atomic; the
+    // ConcurrentHashMap.newKeySet view supports concurrent add/remove.
+    planIndex
+      .computeIfAbsent(
+        indexKey(plan),
+        _ => java.util.concurrent.ConcurrentHashMap.newKeySet[java.lang.Long]())
+      .add(cteId)
   }
 
   /**
    * Refreshes the TTL for the entry whose plan matches the given plan.
-   * Uses reference equality first (fast path for within-query hits),
-   * then falls back to sameResult (for cross-query hits).
+   *
+   * O(1) average case via the `planIndex`. The lookup is keyed on
+   * `QueryExecution.normalize(plan).canonicalized` so two semantically-equal
+   * plans hit the same bucket regardless of exprId variation - and the
+   * normalization matches what `CacheManager.lookupCachedData` does. Hash
+   * collisions and stale index entries (from concurrent eviction) are handled
+   * by verifying with `cache.getIfPresent`, which also refreshes Guava's
+   * access time.
    */
   def recordAccessByPlan(plan: LogicalPlan): Unit = {
-    val it = cache.asMap().entrySet().iterator()
+    val key = indexKey(plan)
+    val ids = planIndex.get(key)
+    if (ids == null) return
+    val it = ids.iterator()
     while (it.hasNext) {
-      val e = it.next()
-      if ((e.getValue.plan eq plan) || e.getValue.plan.sameResult(plan)) {
-        // getIfPresent refreshes the access time for expireAfterAccess
-        cache.getIfPresent(e.getKey)
+      val cteId = it.next()
+      val entry = cache.getIfPresent(cteId)
+      if (entry != null) {
+        // Found a live match. getIfPresent already refreshed the access time
+        // via Guava's expireAfterAccess. Done.
         return
       }
+      // Stale index entry: the cache evicted it but the removal listener
+      // has not yet fired (or fired before our snapshot). Remove from the
+      // index here so we do not visit it again. The KeySetView's iterator
+      // supports remove().
+      it.remove()
+    }
+    // If we drained the bucket entirely, drop it so the index does not
+    // accumulate empty buckets. Use the value-conditional remove so we do
+    // not race with a concurrent insert into the same bucket.
+    if (ids.isEmpty) {
+      planIndex.remove(key, ids)
     }
   }
 
@@ -300,6 +398,7 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
     val plans = new java.util.ArrayList[LogicalPlan]()
     cache.asMap().values().forEach(e => plans.add(e.plan))
     cache.invalidateAll()
+    planIndex.clear()
     var plan = pendingUncache.poll()
     while (plan != null) {
       plans.add(plan)
@@ -311,6 +410,9 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
   }
 
   def numEntries: Int = cache.asMap().size()
+
+  /** Test-only: number of distinct buckets in the secondary plan index. */
+  private[sql] def planIndexSize: Int = planIndex.size()
 }
 
 private[sql] case class AutoCTEEntry(

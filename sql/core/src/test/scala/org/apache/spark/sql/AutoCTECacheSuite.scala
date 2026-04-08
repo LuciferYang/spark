@@ -22,6 +22,12 @@ import org.apache.spark.sql.test.SharedSparkSession
 
 class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
 
+  // Disable the size-based gate so the existing structural-gate tests with
+  // small range() data still cache. Stats-gate behavior is exercised
+  // separately by AutoCTECacheCorrectnessSuite.
+  override protected def sparkConf: org.apache.spark.SparkConf =
+    super.sparkConf.set(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key, "0")
+
   override protected def afterEach(): Unit = {
     try {
       spark.sharedState.autoCTECacheManager.clearAll(spark)

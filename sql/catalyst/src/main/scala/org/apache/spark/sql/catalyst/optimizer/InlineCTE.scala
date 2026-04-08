@@ -89,8 +89,12 @@ case class InlineCTE(
   }
 
   /**
-   * Returns true if the CTE body contains an operator expensive enough that
-   * `ReplaceCTERefWithCache` would consider it for caching.
+   * Returns true if the CTE body is expensive enough that
+   * `ReplaceCTERefWithCache` would consider it for caching. Two gates:
+   *
+   *   1. Structural: contains a Join / Aggregate / Sort / Window.
+   *   2. Stats: estimated `sizeInBytes` >= `AUTO_CTE_CACHE_MIN_SIZE_BYTES`.
+   *      When stats are unavailable the structural gate alone applies.
    *
    * IMPORTANT: This predicate, together with the `!correlatedSubqueryRef`
    * check in the carve-out above, MUST stay in lock-step with
@@ -103,17 +107,32 @@ case class InlineCTE(
    * by InlineCTE itself, because `ReplaceCTERefWithRepartition` does not
    * give cs1/cs2 references separate exprIds.
    *
+   * The two call sites can see slightly different stats (InlineCTE runs
+   * earlier, before predicate pushdown shrinks the body). For clearly
+   * tiny vs clearly large CTEs the divergence is irrelevant; for
+   * borderline cases the structural gate is the primary signal.
+   *
    * The predicate is duplicated rather than shared because catalyst cannot
    * depend on sql/core. There is no test that catches a divergence between
    * the two definitions; reviewers should manually verify when modifying
    * either.
    */
-  private def isAutoCacheEligible(plan: LogicalPlan): Boolean = plan.exists {
-    case _: Join => true
-    case _: Aggregate => true
-    case _: Sort => true
-    case _: Window => true
-    case _ => false
+  private def isAutoCacheEligible(plan: LogicalPlan): Boolean = {
+    val structurallyExpensive = plan.exists {
+      case _: Join => true
+      case _: Aggregate => true
+      case _: Sort => true
+      case _: Window => true
+      case _ => false
+    }
+    if (!structurallyExpensive) return false
+
+    val threshold = SQLConf.get.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
+    try {
+      plan.stats.sizeInBytes.toLong >= threshold
+    } catch {
+      case _: Throwable => true
+    }
   }
 
   /**
