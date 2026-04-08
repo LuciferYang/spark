@@ -131,7 +131,10 @@ case class InlineCTE(
     try {
       plan.stats.sizeInBytes.toLong >= threshold
     } catch {
-      case _: Throwable => true
+      // NonFatal: swallow stats-provider bugs, let fatal errors propagate.
+      // Permissive fallback for consistency with
+      // ReplaceCTERefWithCache.isExpensiveEnough.
+      case scala.util.control.NonFatal(_) => true
     }
   }
 

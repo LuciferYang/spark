@@ -155,7 +155,14 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
     try {
       plan.stats.sizeInBytes.toLong >= threshold
     } catch {
-      case _: Throwable => true
+      // Permissive fallback: if stats computation throws (a stats provider
+      // bug, an unbound subquery, etc.) we err on the side of caching. The
+      // structural gate has already passed, so we know the plan is at least
+      // job-shaped. Returning false here would silently disable caching for
+      // any plan whose stats are unreliable, which would be a regression
+      // for queries that previously cached on default config. NonFatal
+      // swallows ordinary exceptions but lets fatal errors propagate.
+      case scala.util.control.NonFatal(_) => true
     }
   }
 
@@ -282,17 +289,21 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
         if (notification.wasEvicted()) {
           val entry = notification.getValue
           pendingUncache.add(entry.plan)
-          // Clean up the secondary index. Use indexKey to match the
-          // normalization used by trackEntry/recordAccessByPlan; using raw
-          // canonicalized would leave the bucket orphaned forever.
-          // If a removed cteId leaves its bucket empty, drop the bucket
-          // entirely so the index does not grow without bound.
-          val key = indexKey(entry.plan)
-          val ids = planIndex.get(key)
-          if (ids != null) {
-            ids.remove(notification.getKey)
-            if (ids.isEmpty) {
-              planIndex.remove(key, ids)
+          // Clean up the secondary index. Use the pre-computed indexKey
+          // captured at trackEntry time, NOT a fresh recomputation - the
+          // removalListener may run on a Guava cleanup thread where
+          // SparkSession.active is null or the wrong session, which would
+          // produce a different canonical form and leak the bucket.
+          // If the cached key was null (normalisation failed at trackEntry
+          // time), there is no index entry to clean up.
+          val key = entry.indexKey
+          if (key != null) {
+            val ids = planIndex.get(key)
+            if (ids != null) {
+              ids.remove(notification.getKey)
+              if (ids.isEmpty) {
+                planIndex.remove(key, ids)
+              }
             }
           }
           logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
@@ -329,35 +340,68 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
    * The result is a `LogicalPlan` whose `equals`/`hashCode` are structural
    * (case-class semantics) over the canonicalized form, so it is safe to use
    * directly as a `ConcurrentHashMap` key.
+   *
+   * Returns `null` if normalization is not possible: either there is no
+   * active SparkSession (the method was called from a context outside any
+   * query, e.g. a synthetic test) or a normalization rule throws. Callers
+   * MUST handle null by skipping the index operation; we never silently
+   * substitute a different normalization, because that would break the
+   * lookup contract with `CacheManager.lookupCachedData`.
    */
   private def indexKey(plan: LogicalPlan): LogicalPlan = {
-    QueryExecution.normalize(SparkSession.active, plan).canonicalized
+    val session = SparkSession.getActiveSession.orNull
+    if (session == null) return null
+    try {
+      QueryExecution.normalize(session, plan).canonicalized
+    } catch {
+      // NonFatal swallows ordinary exceptions but lets fatal errors
+      // (OOM, StackOverflow, ThreadDeath) propagate as they should.
+      case scala.util.control.NonFatal(_) => null
+    }
   }
 
   def trackEntry(cteId: Long, plan: LogicalPlan): Unit = {
-    cache.put(cteId, AutoCTEEntry(plan = plan, tableName = s"auto_cte_$cteId"))
-    // Maintain the secondary index. computeIfAbsent is atomic; the
-    // ConcurrentHashMap.newKeySet view supports concurrent add/remove.
-    planIndex
-      .computeIfAbsent(
-        indexKey(plan),
-        _ => java.util.concurrent.ConcurrentHashMap.newKeySet[java.lang.Long]())
-      .add(cteId)
+    val key = indexKey(plan)
+    cache.put(cteId, AutoCTEEntry(plan = plan, tableName = s"auto_cte_$cteId", indexKey = key))
+    if (key != null) {
+      // Maintain the secondary index. computeIfAbsent is atomic; the
+      // ConcurrentHashMap.newKeySet view supports concurrent add/remove.
+      planIndex
+        .computeIfAbsent(
+          key,
+          _ => java.util.concurrent.ConcurrentHashMap.newKeySet[java.lang.Long]())
+        .add(cteId)
+    }
   }
 
   /**
-   * Refreshes the TTL for the entry whose plan matches the given plan.
+   * Best-effort TTL refresh for the entry whose plan matches the given plan.
+   *
+   * Returns silently in three cases (none are errors):
+   *   1. `indexKey(plan)` is null (no active session, normalization threw).
+   *   2. The index has no bucket for the key (cache miss).
+   *   3. All ids in the bucket are stale (Guava evicted, removalListener
+   *      pending). The next call to `evictStaleEntries` will run the
+   *      removalListener and clean the bucket.
    *
    * O(1) average case via the `planIndex`. The lookup is keyed on
    * `QueryExecution.normalize(plan).canonicalized` so two semantically-equal
    * plans hit the same bucket regardless of exprId variation - and the
-   * normalization matches what `CacheManager.lookupCachedData` does. Hash
-   * collisions and stale index entries (from concurrent eviction) are handled
-   * by verifying with `cache.getIfPresent`, which also refreshes Guava's
-   * access time.
+   * normalization matches what `CacheManager.lookupCachedData` does.
+   *
+   * Stale entries are NOT removed from the index inside this method:
+   *   1. The removalListener will clean them up shortly (it has the
+   *      pre-computed key on `AutoCTEEntry`).
+   *   2. In-band cleanup races with concurrent `trackEntry` calls. Specifically:
+   *      thread A drains a bucket, thread B inserts a fresh cteId into the
+   *      same bucket, thread A's `remove(key, ids)` checks `ids.equals(ids)`
+   *      (which is trivially true for the same Set instance), and erases
+   *      thread B's insert. Letting `removalListener` own bucket lifecycle
+   *      avoids the race entirely.
    */
   def recordAccessByPlan(plan: LogicalPlan): Unit = {
     val key = indexKey(plan)
+    if (key == null) return
     val ids = planIndex.get(key)
     if (ids == null) return
     val it = ids.iterator()
@@ -369,17 +413,7 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
         // via Guava's expireAfterAccess. Done.
         return
       }
-      // Stale index entry: the cache evicted it but the removal listener
-      // has not yet fired (or fired before our snapshot). Remove from the
-      // index here so we do not visit it again. The KeySetView's iterator
-      // supports remove().
-      it.remove()
-    }
-    // If we drained the bucket entirely, drop it so the index does not
-    // accumulate empty buckets. Use the value-conditional remove so we do
-    // not race with a concurrent insert into the same bucket.
-    if (ids.isEmpty) {
-      planIndex.remove(key, ids)
+      // Stale entry. Do not touch the index here - removalListener owns it.
     }
   }
 
@@ -415,6 +449,18 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
   private[sql] def planIndexSize: Int = planIndex.size()
 }
 
+/**
+ * @param plan      The CTE definition's logical plan as it was passed to
+ *                  `trackEntry`. Held for `pendingUncache` and for diagnostic
+ *                  logging on eviction.
+ * @param tableName The synthetic auto_cte_<id> name used by `CacheManager`.
+ * @param indexKey  The pre-computed key used to insert into `planIndex`.
+ *                  Snapshotted at `trackEntry` time so the removalListener
+ *                  (which may run on a Guava cleanup thread where
+ *                  `SparkSession.active` is null or wrong) can locate the
+ *                  same bucket without re-normalising the plan.
+ */
 private[sql] case class AutoCTEEntry(
     plan: LogicalPlan,
-    tableName: String)
+    tableName: String,
+    indexKey: LogicalPlan)

@@ -512,10 +512,20 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
 
   test("stats gate: tiny CTE with Sort-only is NOT cached when threshold is non-zero") {
     prepareTinyData()
+    // Verify the test data actually has stats below threshold - otherwise
+    // the test could coincidentally pass even if the stats gate is broken,
+    // because the Throwable fallback in isExpensiveEnough returns true.
+    val tinyStats = spark.sql("SELECT * FROM auto_cte_tiny_test")
+      .queryExecution.optimizedPlan.stats.sizeInBytes
+    val threshold = 1048576L
+    assert(tinyStats < threshold,
+      s"Test precondition: tiny table stats ($tinyStats) must be below " +
+      s"threshold ($threshold), otherwise the stats gate is not actually " +
+      s"being exercised.")
+
     withSQLConf(
       SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
-      // Threshold set high enough that the 10-row CTE cannot clear it.
-      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "1048576") {
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> threshold.toString) {
       val sql =
         """WITH tiny AS (
           |  SELECT key, value FROM auto_cte_tiny_test ORDER BY key
@@ -568,7 +578,7 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
     }
   }
 
-  test("stats gate: scan-only CTE is NOT cached even when stats are huge") {
+  test("stats gate: scan-only CTE never caches regardless of stats threshold") {
     prepareData()
     withSQLConf(
       SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
@@ -660,6 +670,97 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
         s"clearAll should empty the cache; left ${mgr.numEntries}")
       assert(mgr.planIndexSize == 0,
         s"clearAll should empty the plan index; left ${mgr.planIndexSize}")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cross-module sync test: InlineCTE.isAutoCacheEligible vs
+  // ReplaceCTERefWithCache.isExpensiveEnough must agree, otherwise the
+  // q64-style fall-through to ReplaceCTERefWithRepartition produces
+  // unresolved plans. The two predicates are duplicated across sql/catalyst
+  // and sql/core (catalyst cannot depend on core), so this test is the
+  // only mechanical defense against drift.
+  // ---------------------------------------------------------------------------
+
+  test("sync: InlineCTE carve-out and AutoCTECache eligibility agree (structural gate)") {
+    prepareData()
+    // Set the stats threshold to 0 so the structural gate is the only
+    // discriminator. Each of the four expensive operator types is exercised
+    // (Join, Aggregate, Sort, Window) plus a negative case.
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "0") {
+      // Cache-eligible: both InlineCTE.shouldInline and AutoCTECache.shouldAutoCache
+      // must agree (InlineCTE keeps it, AutoCTECache caches it). If either side
+      // disagrees, the result is either inlining (numEntries=0) or a fall-through
+      // plan validation failure (which would surface as a different exception
+      // before reaching the assertion).
+      val eligibleCases = Seq(
+        // Aggregate
+        "WITH c AS (SELECT key, sum(value) s FROM auto_cte_corr_test GROUP BY key) " +
+          "SELECT a.s, b.s FROM c a JOIN c b ON a.key = b.key" -> "Aggregate",
+        // Sort: reference `value` outside so column pruning does not strip it
+        "WITH c AS (SELECT key, value FROM auto_cte_corr_test ORDER BY value LIMIT 100) " +
+          "SELECT a.value, b.value FROM c a JOIN c b ON a.key = b.key" -> "Sort",
+        // Window: reference `s` outside so column pruning does not strip the Window op
+        "WITH c AS (SELECT key, sum(value) OVER (PARTITION BY col1) s " +
+          "FROM auto_cte_corr_test) " +
+          "SELECT a.s, b.s FROM c a JOIN c b ON a.key = b.key" -> "Window",
+        // Join inside the CTE body. Use small unique-key ranges so the
+        // inner+outer self-join does not explode (auto_cte_corr_test has
+        // only 100 distinct keys, which would Cartesian to ~10B rows).
+        "WITH c AS (SELECT t1.id k, t1.id v FROM range(20) t1 " +
+          "JOIN range(20) t2 ON t1.id = t2.id) " +
+          "SELECT a.v + b.v FROM c a JOIN c b ON a.k = b.k" -> "Join")
+      eligibleCases.foreach { case (sql, label) =>
+        spark.sharedState.autoCTECacheManager.clearAll(spark)
+        spark.sql(sql).collect()
+        assert(cachedEntries >= 1,
+          s"$label-bearing CTE should be cache-eligible. " +
+          s"If this test fails, InlineCTE.isAutoCacheEligible and " +
+          s"AutoCTECache.isExpensiveEnough have drifted out of sync.")
+      }
+
+      // Negative case: a scan-only CTE must NOT cache. Both predicates must
+      // agree on the rejection - InlineCTE inlines it, AutoCTECache never
+      // sees it.
+      spark.sharedState.autoCTECacheManager.clearAll(spark)
+      spark.sql(
+        """WITH c AS (SELECT key, value FROM auto_cte_corr_test WHERE key < 5)
+          |SELECT a.key FROM c a JOIN c b ON a.key = b.key""".stripMargin).collect()
+      assert(cachedEntries == 0,
+        "Scan-only CTE must NOT cache. If this test fails, the structural " +
+        "gate has been relaxed on one side and not the other.")
+    }
+  }
+
+  test("sync: stats gate divergence between InlineCTE and AutoCTECache produces no fall-through") {
+    prepareData()
+    // The two predicates read `plan.stats.sizeInBytes` at different points
+    // in the optimizer. Pushdown can shrink the body between InlineCTE
+    // (early) and AutoCTECache (late). With a non-zero threshold this is the
+    // most likely place for the two gates to disagree, producing a q64-style
+    // ReplaceCTERefWithRepartition fall-through with an unresolved plan.
+    //
+    // This test runs a CTE whose stats clear the threshold at both gates
+    // and asserts the query completes successfully and either caches or
+    // produces a valid non-cached plan. If a future change makes the two
+    // gates disagree by stats freshness, this test catches the resulting
+    // plan validation failure.
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "1024") {
+      val sql =
+        """WITH c AS (
+          |  SELECT key, sum(value) s FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.s + b.s FROM c a JOIN c b ON a.key = b.key
+          |WHERE a.s > 0""".stripMargin
+      // The .collect() will throw if InlineCTE keeps the CTE but
+      // AutoCTECache then refuses, because ReplaceCTERefWithRepartition
+      // will produce an unresolved plan.
+      val rows = spark.sql(sql).collect()
+      assert(rows != null, "query must complete")
     }
   }
 
