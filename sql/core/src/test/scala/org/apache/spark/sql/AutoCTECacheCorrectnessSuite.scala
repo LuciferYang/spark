@@ -354,6 +354,113 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Correlated-subquery detection tests (TagCorrelatedCTERefs)
+  // ---------------------------------------------------------------------------
+
+  test("correlated-ref: q1-shape correlated scalar subquery is NOT cached") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Mimics TPC-DS q1: a CTE referenced once at top level and once
+      // inside a correlated scalar subquery. The correlation is the
+      // `a.key = b.key` join condition that references the outer `a.key`
+      // from inside the subquery.
+      //
+      // TagCorrelatedCTERefs must observe the SubqueryExpression with
+      // outerAttrs.nonEmpty before RewriteCorrelatedScalarSubquery
+      // decorrelates it, and tag the CTE so AutoCTECache skips caching.
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key FROM agg a
+          |WHERE a.total > (SELECT avg(b.total) * 1.2 FROM agg b WHERE a.key = b.key)
+          |""".stripMargin
+
+      val result = spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "q1-shape correlated scalar subquery must NOT be cached. " +
+        "TagCorrelatedCTERefs should mark the CTE as correlatedSubqueryRef=true " +
+        "before RewriteCorrelatedScalarSubquery decorrelates the subquery.")
+      // Sanity: query still executes correctly
+      assert(result != null)
+    }
+  }
+
+  test("correlated-ref: q23a-shape uncorrelated IN subquery IS cached") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Counter-example to the q1-shape test: an IN subquery is NOT
+      // correlated (no outerAttrs). RewritePredicateSubquery converts it
+      // into a LeftSemi join. TagCorrelatedCTERefs must NOT tag this case
+      // (outerAttrs is empty), so the CTE remains cache-eligible. q23a/q24a
+      // depend on this distinction.
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total FROM agg a
+          |WHERE a.key IN (SELECT key FROM agg WHERE total > 0)
+          |""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries >= 1,
+        "Uncorrelated IN subquery must NOT be tagged as correlated; the CTE " +
+        "should remain cache-eligible. q23a/q24a-shape queries depend on this.")
+    }
+  }
+
+  test("correlated-ref: q1-shape produces same results with flag on vs off") {
+    prepareData()
+    val sql =
+      """WITH agg AS (
+        |  SELECT key, sum(value) as total FROM auto_cte_corr_test GROUP BY key
+        |)
+        |SELECT a.key, a.total FROM agg a
+        |WHERE a.total > (SELECT avg(b.total) * 1.2 FROM agg b WHERE a.key = b.key)
+        |ORDER BY a.key
+        |""".stripMargin
+
+    val baseline = withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "false") {
+      spark.sql(sql).collect().map(_.toString).toSeq
+    }
+    val withFlag = withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      spark.sql(sql).collect().map(_.toString).toSeq
+    }
+    assert(baseline == withFlag,
+      s"q1-shape correlated subquery must produce identical results " +
+      s"regardless of AUTO_REUSED_CTE_ENABLED. " +
+      s"baseline.size=${baseline.size} withFlag.size=${withFlag.size}")
+  }
+
+  test("correlated-ref: CTE inside a non-correlated subquery whose body has " +
+       "a correlated reference to the CTE is tagged") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // The outer query has a non-correlated IN subquery. Inside that subquery,
+      // a correlated scalar subquery references the SAME CTE. TagCorrelatedCTERefs
+      // must recursively walk into the non-correlated outer subquery to find
+      // the correlated inner one and tag the CTE.
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key FROM agg a
+          |WHERE a.key IN (
+          |  SELECT b.key FROM agg b
+          |  WHERE b.total > (SELECT avg(c.total) FROM agg c WHERE c.key = b.key)
+          |)
+          |""".stripMargin
+
+      val result = spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "Nested correlated subquery must tag the inner CTE; " +
+        "TagCorrelatedCTERefs must walk through SubqueryExpressions recursively " +
+        "even when the outer SubqueryExpression is itself non-correlated.")
+      assert(result != null)
+    }
+  }
+
   test("SPARK-40193: cross-query reuse survives subquery merging") {
     prepareData()
     withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {

@@ -65,8 +65,16 @@ case class InlineCTE(
     // Without this carve-out, every deterministic CTE is inlined here and the
     // auto-cache rule has nothing left to materialize on real workloads (TPC-DS
     // CTEs are virtually all deterministic).
+    //
+    // EXCEPTION: if the CTE has a reference inside a correlated subquery
+    // (`correlatedSubqueryRef = true`), `ReplaceCTERefWithCache` will refuse
+    // to cache it. We must NOT skip inlining in that case, otherwise the
+    // CTE survives into `ReplaceCTERefWithRepartition`, which produces an
+    // unresolved plan because the multi-reference is not deduped here.
+    // Inlining correlated-ref CTEs is the safe baseline behavior.
     if (refCount > 1 &&
         SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
+        !cteDef.correlatedSubqueryRef &&
         isAutoCacheEligible(cteDef.child)) {
       return false
     }
@@ -84,13 +92,16 @@ case class InlineCTE(
    * Returns true if the CTE body contains an operator expensive enough that
    * `ReplaceCTERefWithCache` would consider it for caching.
    *
-   * IMPORTANT: This predicate MUST stay in lock-step with
-   * `org.apache.spark.sql.execution.ReplaceCTERefWithCache.isExpensiveEnough`
-   * (sql/core module). If `ReplaceCTERefWithCache` adds a new gate (e.g. a
-   * stats-based size threshold), update this method to match. Otherwise
-   * `InlineCTE` may keep a CTE that `ReplaceCTERefWithCache` then refuses
-   * to cache, leaving it for `ReplaceCTERefWithRepartition` and missing the
-   * intended cache materialisation.
+   * IMPORTANT: This predicate, together with the `!correlatedSubqueryRef`
+   * check in the carve-out above, MUST stay in lock-step with
+   * `org.apache.spark.sql.execution.ReplaceCTERefWithCache.shouldAutoCache`
+   * (sql/core module). If `shouldAutoCache` adds a new gate, update the
+   * carve-out here to match - otherwise this rule may keep a CTE that
+   * `ReplaceCTERefWithCache` then refuses to cache, leaving it for
+   * `ReplaceCTERefWithRepartition` to handle. That fallback path produces an
+   * unresolved plan when the multi-reference CTE was not first deduplicated
+   * by InlineCTE itself, because `ReplaceCTERefWithRepartition` does not
+   * give cs1/cs2 references separate exprIds.
    *
    * The predicate is duplicated rather than shared because catalyst cannot
    * depend on sql/core. There is no test that catches a divergence between

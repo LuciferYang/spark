@@ -61,9 +61,26 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
 
   /**
    * Checks whether a CTE definition should be auto-cached based on heuristics.
+   *
+   * Three gates, all of which must pass:
+   *
+   *   1. `isExpensiveEnough` - the CTE body must contain a Join, Aggregate,
+   *      Sort, or Window. Cheap scan-only CTEs are not worth materialising.
+   *
+   *   2. `!cteDef.correlatedSubqueryRef` - the CTE must NOT have any reference
+   *      that originally appeared inside a correlated subquery expression.
+   *      `TagCorrelatedCTERefs` populates this flag in an early optimizer
+   *      batch BEFORE `RewriteCorrelatedScalarSubquery` decorrelates the
+   *      subquery into a join. Without the tag, q1/q31/q39a-style queries
+   *      cannot be distinguished structurally from q24a's user-written
+   *      `cs1 join cs2` self-join at this point in the pipeline.
+   *
+   *   3. `!hasDivergentPredicates` - placeholder, see method doc.
    */
   private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
-    !hasDivergentPredicates(cteDef) && isExpensiveEnough(cteDef.child)
+    !cteDef.correlatedSubqueryRef &&
+      !hasDivergentPredicates(cteDef) &&
+      isExpensiveEnough(cteDef.child)
   }
 
   /**
@@ -80,20 +97,16 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * the EMR reference cluster caches them, we should too.
    *
    * The original concern (q1/q31/q39a regression risk noted in the design doc)
-   * is about CORRELATED outer references inside scalar subqueries: those
-   * specialise per outer row and benefit more from per-call evaluation than
-   * from a shared materialisation. Correlated references do NOT appear in
-   * `originalPlanWithPredicates._2` at all (they are not pushed down by
-   * `PushdownPredicatesAndPruneColumnsForCTEDef`), so checking that field
-   * for divergence cannot detect them in either direction. A proper
-   * correlated-reference detector belongs in a separate method; for now we
-   * accept the existing q1/q31 regression risk in exchange for getting the
-   * non-correlated case right.
+   * is about CORRELATED outer references inside scalar subqueries. That
+   * concern is now handled by `cteDef.correlatedSubqueryRef`, populated by
+   * `TagCorrelatedCTERefs` in an earlier optimizer batch. See the
+   * `shouldAutoCache` doc for the gating order.
    *
-   * TODO: implement `hasCorrelatedSubqueryReference(cteDef, outerPlan)` and
-   * call it from `shouldAutoCache` to skip caching for q1/q31/q39a-style
-   * patterns. Until then this method is a placeholder kept for documentation
-   * and to make the future fix easy to slot in.
+   * This method is now a placeholder. It is kept (rather than inlined as
+   * `false`) so that the doc comment above documenting WHY divergent
+   * non-correlated predicates are safe to cache stays attached to its
+   * subject - and so that any future hand-rolled divergence check has an
+   * obvious slot.
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = false
 

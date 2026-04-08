@@ -62,6 +62,12 @@ class SparkOptimizer(
 
   override def defaultBatches: Seq[Batch] = flattenBatches(Seq(
     preOptimizationBatches,
+    // Tag CTEs whose references appear inside correlated subqueries BEFORE
+    // RewriteCorrelatedScalarSubquery decorrelates them. The tag is read by
+    // ReplaceCTERefWithCache later to skip caching for the q1/q31/q39a
+    // regression pattern. Must run before any rule that touches
+    // SubqueryExpression structure.
+    Batch("Tag Correlated CTE Refs", Once, TagCorrelatedCTERefs),
     // Move CleanUpTempCTEInfo to after ReplaceCTERefWithCache so that
     // originalPlanWithPredicates is available for divergent-predicate detection.
     super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info"),
