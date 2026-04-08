@@ -5702,6 +5702,42 @@ object SQLConf {
     .booleanConf
     .createWithDefault(false)
 
+  val AUTO_REUSED_CTE_ENABLED =
+    buildConf("spark.sql.auto.reused.cte.enabled")
+      .doc(
+        "When true, non-inlined CTE definitions referenced multiple times " +
+        "are automatically cached as in-memory columnar tables on first " +
+        "execution. Subsequent references within the same query or later " +
+        "queries in the session read from cache instead of recomputing.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
+  val AUTO_CTE_CACHE_TTL =
+    buildConf("spark.sql.auto.cte.cache.ttl")
+      .doc(
+        "Time-to-live for auto-cached CTE entries since last access. " +
+        "Entries not accessed within this duration are evicted. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to 0 to disable eviction (entries persist until session ends).")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
+      .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
+      .createWithDefaultString("1h")
+
+  val AUTO_CTE_CACHE_MAX_SIZE =
+    buildConf("spark.sql.auto.cte.cache.maxSize")
+      .doc(
+        "Maximum total memory for auto-cached CTE entries. LRU eviction " +
+        "when exceeded. Only effective when " +
+        "spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to -1 for unlimited.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("-1")
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +
