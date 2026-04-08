@@ -81,8 +81,21 @@ case class InlineCTE(
   }
 
   /**
-   * Mirrors `ReplaceCTERefWithCache.isExpensiveEnough`. Kept here so InlineCTE
-   * does not have to depend on the sql/core module.
+   * Returns true if the CTE body contains an operator expensive enough that
+   * `ReplaceCTERefWithCache` would consider it for caching.
+   *
+   * IMPORTANT: This predicate MUST stay in lock-step with
+   * `org.apache.spark.sql.execution.ReplaceCTERefWithCache.isExpensiveEnough`
+   * (sql/core module). If `ReplaceCTERefWithCache` adds a new gate (e.g. a
+   * stats-based size threshold), update this method to match. Otherwise
+   * `InlineCTE` may keep a CTE that `ReplaceCTERefWithCache` then refuses
+   * to cache, leaving it for `ReplaceCTERefWithRepartition` and missing the
+   * intended cache materialisation.
+   *
+   * The predicate is duplicated rather than shared because catalyst cannot
+   * depend on sql/core. There is no test that catches a divergence between
+   * the two definitions; reviewers should manually verify when modifying
+   * either.
    */
   private def isAutoCacheEligible(plan: LogicalPlan): Boolean = plan.exists {
     case _: Join => true

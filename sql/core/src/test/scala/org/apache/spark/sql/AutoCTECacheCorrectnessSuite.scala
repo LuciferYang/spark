@@ -248,6 +248,80 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("flag off: deterministic multi-ref CTE is inlined and not cached") {
+    prepareData()
+    // Default behavior: AUTO_REUSED_CTE_ENABLED=false. The InlineCTE carve-out
+    // must NOT fire, so the deterministic CTE is inlined as before and no
+    // cache entries are created. This guards against a future change to the
+    // carve-out condition that might activate it unconditionally.
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "false") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total + b.total
+          |FROM agg a JOIN agg b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "With AUTO_REUSED_CTE_ENABLED=false, deterministic multi-ref CTE " +
+        "must be inlined by InlineCTE (default behavior); the carve-out " +
+        "must not fire and no cache entries should be created.")
+    }
+  }
+
+  test("scan-only deterministic multi-ref CTE is still inlined when flag is on") {
+    prepareData()
+    // Counterpart to the cache-eligible tests: a scan-only CTE (no Join,
+    // Aggregate, Sort, or Window in its body) is below the
+    // isAutoCacheEligible / isExpensiveEnough threshold, so InlineCTE's
+    // carve-out must NOT keep it. The CTE should be inlined as before and
+    // no cache entry should be created. Guards against the carve-out being
+    // accidentally relaxed to fire on cheap CTEs.
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH simple AS (
+          |  SELECT key, value FROM auto_cte_corr_test WHERE key < 50
+          |)
+          |SELECT a.key, b.value
+          |FROM simple a JOIN simple b ON a.key = b.key""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "Scan-only CTE (no Join/Aggregate/Sort/Window in body) must be " +
+        "inlined by InlineCTE even when AUTO_REUSED_CTE_ENABLED=true. " +
+        "InlineCTE.isAutoCacheEligible and ReplaceCTERefWithCache.isExpensiveEnough " +
+        "must agree on this exclusion.")
+    }
+  }
+
+  test("InlineCTE-skipped CTE that ReplaceCTERefWithCache also rejects falls through cleanly") {
+    prepareData()
+    // This is the contract test for the fall-through path. If
+    // InlineCTE.isAutoCacheEligible and ReplaceCTERefWithCache's gates ever
+    // diverge, a CTE that the carve-out keeps may fail
+    // shouldAutoCache. The CTE then falls through to
+    // ReplaceCTERefWithRepartition, which must produce a valid plan. This
+    // test does not assert specific cache state - it asserts that the
+    // query runs to completion and returns rows without a plan validation
+    // failure.
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, sum(value) as total, count(*) as cnt
+          |  FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total + b.cnt FROM agg a JOIN agg b ON a.key = b.key
+          |WHERE a.total > 0 OR b.cnt > 0""".stripMargin
+
+      val result = spark.sql(sql).collect()
+      assert(result.nonEmpty,
+        "Query with cache-eligible CTE must execute successfully regardless " +
+        "of which downstream rule (cache vs repartition) handles it.")
+    }
+  }
+
   test("nested deterministic CTE (q64-shape: outer CTE references inner CTE)") {
     prepareData()
     withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {

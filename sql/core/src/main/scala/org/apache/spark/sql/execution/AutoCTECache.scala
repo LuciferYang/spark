@@ -89,6 +89,11 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * correlated-reference detector belongs in a separate method; for now we
    * accept the existing q1/q31 regression risk in exchange for getting the
    * non-correlated case right.
+   *
+   * TODO: implement `hasCorrelatedSubqueryReference(cteDef, outerPlan)` and
+   * call it from `shouldAutoCache` to skip caching for q1/q31/q39a-style
+   * patterns. Until then this method is a placeholder kept for documentation
+   * and to make the future fix easy to slot in.
    */
   private def hasDivergentPredicates(cteDef: CTERelationDef): Boolean = false
 
@@ -96,6 +101,19 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    * Returns true if the CTE plan contains at least one expensive operator
    * (Join, Aggregate, Sort, Window). Simple scan-only CTEs are cheap to
    * recompute and caching them wastes memory.
+   *
+   * IMPORTANT: This predicate MUST stay in lock-step with
+   * `org.apache.spark.sql.catalyst.optimizer.InlineCTE.isAutoCacheEligible`
+   * (sql/catalyst module). InlineCTE uses the same predicate to decide
+   * whether to skip inlining a deterministic multi-reference CTE so that
+   * this rule can materialise it. If the two diverge, InlineCTE may either
+   * inline a CTE this rule would have cached (lost optimisation) or keep a
+   * CTE this rule then refuses (no-op InlineCTE skip + ReplaceCTERefWithRepartition
+   * fallback).
+   *
+   * The predicate is duplicated rather than shared because sql/catalyst
+   * cannot depend on sql/core. Reviewers must manually keep the two copies
+   * in sync; there is no test that catches a divergence directly.
    */
   private def isExpensiveEnough(plan: LogicalPlan): Boolean = {
     plan.exists {
