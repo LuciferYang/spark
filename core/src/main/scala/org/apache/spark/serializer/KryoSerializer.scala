@@ -598,6 +598,8 @@ private[serializer] object KryoSerializer {
       "org.apache.spark.sql.types.StructType",
       "[Lorg.apache.spark.sql.types.StructType;",
       "org.apache.spark.sql.types.DateType$",
+      "org.apache.spark.sql.types.Decimal",
+      "[Lorg.apache.spark.sql.types.Decimal;",
       "org.apache.spark.sql.types.DecimalType",
       "org.apache.spark.sql.types.Decimal$DecimalAsIfIntegral$",
       "org.apache.spark.sql.types.Decimal$DecimalIsFractional$",
