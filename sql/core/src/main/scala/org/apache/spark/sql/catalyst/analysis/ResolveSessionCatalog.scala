@@ -33,7 +33,7 @@ import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTable => CreateTableV1, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Utils, FileDataSourceV2, FileTable}
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Utils
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf}
 import org.apache.spark.sql.internal.connector.V1Function
 import org.apache.spark.sql.types.{DataType, MetadataBuilder, StringType, StructField, StructType}
@@ -220,6 +220,15 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
 
     // For CREATE TABLE [AS SELECT], we should use the v1 command if the catalog is resolved to the
     // session catalog and the table provider is not v2.
+    //
+    // [SPARK-56336] File source providers (parquet, orc, csv, json, text, avro) were
+    // previously also routed through `constructV1TableCmd` as a transitional fallback
+    // added by SPARK-56175. That fallback is now removed: when the provider is a V2
+    // `FileDataSourceV2`, we leave the plan unchanged so `DataSourceV2Strategy` can
+    // match it and produce `CreateTableExec` / `CreateTableAsSelectExec`. The V2
+    // create path (`V2SessionCatalog.createTable0`) now handles data-type validation
+    // via `FileTable.supportsDataType` internally, so no explicit validation step is
+    // needed here.
     case c @ CreateTable(ResolvedV1Identifier(ident), _, _, tableSpec: TableSpec, _)
         if c.resolved && c.columns.forall(_.isDefaultValueTypeCoerced) =>
       val (storageFormat, provider) = getStorageFormatAndProvider(
@@ -247,34 +256,7 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
         constructV1TableCmd(None, c.tableSpec, ident, StructType(fields), c.partitioning,
           c.ignoreIfExists, storageFormat, provider)
       } else {
-        // File sources: validate data types and create via
-        // V1 command. Non-file V2 providers keep V2 plan.
-        DataSourceV2Utils.getTableProvider(
-            provider, conf) match {
-          case Some(f: FileDataSourceV2) =>
-            val ft = f.getTable(
-              c.tableSchema, c.partitioning.toArray,
-              new org.apache.spark.sql.util
-                .CaseInsensitiveStringMap(
-                  java.util.Collections.emptyMap()))
-            ft match {
-              case ft: FileTable =>
-                c.tableSchema.foreach { field =>
-                  if (!ft.supportsDataType(
-                      field.dataType)) {
-                    throw QueryCompilationErrors
-                      .dataTypeUnsupportedByDataSourceError(
-                        ft.formatName, field)
-                  }
-                }
-              case _ =>
-            }
-            constructV1TableCmd(None, c.tableSpec, ident,
-              StructType(c.columns.map(_.toV1Column)),
-              c.partitioning,
-              c.ignoreIfExists, storageFormat, provider)
-          case _ => c
-        }
+        c
       }
 
     case c @ CreateTableAsSelect(
@@ -294,17 +276,8 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
         constructV1TableCmd(Some(c.query), c.tableSpec, ident, new StructType, c.partitioning,
           c.ignoreIfExists, storageFormat, provider)
       } else {
-        // File sources: create via V1 command.
-        // Non-file V2 providers keep V2 plan.
-        DataSourceV2Utils.getTableProvider(
-            provider, conf) match {
-          case Some(_: FileDataSourceV2) =>
-            constructV1TableCmd(Some(c.query),
-              c.tableSpec, ident, new StructType,
-              c.partitioning, c.ignoreIfExists,
-              storageFormat, provider)
-          case _ => c
-        }
+        // [SPARK-56336] File source intercept removed (see CreateTable comment above).
+        c
       }
 
     case RefreshTable(ResolvedV1TableOrViewIdentifier(ident)) =>
@@ -312,22 +285,21 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
 
     // For REPLACE TABLE [AS SELECT], we should fail if the catalog is resolved to the
     // session catalog and the table provider is not v2.
+    //
+    // [SPARK-56336] File source providers were previously blocked here with
+    // `unsupportedTableOperationError` on the premise that REPLACE TABLE required a
+    // `StagingTableCatalog` (for atomic replacement). That block is now removed:
+    // `DataSourceV2Strategy` handles non-staging catalogs by producing a non-atomic
+    // `ReplaceTableExec` / `ReplaceTableAsSelectExec` that drops then recreates the
+    // table. The non-atomic REPLACE is an accepted V2 behavior; callers that need
+    // atomic REPLACE can use a catalog extension that implements `StagingTableCatalog`.
     case c @ ReplaceTable(ResolvedV1Identifier(ident), _, _, _, _) if c.resolved =>
       val provider = c.tableSpec.provider.getOrElse(conf.defaultDataSourceName)
       if (!isV2Provider(provider)) {
         throw QueryCompilationErrors.unsupportedTableOperationError(
           ident, "REPLACE TABLE")
       } else {
-        // File sources don't support REPLACE TABLE in
-        // the session catalog (requires StagingTableCatalog).
-        DataSourceV2Utils.getTableProvider(
-            provider, conf) match {
-          case Some(_: FileDataSourceV2) =>
-            throw QueryCompilationErrors
-              .unsupportedTableOperationError(
-                ident, "REPLACE TABLE")
-          case _ => c
-        }
+        c
       }
 
     case c @ ReplaceTableAsSelect(ResolvedV1Identifier(ident), _, _, _, _, _, _) =>
@@ -336,14 +308,7 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
         throw QueryCompilationErrors.unsupportedTableOperationError(
           ident, "REPLACE TABLE AS SELECT")
       } else {
-        DataSourceV2Utils.getTableProvider(
-            provider, conf) match {
-          case Some(_: FileDataSourceV2) =>
-            throw QueryCompilationErrors
-              .unsupportedTableOperationError(
-                ident, "REPLACE TABLE AS SELECT")
-          case _ => c
-        }
+        c
       }
 
     // For CREATE TABLE LIKE, use the v1 command if both the target and source are in the session
@@ -441,6 +406,12 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
       RepairTableCommand(ident, addPartitions, dropPartitions)
 
     // V2 catalog doesn't support LOAD DATA yet, we must use v1 command here.
+    //
+    // Note: V1 `LoadDataCommand.run()` itself unconditionally rejects LOAD DATA on
+    // datasource tables via `loadDataNotSupportedForDatasourceTablesError`, so LOAD
+    // DATA is effectively Hive-only regardless of V1 vs V2 routing. We keep the V1
+    // intercept for Hive tables only; file source tables that reach the V2 strategy
+    // will throw `loadDataNotSupportedForV2TablesError` with an equivalent meaning.
     case LoadData(
         ResolvedV1TableIdentifierInSessionCatalog(ident),
         path,

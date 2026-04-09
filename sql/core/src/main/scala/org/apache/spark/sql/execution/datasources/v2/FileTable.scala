@@ -24,9 +24,9 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogTableType}
 import org.apache.spark.sql.catalyst.expressions.{Cast, Literal}
-import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column, MetadataColumn, SupportsMetadataColumns, SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability}
+import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Column, MetadataColumn, SupportsMetadataColumns, SupportsPartitionManagement, SupportsRead, SupportsWrite, Table, TableCapability, TruncatableTable}
 import org.apache.spark.sql.connector.catalog.TableCapability._
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.expressions.filter.{AlwaysTrue, Predicate}
@@ -49,7 +49,7 @@ abstract class FileTable(
     paths: Seq[String],
     userSpecifiedSchema: Option[StructType])
   extends Table with SupportsRead with SupportsWrite
-    with SupportsPartitionManagement with SupportsMetadataColumns {
+    with SupportsPartitionManagement with SupportsMetadataColumns with TruncatableTable {
 
   import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 
@@ -221,6 +221,51 @@ abstract class FileTable(
   override def properties: util.Map[String, String] = options.asCaseSensitiveMap
 
   override def capabilities: java.util.Set[TableCapability] = FileTable.CAPABILITIES
+
+  /**
+   * [SPARK-56336] Implements `TruncatableTable` so `TRUNCATE TABLE` works for V2 file
+   * source catalog tables. Matches V1 `TruncateTableCommand` semantics in the common
+   * case: rejects EXTERNAL tables, then deletes all files under the table's root
+   * locations and recreates the directories so subsequent writes have a valid target.
+   *
+   * For partitioned tables, this deletes the table's root location. Any custom
+   * partition locations pointing outside the table root are not handled here -- that
+   * is a narrow edge case that also requires `HIVE_MANAGE_FILESOURCE_PARTITIONS` and
+   * `ALTER TABLE ... ADD PARTITION ... LOCATION '...'` to produce. Users who need
+   * V1's custom-partition-location truncate behavior can still opt into the V1 path
+   * via `spark.sql.sources.useV1SourceList`.
+   *
+   * This implementation also does not replicate V1's permission-and-ACL preservation
+   * logic (the HDFS-specific `fs.setPermission` / `fs.setAcl` dance): that code is
+   * filesystem-dependent and frequently falls through the `NonFatal` catch blocks in
+   * V1 anyway, and most file source tables live on cloud object stores where POSIX
+   * permissions are not meaningful.
+   */
+  override def truncateTable(): Boolean = {
+    catalogTable.foreach { ct =>
+      if (ct.tableType == CatalogTableType.EXTERNAL) {
+        throw QueryCompilationErrors.truncateTableOnExternalTablesError(
+          ct.identifier.quotedString)
+      }
+    }
+    val hadoopConf = sparkSession.sessionState.newHadoopConf()
+    fileIndex.rootPaths.foreach { path =>
+      val fs = path.getFileSystem(hadoopConf)
+      if (fs.exists(path)) {
+        try {
+          fs.delete(path, true)
+          fs.mkdirs(path)
+        } catch {
+          case e: Exception =>
+            val tableName = catalogTable.map(_.identifier.quotedString).getOrElse(name())
+            throw QueryCompilationErrors
+              .failToTruncateTableWhenRemovingDataError(tableName, path, e)
+        }
+      }
+    }
+    fileIndex.refresh()
+    true
+  }
 
   /**
    * Exposes the `_metadata` struct column so V2 file scans match V1 parity for queries

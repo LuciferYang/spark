@@ -34,6 +34,7 @@ import org.apache.spark.sql.connector.catalog.NamespaceChange.RemoveProperty
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
+import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.execution.datasources.{DataSource, FileFormat}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -236,8 +237,17 @@ class V2SessionCatalog(catalog: SessionCatalog)
           val table = tableProvider.getTable(schema, partitions, dsOptions)
           table match {
             case ft: FileTable =>
+              // [SPARK-56336] Validate data types and field names using the V1
+              // fallback FileFormat so CREATE TABLE matches V1 semantics. The V2
+              // `supportsDataType` may be more permissive than V1 (e.g., CSV V2
+              // allows VariantType for read but V1 rejects it for CREATE TABLE).
+              // Using V1's `supportDataType` keeps the CREATE TABLE validation
+              // consistent.
+              DDLUtils.checkDataColNames(provider, schema)
+              val v1Format = ft.fallbackFileFormat.getDeclaredConstructor()
+                .newInstance().asInstanceOf[FileFormat]
               schema.foreach { field =>
-                if (!ft.supportsDataType(field.dataType)) {
+                if (!v1Format.supportDataType(field.dataType)) {
                   throw QueryCompilationErrors
                     .dataTypeUnsupportedByDataSourceError(
                       ft.formatName, field)
@@ -292,7 +302,13 @@ class V2SessionCatalog(catalog: SessionCatalog)
       properties = tableProperties ++
         maybeClusterBySpec.map(
           clusterBySpec => ClusterBySpec.toProperty(newSchema, clusterBySpec, conf.resolver)),
-      tracksPartitionsInCatalog = conf.manageFilesourcePartitions,
+      // [SPARK-56336] Match V1 `CreateDataSourceTableCommand.run()` semantics: only set
+      // `tracksPartitionsInCatalog` for tables that actually have partition columns.
+      // Setting it unconditionally would store a "catalog manages partitions" flag on
+      // non-partitioned tables, which has no effect at best and causes downstream
+      // confusion (e.g., `MSCK REPAIR TABLE` reporting an always-empty partition set).
+      tracksPartitionsInCatalog =
+        partitionColumns.nonEmpty && conf.manageFilesourcePartitions,
       comment = Option(properties.get(TableCatalog.PROP_COMMENT)),
       collation = Option(properties.get(TableCatalog.PROP_COLLATION)))
 
