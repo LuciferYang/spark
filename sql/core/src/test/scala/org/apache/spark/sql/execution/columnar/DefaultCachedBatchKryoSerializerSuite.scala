@@ -104,4 +104,68 @@ class DefaultCachedBatchKryoSerializerSuite extends SparkFunSuite {
     val back = ser.deserialize[Array[Decimal]](ser.serialize(arr))
     assert(back.toSeq === arr.toSeq)
   }
+
+  // ---------------------------------------------------------------------------
+  // BigDecimal-backed Decimal coverage
+  //
+  // `org.apache.spark.sql.types.Decimal` internally has two representations:
+  //   - `longVal: Long` for values that fit in Long precision (<= 18 digits).
+  //     `decimalVal` stays null. This was covered by the tests above.
+  //   - `decimalVal: scala.math.BigDecimal` for values that overflow Long.
+  //     `longVal` stays 0. This triggers Kryo to recurse through
+  //     chill's BigDecimalSerializer into `java.math.BigDecimal` and
+  //     its `java.math.BigInteger` unscaled value.
+  //
+  // A TPC-DS q14 benchmark run hit this second path at line 75 of
+  // `DefaultCachedBatchKryoSerializer.write` and crashed on
+  // `java.math.BigDecimal` not being registered. The tests below lock
+  // in the round-trip behaviour for that path.
+  // ---------------------------------------------------------------------------
+
+  test("SPARK-XXXXX: round-trip high-precision Decimal that overflows Long") {
+    val ser = newSerializer()
+    // A 30-digit value cannot fit in Long; this forces the BigDecimal
+    // representation. Verified by asserting `precision > 18` in the
+    // constructor.
+    val bigBacked =
+      Decimal(BigDecimal("123456789012345678901234567890.123"), 33, 3)
+    assert(bigBacked.precision > 18,
+      "test precondition: precision must exceed Long range to exercise " +
+      "the decimalVal code path")
+    val back = ser.deserialize[Decimal](ser.serialize(bigBacked))
+    assert(back === bigBacked)
+  }
+
+  test("SPARK-XXXXX: round-trip GenericInternalRow with BigDecimal-backed Decimal") {
+    val ser = newSerializer()
+    val row = new GenericInternalRow(Array[Any](
+      Decimal(BigDecimal("99999999999999999999.999999999"), 29, 9),
+      Decimal(123L, 5, 2)))  // mix of both representations
+    val bytes = ser.serialize(row)
+    val back = ser.deserialize[GenericInternalRow](bytes)
+    assert(back.numFields === 2)
+    assert(back.getDecimal(0, 29, 9) ===
+      Decimal(BigDecimal("99999999999999999999.999999999"), 29, 9))
+    assert(back.getDecimal(1, 5, 2) === Decimal(123L, 5, 2))
+  }
+
+  test("SPARK-XXXXX: round-trip DefaultCachedBatch whose stats hold a " +
+       "BigDecimal-backed Decimal (matches the q14 benchmark failure shape)") {
+    val ser = newSerializer()
+    val stats = new GenericInternalRow(Array[Any](
+      Decimal(BigDecimal("1.0"), 38, 6),
+      Decimal(BigDecimal("99999999999999999999999999999999.999999"), 38, 6),
+      100L, 0L))
+    val batch = DefaultCachedBatch(
+      numRows = 1000,
+      buffers = Array(Array[Byte](10, 20, 30)),
+      stats = stats)
+    val bytes = ser.serialize(batch)
+    val back = ser.deserialize[DefaultCachedBatch](bytes)
+    assert(back.numRows === 1000)
+    assert(back.buffers.length === 1)
+    assert(back.stats.getDecimal(0, 38, 6) === Decimal(BigDecimal("1.0"), 38, 6))
+    assert(back.stats.getDecimal(1, 38, 6) ===
+      Decimal(BigDecimal("99999999999999999999999999999999.999999"), 38, 6))
+  }
 }

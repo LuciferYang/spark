@@ -603,6 +603,16 @@ private[serializer] object KryoSerializer {
       "org.apache.spark.sql.types.DecimalType",
       "org.apache.spark.sql.types.Decimal$DecimalAsIfIntegral$",
       "org.apache.spark.sql.types.Decimal$DecimalIsFractional$",
+      // `org.apache.spark.sql.types.Decimal` delegates to
+      // `scala.math.BigDecimal` (registered by chill's `AllScalaRegistrar`)
+      // for values that do not fit in a Long. Chill's `BigDecimalSerializer`
+      // then writes the underlying `java.math.BigDecimal` via
+      // `writeClassAndObject`, which requires the Java class to be
+      // registered. `java.math.BigDecimal` in turn wraps a
+      // `java.math.BigInteger` for its unscaled value, so register that
+      // too to survive the full recursive walk under strict Kryo mode.
+      "java.math.BigDecimal",
+      "java.math.BigInteger",
       "org.apache.spark.sql.execution.command.PartitionStatistics",
       "org.apache.spark.sql.execution.datasources.BasicWriteTaskStats",
       "org.apache.spark.sql.execution.datasources.ExecutedWriteSummary",
