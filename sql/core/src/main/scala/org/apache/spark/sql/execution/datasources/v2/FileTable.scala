@@ -293,14 +293,27 @@ abstract class FileTable(
   protected def mergedOptions(options: CaseInsensitiveStringMap): CaseInsensitiveStringMap = {
     val base = this.options.asCaseSensitiveMap().asScala ++
       options.asCaseSensitiveMap().asScala
-    // Inject stored numRows from catalog for FileScan.estimateStatistics()
-    val withStats = catalogTable.flatMap(_.stats)
-      .flatMap(_.rowCount) match {
-      case Some(rows) =>
-        base ++ Map(FileTable.NUM_ROWS_KEY -> rows.toString)
+    // Inject stored stats from catalog for FileScan.estimateStatistics().
+    //
+    // numRows is propagated for all catalog file source tables (added by SPARK-56176).
+    //
+    // [SPARK-56337] sizeInBytes is propagated for non-partitioned catalog file source
+    // tables. For partitioned tables that use `useCatalogFileIndex`, the analyzed
+    // sizeInBytes already flows through `CatalogFileIndex.sizeInBytes` directly. For
+    // non-partitioned tables (`InMemoryFileIndex`), the file-listing-based estimate
+    // is used unless we side-channel the analyzed value here, so this injection
+    // closes the gap.
+    val stats = catalogTable.flatMap(_.stats)
+    val withRowCount = stats.flatMap(_.rowCount) match {
+      case Some(rows) => base ++ Map(FileTable.NUM_ROWS_KEY -> rows.toString)
       case None => base
     }
-    new CaseInsensitiveStringMap(withStats.asJava)
+    val withSizeInBytes = stats.map(_.sizeInBytes) match {
+      case Some(size) =>
+        withRowCount ++ Map(FileTable.SIZE_IN_BYTES_KEY -> size.toString)
+      case None => withRowCount
+    }
+    new CaseInsensitiveStringMap(withSizeInBytes.asJava)
   }
 
   /**
@@ -607,4 +620,7 @@ object FileTable {
 
   /** Option key for injecting stored row count from ANALYZE TABLE into FileScan. */
   val NUM_ROWS_KEY: String = "__numRows"
+
+  /** Option key for injecting stored size-in-bytes from ANALYZE TABLE into FileScan. */
+  val SIZE_IN_BYTES_KEY: String = "__sizeInBytes"
 }

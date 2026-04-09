@@ -332,12 +332,20 @@ trait FileScan extends Scan
   override def estimateStatistics(): Statistics = {
     new Statistics {
       override def sizeInBytes(): OptionalLong = {
-        val compressionFactor = conf.fileCompressionFactor
-        val size = (compressionFactor * fileIndex.sizeInBytes /
-          (dataSchema.defaultSize + fileIndex.partitionSchema.defaultSize) *
-          (readDataSchema.defaultSize + readPartitionSchema.defaultSize)).toLong
-
-        OptionalLong.of(size)
+        // [SPARK-56337] Prefer the analyzed sizeInBytes propagated from
+        // `CatalogTable.stats` via `FileTable.mergedOptions`. For non-partitioned
+        // catalog tables this is the only way the V2 scan sees the analyzed value,
+        // since `InMemoryFileIndex` returns a file-listing-based estimate.
+        // Partitioned catalog tables that use `useCatalogFileIndex` already see the
+        // analyzed size through `CatalogFileIndex.sizeInBytes`, but going through
+        // this path is consistent and harmless.
+        storedSizeInBytes.map(OptionalLong.of).getOrElse {
+          val compressionFactor = conf.fileCompressionFactor
+          val size = (compressionFactor * fileIndex.sizeInBytes /
+            (dataSchema.defaultSize + fileIndex.partitionSchema.defaultSize) *
+            (readDataSchema.defaultSize + readPartitionSchema.defaultSize)).toLong
+          OptionalLong.of(size)
+        }
       }
 
       override def numRows(): OptionalLong = {
@@ -355,6 +363,13 @@ trait FileScan extends Scan
    */
   protected def storedNumRows: Option[Long] =
     Option(options.get(FileTable.NUM_ROWS_KEY)).map(_.toLong)
+
+  /**
+   * [SPARK-56337] Stored sizeInBytes from ANALYZE TABLE, if available.
+   * Injected via FileTable.mergedOptions.
+   */
+  protected def storedSizeInBytes: Option[Long] =
+    Option(options.get(FileTable.SIZE_IN_BYTES_KEY)).map(_.toLong)
 
   override def toBatch: Batch = this
 
