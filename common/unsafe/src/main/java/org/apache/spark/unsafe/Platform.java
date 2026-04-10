@@ -310,7 +310,7 @@ public final class Platform {
       DOUBLE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(double[].class);
       try {
         DIRECT_BUFFER_ADDRESS_OFFSET =
-            _UNSAFE.objectFieldOffset(java.nio.Buffer.class.getDeclaredField("address"));
+          _UNSAFE.objectFieldOffset(java.nio.Buffer.class.getDeclaredField("address"));
       } catch (NoSuchFieldException e) {
         throw new IllegalStateException(e);
       }
