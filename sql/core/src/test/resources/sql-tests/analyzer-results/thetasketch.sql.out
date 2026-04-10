@@ -977,7 +977,7 @@ SELECT
 FROM individual_sketches
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias sketches
 :     +- Union false, false
 :        :- Union false, false
@@ -994,12 +994,12 @@ WithCTE
 :        +- Aggregate [string_sketch AS sketch_type#x, theta_sketch_agg(col1#x, 14, 0, 0) AS sketch#x]
 :           +- SubqueryAlias spark_catalog.default.t_string_a_d_through_e_h
 :              +- Relation spark_catalog.default.t_string_a_d_through_e_h[col1#x,col2#x] parquet
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias union_result
 :     +- Aggregate [theta_union_agg(sketch#x, 16, 0, 0) AS union_sketch#x]
 :        +- SubqueryAlias sketches
 :           +- CTERelationRef xxxx, true, [sketch_type#x, sketch#x], false, false, 4
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias individual_sketches
 :     +- Aggregate [theta_sketch_agg(col1#x, 12, 0, 0) AS sketch1#x, theta_sketch_agg(col2#x, 12, 0, 0) AS sketch2#x]
 :        +- SubqueryAlias spark_catalog.default.t_int_1_5_through_7_11
