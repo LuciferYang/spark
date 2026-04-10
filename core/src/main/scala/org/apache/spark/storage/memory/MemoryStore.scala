@@ -488,18 +488,22 @@ private[spark] class MemoryStore(
       // can lead to exceptions.
       entries.synchronized {
         val iterator = entries.entrySet().iterator()
-        while (freedMemory < space && iterator.hasNext) {
+        val candidates = new ArrayBuffer[(BlockId, MemoryEntry[_], Int)]
+        while (iterator.hasNext) {
           val pair = iterator.next()
           val blockId = pair.getKey
           val entry = pair.getValue
           if (blockIsEvictable(blockId, entry)) {
-            // We don't want to evict blocks which are currently being read, so we need to obtain
-            // an exclusive write lock on blocks which are candidates for eviction. We perform a
-            // non-blocking "tryLock" here in order to ignore blocks which are locked for reading:
-            if (blockInfoManager.lockForWriting(blockId, blocking = false).isDefined) {
-              selectedBlocks += blockId
-              freedMemory += entry.size
-            }
+            val priority = blockInfoManager.getEvictionPriority(blockId)
+            candidates += ((blockId, entry, priority))
+          }
+        }
+        // Stable sort: lower priority evicted first, LRU order preserved within same priority
+        val sorted = candidates.sortBy(_._3)
+        for ((blockId, entry, _) <- sorted if freedMemory < space) {
+          if (blockInfoManager.lockForWriting(blockId, blocking = false).isDefined) {
+            selectedBlocks += blockId
+            freedMemory += entry.size
           }
         }
       }
