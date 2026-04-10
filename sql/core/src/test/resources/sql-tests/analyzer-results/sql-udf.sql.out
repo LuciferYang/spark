@@ -2763,7 +2763,7 @@ WITH cte AS (SELECT foo3_1a(c1, c2) FROM t1)
 SELECT * FROM cte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [spark_catalog.default.foo3_1a(a#x, b#x) AS spark_catalog.default.foo3_1a(c1, c2)#x]
 :        +- Project [c1#x, c2#x, cast(c1#x as double) AS a#x, cast(c2#x as double) AS b#x]
@@ -3492,7 +3492,7 @@ SELECT foo3_2e1(
 -- !query analysis
 Project [spark_catalog.default.foo3_2e1(occurrences#x, instance_start_time#x) AS spark_catalog.default.foo3_2e1(array(struct(2022-01-01 10:11:12, 1), struct(2022-01-01 10:11:15, 2)), 2022-01-01)#x]
 :  +- WithCTE
-:     :- CTERelationDef xxxx, false
+:     :- CTERelationDef xxxx, false, false
 :     :  +- SubqueryAlias t
 :     :     +- Project [transform(outer(occurrences#x), lambdafunction(named_struct(diff, abs((unix_millis(lambda x#x.start_time) - unix_millis(outer(instance_start_time#x)))), id, lambda x#x.occurrence_id), lambda x#x, false)) AS diffs#x]
 :     :        +- OneRowRelation
