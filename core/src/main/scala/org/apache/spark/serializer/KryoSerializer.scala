@@ -576,6 +576,7 @@ private[serializer] object KryoSerializer {
       "org.apache.spark.sql.catalyst.InternalRow",
       "org.apache.spark.sql.catalyst.InternalRow$",
       "[Lorg.apache.spark.sql.catalyst.InternalRow;",
+      "org.apache.spark.sql.catalyst.expressions.GenericInternalRow",
       "org.apache.spark.sql.catalyst.expressions.UnsafeRow",
       "org.apache.spark.sql.catalyst.expressions.UnsafeArrayData",
       "org.apache.spark.sql.catalyst.expressions.UnsafeMapData",
