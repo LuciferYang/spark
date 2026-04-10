@@ -362,7 +362,7 @@ GROUP BY
 -- !query analysis
 Aggregate [scalar-subquery#x []], [scalar-subquery#x [] AS subq1#x]
 :  :- WithCTE
-:  :  :- CTERelationDef xxxx, false
+:  :  :- CTERelationDef xxxx, false, false
 :  :  :  +- SubqueryAlias cte
 :  :  :     +- Project [1 AS 1#x]
 :  :  :        +- OneRowRelation
@@ -370,7 +370,7 @@ Aggregate [scalar-subquery#x []], [scalar-subquery#x [] AS subq1#x]
 :  :     +- SubqueryAlias cte
 :  :        +- CTERelationRef xxxx, true, [1#x], false, false, 1
 :  +- WithCTE
-:     :- CTERelationDef xxxx, false
+:     :- CTERelationDef xxxx, false, false
 :     :  +- SubqueryAlias cte
 :     :     +- Project [1 AS 1#x]
 :     :        +- OneRowRelation
