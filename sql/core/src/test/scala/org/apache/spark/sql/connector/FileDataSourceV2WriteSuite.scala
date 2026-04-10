@@ -86,8 +86,10 @@ class FileDataSourceV2WriteSuite extends QueryTest with SharedSparkSession {
   private val dummyReadOnlyFileSourceV2 = classOf[DummyReadOnlyFileDataSourceV2].getName
   private val dummyWriteOnlyFileSourceV2 = classOf[DummyWriteOnlyFileDataSourceV2].getName
 
-  // Built-in file formats for write testing. Text is excluded
-  // because it only supports a single string column.
+  // Built-in file formats for write testing. Text is excluded because it only
+  // supports a single string column. Avro is excluded because it lives in a
+  // separate module (`connector/avro`) and is not available in `sql/core` tests;
+  // equivalent V2 write coverage for avro is provided by `AvroV2Suite`.
   private val fileFormats = Seq("parquet", "orc", "json", "csv")
 
   override protected def sparkConf: SparkConf = super.sparkConf.set(SQLConf.USE_V1_SOURCE_LIST, "")

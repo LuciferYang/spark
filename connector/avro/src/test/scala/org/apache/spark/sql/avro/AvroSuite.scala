@@ -3483,6 +3483,185 @@ class AvroV2Suite extends AvroSuite with ExplainSuiteHelper {
     }
   }
 
+  test("SPARK-56171: Avro V2 write produces same results as V1 write") {
+    withTempPath { v1Path =>
+      withTempPath { v2Path =>
+        val data = spark.range(100).selectExpr("id", "id * 2 as value")
+
+        withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "avro") {
+          data.write.format("avro").save(v1Path.getCanonicalPath)
+        }
+        data.write.format("avro").save(v2Path.getCanonicalPath)
+
+        val v1Result = spark.read.format("avro").load(v1Path.getCanonicalPath)
+        val v2Result = spark.read.format("avro").load(v2Path.getCanonicalPath)
+        checkAnswer(v1Result, v2Result)
+      }
+    }
+  }
+
+  test("SPARK-56171: Avro V2 multi-level partitioned write") {
+    withTempPath { path =>
+      val data = spark.range(30).selectExpr("id", "id % 3 as year", "id % 2 as month")
+      data.write.format("avro").partitionBy("year", "month").save(path.getCanonicalPath)
+      val result = spark.read.format("avro").load(path.getCanonicalPath)
+      checkAnswer(result, data)
+
+      val yearDirs = path.listFiles().filter(_.isDirectory).map(_.getName)
+      assert(yearDirs.exists(_.startsWith("year=")),
+        s"Expected year partition dirs, got: ${yearDirs.mkString(", ")}")
+      val firstYearDir = path.listFiles().filter(_.isDirectory).head
+      val monthDirs = firstYearDir.listFiles().filter(_.isDirectory).map(_.getName)
+      assert(monthDirs.exists(_.startsWith("month=")),
+        s"Expected month partition dirs, got: ${monthDirs.mkString(", ")}")
+    }
+  }
+
+  test("SPARK-56171: Avro V2 dynamic partition overwrite") {
+    withSQLConf(SQLConf.PARTITION_OVERWRITE_MODE.key -> "dynamic") {
+      withTempPath { path =>
+        val initial = spark.range(9).selectExpr("id", "id % 3 as part")
+        initial.write.format("avro").partitionBy("part").save(path.getCanonicalPath)
+
+        val overwrite = spark.createDataFrame(
+          Seq((100L, 0L), (101L, 0L))).toDF("id", "part")
+        overwrite.write.format("avro")
+          .mode("overwrite").partitionBy("part").save(path.getCanonicalPath)
+
+        val result = spark.read.format("avro").load(path.getCanonicalPath)
+        val expected = initial.filter("part != 0").union(overwrite)
+        checkAnswer(result, expected)
+      }
+    }
+  }
+
+  test("SPARK-56171: Avro V2 cache invalidation on overwrite") {
+    withTempPath { path =>
+      val p = path.getCanonicalPath
+      spark.range(1000).toDF("id").write.format("avro").save(p)
+      val df = spark.read.format("avro").load(p).cache()
+      assert(df.count() == 1000)
+      spark.range(10).toDF("id").write.mode("append").format("avro").save(p)
+      spark.range(10).toDF("id").write.mode("overwrite").format("avro").save(p)
+      assert(df.count() == 10,
+        "Cache should be invalidated after V2 overwrite")
+      df.unpersist()
+    }
+  }
+
+  test("SPARK-56171: Avro V2 cache invalidation on append") {
+    withTempPath { path =>
+      val p = path.getCanonicalPath
+      spark.range(1000).toDF("id").write.format("avro").save(p)
+      val df = spark.read.format("avro").load(p).cache()
+      assert(df.count() == 1000)
+      spark.range(10).toDF("id").write.mode("append").format("avro").save(p)
+      assert(df.count() == 1010,
+        "Cache should be invalidated after V2 append")
+      df.unpersist()
+    }
+  }
+
+  test("SPARK-56171: Avro V2 catalog table INSERT INTO") {
+    withTable("t_avro_insert") {
+      sql("CREATE TABLE t_avro_insert (id BIGINT, value BIGINT) USING avro")
+      sql("INSERT INTO t_avro_insert VALUES (1, 10), (2, 20), (3, 30)")
+      checkAnswer(sql("SELECT * FROM t_avro_insert ORDER BY id"),
+        Seq(Row(1L, 10L), Row(2L, 20L), Row(3L, 30L)))
+    }
+  }
+
+  test("SPARK-56171: Avro V2 CTAS") {
+    withTable("t_avro_ctas") {
+      sql("CREATE TABLE t_avro_ctas USING avro AS SELECT id, id * 2 as value FROM range(10)")
+      checkAnswer(
+        sql("SELECT count(*) FROM t_avro_ctas"),
+        Seq(Row(10L)))
+    }
+  }
+
+  test("SPARK-56171: Avro V2 partitioned write produces same results as V1") {
+    withTempPath { v1Path =>
+      withTempPath { v2Path =>
+        val data = spark.range(50).selectExpr("id", "id % 3 as part", "id * 10 as value")
+        withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "avro") {
+          data.write.format("avro").partitionBy("part").save(v1Path.getCanonicalPath)
+        }
+        data.write.format("avro").partitionBy("part").save(v2Path.getCanonicalPath)
+        val v1Result = spark.read.format("avro").load(v1Path.getCanonicalPath)
+        val v2Result = spark.read.format("avro").load(v2Path.getCanonicalPath)
+        checkAnswer(v1Result, v2Result)
+      }
+    }
+  }
+
+  test("SPARK-56171: Avro V2 dynamic partition overwrite produces same results as V1") {
+    withSQLConf(SQLConf.PARTITION_OVERWRITE_MODE.key -> "dynamic") {
+      withTempPath { v1Path =>
+        withTempPath { v2Path =>
+          val initial = spark.range(12).selectExpr("id", "id % 4 as part")
+          val overwrite = spark.createDataFrame(
+            Seq((200L, 1L), (201L, 1L))).toDF("id", "part")
+
+          Seq(("avro", v1Path), ("", v2Path)).foreach { case (useV1, path) =>
+            withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> useV1) {
+              initial.write.format("avro").partitionBy("part").save(path.getCanonicalPath)
+              overwrite.write.format("avro")
+                .mode("overwrite").partitionBy("part").save(path.getCanonicalPath)
+            }
+          }
+
+          val v1Result = spark.read.format("avro").load(v1Path.getCanonicalPath)
+          val v2Result = spark.read.format("avro").load(v2Path.getCanonicalPath)
+          checkAnswer(v1Result, v2Result)
+        }
+      }
+    }
+  }
+
+  test("SPARK-56171: Avro V2 catalog table partitioned INSERT INTO") {
+    withTable("t_avro_part_insert") {
+      sql(
+        "CREATE TABLE t_avro_part_insert (id BIGINT, part BIGINT) USING avro PARTITIONED BY (part)")
+      sql("INSERT INTO t_avro_part_insert VALUES (1, 1), (2, 1), (3, 2), (4, 2)")
+      checkAnswer(sql("SELECT * FROM t_avro_part_insert ORDER BY id"),
+        Seq(Row(1L, 1L), Row(2L, 1L), Row(3L, 2L), Row(4L, 2L)))
+    }
+  }
+
+  test("SPARK-56171: Avro V2 cache invalidation on catalog table overwrite") {
+    withTable("t_avro_cache") {
+      sql("CREATE TABLE t_avro_cache (id BIGINT) USING avro")
+      sql("INSERT INTO t_avro_cache SELECT id FROM range(100)")
+      spark.table("t_avro_cache").cache()
+      assert(spark.table("t_avro_cache").count() == 100)
+      sql("INSERT OVERWRITE TABLE t_avro_cache SELECT id FROM range(10)")
+      assert(spark.table("t_avro_cache").count() == 10,
+        "Cache should be invalidated after catalog table overwrite")
+      spark.catalog.uncacheTable("t_avro_cache")
+    }
+  }
+
+  test("SPARK-56171: Avro V2 partitioned write to empty directory") {
+    withTempDir { dir =>
+      val data = spark.range(20).selectExpr("id", "id % 4 as k")
+      data.write.format("avro").partitionBy("k")
+        .mode("overwrite").save(dir.toString)
+      checkAnswer(spark.read.format("avro").load(dir.toString), data)
+    }
+  }
+
+  test("SPARK-56171: Avro V2 partitioned overwrite to existing directory") {
+    withTempPath { dir =>
+      val data1 = spark.range(10).selectExpr("id", "id % 2 as k")
+      data1.write.format("avro").partitionBy("k").save(dir.toString)
+      val data2 = spark.range(10, 20).selectExpr("id", "id % 2 as k")
+      data2.write.format("avro").partitionBy("k")
+        .mode("overwrite").save(dir.toString)
+      checkAnswer(spark.read.format("avro").load(dir.toString), data2)
+    }
+  }
+
   test("Geospatial types are not supported in Avro") {
     withTempDir { dir =>
       // Temporary directory for writing the test data.
