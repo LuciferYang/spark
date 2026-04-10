@@ -86,12 +86,25 @@ case class UnionLoopRef(
  *                                   pushdown to help ensure rule idempotency.
  * @param underSubquery If true, it means we don't need to add a shuffle for this CTE relation as
  *                      subquery reuse will be applied to reuse CTE relation output.
+ * @param maxDepth The maximal depth of a recursion in a recursive CTE.
+ * @param correlatedSubqueryRef If true, at least one reference to this CTE was originally placed
+ *                              inside a correlated subquery expression (a SubqueryExpression with
+ *                              non-empty outerAttrs). This field is populated by
+ *                              `TagCorrelatedCTERefs` BEFORE `RewriteCorrelatedScalarSubquery`
+ *                              decorrelates the subquery into a join, so the signal survives the
+ *                              decorrelation. `ReplaceCTERefWithCache` reads this field to skip
+ *                              caching CTEs that match the q1/q31/q39a regression pattern, where
+ *                              materialising the CTE would block the per-key specialisation that
+ *                              the decorrelated join can otherwise exploit via runtime filters
+ *                              and predicate pushdown.
  */
 case class CTERelationDef(
     child: LogicalPlan,
     id: Long = CTERelationDef.newId,
     originalPlanWithPredicates: Option[(LogicalPlan, Seq[Expression])] = None,
-    underSubquery: Boolean = false) extends UnaryNode {
+    underSubquery: Boolean = false,
+    maxDepth: Option[Int] = None,
+    correlatedSubqueryRef: Boolean = false) extends UnaryNode {
 
   final override val nodePatterns: Seq[TreePattern] = Seq(CTE)
 

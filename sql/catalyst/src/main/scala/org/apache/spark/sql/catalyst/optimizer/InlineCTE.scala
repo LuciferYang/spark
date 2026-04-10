@@ -22,9 +22,10 @@ import scala.collection.mutable
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
 import org.apache.spark.sql.catalyst.expressions.{Alias, OuterReference, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.logical.{CTERelationDef, CTERelationRef, Join, JoinHint, LogicalPlan, Project, Subquery, WithCTE}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, CTERelationDef, CTERelationRef, Join, JoinHint, LogicalPlan, Project, Sort, Subquery, Window, WithCTE}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{CTE, PLAN_EXPRESSION}
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * Inlines CTE definitions into corresponding references if either of the conditions satisfies:
@@ -55,7 +56,29 @@ case class InlineCTE(
     }
   }
 
-  private def shouldInline(cteDef: CTERelationDef, refCount: Int): Boolean = alwaysInline || {
+  private def shouldInline(cteDef: CTERelationDef, refCount: Int): Boolean = {
+    if (alwaysInline) return true
+
+    // When auto-CTE caching is enabled, do not inline a multi-reference CTE that
+    // has an expensive body (Join / Aggregate / Sort / Window). Such CTEs are
+    // candidates for `ReplaceCTERefWithCache` to materialize as `InMemoryRelation`.
+    // Without this carve-out, every deterministic CTE is inlined here and the
+    // auto-cache rule has nothing left to materialize on real workloads (TPC-DS
+    // CTEs are virtually all deterministic).
+    //
+    // EXCEPTION: if the CTE has a reference inside a correlated subquery
+    // (`correlatedSubqueryRef = true`), `ReplaceCTERefWithCache` will refuse
+    // to cache it. We must NOT skip inlining in that case, otherwise the
+    // CTE survives into `ReplaceCTERefWithRepartition`, which produces an
+    // unresolved plan because the multi-reference is not deduped here.
+    // Inlining correlated-ref CTEs is the safe baseline behavior.
+    if (refCount > 1 &&
+        SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
+        !cteDef.correlatedSubqueryRef &&
+        isAutoCacheEligible(cteDef.child)) {
+      return false
+    }
+
     // We do not need to check enclosed `CTERelationRef`s for `deterministic` or `OuterReference`,
     // because:
     // 1) It is fine to inline a CTE if it references another CTE that is non-deterministic;
@@ -66,6 +89,56 @@ case class InlineCTE(
       // a UnionLoopRef with the same ID.
       (cteDef.deterministic && !cteDef.hasSelfReferenceAsUnionLoopRef) ||
       cteDef.child.exists(_.expressions.exists(_.isInstanceOf[OuterReference]))
+  }
+
+  /**
+   * Returns true if the CTE body is expensive enough that
+   * `ReplaceCTERefWithCache` would consider it for caching. Two gates:
+   *
+   *   1. Structural: contains a Join / Aggregate / Sort / Window.
+   *   2. Stats: estimated `sizeInBytes` >= `AUTO_CTE_CACHE_MIN_SIZE_BYTES`.
+   *      When stats are unavailable the structural gate alone applies.
+   *
+   * IMPORTANT: This predicate, together with the `!correlatedSubqueryRef`
+   * check in the carve-out above, MUST stay in lock-step with
+   * `org.apache.spark.sql.execution.ReplaceCTERefWithCache.shouldAutoCache`
+   * (sql/core module). If `shouldAutoCache` adds a new gate, update the
+   * carve-out here to match - otherwise this rule may keep a CTE that
+   * `ReplaceCTERefWithCache` then refuses to cache, leaving it for
+   * `ReplaceCTERefWithRepartition` to handle. That fallback path produces an
+   * unresolved plan when the multi-reference CTE was not first deduplicated
+   * by InlineCTE itself, because `ReplaceCTERefWithRepartition` does not
+   * give cs1/cs2 references separate exprIds.
+   *
+   * The two call sites can see slightly different stats (InlineCTE runs
+   * earlier, before predicate pushdown shrinks the body). For clearly
+   * tiny vs clearly large CTEs the divergence is irrelevant; for
+   * borderline cases the structural gate is the primary signal.
+   *
+   * The predicate is duplicated rather than shared because catalyst cannot
+   * depend on sql/core. There is no test that catches a divergence between
+   * the two definitions; reviewers should manually verify when modifying
+   * either.
+   */
+  private def isAutoCacheEligible(plan: LogicalPlan): Boolean = {
+    val structurallyExpensive = plan.exists {
+      case _: Join => true
+      case _: Aggregate => true
+      case _: Sort => true
+      case _: Window => true
+      case _ => false
+    }
+    if (!structurallyExpensive) return false
+
+    val threshold = SQLConf.get.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
+    try {
+      plan.stats.sizeInBytes.toLong >= threshold
+    } catch {
+      // NonFatal: swallow stats-provider bugs, let fatal errors propagate.
+      // Permissive fallback for consistency with
+      // ReplaceCTERefWithCache.isExpensiveEnough.
+      case scala.util.control.NonFatal(_) => true
+    }
   }
 
   /**
