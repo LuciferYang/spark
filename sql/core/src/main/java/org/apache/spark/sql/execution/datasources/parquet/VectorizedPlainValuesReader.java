@@ -43,9 +43,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   private int bitOffset;
   private byte currentByte = 0;
 
-  // Reusable scratch buffer for string/binary decoding in direct ByteBuffer paths.
-  // putByteArray copies the data into arrayData(), so this buffer can be safely reused.
-  private byte[] scratch = new byte[0];
 
   public VectorizedPlainValuesReader() {
   }
@@ -129,17 +126,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     } catch (IOException e) {
       throw new ParquetDecodingException("Failed to read " + length + " bytes", e);
     }
-  }
-
-  /**
-   * Returns {@code buf} if it is already large enough for {@code needed} bytes;
-   * otherwise allocates a new array. The new size follows a 1.5x growth policy
-   * (same as {@link java.util.ArrayList}) to amortize allocation cost.
-   */
-  private static byte[] ensureScratch(byte[] buf, int needed) {
-    if (buf.length >= needed) return buf;
-    int newLen = Math.max(needed, buf.length + (buf.length >> 1));
-    return new byte[newLen];
   }
 
   @Override
@@ -490,9 +476,9 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       if (buffer.hasArray()) {
         v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
       } else {
-        scratch = ensureScratch(scratch, len);
-        buffer.get(scratch, 0, len);
-        v.putByteArray(rowId + i, scratch, 0, len);
+        // Copy directly from the ByteBuffer into the column vector's backing storage,
+        // bypassing any intermediate byte[] allocation.
+        v.putByteArray(rowId + i, buffer, buffer.position(), len);
       }
     }
   }
@@ -512,7 +498,6 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       return Binary.fromConstantByteArray(
           buffer.array(), buffer.arrayOffset() + buffer.position(), len);
     } else {
-      // Cannot reuse scratch here: Binary.fromConstantByteArray holds a reference to the array.
       byte[] bytes = new byte[len];
       buffer.get(bytes);
       return Binary.fromConstantByteArray(bytes);

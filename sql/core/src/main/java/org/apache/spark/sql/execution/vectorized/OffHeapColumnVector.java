@@ -204,6 +204,22 @@ public final class OffHeapColumnVector extends WritableColumnVector {
   }
 
   @Override
+  public void putBytes(int rowId, int count, ByteBuffer src, int srcIndex) {
+    if (src.hasArray()) {
+      Platform.copyMemory(
+          src.array(),
+          Platform.BYTE_ARRAY_OFFSET + src.arrayOffset() + srcIndex,
+          null,
+          data + rowId,
+          count);
+    } else {
+      // Direct buffer: native-to-native copy, single Unsafe call, no temp array.
+      long srcAddr = Platform.getDirectBufferAddress(src) + srcIndex;
+      Platform.copyMemory(null, srcAddr, null, data + rowId, count);
+    }
+  }
+
+  @Override
   public byte getByte(int rowId) {
     if (dictionary == null) {
       return Platform.getByte(null, data + rowId);
