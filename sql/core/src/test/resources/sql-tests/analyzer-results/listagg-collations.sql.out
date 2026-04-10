@@ -12,7 +12,7 @@ Aggregate [listagg(c1#x, null, collate(c1#x, utf8_binary) ASC NULLS FIRST, 0, 0)
 WITH t(c1) AS (SELECT listagg(DISTINCT col1 COLLATE utf8_binary) FROM (VALUES ('a'), ('A'), ('b'), ('B'))) SELECT len(c1), regexp_count(c1, 'a'), regexp_count(c1, 'b'), regexp_count(c1, 'A'), regexp_count(c1, 'B') FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [listagg(DISTINCT collate(col1, utf8_binary), NULL)#x AS c1#x]
 :        +- Aggregate [listagg(distinct collate(col1#x, utf8_binary), null, 0, 0) AS listagg(DISTINCT collate(col1, utf8_binary), NULL)#x]
@@ -27,7 +27,7 @@ WithCTE
 WITH t(c1) AS (SELECT listagg(col1) WITHIN GROUP (ORDER BY col1) FROM (VALUES ('abc  '), ('abc '), ('abc\n'), ('abc'), ('x'))) SELECT replace(replace(c1, ' ', ''), '\n', '$') FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [listagg(col1, NULL) WITHIN GROUP (ORDER BY col1 ASC NULLS FIRST)#x AS c1#x]
 :        +- Aggregate [listagg(col1#x, null, col1#x ASC NULLS FIRST, 0, 0) AS listagg(col1, NULL) WITHIN GROUP (ORDER BY col1 ASC NULLS FIRST)#x]
@@ -53,7 +53,7 @@ Aggregate [lower(listagg(c1#x, null, collate(c1#x, utf8_lcase) ASC NULLS FIRST, 
 WITH t(c1) AS (SELECT lower(listagg(DISTINCT col1 COLLATE utf8_lcase)) FROM (VALUES ('a'), ('A'), ('b'), ('B'))) SELECT len(c1), regexp_count(c1, 'a'), regexp_count(c1, 'b') FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [lower(listagg(DISTINCT collate(col1, utf8_lcase), NULL))#x AS c1#x]
 :        +- Aggregate [lower(listagg(distinct collate(col1#x, utf8_lcase), null, 0, 0)) AS lower(listagg(DISTINCT collate(col1, utf8_lcase), NULL))#x]
@@ -77,7 +77,7 @@ Aggregate [lower(listagg(distinct collate(c1#x, utf8_lcase), null, collate(c1#x,
 WITH t(c1) AS (SELECT replace(listagg(DISTINCT col1 COLLATE unicode_rtrim) COLLATE utf8_binary, ' ', '') FROM (VALUES ('xbc  '), ('xbc '), ('a'), ('xbc'))) SELECT len(c1), regexp_count(c1, 'a'), regexp_count(c1, 'xbc') FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [replace(collate(listagg(DISTINCT collate(col1, unicode_rtrim), NULL), utf8_binary),  , )#x AS c1#x]
 :        +- Aggregate [replace(collate(listagg(distinct collate(col1#x, unicode_rtrim), null, 0, 0), utf8_binary),  , ) AS replace(collate(listagg(DISTINCT collate(col1, unicode_rtrim), NULL), utf8_binary),  , )#x]
@@ -92,7 +92,7 @@ WithCTE
 WITH t(c1) AS (SELECT listagg(col1) WITHIN GROUP (ORDER BY col1 COLLATE unicode_rtrim) FROM (VALUES ('abc '), ('abc\n'), ('abc'), ('x'))) SELECT replace(replace(c1, ' ', ''), '\n', '$') FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [listagg(col1, NULL) WITHIN GROUP (ORDER BY collate(col1, unicode_rtrim) ASC NULLS FIRST)#x AS c1#x]
 :        +- Aggregate [listagg(col1#x, null, collate(col1#x, unicode_rtrim) ASC NULLS FIRST, 0, 0) AS listagg(col1, NULL) WITHIN GROUP (ORDER BY collate(col1, unicode_rtrim) ASC NULLS FIRST)#x]

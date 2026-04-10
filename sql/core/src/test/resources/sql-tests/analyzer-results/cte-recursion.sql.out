@@ -34,7 +34,7 @@ WITH RECURSIVE r AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- UnionLoop xxxx
 :        :- Project [0 AS level#x]
@@ -57,7 +57,7 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -81,7 +81,7 @@ WITH RECURSIVE r(c) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [a#x AS c#x]
 :        +- UnionLoop xxxx
@@ -106,7 +106,7 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -144,7 +144,7 @@ WITH RECURSIVE t(n) AS (
 SELECT * FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -179,7 +179,7 @@ WITH RECURSIVE r(level) MAX RECURSION LEVEL 35 AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false, 35
+:- CTERelationDef xxxx, false, 35, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx, 35
@@ -227,7 +227,7 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -266,7 +266,7 @@ WITH RECURSIVE t(n) AS (
 SELECT * FROM t LIMIT 60
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -303,7 +303,7 @@ WITH RECURSIVE t(n) MAX RECURSION LEVEL 100 AS (
 SELECT * FROM t LIMIT ALL
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false, 100
+:- CTERelationDef xxxx, false, 100, false
 :  +- SubqueryAlias t
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx, 100
@@ -328,7 +328,7 @@ WITH RECURSIVE t MAX RECURSION LEVEL 100 AS (
 SELECT * FROM t LIMIT ALL
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false, 100
+:- CTERelationDef xxxx, false, 100, false
 :  +- SubqueryAlias t
 :     +- UnionLoop xxxx, 100
 :        :- Project [1 AS n#x]
@@ -351,7 +351,7 @@ WITH RECURSIVE t MAX RECURSION LEVEL 100 AS (
    (SELECT n FROM t LIMIT ALL) UNION ALL (SELECT n FROM t)
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false, 100
+:- CTERelationDef xxxx, false, 100, false
 :  +- SubqueryAlias t
 :     +- UnionLoop xxxx, 100
 :        :- Project [1 AS n#x]
@@ -378,7 +378,7 @@ WITH RECURSIVE t MAX RECURSION LEVEL 100 AS (
    (SELECT n FROM t LIMIT ALL) UNION ALL (SELECT n FROM t LIMIT ALL)
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false, 100
+:- CTERelationDef xxxx, false, 100, false
 :  +- SubqueryAlias t
 :     +- UnionLoop xxxx, 100
 :        :- Project [1 AS n#x]
@@ -405,7 +405,7 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r LIMIT 10
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -474,7 +474,7 @@ WITH RECURSIVE r(level) AS (
 SELECT level, level FROM r ORDER BY 1 LIMIT 10
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -528,7 +528,7 @@ WITH RECURSIVE t(n) AS (
 SELECT * FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [1#x AS n#x]
 :        +- Union false, false
@@ -600,7 +600,7 @@ WITH RECURSIVE t1(n) AS (
 SELECT * FROM t1 LIMIT 5
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -632,13 +632,13 @@ WITH RECURSIVE
 SELECT * FROM t1
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- UnionLoop xxxx
 :        :- Project [1 AS level#x]
 :        :  +- OneRowRelation
 :        +- WithCTE
-:           :- CTERelationDef xxxx, false
+:           :- CTERelationDef xxxx, false, false
 :           :  +- SubqueryAlias t2
 :           :     +- Project [(level#x + 1) AS (level + 1)#x]
 :           :        +- Filter (level#x < 10)
@@ -675,17 +675,17 @@ WITH
 SELECT * FROM t2
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1 AS 1#x]
 :        +- OneRowRelation
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- UnionLoop xxxx
 :        :- Project [1 AS level#x]
 :        :  +- OneRowRelation
 :        +- WithCTE
-:           :- CTERelationDef xxxx, false
+:           :- CTERelationDef xxxx, false, false
 :           :  +- SubqueryAlias t3
 :           :     +- Project [(level#x + 1) AS (level + 1)#x]
 :           :        +- Filter (level#x < 10)
@@ -694,7 +694,7 @@ WithCTE
 :           +- Project [(level + 1)#x]
 :              +- SubqueryAlias t3
 :                 +- CTERelationRef xxxx, true, [(level + 1)#x], false, false
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t2
 :     +- Project [level#x]
 :        +- SubqueryAlias t1
@@ -716,7 +716,7 @@ WITH RECURSIVE r(level, data) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x, col2#x AS data#x]
 :        +- UnionLoop xxxx
@@ -751,7 +751,7 @@ WITH RECURSIVE r(level, data) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x, col2#x AS data#x]
 :        +- UnionLoop xxxx
@@ -804,7 +804,7 @@ WITH RECURSIVE r(level, data) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x, col2#x AS data#x]
 :        +- UnionLoop xxxx
@@ -877,7 +877,7 @@ WITH RECURSIVE r(level, data) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x, col2#x AS data#x]
 :        +- UnionLoop xxxx
@@ -929,7 +929,7 @@ WITH RECURSIVE r(level, data) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x, col2#x AS data#x]
 :        +- UnionLoop xxxx
@@ -1012,7 +1012,7 @@ CreateViewCommand `rv`, WITH RECURSIVE r(level) AS (
 )
 SELECT * FROM r, false, false, LocalTempView, UNSUPPORTED, true
    +- WithCTE
-      :- CTERelationDef xxxx, false
+      :- CTERelationDef xxxx, false, false
       :  +- SubqueryAlias r
       :     +- Project [col1#x AS level#x]
       :        +- UnionLoop xxxx
@@ -1035,7 +1035,7 @@ Project [level#x]
    +- View (`rv`, [level#x])
       +- Project [cast(level#x as int) AS level#x]
          +- WithCTE
-            :- CTERelationDef xxxx, false
+            :- CTERelationDef xxxx, false, false
             :  +- SubqueryAlias r
             :     +- Project [col1#x AS level#x]
             :        +- UnionLoop xxxx
@@ -1073,7 +1073,7 @@ INSERT INTO rt SELECT * FROM r
 InsertIntoHadoopFsRelationCommand file:[not included in comparison]/{warehouse_dir}/rt, false, CSV, [path=file:[not included in comparison]/{warehouse_dir}/rt], Append, `spark_catalog`.`default`.`rt`, org.apache.spark.sql.execution.datasources.InMemoryFileIndex(file:[not included in comparison]/{warehouse_dir}/rt), [level]
 +- Project [level#x AS level#x]
    +- WithCTE
-      :- CTERelationDef xxxx, false
+      :- CTERelationDef xxxx, false, false
       :  +- SubqueryAlias r
       :     +- Project [col1#x AS level#x]
       :        +- UnionLoop xxxx
@@ -1120,7 +1120,7 @@ INSERT INTO rt2 SELECT *
 INSERT INTO rt2 SELECT *
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [col1#x AS level#x]
 :        +- UnionLoop xxxx
@@ -1175,7 +1175,7 @@ FROM r1
 JOIN r2 ON r2.level = r1.level + 10
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r1
 :     +- UnionLoop xxxx
 :        :- Project [0 AS level#x]
@@ -1184,7 +1184,7 @@ WithCTE
 :           +- Filter (level#x < 9)
 :              +- SubqueryAlias r1
 :                 +- UnionLoopRef xxxx, [level#x], false
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r2
 :     +- UnionLoop xxxx
 :        :- Project [10 AS level#x]
@@ -1212,7 +1212,7 @@ FROM r AS r1
 JOIN r AS r2 ON r2.level = r1.level
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- UnionLoop xxxx
 :        :- Project [0 AS level#x]
@@ -1245,10 +1245,10 @@ WITH RECURSIVE r2 AS (
 SELECT * FROM r2
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r2
 :     +- WithCTE
-:        :- CTERelationDef xxxx, false
+:        :- CTERelationDef xxxx, false, false
 :        :  +- SubqueryAlias r1
 :        :     +- UnionLoop xxxx
 :        :        :- Project [0 AS innerlevel#x]
@@ -1284,11 +1284,11 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [level#x AS level#x]
 :        +- WithCTE
-:           :- CTERelationDef xxxx, false
+:           :- CTERelationDef xxxx, false, false
 :           :  +- SubqueryAlias r
 :           :     +- Project [col1#x AS level#x]
 :           :        +- UnionLoop xxxx
@@ -1325,12 +1325,12 @@ WITH RECURSIVE r(level) AS (
 SELECT * FROM r
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r
 :     +- Project [level#x AS level#x]
 :        +- UnionLoop xxxx
 :           :- WithCTE
-:           :  :- CTERelationDef xxxx, false
+:           :  :- CTERelationDef xxxx, false, false
 :           :  :  +- SubqueryAlias r
 :           :  :     +- Project [col1#x AS level#x]
 :           :  :        +- UnionLoop xxxx
@@ -1381,7 +1381,7 @@ WITH RECURSIVE destinations_from_new_york AS (
 SELECT * FROM destinations_from_new_york
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias destinations_from_new_york
 :     +- UnionLoop xxxx
 :        :- Project [New York AS destination#x, array(New York) AS path#x, 0 AS length#x]
@@ -1416,7 +1416,7 @@ WITH RECURSIVE fibonacci AS (
 SELECT a FROM fibonacci ORDER BY a
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias fibonacci
 :     +- UnionLoop xxxx
 :        :- SubqueryAlias t
@@ -1439,7 +1439,7 @@ WITH RECURSIVE t1(a,b,c) AS (
 SELECT a FROM t1 LIMIT 5
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS a#x, 1#x AS b#x, 1#x AS c#x]
 :        +- UnionLoop xxxx
@@ -1479,7 +1479,7 @@ WITH RECURSIVE t(n) AS (
 SELECT * FROM t LIMIT 63
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -1517,7 +1517,7 @@ WITH RECURSIVE
 SELECT * FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias x
 :     +- Project [1#x AS id#x]
 :        +- Distinct
@@ -1526,7 +1526,7 @@ WithCTE
 :              :  +- OneRowRelation
 :              +- Project [2 AS 2#x]
 :                 +- OneRowRelation
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- Project [id#x AS id#x, xid#x AS xid#x]
 :        +- UnionLoop xxxx
@@ -1559,7 +1559,7 @@ t2(n) AS (
 SELECT * FROM t2
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS a#x, 1#x AS b#x]
 :        +- UnionLoop xxxx
@@ -1570,7 +1570,7 @@ WithCTE
 :                 +- SubqueryAlias t1
 :                    +- Project [1#x AS a#x, 1#x AS b#x]
 :                       +- UnionLoopRef xxxx, [1#x, 1#x], false
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t2
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -1606,20 +1606,20 @@ WITH RECURSIVE t1 (n) AS (
 SELECT n FROM t1
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [col1#x AS n#x]
 :        +- UnionLoop xxxx
 :           :- LocalRelation [col1#x]
 :           +- WithCTE
-:              :- CTERelationDef xxxx, false
+:              :- CTERelationDef xxxx, false, false
 :              :  +- SubqueryAlias t2
 :              :     +- Project [(n + 1)#x AS j#x]
 :              :        +- Project [(n#x + 1) AS (n + 1)#x]
 :              :           +- SubqueryAlias t1
 :              :              +- Project [col1#x AS n#x]
 :              :                 +- UnionLoopRef xxxx, [col1#x], false
-:              :- CTERelationDef xxxx, false
+:              :- CTERelationDef xxxx, false, false
 :              :  +- SubqueryAlias t3
 :              :     +- Project [j#x AS k#x]
 :              :        +- Project [j#x]
@@ -1648,11 +1648,11 @@ WITH RECURSIVE r2(outerlevel1, innerlevel1) AS (
 SELECT * FROM r2
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias r2
 :     +- Project [outerlevel#x AS outerlevel1#x, innerlevel#x AS innerlevel1#x]
 :        +- WithCTE
-:           :- CTERelationDef xxxx, false
+:           :- CTERelationDef xxxx, false, false
 :           :  +- SubqueryAlias r1
 :           :     +- UnionLoop xxxx
 :           :        :- Project [0 AS innerlevel#x]
@@ -1716,11 +1716,11 @@ WITH RECURSIVE tmp(x) AS (
 SELECT * FROM rcte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias tmp
 :     +- Project [col1#x AS x#x]
 :        +- LocalRelation [col1#x]
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias rcte
 :     +- Project [x#x AS x#x, x#x AS y#x]
 :        +- UnionLoop xxxx
@@ -1755,11 +1755,11 @@ WITH RECURSIVE tmp(x) AS (
 SELECT * FROM rcte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias tmp
 :     +- Project [col1#x AS x#x]
 :        +- LocalRelation [col1#x]
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias rcte
 :     +- Project [x#x AS x#x, x#x AS y#x]
 :        +- UnionLoop xxxx
@@ -1794,11 +1794,11 @@ WITH RECURSIVE tmp(x) AS (
 SELECT * FROM rcte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias tmp
 :     +- Project [col1#x AS x#x]
 :        +- LocalRelation [col1#x]
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias rcte
 :     +- Project [x#x AS x#x, x#x AS y#x, x#x AS z#x, x#x AS t#x]
 :        +- UnionLoop xxxx
@@ -1896,7 +1896,7 @@ WITH RECURSIVE t1(n, m) AS (
 SELECT * FROM t1
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x, CAST(1 AS BIGINT)#xL AS m#xL]
 :        +- UnionLoop xxxx
@@ -1940,7 +1940,7 @@ WITH RECURSIVE t1(n, str, ts) AS (
 SELECT * FROM t1
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x, 2024-01-15 00:00:00#x AS str#x, CAST(2024-01-15 00:00:00 AS TIMESTAMP)#x AS ts#x]
 :        +- UnionLoop xxxx
@@ -1966,7 +1966,7 @@ WITH RECURSIVE t1(n) AS (
 SELECT * FROM t1 LIMIT 25
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -1992,7 +1992,7 @@ WITH RECURSIVE t1(n) AS (
 SELECT (SELECT SUM(n) FROM (SELECT * FROM t1)), (SELECT SUM(n) FROM (SELECT * FROM t1 LIMIT 3))
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -2028,7 +2028,7 @@ WITH RECURSIVE t1(n) AS (
 SELECT (SELECT SUM(n) FROM (SELECT * FROM t1 LIMIT 5)), (SELECT SUM(n) FROM (SELECT * FROM t1 LIMIT 3))
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -2069,7 +2069,7 @@ WITH RECURSIVE t1(n) AS (
 SELECT * FROM t2 LIMIT 20
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -2079,7 +2079,7 @@ WithCTE
 :              +- SubqueryAlias t1
 :                 +- Project [1#x AS n#x]
 :                    +- UnionLoopRef xxxx, [1#x], false
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t2
 :     +- Project [scalarsubquery()#xL AS m#xL]
 :        +- UnionLoop xxxx
@@ -2119,7 +2119,7 @@ WITH RECURSIVE t1(n) AS (
     ((SELECT n FROM t1) UNION ALL (SELECT n FROM t1)) LIMIT 20
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t1
 :     +- Project [1#x AS n#x]
 :        +- UnionLoop xxxx
@@ -2241,7 +2241,7 @@ WITH RECURSIVE t AS (
 SELECT * FROM t
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t
 :     +- UnionLoop xxxx
 :        :- Project [1 AS n#x]
