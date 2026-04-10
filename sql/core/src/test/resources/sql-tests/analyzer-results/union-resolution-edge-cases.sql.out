@@ -20,7 +20,7 @@ WITH cte AS (
 SELECT col1 FROM cte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Distinct
 :        +- Union false, false
@@ -46,7 +46,7 @@ WITH cte AS (
 SELECT * FROM cte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Union false, false
 :        :- Project [col2#x, from_utc_timestamp(col1, unknown)#x, col2#x AS col2#x]

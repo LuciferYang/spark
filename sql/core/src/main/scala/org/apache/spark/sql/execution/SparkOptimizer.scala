@@ -62,7 +62,15 @@ class SparkOptimizer(
 
   override def defaultBatches: Seq[Batch] = flattenBatches(Seq(
     preOptimizationBatches,
-    super.defaultBatches,
+    // Tag CTEs whose references appear inside correlated subqueries BEFORE
+    // RewriteCorrelatedScalarSubquery decorrelates them. The tag is read by
+    // ReplaceCTERefWithCache later to skip caching for the q1/q31/q39a
+    // regression pattern. Must run before any rule that touches
+    // SubqueryExpression structure.
+    Batch("Tag Correlated CTE Refs", Once, TagCorrelatedCTERefs),
+    // Move CleanUpTempCTEInfo to after ReplaceCTERefWithCache so that
+    // originalPlanWithPredicates is available for divergent-predicate detection.
+    super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info"),
     Batch("Optimize Metadata Only Query", Once, OptimizeMetadataOnlyQuery(catalog)),
     Batch("PartitionPruning", Once,
       PartitionPruning,
@@ -107,7 +115,8 @@ class SparkOptimizer(
       ConstantFolding,
       EliminateLimits),
     Batch("User Provided Optimizers", fixedPoint, experimentalMethods.extraOptimizations: _*),
-    Batch("Replace CTE with Repartition", Once, ReplaceCTERefWithRepartition)))
+    Batch("Replace CTE with Repartition", Once,
+      ReplaceCTERefWithCache, ReplaceCTERefWithRepartition, CleanUpTempCTEInfo)))
 
   override def nonExcludableRules: Seq[String] = super.nonExcludableRules ++
     Seq(

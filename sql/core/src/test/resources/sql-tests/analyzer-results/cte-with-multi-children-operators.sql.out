@@ -29,7 +29,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
 +- Join LeftOuter
    :- SubqueryAlias __auto_generated_subquery_name
    :  +- WithCTE
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t1
@@ -38,7 +38,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :     :                 +- Project [col1#x, col2#x]
    :     :                    +- SubqueryAlias t1
    :     :                       +- LocalRelation [col1#x, col2#x]
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t2
@@ -72,7 +72,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
 +- Join Inner
    :- SubqueryAlias __auto_generated_subquery_name
    :  +- WithCTE
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t1
@@ -81,7 +81,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :     :                 +- Project [col1#x, col2#x]
    :     :                    +- SubqueryAlias t1
    :     :                       +- LocalRelation [col1#x, col2#x]
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t2
@@ -115,7 +115,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
 +- Join RightOuter
    :- SubqueryAlias __auto_generated_subquery_name
    :  +- WithCTE
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t1
@@ -124,7 +124,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :     :                 +- Project [col1#x, col2#x]
    :     :                    +- SubqueryAlias t1
    :     :                       +- LocalRelation [col1#x, col2#x]
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t2
@@ -158,7 +158,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
 +- Join FullOuter
    :- SubqueryAlias __auto_generated_subquery_name
    :  +- WithCTE
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t1
@@ -167,7 +167,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :     :                 +- Project [col1#x, col2#x]
    :     :                    +- SubqueryAlias t1
    :     :                       +- LocalRelation [col1#x, col2#x]
-   :     :- CTERelationDef xxxx, false
+   :     :- CTERelationDef xxxx, false, false
    :     :  +- SubqueryAlias cte
    :     :     +- Project [col1#x, col2#x]
    :     :        +- SubqueryAlias t2
@@ -203,7 +203,7 @@ Distinct
    :- Project [col1#x, col2#x]
    :  +- SubqueryAlias __auto_generated_subquery_name
    :     +- WithCTE
-   :        :- CTERelationDef xxxx, false
+   :        :- CTERelationDef xxxx, false, false
    :        :  +- SubqueryAlias cte
    :        :     +- Project [col1#x, col2#x]
    :        :        +- SubqueryAlias t1
@@ -212,7 +212,7 @@ Distinct
    :        :                 +- Project [col1#x, col2#x]
    :        :                    +- SubqueryAlias t1
    :        :                       +- LocalRelation [col1#x, col2#x]
-   :        :- CTERelationDef xxxx, false
+   :        :- CTERelationDef xxxx, false, false
    :        :  +- SubqueryAlias cte
    :        :     +- Project [col1#x, col2#x]
    :        :        +- SubqueryAlias t2
@@ -248,7 +248,7 @@ Except false
 :- Project [col1#x, col2#x]
 :  +- SubqueryAlias __auto_generated_subquery_name
 :     +- WithCTE
-:        :- CTERelationDef xxxx, false
+:        :- CTERelationDef xxxx, false, false
 :        :  +- SubqueryAlias cte
 :        :     +- Project [col1#x, col2#x]
 :        :        +- SubqueryAlias t1
@@ -257,7 +257,7 @@ Except false
 :        :                 +- Project [col1#x, col2#x]
 :        :                    +- SubqueryAlias t1
 :        :                       +- LocalRelation [col1#x, col2#x]
-:        :- CTERelationDef xxxx, false
+:        :- CTERelationDef xxxx, false, false
 :        :  +- SubqueryAlias cte
 :        :     +- Project [col1#x, col2#x]
 :        :        +- SubqueryAlias t2
@@ -293,7 +293,7 @@ Intersect false
 :- Project [col1#x, col2#x]
 :  +- SubqueryAlias __auto_generated_subquery_name
 :     +- WithCTE
-:        :- CTERelationDef xxxx, false
+:        :- CTERelationDef xxxx, false, false
 :        :  +- SubqueryAlias cte
 :        :     +- Project [col1#x, col2#x]
 :        :        +- SubqueryAlias t1
@@ -302,7 +302,7 @@ Intersect false
 :        :                 +- Project [col1#x, col2#x]
 :        :                    +- SubqueryAlias t1
 :        :                       +- LocalRelation [col1#x, col2#x]
-:        :- CTERelationDef xxxx, false
+:        :- CTERelationDef xxxx, false, false
 :        :  +- SubqueryAlias cte
 :        :     +- Project [col1#x, col2#x]
 :        :        +- SubqueryAlias t2
@@ -335,7 +335,7 @@ LEFT JOIN (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 Project [col1#x, col2#x, col1#x, col2#x]
 +- WithCTE
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t1
@@ -344,7 +344,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :                 +- Project [col1#x, col2#x]
    :                    +- SubqueryAlias t1
    :                       +- LocalRelation [col1#x, col2#x]
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t2
@@ -370,7 +370,7 @@ INNER JOIN (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 Project [col1#x, col2#x, col1#x, col2#x]
 +- WithCTE
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t1
@@ -379,7 +379,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :                 +- Project [col1#x, col2#x]
    :                    +- SubqueryAlias t1
    :                       +- LocalRelation [col1#x, col2#x]
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t2
@@ -405,7 +405,7 @@ RIGHT JOIN (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 Project [col1#x, col2#x, col1#x, col2#x]
 +- WithCTE
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t1
@@ -414,7 +414,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :                 +- Project [col1#x, col2#x]
    :                    +- SubqueryAlias t1
    :                       +- LocalRelation [col1#x, col2#x]
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t2
@@ -440,7 +440,7 @@ FULL OUTER JOIN (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 Project [col1#x, col2#x, col1#x, col2#x]
 +- WithCTE
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t1
@@ -449,7 +449,7 @@ Project [col1#x, col2#x, col1#x, col2#x]
    :                 +- Project [col1#x, col2#x]
    :                    +- SubqueryAlias t1
    :                       +- LocalRelation [col1#x, col2#x]
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t2
@@ -476,7 +476,7 @@ SELECT * FROM (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 Distinct
 +- WithCTE
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t1
@@ -485,7 +485,7 @@ Distinct
    :                 +- Project [col1#x, col2#x]
    :                    +- SubqueryAlias t1
    :                       +- LocalRelation [col1#x, col2#x]
-   :- CTERelationDef xxxx, false
+   :- CTERelationDef xxxx, false, false
    :  +- SubqueryAlias cte
    :     +- Project [col1#x, col2#x]
    :        +- SubqueryAlias t2
@@ -513,7 +513,7 @@ EXCEPT
 SELECT * FROM (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [col1#x, col2#x]
 :        +- SubqueryAlias t1
@@ -522,7 +522,7 @@ WithCTE
 :                 +- Project [col1#x, col2#x]
 :                    +- SubqueryAlias t1
 :                       +- LocalRelation [col1#x, col2#x]
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [col1#x, col2#x]
 :        +- SubqueryAlias t2
@@ -550,7 +550,7 @@ INTERSECT
 SELECT * FROM (WITH cte AS (SELECT * FROM t2) SELECT * FROM cte)
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [col1#x, col2#x]
 :        +- SubqueryAlias t1
@@ -559,7 +559,7 @@ WithCTE
 :                 +- Project [col1#x, col2#x]
 :                    +- SubqueryAlias t1
 :                       +- LocalRelation [col1#x, col2#x]
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [col1#x, col2#x]
 :        +- SubqueryAlias t2
