@@ -34,7 +34,7 @@ import org.apache.spark.internal.LogKeys.{CONFIG, CONFIG2, PATH, VALUE}
 import org.apache.spark.sql.catalyst.analysis.RelationCache
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.errors.QueryExecutionErrors
-import org.apache.spark.sql.execution.CacheManager
+import org.apache.spark.sql.execution.{AutoCTECacheManager, CacheManager}
 import org.apache.spark.sql.execution.streaming.runtime.StreamExecution
 import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLTab, StreamingQueryStatusStore}
 import org.apache.spark.sql.internal.StaticSQLConf._
@@ -96,6 +96,17 @@ private[sql] class SharedState(
    * Class for caching query results reused in future executions.
    */
   val cacheManager: CacheManager = new CacheManager
+
+  /**
+   * Manages lifecycle of auto-cached CTE definitions.
+   */
+  val autoCTECacheManager: AutoCTECacheManager = {
+    val sqlConf = new SQLConf()
+    conf.getAll.foreach { case (k, v) => sqlConf.setConfString(k, v) }
+    new AutoCTECacheManager(
+      ttlMs = sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_TTL),
+      maxSizeBytes = sqlConf.getConf(SQLConf.AUTO_CTE_CACHE_MAX_SIZE))
+  }
 
   /**
    * A relation cache backed by the cache manager.
