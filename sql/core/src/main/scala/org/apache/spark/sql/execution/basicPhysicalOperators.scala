@@ -256,8 +256,18 @@ case class FilterExec(condition: Expression, child: SparkPlan)
     // Apply CSE to otherPreds only (notNullPreds are simple IsNotNull checks with no CSE value).
     val (inputVarsCode, subExprsCode, predicateCode) =
       if (conf.subexpressionEliminationEnabled && otherPreds.nonEmpty) {
+        // SPARK-NNNNN: bind against `child.output` (untightened nullability),
+        // NOT `output` (which has notNullAttributes columns marked non-null).
+        // The CSE precomputation runs at the start of the do {} block, BEFORE
+        // the IsNotNull predicates short-circuit. At that point, columns in
+        // `notNullAttributes` may still be null at runtime. If we bind against
+        // the tightened `output`, the CSE-generated code declares those
+        // columns non-null and skips runtime null checks; the precomputation
+        // then crashes with NPE on operators like Decimal.subtract when the
+        // column is actually null. Binding against `child.output` preserves
+        // the original nullability and emits the proper null guards.
         val boundOtherPreds = otherPreds.map(
-          BindReferences.bindReference(_, output))
+          BindReferences.bindReference(_, child.output))
         // Pre-evaluate input variables before CSE analysis: CSE clears
         // ctx.currentVars[i].code as a side effect; without this pre-evaluation, Janino fails
         // with "Unknown variable or type" when notNullPreds reference the same input columns.
