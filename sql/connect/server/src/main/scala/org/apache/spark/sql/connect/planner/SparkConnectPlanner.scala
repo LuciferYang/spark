@@ -3508,22 +3508,28 @@ class SparkConnectPlanner(
       }
     }
 
-    // This is filled when a foreach batch runner started for Python.
+    // This is filled when a foreach batch runner is started.
     var foreachBatchRunnerCleaner: Option[AutoCloseable] = None
+    // Reference to set the query ID after the streaming query starts.
+    // Used by the foreachBatch caching wrapper for sanity checks.
+    var foreachBatchQueryIdRef: Option[java.util.concurrent.atomic.AtomicReference[String]] = None
 
     if (writeOp.hasForeachBatch) {
       val foreachBatchFn = writeOp.getForeachBatch.getFunctionCase match {
         case StreamingForeachFunction.FunctionCase.PYTHON_FUNCTION =>
           val pythonFn = transformPythonFunction(writeOp.getForeachBatch.getPythonFunction)
-          val (fn, cleaner) =
+          val (fn, cleaner, queryIdRef) =
             StreamingForeachBatchHelper.pythonForeachBatchWrapper(pythonFn, sessionHolder)
           foreachBatchRunnerCleaner = Some(cleaner)
+          foreachBatchQueryIdRef = Some(queryIdRef)
           fn
 
         case StreamingForeachFunction.FunctionCase.SCALA_FUNCTION =>
-          StreamingForeachBatchHelper.scalaForeachBatchWrapper(
+          val (fn, queryIdRef) = StreamingForeachBatchHelper.scalaForeachBatchWrapper(
             writeOp.getForeachBatch.getScalaFunction.getPayload.toByteArray,
             sessionHolder)
+          foreachBatchQueryIdRef = Some(queryIdRef)
+          fn
 
         case other =>
           throw InvalidInputErrors.invalidOneOfField(
@@ -3550,13 +3556,16 @@ class SparkConnectPlanner(
           throw ex
       }
 
+    // Set the query ID in the foreachBatch wrapper so it can track cached DataFrames per query.
+    foreachBatchQueryIdRef.foreach(_.set(query.id.toString))
+
     // Register the new query so that its reference is cached and is stopped on session timeout.
     SparkConnectService.streamingSessionManager.registerNewStreamingQuery(
       sessionHolder,
       query,
       executeHolder.sparkSessionTags,
       executeHolder.operationId)
-    // Register the runner with the query if Python foreachBatch is enabled.
+    // Register the runner with the query for cleanup on termination.
     foreachBatchRunnerCleaner.foreach { cleaner =>
       sessionHolder.streamingForeachBatchRunnerCleanerCache.registerCleanerForQuery(
         query,
