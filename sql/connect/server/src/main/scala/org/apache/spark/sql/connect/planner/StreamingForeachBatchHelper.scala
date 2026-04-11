@@ -215,6 +215,50 @@ object StreamingForeachBatchHelper extends Logging {
   }
 
   /**
+   * Creates a foreachBatch function that uses the callback protocol instead of deserializing
+   * the user's lambda. The function caches the batch DataFrame and signals the client to
+   * execute the user function via the StreamingForeachBatchCallbackHandler.
+   *
+   * This enables Scala 3 clients (and any other client that cannot serialize lambdas) to use
+   * foreachBatch by keeping the function on the client side.
+   *
+   * @return A tuple of (foreachBatchFn, callbackHandler, queryIdRef). The caller should:
+   *         - Register the callbackHandler in SessionHolder.foreachBatchCallbackHandlers
+   *         - Set queryIdRef to the query ID after starting the query
+   *         - Register the callbackHandler as a cleaner for the query
+   */
+  def scalaForeachBatchCallbackWrapper(
+      sessionHolder: SessionHolder,
+      callbackTimeoutMs: Long): (ForeachBatchFnType, StreamingForeachBatchCallbackHandler,
+      AtomicReference[String]) = {
+
+    val queryIdRef = new AtomicReference[String]()
+    val handlerRef = new AtomicReference[StreamingForeachBatchCallbackHandler]()
+
+    val foreachBatchFn = dataFrameCachingWrapper(
+      (args: FnArgsWithId) => {
+        val handler = handlerRef.get()
+        if (handler == null) {
+          throw new SparkException(
+            "ForeachBatch callback handler not initialized. " +
+              "Client must open a signal stream before the first batch.")
+        }
+        handler.signalBatchAndWait(args.dfId, args.batchId)
+      },
+      sessionHolder,
+      queryIdRef)
+
+    // The handler uses queryIdRef to resolve the real queryId lazily (set after query starts).
+    val handler = new StreamingForeachBatchCallbackHandler(
+      sessionHolder,
+      queryIdRef,
+      callbackTimeoutMs)
+    handlerRef.set(handler)
+
+    (foreachBatchFn, handler, queryIdRef)
+  }
+
+  /**
    * Starts up Python worker and initializes it with Python function. Returns a foreachBatch
    * function that sets up the session and Dataframe cache and and interacts with the Python
    * worker to execute user's function. In addition, it returns an AutoClosable and a queryId

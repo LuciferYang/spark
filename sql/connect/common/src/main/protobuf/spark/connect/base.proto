@@ -429,6 +429,10 @@ message ExecutePlanResponse {
     // register its result with the server.
     PipelineQueryFunctionExecutionSignal pipeline_query_function_execution_signal = 23;
 
+    // A signal from the server to the client to execute the foreachBatch function for a
+    // streaming query batch. Used with the foreachBatch callback protocol.
+    ForeachBatchExecutionSignal foreach_batch_execution_signal = 24;
+
     // Support arbitrary result objects.
     google.protobuf.Any extension = 999;
   }

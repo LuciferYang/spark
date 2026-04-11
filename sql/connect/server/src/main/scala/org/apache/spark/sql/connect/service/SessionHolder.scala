@@ -150,6 +150,12 @@ case class SessionHolder(userId: String, sessionId: String, session: SparkSessio
   private[connect] lazy val streamingForeachBatchRunnerCleanerCache =
     new StreamingForeachBatchHelper.CleanerCache(this)
 
+  // Mapping from streaming query ID to foreachBatch callback handler.
+  // Used for the callback protocol where the user function stays on the client side.
+  private[connect] lazy val foreachBatchCallbackHandlers:
+    ConcurrentMap[String, org.apache.spark.sql.connect.planner
+      .StreamingForeachBatchCallbackHandler] = new ConcurrentHashMap()
+
   private[connect] lazy val streamingServersideListenerHolder = new ServerSideListenerHolder(this)
 
   def key: SessionKey = SessionKey(userId, sessionId)
@@ -401,6 +407,7 @@ case class SessionHolder(userId: String, sessionId: String, session: SparkSessio
     // Note: there can be concurrent streaming queries being started.
     SparkConnectService.streamingSessionManager.cleanupRunningQueries(this, blocking = true)
     streamingForeachBatchRunnerCleanerCache.cleanUpAll() // Clean up any streaming workers.
+    foreachBatchCallbackHandlers.clear() // Clear callback handler references.
     removeAllListeners() // removes all listener and stop python listener processes if necessary.
     // Stops all pipeline execution and clears the pipeline execution cache
     removeAllPipelineExecutions()

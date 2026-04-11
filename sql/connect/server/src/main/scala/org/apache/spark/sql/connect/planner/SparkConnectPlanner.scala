@@ -33,7 +33,7 @@ import org.apache.spark.{SparkClassNotFoundException, SparkEnv, SparkException}
 import org.apache.spark.annotation.{DeveloperApi, Since}
 import org.apache.spark.api.python.{PythonEvalType, SimplePythonFunction}
 import org.apache.spark.connect.proto
-import org.apache.spark.connect.proto.{CheckpointCommand, CreateResourceProfileCommand, ExecutePlanResponse, SqlCommand, StreamingForeachFunction, StreamingQueryCommand, StreamingQueryCommandResult, StreamingQueryInstanceId, StreamingQueryManagerCommand, StreamingQueryManagerCommandResult, WriteStreamOperationStart, WriteStreamOperationStartResult}
+import org.apache.spark.connect.proto.{CheckpointCommand, CreateResourceProfileCommand, ExecutePlanResponse, SqlCommand, StreamingForeachBatchCommand, StreamingForeachFunction, StreamingQueryCommand, StreamingQueryCommandResult, StreamingQueryInstanceId, StreamingQueryManagerCommand, StreamingQueryManagerCommandResult, WriteStreamOperationStart, WriteStreamOperationStartResult}
 import org.apache.spark.connect.proto.ExecutePlanResponse.SqlCommandResult
 import org.apache.spark.connect.proto.Parse.ParseFormat
 import org.apache.spark.connect.proto.StreamingQueryManagerCommandResult.StreamingQueryInstance
@@ -60,7 +60,7 @@ import org.apache.spark.sql.classic.{Catalog, DataFrameWriter, Dataset, MergeInt
 import org.apache.spark.sql.classic.ClassicConversions._
 import org.apache.spark.sql.connect.client.arrow.ArrowSerializer
 import org.apache.spark.sql.connect.common.{DataTypeProtoConverter, ForeachWriterPacket, LiteralValueProtoConverter, StorageLevelProtoConverter, StreamingListenerPacket, UdfPacket}
-import org.apache.spark.sql.connect.config.Connect.CONNECT_GRPC_ARROW_MAX_BATCH_SIZE
+import org.apache.spark.sql.connect.config.Connect.{CONNECT_FOREACH_BATCH_CALLBACK_TIMEOUT, CONNECT_GRPC_ARROW_MAX_BATCH_SIZE}
 import org.apache.spark.sql.connect.ml.MLHandler
 import org.apache.spark.sql.connect.pipelines.PipelinesHandler
 import org.apache.spark.sql.connect.plugin.SparkConnectPluginRegistry
@@ -2903,6 +2903,9 @@ class SparkConnectPlanner(
         handlePipelineCommand(command.getPipelineCommand, responseObserver)
       case proto.Command.CommandTypeCase.EXECUTE_EXTERNAL_COMMAND =>
         handleExecuteExternalCommand(command.getExecuteExternalCommand, responseObserver)
+      case proto.Command.CommandTypeCase.STREAMING_FOREACH_BATCH_COMMAND =>
+        handleStreamingForeachBatchCommand(
+          command.getStreamingForeachBatchCommand, responseObserver)
 
       case other =>
         throw InvalidInputErrors.invalidOneOfField(other, command.getDescriptorForType)
@@ -3508,11 +3511,13 @@ class SparkConnectPlanner(
       }
     }
 
-    // This is filled when a foreach batch runner is started.
+    // This is filled when a foreach batch runner or callback handler is started.
     var foreachBatchRunnerCleaner: Option[AutoCloseable] = None
     // Reference to set the query ID after the streaming query starts.
     // Used by the foreachBatch caching wrapper for sanity checks.
     var foreachBatchQueryIdRef: Option[java.util.concurrent.atomic.AtomicReference[String]] = None
+    // The callback handler for Scala foreachBatch callback protocol.
+    var foreachBatchCallbackHandler: Option[StreamingForeachBatchCallbackHandler] = None
 
     if (writeOp.hasForeachBatch) {
       val foreachBatchFn = writeOp.getForeachBatch.getFunctionCase match {
@@ -3525,11 +3530,25 @@ class SparkConnectPlanner(
           fn
 
         case StreamingForeachFunction.FunctionCase.SCALA_FUNCTION =>
-          val (fn, queryIdRef) = StreamingForeachBatchHelper.scalaForeachBatchWrapper(
-            writeOp.getForeachBatch.getScalaFunction.getPayload.toByteArray,
-            sessionHolder)
-          foreachBatchQueryIdRef = Some(queryIdRef)
-          fn
+          val useCallback =
+            writeOp.getForeachBatch.hasUseCallback && writeOp.getForeachBatch.getUseCallback
+          if (useCallback) {
+            val callbackTimeoutMs =
+              session.sessionState.conf.getConf(CONNECT_FOREACH_BATCH_CALLBACK_TIMEOUT)
+            val (fn, handler, queryIdRef) =
+              StreamingForeachBatchHelper.scalaForeachBatchCallbackWrapper(
+                sessionHolder, callbackTimeoutMs)
+            foreachBatchCallbackHandler = Some(handler)
+            foreachBatchRunnerCleaner = Some(handler)
+            foreachBatchQueryIdRef = Some(queryIdRef)
+            fn
+          } else {
+            val (fn, queryIdRef) = StreamingForeachBatchHelper.scalaForeachBatchWrapper(
+              writeOp.getForeachBatch.getScalaFunction.getPayload.toByteArray,
+              sessionHolder)
+            foreachBatchQueryIdRef = Some(queryIdRef)
+            fn
+          }
 
         case other =>
           throw InvalidInputErrors.invalidOneOfField(
@@ -3559,17 +3578,33 @@ class SparkConnectPlanner(
     // Set the query ID in the foreachBatch wrapper so it can track cached DataFrames per query.
     foreachBatchQueryIdRef.foreach(_.set(query.id.toString))
 
+    // Register the callback handler so signal stream and result delivery can find it by queryId.
+    foreachBatchCallbackHandler.foreach { handler =>
+      sessionHolder.foreachBatchCallbackHandlers.put(query.id.toString, handler)
+    }
+
     // Register the new query so that its reference is cached and is stopped on session timeout.
     SparkConnectService.streamingSessionManager.registerNewStreamingQuery(
       sessionHolder,
       query,
       executeHolder.sparkSessionTags,
       executeHolder.operationId)
-    // Register the runner with the query for cleanup on termination.
+    // Register the runner/handler with the query for cleanup on termination.
     foreachBatchRunnerCleaner.foreach { cleaner =>
+      // For callback handlers, wrap the cleaner to also remove from the lookup map.
+      val effectiveCleaner = foreachBatchCallbackHandler match {
+        case Some(_) =>
+          new AutoCloseable {
+            override def close(): Unit = {
+              cleaner.close()
+              sessionHolder.foreachBatchCallbackHandlers.remove(query.id.toString)
+            }
+          }
+        case None => cleaner
+      }
       sessionHolder.streamingForeachBatchRunnerCleanerCache.registerCleanerForQuery(
         query,
-        cleaner)
+        effectiveCleaner)
     }
     executeHolder.eventsManager.postFinished()
 
@@ -3617,6 +3652,57 @@ class SparkConnectPlanner(
         .setServerSideSessionId(sessionHolder.serverSessionId)
         .setWriteStreamOperationStartResult(resultBuilder.build())
         .build())
+  }
+
+  private def handleStreamingForeachBatchCommand(
+      command: StreamingForeachBatchCommand,
+      responseObserver: StreamObserver[ExecutePlanResponse]): Unit = {
+
+    command.getCommandCase match {
+      case StreamingForeachBatchCommand.CommandCase.GET_SIGNAL_STREAM =>
+        val getSignalStream = command.getGetSignalStream
+        val queryId = getSignalStream.getQueryId.getId
+
+        val handler = sessionHolder.foreachBatchCallbackHandlers.get(queryId)
+        if (handler == null) {
+          throw new SparkException(
+            s"No foreachBatch callback handler registered for query $queryId. " +
+              s"Ensure the query was started with use_callback=true.")
+        }
+
+        // Register the response observer as the signal stream.
+        // The handler will use it to push ForeachBatchExecutionSignal messages.
+        handler.setSignalObserver(responseObserver)
+        executeHolder.eventsManager.postFinished()
+        // Do NOT call responseObserver.onCompleted() here - the stream stays open
+        // until the query terminates and the handler is closed.
+
+      case StreamingForeachBatchCommand.CommandCase.EXECUTION_RESULT =>
+        val result = command.getExecutionResult
+        val queryId = result.getQueryId.getId
+
+        val handler = sessionHolder.foreachBatchCallbackHandlers.get(queryId)
+        if (handler == null) {
+          throw new SparkException(
+            s"No foreachBatch callback handler registered for query $queryId. " +
+              s"Cannot deliver execution result.")
+        }
+
+        val errorMsg = if (result.hasErrorMessage) Some(result.getErrorMessage) else None
+        handler.completeExecution(errorMsg)
+        executeHolder.eventsManager.postFinished()
+
+        // Send an empty acknowledgement response.
+        responseObserver.onNext(
+          ExecutePlanResponse
+            .newBuilder()
+            .setSessionId(sessionId)
+            .setServerSideSessionId(sessionHolder.serverSessionId)
+            .build())
+
+      case other =>
+        throw InvalidInputErrors.invalidOneOfField(other, command.getDescriptorForType)
+    }
   }
 
   private def handleStreamingQueryCommand(

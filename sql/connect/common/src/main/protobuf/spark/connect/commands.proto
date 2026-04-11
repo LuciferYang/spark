@@ -53,6 +53,7 @@ message Command {
     MlCommand ml_command = 17;
     ExecuteExternalCommand execute_external_command = 18;
     PipelineCommand pipeline_command = 19;
+    StreamingForeachBatchCommand streaming_foreach_batch_command = 20;
 
     // This field is used to mark extensions to the protocol. When plugins generate arbitrary
     // Commands they can add them here. During the planning the correct resolution is done.
@@ -256,6 +257,12 @@ message StreamingForeachFunction {
     PythonUDF python_function = 1;
     ScalarScalaUDF scala_function = 2;
   }
+  // (Optional) When true, the server will use a callback protocol instead of deserializing
+  // the function. The client keeps the function locally and executes it when signaled by the
+  // server via ForeachBatchExecutionSignal. This enables cross-Scala-version compatibility
+  // (e.g., Scala 3 client with Scala 2.13 server) since the lambda is never serialized.
+  // Default is false, which preserves the existing behavior of deserializing the function.
+  optional bool use_callback = 3;
 }
 
 message WriteStreamOperationStartResult {
@@ -501,6 +508,44 @@ message CreateResourceProfileCommandResult {
 message RemoveCachedRemoteRelationCommand {
   // (Required) The remote to be related
   CachedRemoteRelation relation = 1;
+}
+
+// Command for foreachBatch callback protocol.
+// Used when StreamingForeachFunction.use_callback is true.
+// The client opens a signal stream to receive batch execution signals from the server,
+// and sends execution results back after processing each batch.
+message StreamingForeachBatchCommand {
+  oneof command {
+    // Open a stream to receive ForeachBatchExecutionSignal messages from the server.
+    GetForeachBatchExecutionSignalStream get_signal_stream = 1;
+    // Report the result of executing the foreachBatch function for a specific batch.
+    ForeachBatchExecutionResult execution_result = 2;
+  }
+
+  message GetForeachBatchExecutionSignalStream {
+    // (Required) The streaming query to receive signals for.
+    StreamingQueryInstanceId query_id = 1;
+  }
+
+  message ForeachBatchExecutionResult {
+    // (Required) The streaming query this result belongs to.
+    StreamingQueryInstanceId query_id = 1;
+    // (Required) The cached DataFrame ID that was processed.
+    string df_id = 2;
+    // (Required) The batch ID that was processed.
+    int64 batch_id = 3;
+    // (Optional) Error message if the client-side function execution failed.
+    optional string error_message = 4;
+  }
+}
+
+// Signal from server to client to execute the foreachBatch function for a specific batch.
+// Sent via ExecutePlanResponse when the client has opened a signal stream.
+message ForeachBatchExecutionSignal {
+  // (Required) The cached DataFrame ID to use for this batch.
+  string df_id = 1;
+  // (Required) The batch ID for this batch.
+  int64 batch_id = 2;
 }
 
 message CheckpointCommand {

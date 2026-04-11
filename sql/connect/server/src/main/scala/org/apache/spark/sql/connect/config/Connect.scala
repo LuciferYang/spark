@@ -453,6 +453,15 @@ object Connect {
       .intConf
       .createWithDefault(10 * 1024 * 1024) // 10 MB
 
+  val CONNECT_FOREACH_BATCH_CALLBACK_TIMEOUT =
+    buildStaticConf("spark.connect.foreachBatch.callback.timeout")
+      .internal()
+      .doc("Timeout for the server to wait for a foreachBatch callback response from the " +
+        "client when using the callback protocol (use_callback=true).")
+      .version("4.1.0")
+      .timeConf(TimeUnit.MILLISECONDS)
+      .createWithDefaultString("5m")
+
   val CONNECT_PLAN_COMPRESSION_DEFAULT_ALGORITHM =
     buildConf("spark.connect.session.planCompression.defaultAlgorithm")
       .doc("The default algorithm of proto plan compression.")
