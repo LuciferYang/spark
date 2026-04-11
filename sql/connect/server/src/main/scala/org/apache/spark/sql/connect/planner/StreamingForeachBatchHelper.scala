@@ -62,8 +62,59 @@ object StreamingForeachBatchHelper extends Logging {
   private case class FnArgsWithId(dfId: String, df: DataFrame, batchId: Long)
 
   /**
+   * Holds the cloned SessionHolder for a foreachBatch streaming query's micro-batch execution.
+   * The MicroBatch execution creates a cloned SparkSession (`sparkSessionForStream`), so batch
+   * DataFrames are bound to a different session than the original one used to start the query.
+   * This holder lazily creates a corresponding cloned SessionHolder on the first batch and
+   * provides methods for caching/removing DataFrames in the correct session context.
+   *
+   * IMPORTANT: For the Scala foreachBatch path (HACK), the cloned session holder is not yet used
+   * because the user function directly operates on the classic DataFrame. For the Python path,
+   * the Python worker currently connects back using the original session_id, so we cache in the
+   * original SessionHolder for now. The cloned session holder will be fully utilized once the
+   * Connect callback protocol (Subtask 2) is implemented and the Python worker is updated.
+   */
+  private class ForeachBatchSessionManager(
+      parentSessionHolder: SessionHolder) extends Logging {
+
+    // The cloned SessionHolder for the micro-batch execution session.
+    // Lazily initialized on the first batch to avoid creating it if the query never produces data.
+    @volatile private var _clonedSessionHolder: SessionHolder = null
+
+    /**
+     * Get or create the cloned SessionHolder for the given batch DataFrame's SparkSession.
+     * Currently returns the parent session holder since the Python worker uses the original
+     * session_id. This will be updated to return a cloned session holder when the callback
+     * protocol is fully implemented.
+     */
+    def getSessionHolder(batchDf: DataFrame): SessionHolder = {
+      // TODO(SPARK-44462): Once the callback protocol and Python worker are updated to support
+      // cloned session IDs, this should create and return a proper cloned SessionHolder from
+      // batchDf.sparkSession. For now, return the parent to maintain backward compatibility.
+      parentSessionHolder
+    }
+
+    /**
+     * Clean up the cloned session holder (if any) when the streaming query terminates.
+     */
+    def close(): Unit = {
+      if (_clonedSessionHolder != null) {
+        logInfo(
+          log"[session: ${MDC(SESSION_ID, parentSessionHolder.sessionId)}] " +
+            log"Cleaning up cloned session holder for foreachBatch")
+        _clonedSessionHolder = null
+      }
+    }
+  }
+
+  /**
    * Return a new ForeachBatch function that wraps `fn`. It sets up DataFrame cache so that the
    * user function can access it. The cache is cleared once ForeachBatch returns.
+   *
+   * Uses a ForeachBatchSessionManager to handle session cloning for micro-batch execution.
+   * The batch DataFrame's SparkSession may differ from the original session (due to
+   * StreamExecution.sparkSessionForStream cloning), so the session manager provides the
+   * appropriate SessionHolder for caching.
    *
    * @param queryIdRef A reference that will be populated with the streaming query ID after the
    *                   query starts. Used to track at most one active cached DataFrame per query.
@@ -76,12 +127,17 @@ object StreamingForeachBatchHelper extends Logging {
       queryIdRef: AtomicReference[String] = new AtomicReference[String]())
       : ForeachBatchFnType = {
 
+    val sessionManager = new ForeachBatchSessionManager(sessionHolder)
+
     (df: DataFrame, batchId: Long) => {
       val dfId = UUID.randomUUID().toString
       val queryId = Option(queryIdRef.get())
+      // Use the session manager to get the appropriate SessionHolder for this batch.
+      // This handles the session clone that MicroBatch execution creates.
+      val effectiveSessionHolder = sessionManager.getSessionHolder(df)
 
       logInfo(
-        log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
+        log"[session: ${MDC(SESSION_ID, effectiveSessionHolder.sessionId)}] " +
           log"[queryId: ${MDC(QUERY_ID, queryId.getOrElse("unknown"))}] " +
           log"Caching DataFrame with id ${MDC(DATAFRAME_ID, dfId)}")
 
@@ -89,27 +145,27 @@ object StreamingForeachBatchHelper extends Logging {
       // If a previous batch's DataFrame was not properly cleaned up, log a warning
       // and remove the stale entry before caching the new one.
       queryId.foreach { qId =>
-        Option(sessionHolder.dataFrameQueryIndex.put(qId, dfId)).foreach { staleDfId =>
+        Option(effectiveSessionHolder.dataFrameQueryIndex.put(qId, dfId)).foreach { staleDfId =>
           logWarning(
-            log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
+            log"[session: ${MDC(SESSION_ID, effectiveSessionHolder.sessionId)}] " +
               log"Found stale cached DataFrame ${MDC(DATAFRAME_ID, staleDfId)} " +
               log"for query ${MDC(QUERY_ID, qId)} while caching new DataFrame. " +
               log"Removing stale entry.")
-          sessionHolder.removeCachedDataFrame(staleDfId)
+          effectiveSessionHolder.removeCachedDataFrame(staleDfId)
         }
       }
 
-      sessionHolder.cacheDataFrameById(dfId, df)
+      effectiveSessionHolder.cacheDataFrameById(dfId, df)
       try {
         fn(FnArgsWithId(dfId, df, batchId))
       } finally {
         logInfo(
-          log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
+          log"[session: ${MDC(SESSION_ID, effectiveSessionHolder.sessionId)}] " +
             log"Removing DataFrame with id ${MDC(DATAFRAME_ID, dfId)} from the cache")
-        sessionHolder.removeCachedDataFrame(dfId)
+        effectiveSessionHolder.removeCachedDataFrame(dfId)
         // Remove query-to-dfId mapping only if it still points to this dfId
         queryId.foreach { qId =>
-          sessionHolder.dataFrameQueryIndex.remove(qId, dfId)
+          effectiveSessionHolder.dataFrameQueryIndex.remove(qId, dfId)
         }
       }
     }
