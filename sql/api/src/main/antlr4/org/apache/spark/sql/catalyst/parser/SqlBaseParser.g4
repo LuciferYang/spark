@@ -359,7 +359,6 @@ statement
     | CLOSE multipartIdentifier                                        #closeCursorStatement
     | EXPLAIN (LOGICAL | FORMATTED | EXTENDED | CODEGEN | COST)?
         (statement|setResetStatement)                                  #explain
-    | SHOW CACHED TABLES                                                 #showCachedTables
     | SHOW TABLES ((FROM | IN) identifierReference)?
         (LIKE? pattern=stringLit)?                                        #showTables
     | SHOW TABLE EXTENDED ((FROM | IN) ns=identifierReference)?
@@ -576,7 +575,10 @@ query
 insertInto
     : INSERT (WITH SCHEMA EVOLUTION)? OVERWRITE TABLE? identifierReference optionsClause? (partitionSpec (IF errorCapturingNot EXISTS)?)?  ((BY NAME) | identifierList)? #insertOverwriteTable
     | INSERT (WITH SCHEMA EVOLUTION)? INTO TABLE? identifierReference optionsClause? partitionSpec? (IF errorCapturingNot EXISTS)? ((BY NAME) | identifierList)?   #insertIntoTable
-    | INSERT (WITH SCHEMA EVOLUTION)? INTO TABLE? identifierReference optionsClause? (BY NAME)? REPLACE whereClause              #insertIntoReplaceWhere
+    | INSERT (WITH SCHEMA EVOLUTION)? INTO TABLE? identifierReference tableAlias optionsClause? (BY NAME)?
+        REPLACE (WHERE | ON) replaceCondition=booleanExpression        #insertIntoReplaceBooleanCond
+    | INSERT (WITH SCHEMA EVOLUTION)? INTO TABLE? identifierReference tableAlias optionsClause? (BY NAME)?
+        REPLACE USING identifierList                                   #insertIntoReplaceUsing
     | INSERT OVERWRITE LOCAL? DIRECTORY path=stringLit rowFormat? createFileFormat?                     #insertOverwriteHiveDir
     | INSERT OVERWRITE LOCAL? DIRECTORY (path=stringLit)? tableProvider (OPTIONS options=propertyList)? #insertOverwriteDir
     ;
@@ -721,7 +723,7 @@ resource
     ;
 
 dmlStatementNoWith
-    : insertInto query                                                             #singleInsertQuery
+    : insertInto (query | LEFT_PAREN query RIGHT_PAREN queryAlias=tableAlias)      #singleInsertQuery
     | fromClause multiInsertQueryBody+                                             #multiInsertQuery
     | DELETE FROM identifierReference tableAlias whereClause?                      #deleteFromTable
     | UPDATE identifierReference tableAlias setClause whereClause?                 #updateTable
@@ -1493,7 +1495,7 @@ primitiveType
 dataType
     : complex=ARRAY (LT dataType GT)?                           #complexDataType
     | complex=MAP (LT dataType COMMA dataType GT)?              #complexDataType
-    | complex=STRUCT ((LT complexColTypeList? GT) | NEQ)?       #complexDataType
+    | complex=STRUCT ((LT complexColTypeList? GT) | NEQ {((SqlBaseLexer) getTokenStream().getTokenSource()).decComplexTypeLevelCounter();})?       #complexDataType
     | primitiveType                                             #primitiveDataType
     ;
 
@@ -1930,7 +1932,6 @@ ansiNonReserved
     | BY
     | BYTE
     | CACHE
-    | CACHED
     | CALLED
     | CASCADE
     | CATALOG
@@ -2302,7 +2303,6 @@ nonReserved
     | BY
     | BYTE
     | CACHE
-    | CACHED
     | CALL
     | CALLED
     | CASCADE

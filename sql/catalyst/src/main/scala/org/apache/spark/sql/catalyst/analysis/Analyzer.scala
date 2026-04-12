@@ -1016,7 +1016,7 @@ class Analyzer(
 
     def apply(plan: LogicalPlan)
         : LogicalPlan = plan.resolveOperatorsUpWithPruning(AlwaysProcess.fn, ruleId) {
-      case i @ InsertIntoStatement(table, _, _, _, _, _, _, _) =>
+      case i @ InsertIntoStatement(table, _, _, _, _, _, _, _, _) =>
         val relation = table match {
           case u: UnresolvedRelation if !u.isStreaming =>
             resolveRelation(u).getOrElse(u)
@@ -1152,8 +1152,18 @@ class Analyzer(
   object ResolveInsertInto extends ResolveInsertionBase {
     override def apply(plan: LogicalPlan): LogicalPlan = plan.resolveOperatorsWithPruning(
       AlwaysProcess.fn, ruleId) {
-      case i @ InsertIntoStatement(r: DataSourceV2Relation, _, _, _, _, _, _, _)
-          if i.query.resolved =>
+      case i: InsertIntoStatement
+          if i.table.isInstanceOf[DataSourceV2Relation] &&
+            i.query.resolved &&
+            i.replaceCriteriaOpt.isDefined =>
+        throw QueryCompilationErrors.unsupportedInsertReplaceOnOrUsing(
+          i.table.asInstanceOf[DataSourceV2Relation].table.name())
+
+      case i: InsertIntoStatement
+          if i.table.isInstanceOf[DataSourceV2Relation] &&
+            i.query.resolved &&
+            i.replaceCriteriaOpt.isEmpty =>
+        val r = i.table.asInstanceOf[DataSourceV2Relation]
         // ifPartitionNotExists is append with validation, but validation is not supported
         if (i.ifPartitionNotExists) {
           throw QueryCompilationErrors.unsupportedIfNotExistsError(r.table.name)
@@ -1407,6 +1417,12 @@ class Analyzer(
       // Don't wait other rules to resolve the child plans of `SetVariable` as we need
       // to resolve column "DEFAULT" in the child plans so that they must be unresolved.
       case s: SetVariable => resolveColumnDefaultInCommandInputQuery(s)
+
+      // SPARK-43752: resolve column "DEFAULT" in V2 write commands before the
+      // query is fully resolved, matching the InsertIntoStatement behavior above.
+      case v2: V2WriteCommand
+          if v2.table.resolved && v2.query.containsPattern(UNRESOLVED_ATTRIBUTE) =>
+        resolveColumnDefaultInCommandInputQuery(v2)
 
       // Skip FetchCursor - let ResolveFetchCursor handle variable resolution
       // This prevents ResolveReferences from trying to resolve target variables as columns

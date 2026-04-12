@@ -591,6 +591,10 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
       messageParameters = Map.empty)
   }
 
+  def unsupportedInsertReplaceOnOrUsing(tableName: String): Throwable = {
+    unsupportedTableOperationError(tableName, "INSERT INTO ... REPLACE ON/USING")
+  }
+
   def writeIntoViewNotAllowedError(identifier: TableIdentifier, t: TreeNode[_]): Throwable = {
     new AnalysisException(
       errorClass = "VIEW_WRITE_NOT_ALLOWED",
@@ -1681,9 +1685,10 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
   }
 
   def unsupportedJDBCNamespaceChangeInCatalogError(changes: Seq[NamespaceChange]): Throwable = {
+    val changesDesc = changes.map(_.toString).mkString("; ")
     new AnalysisException(
       errorClass = "_LEGACY_ERROR_TEMP_1120",
-      messageParameters = Map("changes" -> changes.toString()))
+      messageParameters = Map("changes" -> changesDesc))
   }
 
   private def tableDoesNotSupportError(cmd: String, table: Table): Throwable = {
@@ -3489,6 +3494,12 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
         "columnName" -> toSQLId(columnName)
       )
     )
+  }
+
+  def parseInputNotStringTypeError(dataType: DataType): Throwable = {
+    new AnalysisException(
+      errorClass = "PARSE_INPUT_NOT_STRING_TYPE",
+      messageParameters = Map("dataType" -> toSQLType(dataType)))
   }
 
   def textDataSourceWithMultiColumnsError(schema: StructType): Throwable = {

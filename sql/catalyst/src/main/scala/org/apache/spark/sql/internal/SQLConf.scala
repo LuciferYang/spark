@@ -4439,6 +4439,19 @@ object SQLConf {
       .intConf
       .createWithDefault(3)
 
+  val ARROW_PYSPARK_UDF_COLUMNAR_INPUT_ENABLED =
+    buildConf("spark.sql.execution.arrow.pythonUDF.columnarInput.enabled")
+      .doc("When true, Arrow-based Python UDFs (pandas UDFs) can accept " +
+        "columnar input directly from upstream operators that produce " +
+        "Arrow-backed ColumnarBatch (e.g., DataSource V2 connectors), " +
+        "bypassing the ColumnarToRow and ArrowWriter conversion. " +
+        "This optimization reduces data transfer overhead between " +
+        "the JVM and Python worker processes.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
   val ARROW_TRANSFORM_WITH_STATE_IN_PYSPARK_MAX_STATE_RECORDS_PER_BATCH =
     buildConf("spark.sql.execution.arrow.transformWithStateInPySpark.maxStateRecordsPerBatch")
       .doc("When using TransformWithState in PySpark (both Python Row and Pandas), limit " +
@@ -4865,6 +4878,48 @@ object SQLConf {
       .version("2.3.0")
       .enumConf(PartitionOverwriteMode)
       .createWithDefault(PartitionOverwriteMode.STATIC)
+
+  val INSERT_INTO_REPLACE_ON_ENABLED =
+    buildConf("spark.sql.insertIntoReplaceOn.enabled")
+      .doc("Enable the SQL syntax INSERT INTO ... REPLACE ON (...). " +
+        "The command atomically inserts new rows into a table after deleting all existing rows " +
+        "that match the new rows according to the specified matching condition. The " +
+        "inserted rows are specified by a VALUES expression or the result of a query.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val INSERT_INTO_REPLACE_ON_BY_NAME_ENABLED =
+    buildConf("spark.sql.insertIntoReplaceOnByName.enabled")
+      .doc("Enable the SQL syntax INSERT INTO ... BY NAME REPLACE ON. " +
+        "Allows using the BY NAME clause with INSERT INTO REPLACE ON.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val INSERT_INTO_REPLACE_USING_ENABLED =
+    buildConf("spark.sql.insertIntoReplaceUsing.enabled")
+      .doc("Enable the SQL syntax INSERT INTO ... REPLACE USING (...). " +
+        "The command atomically inserts new rows into a table after deleting all existing rows " +
+        "that match the new rows according to the key columns specified in the statement. The " +
+        "inserted rows are specified by a VALUES expression or the result of a query.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val INSERT_INTO_REPLACE_USING_BY_NAME_ENABLED =
+    buildConf("spark.sql.insertIntoReplaceUsingByName.enabled")
+      .doc("Enable the SQL syntax INSERT INTO ... BY NAME REPLACE USING (...). " +
+        "Allows using the BY NAME clause with INSERT INTO REPLACE USING.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
 
   object StoreAssignmentPolicy extends Enumeration {
     val ANSI, LEGACY, STRICT = Value
@@ -7984,6 +8039,9 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
   def arrowCompressionCodec: String = getConf(ARROW_EXECUTION_COMPRESSION_CODEC)
 
   def arrowZstdCompressionLevel: Int = getConf(ARROW_EXECUTION_ZSTD_COMPRESSION_LEVEL)
+
+  def arrowPySparkUDFColumnarInputEnabled: Boolean =
+    getConf(ARROW_PYSPARK_UDF_COLUMNAR_INPUT_ENABLED)
 
   def arrowTransformWithStateInPySparkMaxStateRecordsPerBatch: Int =
     getConf(ARROW_TRANSFORM_WITH_STATE_IN_PYSPARK_MAX_STATE_RECORDS_PER_BATCH)
