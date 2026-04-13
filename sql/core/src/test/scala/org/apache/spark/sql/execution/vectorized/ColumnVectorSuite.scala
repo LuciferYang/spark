@@ -298,6 +298,37 @@ class ColumnVectorSuite extends SparkFunSuite with SQLHelper {
     verifyPutByteArray(testVector)
   }
 
+  testVectors("putBytes from ByteBuffer", 16, ByteType) { testVector =>
+    val data = Array[Byte](10, 20, 30, 40, 50, 60, 70, 80)
+
+    // Heap ByteBuffer
+    testVector.putBytes(0, data.length, ByteBuffer.wrap(data), 0)
+    (0 until data.length).foreach { i =>
+      assert(testVector.getByte(i) === data(i))
+    }
+
+    // Direct ByteBuffer
+    val directBuf = ByteBuffer.allocateDirect(data.length)
+    directBuf.put(data)
+    testVector.putBytes(0, data.length, directBuf, 0)
+    (0 until data.length).foreach { i =>
+      assert(testVector.getByte(i) === data(i))
+    }
+
+    // Read-only ByteBuffer (hasArray=false, isDirect=false)
+    val readOnlyBuf = ByteBuffer.wrap(data).asReadOnlyBuffer()
+    testVector.putBytes(0, data.length, readOnlyBuf, 0)
+    (0 until data.length).foreach { i =>
+      assert(testVector.getByte(i) === data(i))
+    }
+
+    // With srcIndex offset
+    testVector.putBytes(0, 4, ByteBuffer.wrap(data), 4)
+    (0 until 4).foreach { i =>
+      assert(testVector.getByte(i) === data(i + 4))
+    }
+  }
+
   DataTypeTestUtils.yearMonthIntervalTypes.foreach {
     dt =>
       testVectors(dt.typeName,
