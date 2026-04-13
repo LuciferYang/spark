@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.vectorized
 
+import java.nio.ByteBuffer
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.YearUDT
 import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow
@@ -260,6 +262,40 @@ class ColumnVectorSuite extends SparkFunSuite with SQLHelper {
       assert(array.get(i, BinaryType) === utf8)
       assert(arrayCopy.get(i, BinaryType) === utf8)
     }
+  }
+
+  testVectors("putByteArray from ByteBuffer", 10, BinaryType) { testVector =>
+    def verifyPutByteArray(testVector: WritableColumnVector): Unit = {
+      (0 until 10).foreach { i =>
+        assert(testVector.getBinary(i) === s"str$i".getBytes("utf8"))
+      }
+    }
+
+    // Heap ByteBuffer
+    (0 until 10).foreach { i =>
+      val bytes = s"str$i".getBytes("utf8")
+      testVector.putByteArray(i, ByteBuffer.wrap(bytes), 0, bytes.length)
+    }
+    verifyPutByteArray(testVector)
+
+    // Direct ByteBuffer
+    testVector.reset()
+    (0 until 10).foreach { i =>
+      val bytes = s"str$i".getBytes("utf8")
+      val buf = ByteBuffer.allocateDirect(bytes.length)
+      buf.put(bytes)
+      testVector.putByteArray(i, buf, 0, bytes.length)
+    }
+    verifyPutByteArray(testVector)
+
+    // Read-only ByteBuffer (hasArray=false, isDirect=false)
+    testVector.reset()
+    (0 until 10).foreach { i =>
+      val bytes = s"str$i".getBytes("utf8")
+      val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
+      testVector.putByteArray(i, buf, 0, bytes.length)
+    }
+    verifyPutByteArray(testVector)
   }
 
   DataTypeTestUtils.yearMonthIntervalTypes.foreach {

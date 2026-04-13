@@ -208,9 +208,14 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     if (src.hasArray()) {
       Platform.copyMemory(src.array(), Platform.BYTE_ARRAY_OFFSET + src.arrayOffset() + srcIndex,
         null, data + rowId, count);
-    } else {
+    } else if (src.isDirect()) {
       long srcAddr = Platform.getDirectBufferAddress(src) + srcIndex;
       Platform.copyMemory(null, srcAddr, null, data + rowId, count);
+    } else {
+      // Fallback for non-heap, non-direct buffers (e.g., read-only wrappers).
+      byte[] tmp = new byte[count];
+      src.get(srcIndex, tmp, 0, count);
+      Platform.copyMemory(tmp, Platform.BYTE_ARRAY_OFFSET, null, data + rowId, count);
     }
   }
 
