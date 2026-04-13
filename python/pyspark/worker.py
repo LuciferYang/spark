@@ -207,6 +207,20 @@ class EvalConf(Conf):
         except ValueError:
             return port
 
+    @property
+    def input_type(self) -> Optional[DataType]:
+        input_type = self.get("input_type", None, lower_str=False)
+        if input_type is None:
+            return None
+        return _parse_datatype_json_string(input_type)
+
+    @property
+    def table_arg_offsets(self) -> Optional[list[int]]:
+        offsets = self.get("table_arg_offsets", None)
+        if offsets is None:
+            return None
+        return [int(x) for x in offsets.split(",") if x]
+
 
 def report_times(outfile, boot, init, finish, processing_time_ms):
     write_int(SpecialLengths.TIMING_DATA, outfile)
@@ -1251,15 +1265,14 @@ def read_single_udf(pickleSer, infile, eval_type, runner_conf, udf_index):
 # It expects the UDTF to be in a specific format and performs various checks to
 # ensure the UDTF is valid. This function also prepares a mapper function for applying
 # the UDTF logic to input rows.
-def read_udtf(pickleSer, infile, eval_type, runner_conf):
+def read_udtf(pickleSer, infile, eval_type, runner_conf, eval_conf):
     if eval_type == PythonEvalType.SQL_ARROW_TABLE_UDF:
-        input_type = _parse_datatype_json_string(utf8_deserializer.loads(infile))
         if runner_conf.use_legacy_pandas_udtf_conversion:
             # NOTE: if timezone is set here, that implies respectSessionTimeZone is True
             ser = ArrowStreamPandasUDTFSerializer(
                 timezone=runner_conf.timezone,
                 safecheck=runner_conf.safecheck,
-                input_type=input_type,
+                input_type=eval_conf.input_type,
                 prefer_int_ext_dtype=runner_conf.prefer_int_ext_dtype,
                 int_to_decimal_coercion_enabled=runner_conf.int_to_decimal_coercion_enabled,
             )
@@ -1267,10 +1280,8 @@ def read_udtf(pickleSer, infile, eval_type, runner_conf):
             ser = ArrowStreamUDTFSerializer()
     elif eval_type == PythonEvalType.SQL_ARROW_UDTF:
         # Read the table argument offsets
-        num_table_arg_offsets = read_int(infile)
-        table_arg_offsets = [read_int(infile) for _ in range(num_table_arg_offsets)]
         # Use PyArrow-native serializer for Arrow UDTFs with potential UDT support
-        ser = ArrowStreamArrowUDTFSerializer(table_arg_offsets=table_arg_offsets)
+        ser = ArrowStreamArrowUDTFSerializer(table_arg_offsets=eval_conf.table_arg_offsets)
     else:
         # Each row is a group so do not batch but send one by one.
         ser = BatchedSerializer(CPickleSerializer(), 1)
@@ -2178,7 +2189,7 @@ def read_udtf(pickleSer, infile, eval_type, runner_conf):
                         none_on_identity=True,
                         binary_as_bytes=runner_conf.binary_as_bytes,
                     )
-                    for f in input_type
+                    for f in eval_conf.input_type
                 ]
                 for a in it:
                     pylist = [
@@ -2532,10 +2543,8 @@ def read_udfs(pickleSer, infile, eval_type, runner_conf, eval_conf):
             PythonEvalType.SQL_MAP_ARROW_ITER_UDF,
             PythonEvalType.SQL_SCALAR_ARROW_UDF,
             PythonEvalType.SQL_SCALAR_ARROW_ITER_UDF,
+            PythonEvalType.SQL_ARROW_BATCHED_UDF,
         ):
-            ser = ArrowStreamSerializer(write_start_stream=True)
-        elif eval_type == PythonEvalType.SQL_ARROW_BATCHED_UDF:
-            input_type = _parse_datatype_json_string(utf8_deserializer.loads(infile))
             ser = ArrowStreamSerializer(write_start_stream=True)
         else:
             # Scalar Pandas UDF handles struct type arguments as pandas DataFrames instead of
@@ -2865,7 +2874,7 @@ def read_udfs(pickleSer, infile, eval_type, runner_conf, eval_conf):
             ArrowTableToRowsConversion._create_converter(
                 f.dataType, none_on_identity=True, binary_as_bytes=runner_conf.binary_as_bytes
             )
-            for f in input_type
+            for f in eval_conf.input_type
         ]
 
         @fail_on_stopiteration
@@ -2968,7 +2977,7 @@ def read_udfs(pickleSer, infile, eval_type, runner_conf, eval_conf):
                 pandas_columns = ArrowBatchTransformer.to_pandas(
                     input_batch,
                     timezone=runner_conf.timezone,
-                    schema=input_type,
+                    schema=eval_conf.input_type,
                     struct_in_pandas="row",
                     ndarray_as_list=True,
                     prefer_int_ext_dtype=runner_conf.prefer_int_ext_dtype,
@@ -3520,7 +3529,7 @@ def main(infile, outfile):
             PythonEvalType.SQL_ARROW_UDTF,
         ):
             func, profiler, deserializer, serializer = read_udtf(
-                pickleSer, infile, eval_type, runner_conf
+                pickleSer, infile, eval_type, runner_conf, eval_conf
             )
         else:
             func, profiler, deserializer, serializer = read_udfs(
