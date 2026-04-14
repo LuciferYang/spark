@@ -22,6 +22,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{execution, DataFrame, Row}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, DeclarativeAggregate, Final}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Range, Repartition, RepartitionOperation, Union}
 import org.apache.spark.sql.catalyst.plans.physical._
@@ -744,18 +745,28 @@ class PlannerSuite extends SharedSparkSession with AdaptiveSparkPlanHelper {
   }
 
   test("SPARK-24500: create union with stream of children") {
-    @scala.annotation.nowarn("cat=deprecation")
-    val df = Union(Stream(
-      Range(1, 1, 1, 1),
-      Range(1, 2, 1, 1)))
-    df.queryExecution.executedPlan.execute()
+    withSQLConf(
+      SQLConf.ANALYZER_SINGLE_PASS_RESOLVER_ENABLED.key -> "false",
+      SQLConf.ANALYZER_DUAL_RUN_LEGACY_AND_SINGLE_PASS_RESOLVER.key -> "false"
+    ) {
+      @scala.annotation.nowarn("cat=deprecation")
+      val df = Union(Stream(
+        Range(1, 1, 1, 1),
+        Range(1, 2, 1, 1)))
+      df.queryExecution.executedPlan.execute()
+    }
   }
 
   test("SPARK-45685: create union with LazyList of children") {
-    val df = Union(LazyList(
-      Range(1, 1, 1, 1),
-      Range(1, 2, 1, 1)))
-    df.queryExecution.executedPlan.execute()
+    withSQLConf(
+      SQLConf.ANALYZER_SINGLE_PASS_RESOLVER_ENABLED.key -> "false",
+      SQLConf.ANALYZER_DUAL_RUN_LEGACY_AND_SINGLE_PASS_RESOLVER.key -> "false"
+    ) {
+      val df = Union(LazyList(
+        Range(1, 1, 1, 1),
+        Range(1, 2, 1, 1)))
+      df.queryExecution.executedPlan.execute()
+    }
   }
 
   test("SPARK-25278: physical nodes should be different instances for same logical nodes") {
@@ -1395,6 +1406,41 @@ class PlannerSuite extends SharedSparkSession with AdaptiveSparkPlanHelper {
     val planned = df.queryExecution.sparkPlan
     assert(planned.exists(_.isInstanceOf[GlobalLimitExec]))
     assert(planned.exists(_.isInstanceOf[LocalLimitExec]))
+  }
+
+  test("SPARK-55979: required input attributes are missing from PartialMerge / Final " +
+    "BaseAggregateExec.references") {
+    val scanAggBufferAttr = AttributeReference("buf", IntegerType, nullable = true)()
+    val inputAggBufferAttr = scanAggBufferAttr.withName("renamed_buf")
+
+    case class MyAggregate() extends DeclarativeAggregate {
+      override def children: Seq[Expression] = Nil
+      override def nullable: Boolean = true
+      override def dataType: DataType = IntegerType
+      override def prettyName: String = "test_agg"
+      override val aggBufferAttributes: Seq[AttributeReference] = Seq(scanAggBufferAttr)
+      override lazy val inputAggBufferAttributes: Seq[AttributeReference] =
+        Seq(inputAggBufferAttr)
+      override val initialValues: Seq[Expression] = Seq(Literal(0))
+      override val updateExpressions: Seq[Expression] = Seq(scanAggBufferAttr)
+      override val mergeExpressions: Seq[Expression] = Seq(inputAggBufferAttr)
+      override val evaluateExpression: Expression = scanAggBufferAttr
+      override protected def withNewChildrenInternal(
+        newChildren: IndexedSeq[Expression]): Expression = copy()
+    }
+    val aggregateExpression = AggregateExpression(MyAggregate(), Final, isDistinct = false)
+    val aggregate = HashAggregateExec(
+      requiredChildDistributionExpressions = None,
+      isStreaming = false,
+      numShufflePartitions = None,
+      groupingExpressions = Nil,
+      aggregateExpressions = Seq(aggregateExpression),
+      aggregateAttributes = Seq(aggregateExpression.resultAttribute),
+      initialInputBufferOffset = 0,
+      resultExpressions = Seq(Alias(aggregateExpression, "result")()),
+      child = LocalTableScanExec(Seq(scanAggBufferAttr), Nil, None))
+
+    assert(aggregate.references.contains(inputAggBufferAttr))
   }
 }
 
