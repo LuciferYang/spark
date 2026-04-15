@@ -246,14 +246,35 @@ public final class VectorizedRleValuesReader extends ValuesReader
             state.valueOffset += n;
           }
           case PACKED -> {
-            for (int i = 0; i < n; ++i) {
-              int currentValue = currentBuffer[currentBufferIdx++];
-              if (currentValue == state.maxDefinitionLevel) {
-                updater.readValue(state.valueOffset++, values, valueReader);
+            // Scan currentBuffer for contiguous null / non-null runs and dispatch one batch
+            // call per run. Converts O(n) virtual dispatch into O(runs) batch calls. Groups
+            // by null/non-null only — the caller has no defLevels vector so exact def-level
+            // values below maxDefinitionLevel are not observable (see readValuesN for the
+            // variant that must group by exact def-level value).
+            final int maxDefLevel = state.maxDefinitionLevel;
+            final int bufEnd = currentBufferIdx + n;
+            int valueOff = state.valueOffset;
+            while (currentBufferIdx < bufEnd) {
+              int runStart = currentBufferIdx;
+              if (currentBuffer[currentBufferIdx] == maxDefLevel) {
+                do {
+                  currentBufferIdx++;
+                } while (currentBufferIdx < bufEnd
+                    && currentBuffer[currentBufferIdx] == maxDefLevel);
+                int runLen = currentBufferIdx - runStart;
+                updater.readValues(runLen, valueOff, values, valueReader);
+                valueOff += runLen;
               } else {
-                nulls.putNull(state.valueOffset++);
+                do {
+                  currentBufferIdx++;
+                } while (currentBufferIdx < bufEnd
+                    && currentBuffer[currentBufferIdx] != maxDefLevel);
+                int runLen = currentBufferIdx - runStart;
+                nulls.putNulls(valueOff, runLen);
+                valueOff += runLen;
               }
             }
+            state.valueOffset = valueOff;
           }
         }
         state.levelOffset += n;
@@ -637,15 +658,30 @@ public final class VectorizedRleValuesReader extends ValuesReader
         defLevels.putInts(state.levelOffset, n, currentValue);
       }
       case PACKED -> {
-        for (int i = 0; i < n; ++i) {
-          int currentValue = currentBuffer[currentBufferIdx++];
-          if (currentValue == state.maxDefinitionLevel) {
-            updater.readValue(state.valueOffset++, values, valueReader);
+        // Group by equal def-level value: each run is uniform in both nullness and the exact
+        // def-level value (important for nested columns with maxDefinitionLevel > 1), so we can
+        // batch both the value/null dispatch and the def-level write.
+        final int maxDefLevel = state.maxDefinitionLevel;
+        final int end = currentBufferIdx + n;
+        int valueOff = state.valueOffset;
+        int levelIdx = state.levelOffset;
+        while (currentBufferIdx < end) {
+          int runStart = currentBufferIdx;
+          int runValue = currentBuffer[currentBufferIdx];
+          do {
+            currentBufferIdx++;
+          } while (currentBufferIdx < end && currentBuffer[currentBufferIdx] == runValue);
+          int runLen = currentBufferIdx - runStart;
+          if (runValue == maxDefLevel) {
+            updater.readValues(runLen, valueOff, values, valueReader);
           } else {
-            nulls.putNull(state.valueOffset++);
+            nulls.putNulls(valueOff, runLen);
           }
-          defLevels.putInt(state.levelOffset + i, currentValue);
+          valueOff += runLen;
+          defLevels.putInts(levelIdx, runLen, runValue);
+          levelIdx += runLen;
         }
+        state.valueOffset = valueOff;
       }
     }
   }
