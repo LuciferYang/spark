@@ -262,7 +262,11 @@ public final class VectorizedRleValuesReader extends ValuesReader
                 } while (currentBufferIdx < bufEnd
                     && currentBuffer[currentBufferIdx] == maxDefLevel);
                 int runLen = currentBufferIdx - runStart;
-                updater.readValues(runLen, valueOff, values, valueReader);
+                if (runLen == 1) {
+                  updater.readValue(valueOff, values, valueReader);
+                } else {
+                  updater.readValues(runLen, valueOff, values, valueReader);
+                }
                 valueOff += runLen;
               } else {
                 do {
@@ -270,7 +274,11 @@ public final class VectorizedRleValuesReader extends ValuesReader
                 } while (currentBufferIdx < bufEnd
                     && currentBuffer[currentBufferIdx] != maxDefLevel);
                 int runLen = currentBufferIdx - runStart;
-                nulls.putNulls(valueOff, runLen);
+                if (runLen == 1) {
+                  nulls.putNull(valueOff);
+                } else {
+                  nulls.putNulls(valueOff, runLen);
+                }
                 valueOff += runLen;
               }
             }
@@ -673,12 +681,24 @@ public final class VectorizedRleValuesReader extends ValuesReader
           } while (currentBufferIdx < end && currentBuffer[currentBufferIdx] == runValue);
           int runLen = currentBufferIdx - runStart;
           if (runValue == maxDefLevel) {
-            updater.readValues(runLen, valueOff, values, valueReader);
+            if (runLen == 1) {
+              updater.readValue(valueOff, values, valueReader);
+            } else {
+              updater.readValues(runLen, valueOff, values, valueReader);
+            }
           } else {
-            nulls.putNulls(valueOff, runLen);
+            if (runLen == 1) {
+              nulls.putNull(valueOff);
+            } else {
+              nulls.putNulls(valueOff, runLen);
+            }
           }
           valueOff += runLen;
-          defLevels.putInts(levelIdx, runLen, runValue);
+          if (runLen == 1) {
+            defLevels.putInt(levelIdx, runValue);
+          } else {
+            defLevels.putInts(levelIdx, runLen, runValue);
+          }
           levelIdx += runLen;
         }
         state.valueOffset = valueOff;
