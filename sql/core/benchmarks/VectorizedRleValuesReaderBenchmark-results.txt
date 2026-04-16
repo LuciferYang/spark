@@ -6,12 +6,12 @@ OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.17.0-1010-azure
 AMD EPYC 7763 64-Core Processor
 RLE readBooleans PACKED decode:           Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-cold reader, trueRatio=0.1                            1              1           0        865.1           1.2       1.0X
-reused reader, trueRatio=0.1                          1              1           0        862.6           1.2       1.0X
-cold reader, trueRatio=0.5                            1              1           0        748.9           1.3       0.9X
-reused reader, trueRatio=0.5                          1              1           0        988.6           1.0       1.1X
-cold reader, trueRatio=0.9                            2              2           0        657.0           1.5       0.8X
-reused reader, trueRatio=0.9                          1              1           0        839.8           1.2       1.0X
+cold reader, trueRatio=0.1                            1              1           0        864.3           1.2       1.0X
+reused reader, trueRatio=0.1                          1              1           0        864.8           1.2       1.0X
+cold reader, trueRatio=0.5                            1              1           0        756.8           1.3       0.9X
+reused reader, trueRatio=0.5                          1              1           0        985.4           1.0       1.1X
+cold reader, trueRatio=0.9                            2              2           0        655.3           1.5       0.8X
+reused reader, trueRatio=0.9                          1              1           0        830.0           1.2       1.0X
 
 
 ================================================================================================
@@ -22,14 +22,14 @@ OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.17.0-1010-azure
 AMD EPYC 7763 64-Core Processor
 RLE readIntegers PACKED dictionary-id decode:  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ----------------------------------------------------------------------------------------------------------------------------
-cold reader, bitWidth=4                                   2              2           0        506.5           2.0       1.0X
-reused reader, bitWidth=4                                 2              2           0        504.8           2.0       1.0X
-cold reader, bitWidth=8                                   2              2           0        498.9           2.0       1.0X
-reused reader, bitWidth=8                                 2              2           0        487.1           2.1       1.0X
-cold reader, bitWidth=12                                  3              3           0        375.0           2.7       0.7X
-reused reader, bitWidth=12                                3              3           0        366.1           2.7       0.7X
-cold reader, bitWidth=20                                  3              3           0        315.0           3.2       0.6X
-reused reader, bitWidth=20                                3              3           0        314.7           3.2       0.6X
+cold reader, bitWidth=4                                   2              2           0        508.6           2.0       1.0X
+reused reader, bitWidth=4                                 2              2           0        507.3           2.0       1.0X
+cold reader, bitWidth=8                                   2              2           0        501.5           2.0       1.0X
+reused reader, bitWidth=8                                 2              2           0        488.8           2.0       1.0X
+cold reader, bitWidth=12                                  3              3           0        375.4           2.7       0.7X
+reused reader, bitWidth=12                                3              3           0        374.4           2.7       0.7X
+cold reader, bitWidth=20                                  3              3           0        315.5           3.2       0.6X
+reused reader, bitWidth=20                                3              3           0        314.9           3.2       0.6X
 
 
 ================================================================================================
@@ -40,15 +40,15 @@ OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.17.0-1010-azure
 AMD EPYC 7763 64-Core Processor
 Nullable batch, constant value reader:    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-nullRatio=0.0, n/a                                    0              0           0      22926.7           0.0       1.0X
-nullRatio=0.1, random                                 7              7           0        152.0           6.6       0.0X
-nullRatio=0.1, clustered                              5              5           0        222.3           4.5       0.0X
-nullRatio=0.3, random                                10             10           0        102.1           9.8       0.0X
-nullRatio=0.3, clustered                              5              5           0        213.5           4.7       0.0X
-nullRatio=0.5, random                                12             12           0         90.4          11.1       0.0X
-nullRatio=0.5, clustered                              5              5           0        209.4           4.8       0.0X
-nullRatio=0.9, random                                 7              7           1        145.5           6.9       0.0X
-nullRatio=0.9, clustered                              5              5           0        211.2           4.7       0.0X
+nullRatio=0.0, n/a                                    0              0           0      23017.8           0.0       1.0X
+nullRatio=0.1, random                                 7              7           0        156.5           6.4       0.0X
+nullRatio=0.1, clustered                              4              4           0        236.6           4.2       0.0X
+nullRatio=0.3, random                                10             10           0        102.0           9.8       0.0X
+nullRatio=0.3, clustered                              5              5           0        223.9           4.5       0.0X
+nullRatio=0.5, random                                12             12           0         88.9          11.3       0.0X
+nullRatio=0.5, clustered                              5              5           0        216.3           4.6       0.0X
+nullRatio=0.9, random                                 7              7           0        143.1           7.0       0.0X
+nullRatio=0.9, clustered                              5              5           0        217.3           4.6       0.0X
 
 
 ================================================================================================
@@ -59,14 +59,14 @@ OpenJDK 64-Bit Server VM 17.0.18+8-LTS on Linux 6.17.0-1010-azure
 AMD EPYC 7763 64-Core Processor
 Nullable batch, plain INT32 value reader:  Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
 ------------------------------------------------------------------------------------------------------------------------
-nullRatio=0.0, n/a                                    0              0           0       6564.7           0.2       1.0X
-nullRatio=0.1, random                                11             11           0         93.6          10.7       0.0X
-nullRatio=0.1, clustered                              7              7           0        144.8           6.9       0.0X
-nullRatio=0.3, random                                17             17           0         62.1          16.1       0.0X
-nullRatio=0.3, clustered                              7              8           0        140.5           7.1       0.0X
-nullRatio=0.5, random                                18             19           1         57.1          17.5       0.0X
-nullRatio=0.5, clustered                              8              8           0        138.5           7.2       0.0X
-nullRatio=0.9, random                                11             11           0         93.8          10.7       0.0X
-nullRatio=0.9, clustered                              7              8           0        140.7           7.1       0.0X
+nullRatio=0.0, n/a                                    0              0           0       6635.5           0.2       1.0X
+nullRatio=0.1, random                                10             10           0        109.8           9.1       0.0X
+nullRatio=0.1, clustered                              6              6           0        170.5           5.9       0.0X
+nullRatio=0.3, random                                14             14           0         76.0          13.2       0.0X
+nullRatio=0.3, clustered                              6              6           0        167.7           6.0       0.0X
+nullRatio=0.5, random                                15             15           0         69.6          14.4       0.0X
+nullRatio=0.5, clustered                              6              6           0        168.7           5.9       0.0X
+nullRatio=0.9, random                                 9              9           0        118.6           8.4       0.0X
+nullRatio=0.9, clustered                              6              6           0        178.5           5.6       0.0X
 
 
