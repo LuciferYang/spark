@@ -67,6 +67,9 @@ object VectorizedRleValuesReaderBenchmark extends BenchmarkBase {
     ByteBufferInputStream.wrap(ByteBuffer.wrap(bytes))
 
   // Def-level pattern where most 8-value groups contain mixed values, forcing PACKED mode.
+  // Note: the perturbation shifts the effective null ratio by ~10% from the requested value
+  // (e.g., requested 0.9 becomes ~0.79). This is acceptable because the benchmark compares
+  // baseline vs optimized runs of the same pattern, so the exact ratio is irrelevant.
   private def packedFriendlyDefLevels(
       n: Int, nullRatio: Double, clustered: Boolean): Array[Int] = {
     val rng = new Random(42)
@@ -91,12 +94,14 @@ object VectorizedRleValuesReaderBenchmark extends BenchmarkBase {
         i += 1
       }
     }
-    // Perturb every 9th element to break long identical runs and keep encoder in PACKED mode.
+    // Perturb every 8th element to break long identical runs and keep encoder in PACKED mode.
+    // The RLE encoder switches to RLE when it sees 8+ consecutive identical values, so flipping
+    // every 8th ensures the max uninterrupted run is 7, always below the threshold.
     // Skip for the pure-RLE control cases (all 0s or all 1s) where we want a single RLE run.
     if (nullRatio > 0.0 && nullRatio < 1.0) {
       var k = 1
       while (k < n) {
-        if (arr(k) == arr(k - 1) && (k % 9 == 0)) arr(k) ^= 1
+        if (arr(k) == arr(k - 1) && (k % 8 == 0)) arr(k) ^= 1
         k += 1
       }
     }
