@@ -57,6 +57,12 @@ final class BitArray {
     return doubled > Integer.MAX_VALUE ? numWords : (int) doubled;
   }
 
+  /**
+   * Creates a new bit array large enough to hold at least {@code numBits} bits. The actual
+   * {@link #bitSize()} may be larger than {@code numBits}: the underlying word count is rounded
+   * up to the next power of 2 so that hash-to-index mapping can use a bitmask fast path
+   * instead of long-division modulo. The worst-case extra allocation is at most ~2x.
+   */
   BitArray(long numBits) {
     this(new long[roundUpToPowerOfTwo(numWords(numBits))]);
   }
@@ -137,6 +143,12 @@ final class BitArray {
     this.bitCount = bitCount;
   }
 
+  /**
+   * Writes this bit array to {@code out}. The serialized format is the actual number of
+   * underlying words ({@code data.length}, which may have been rounded up to a power of 2 by
+   * the constructor) followed by the raw word values. {@link #readFrom(DataInputStream)}
+   * reconstructs the array using the stored word count, preserving the bit layout verbatim.
+   */
   void writeTo(DataOutputStream out) throws IOException {
     out.writeInt(data.length);
     for (long datum : data) {

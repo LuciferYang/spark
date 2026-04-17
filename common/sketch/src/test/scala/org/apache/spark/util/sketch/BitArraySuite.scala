@@ -38,6 +38,23 @@ class BitArraySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     assert(new BitArray(128).bitSize() == 128)
   }
 
+  test("roundUpToPowerOfTwo edge cases") {
+    // Already power-of-2 values pass through unchanged.
+    assert(BitArray.roundUpToPowerOfTwo(1) == 1)
+    assert(BitArray.roundUpToPowerOfTwo(2) == 2)
+    assert(BitArray.roundUpToPowerOfTwo(1024) == 1024)
+    // Non-power-of-2 values are rounded up to the next power of 2.
+    assert(BitArray.roundUpToPowerOfTwo(3) == 4)
+    assert(BitArray.roundUpToPowerOfTwo(5) == 8)
+    assert(BitArray.roundUpToPowerOfTwo(1023) == 1024)
+    // Largest power of 2 that fits in a positive int: 2^30 = 1073741824.
+    assert(BitArray.roundUpToPowerOfTwo(1073741824) == 1073741824)
+    // Values above 2^30 cannot be doubled without overflow; keep them unchanged so callers
+    // fall back to the legacy modulo path rather than allocating a negative-sized array.
+    assert(BitArray.roundUpToPowerOfTwo(1073741825) == 1073741825)
+    assert(BitArray.roundUpToPowerOfTwo(Integer.MAX_VALUE) == Integer.MAX_VALUE)
+  }
+
   test("bitSize is rounded up to the next power of 2") {
     // 129 bits require 3 longs; rounded up to 4 longs = 256 bits.
     assert(new BitArray(129).bitSize() == 256)
