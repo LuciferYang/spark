@@ -51,7 +51,6 @@ class BloomFilterImplV2 extends BloomFilterBase implements Serializable {
     int h1 = inputHash.hi();
     int h2 = inputHash.lo();
 
-    long bitSize = bits.bitSize();
     boolean bitsChanged = false;
 
     // Integer.MAX_VALUE takes care of scrambling the higher four bytes of combinedHash
@@ -62,7 +61,7 @@ class BloomFilterImplV2 extends BloomFilterBase implements Serializable {
       // Flip all the bits if it's negative (guaranteed positive number)
       long combinedIndex = combinedHash < 0 ? ~combinedHash : combinedHash;
 
-      bitsChanged |= bits.set(combinedIndex % bitSize);
+      bitsChanged |= bits.set(bits.indexFor(combinedIndex));
     }
     return bitsChanged;
   }
@@ -70,8 +69,6 @@ class BloomFilterImplV2 extends BloomFilterBase implements Serializable {
   protected boolean scatterHashAndGetAllBits(HiLoHash inputHash) {
     int h1 = inputHash.hi();
     int h2 = inputHash.lo();
-
-    long bitSize = bits.bitSize();
 
     // Integer.MAX_VALUE takes care of scrambling the higher four bytes of combinedHash
     long combinedHash = (long) h1 * Integer.MAX_VALUE;
@@ -81,7 +78,7 @@ class BloomFilterImplV2 extends BloomFilterBase implements Serializable {
       // Flip all the bits if it's negative (guaranteed positive number)
       long combinedIndex = combinedHash < 0 ? ~combinedHash : combinedHash;
 
-      if (!bits.get(combinedIndex % bitSize)) {
+      if (!bits.get(bits.indexFor(combinedIndex))) {
         return false;
       }
     }

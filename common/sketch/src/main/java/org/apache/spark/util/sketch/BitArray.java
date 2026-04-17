@@ -24,6 +24,12 @@ import java.util.Arrays;
 
 final class BitArray {
   private final long[] data;
+  private final long bitSize;
+  /**
+   * Mask for fast index mapping when {@link #bitSize} is a power of 2, or {@code -1L} sentinel
+   * for legacy deserialized filters whose bit array length is not a power of 2.
+   */
+  private final long bitMask;
   private long bitCount;
 
   static int numWords(long numBits) {
@@ -37,17 +43,52 @@ final class BitArray {
     return (int) numWords;
   }
 
+  /**
+   * Rounds {@code numWords} up to the next power of 2, enabling bitmask-based index mapping in
+   * hot hash paths. Returns {@code numWords} unchanged if it is already a power of 2 or if
+   * rounding up would overflow a positive {@code int}.
+   */
+  static int roundUpToPowerOfTwo(int numWords) {
+    int highestBit = Integer.highestOneBit(numWords);
+    if (highestBit == numWords) {
+      return numWords;
+    }
+    long doubled = (long) highestBit << 1;
+    return doubled > Integer.MAX_VALUE ? numWords : (int) doubled;
+  }
+
   BitArray(long numBits) {
-    this(new long[numWords(numBits)]);
+    this(new long[roundUpToPowerOfTwo(numWords(numBits))]);
   }
 
   private BitArray(long[] data) {
     this.data = data;
+    this.bitSize = (long) data.length * Long.SIZE;
+    // If data.length is a power of 2 (and non-zero), bitSize is also a power of 2 and we can
+    // replace (hash % bitSize) with (hash & bitMask) in hot paths. Otherwise, fall back to
+    // modulo — this happens only for legacy filters deserialized via readFrom() where the
+    // stored numWords predates the power-of-2 rounding introduced in the public constructor.
+    this.bitMask = (data.length > 0 && (data.length & (data.length - 1)) == 0) ? bitSize - 1 : -1L;
     long bitCount = 0;
     for (long word : data) {
       bitCount += Long.bitCount(word);
     }
     this.bitCount = bitCount;
+  }
+
+  /**
+   * Maps a non-negative {@code long} hash value to a bit index in {@code [0, bitSize)}.
+   * Uses a bitmask fast path when {@link #bitSize} is a power of 2; falls back to {@code %}
+   * for legacy bit arrays whose length is not a power of 2.
+   *
+   * <p>Callers must pass a non-negative hash. Keeping the sign-normalization
+   * ({@code hash < 0 ? ~hash : hash}) at the call site preserves the historical hash-to-index
+   * mapping so that filters written by the updated code remain readable by older Spark
+   * versions (which apply modulo on power-of-2 {@code bitSize}, yielding identical indices for
+   * non-negative inputs).
+   */
+  long indexFor(long hash) {
+    return bitMask != -1L ? (hash & bitMask) : (hash % bitSize);
   }
 
   /** Returns true if the bit changed value. */
@@ -66,7 +107,7 @@ final class BitArray {
 
   /** Number of bits */
   long bitSize() {
-    return (long) data.length * Long.SIZE;
+    return bitSize;
   }
 
   /** Number of set bits (1s) */

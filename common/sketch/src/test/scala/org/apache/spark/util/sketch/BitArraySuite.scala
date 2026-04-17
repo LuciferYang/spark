@@ -17,6 +17,8 @@
 
 package org.apache.spark.util.sketch
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream}
+
 import scala.util.Random
 
 import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
@@ -34,6 +36,64 @@ class BitArraySuite extends AnyFunSuite { // scalastyle:ignore funsuite
     assert(new BitArray(65).bitSize() == 128)
     assert(new BitArray(127).bitSize() == 128)
     assert(new BitArray(128).bitSize() == 128)
+  }
+
+  test("bitSize is rounded up to the next power of 2") {
+    // 129 bits require 3 longs; rounded up to 4 longs = 256 bits.
+    assert(new BitArray(129).bitSize() == 256)
+    // 192 bits = 3 longs, rounded up to 4 longs = 256 bits.
+    assert(new BitArray(192).bitSize() == 256)
+    // 321 bits = 6 longs, rounded up to 8 longs = 512 bits.
+    assert(new BitArray(321).bitSize() == 512)
+    // Already power-of-2 sizes pass through unchanged.
+    assert(new BitArray(1024).bitSize() == 1024)
+    assert(new BitArray(4096).bitSize() == 4096)
+  }
+
+  test("indexFor uses power-of-2 bitmask fast path for new filters") {
+    val bitArray = new BitArray(256) // 4 longs, power of 2
+    // indexFor must map any non-negative hash to a valid index in [0, 256).
+    val hashes = Seq(0L, 1L, 255L, 256L, 1024L, 1_000_000L, Int.MaxValue.toLong, Long.MaxValue)
+    hashes.foreach { h =>
+      val idx = bitArray.indexFor(h)
+      assert(idx >= 0 && idx < 256, s"indexFor($h) = $idx out of range")
+      // Fast path semantics: bitmask equals plain modulo for non-negative hashes and pow2 size.
+      assert(idx == h % 256, s"indexFor($h) = $idx, expected ${h % 256}")
+    }
+  }
+
+  test("indexFor falls back to modulo for non-power-of-2 legacy bit arrays") {
+    // Legacy filters can have arbitrary numWords; simulate via serialize-of-a-constructed array
+    // and then manual deserialization with a non-power-of-2 word count.
+    val legacy = deserializeWithNumWords(3) // 3 words = 192 bits, not a power of 2
+    assert(legacy.bitSize() == 192)
+    // Slow path: (hash % 192) must be used.
+    val hashes = Seq(0L, 1L, 191L, 192L, 1024L, 5_000_000L)
+    hashes.foreach { h =>
+      assert(legacy.indexFor(h) == h % 192, s"indexFor($h) expected ${h % 192}")
+    }
+  }
+
+  test("legacy non-power-of-2 filters round-trip through serialization unchanged") {
+    // Simulate an old serialized filter with 6 words (not a power of 2). The new deserializer
+    // must preserve the original word count so hash-to-bit mappings remain stable.
+    val legacy = deserializeWithNumWords(6) // 6 * 64 = 384 bits
+    assert(legacy.bitSize() == 384)
+
+    val buf = new ByteArrayOutputStream()
+    legacy.writeTo(new DataOutputStream(buf))
+    val roundTripped = BitArray.readFrom(
+      new DataInputStream(new ByteArrayInputStream(buf.toByteArray)))
+    assert(roundTripped.bitSize() == 384)
+    assert(roundTripped.indexFor(500L) == 500L % 384)
+  }
+
+  private def deserializeWithNumWords(numWords: Int): BitArray = {
+    val buf = new ByteArrayOutputStream()
+    val dos = new DataOutputStream(buf)
+    dos.writeInt(numWords)
+    (0 until numWords).foreach(_ => dos.writeLong(0L))
+    BitArray.readFrom(new DataInputStream(new ByteArrayInputStream(buf.toByteArray)))
   }
 
   test("set") {
