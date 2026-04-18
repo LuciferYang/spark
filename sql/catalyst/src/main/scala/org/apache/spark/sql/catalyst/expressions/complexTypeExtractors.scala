@@ -531,7 +531,7 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
     case BooleanType | ByteType | ShortType | IntegerType | LongType |
          FloatType | DoubleType | DateType | TimestampType |
          TimestampNTZType | _: YearMonthIntervalType |
-         _: DayTimeIntervalType | _: DecimalType => true
+         _: DayTimeIntervalType | _: DecimalType | _: TimeType => true
     case st: StringType if st.supportsBinaryEquality => true
     case _ => false
   }
@@ -617,7 +617,7 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
     def genHash(v: String): String = keyType match {
       case BooleanType => s"($v ? 1 : 0)"
       case ByteType | ShortType | IntegerType | DateType | _: YearMonthIntervalType => s"$v"
-      case LongType | TimestampType | TimestampNTZType | _: DayTimeIntervalType =>
+      case LongType | TimestampType | TimestampNTZType | _: DayTimeIntervalType | _: TimeType =>
         s"(int)($v ^ ($v >>> 32))"
       case FloatType => s"Float.floatToIntBits($v)"
       case DoubleType =>

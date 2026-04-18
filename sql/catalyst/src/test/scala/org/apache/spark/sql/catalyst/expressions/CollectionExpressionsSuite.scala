@@ -2064,6 +2064,33 @@ class CollectionExpressionsSuite
         checkEvaluation(ElementAt(dupDecMap, Literal(d1, decType)), 10)
         checkEvaluation(ElementAt(dupDecMap, Literal(d2, decType)), 20)
 
+        // Time keys
+        val timeType = TimeType()
+        val t1 = DateTimeTestUtils.localTime(10, 30, 0)
+        val t2 = DateTimeTestUtils.localTime(14, 0, 30)
+        val t3 = DateTimeTestUtils.localTime(23, 59, 59, 999999)
+        val timeMap = Literal.create(Map(t1 -> 10, t2 -> 20, t3 -> 30),
+          MapType(timeType, IntegerType))
+        checkEvaluation(ElementAt(timeMap, Literal(t1, timeType)), 10)
+        checkEvaluation(ElementAt(timeMap, Literal(t2, timeType)), 20)
+        checkEvaluation(ElementAt(timeMap, Literal(t3, timeType)), 30)
+        checkEvaluation(ElementAt(timeMap,
+          Literal(DateTimeTestUtils.localTime(0, 0, 0), timeType)), null)
+
+        // Time zero (midnight)
+        val t0 = DateTimeTestUtils.localTime()
+        val timeZeroMap = Literal.create(Map(t0 -> 99, t1 -> 10),
+          MapType(timeType, IntegerType))
+        checkEvaluation(ElementAt(timeZeroMap, Literal(t0, timeType)), 99)
+
+        // Time duplicate keys
+        val timeKeys = new GenericArrayData(Array(t1, t2, t1))
+        val timeValues = new GenericArrayData(Array(10, 20, 30))
+        val dupTimeMapData = new ArrayBasedMapData(timeKeys, timeValues)
+        val dupTimeMap = Literal.create(dupTimeMapData, MapType(timeType, IntegerType))
+        checkEvaluation(ElementAt(dupTimeMap, Literal(t1, timeType)), 10)
+        checkEvaluation(ElementAt(dupTimeMap, Literal(t2, timeType)), 20)
+
         // Array Keys
         val arrayType = ArrayType(IntegerType)
         val arrayMap = Literal.create(
