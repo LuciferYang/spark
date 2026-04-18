@@ -47,13 +47,31 @@ def main(infile: IO, outfile: IO) -> None:
 
     log_name = "Streaming ForeachBatch worker"
 
-    def process(df_id, batch_id):  # type: ignore[no-untyped-def]
+    def process(df_id, batch_id, stream_session_id):  # type: ignore[no-untyped-def]
         global spark
-        print(f"{log_name} Started batch {batch_id} with DF id {df_id} and session id {session_id}")
-        batch_df = spark_connect_session._create_remote_dataframe(df_id)
+        # Lazily create or switch the SparkSession when the stream session changes.
+        # Use create() instead of getOrCreate() because the latter returns the cached
+        # active/default session, ignoring the stream session ID in the URL.
+        if spark is None or spark.session_id != stream_session_id:
+            stream_url = connect_url + ";session_id=" + stream_session_id
+            spark = SparkSession.builder.remote(stream_url).create()
+            if spark.session_id != stream_session_id:
+                raise RuntimeError(
+                    f"Stream session ID mismatch: expected {stream_session_id}, "
+                    f"got {spark.session_id}"
+                )
+            print(
+                f"{log_name} Created new session for stream_session_id {stream_session_id}"
+            )
+        print(
+            f"{log_name} Started batch {batch_id} with DF id {df_id} "
+            f"and session id {stream_session_id}"
+        )
+        batch_df = spark._create_remote_dataframe(df_id)
         func(batch_df, batch_id)
         print(
-            f"{log_name} Completed batch {batch_id} with DF id {df_id} and session id {session_id}"
+            f"{log_name} Completed batch {batch_id} with DF id {df_id} "
+            f"and session id {stream_session_id}"
         )
 
     try:
@@ -67,11 +85,16 @@ def main(infile: IO, outfile: IO) -> None:
 
         print(f"{log_name} is starting with url {connect_url} and sessionId {session_id}.")
 
-        # To attach to the existing SparkSession, we're setting the session_id in the URL.
-        connect_url = connect_url + ";session_id=" + session_id
-        spark_connect_session = SparkSession.builder.remote(connect_url).getOrCreate()
-        assert spark_connect_session.session_id == session_id
-        spark = spark_connect_session
+        # Create an initial SparkSession using the parent session id for initialization only.
+        # The per-batch stream session id will be received with each batch and used to create
+        # or switch to the correct stream-level session.
+        connect_url_init = connect_url + ";session_id=" + session_id
+        spark_connect_session = SparkSession.builder.remote(connect_url_init).getOrCreate()
+        if spark_connect_session.session_id != session_id:
+            raise RuntimeError(
+                f"Parent session ID mismatch: expected {session_id}, "
+                f"got {spark_connect_session.session_id}"
+            )
 
         func = worker.read_command(pickle_ser, infile)
         write_int(0, outfile)
@@ -80,9 +103,10 @@ def main(infile: IO, outfile: IO) -> None:
         while True:
             df_ref_id = utf8_deserializer.loads(infile)
             batch_id = read_long(infile)
-            # Handle errors inside Python worker. Write 0 to outfile if no errors and write -2 with
-            # traceback string if error occurs.
-            process(df_ref_id, int(batch_id))
+            stream_session_id = utf8_deserializer.loads(infile)
+            # Handle errors inside Python worker. Write 0 to outfile if no errors and write -2
+            # with traceback string if error occurs.
+            process(df_ref_id, int(batch_id), stream_session_id)
             write_int(0, outfile)
             outfile.flush()
     except Exception as e:

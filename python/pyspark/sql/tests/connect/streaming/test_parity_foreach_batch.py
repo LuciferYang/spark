@@ -34,24 +34,34 @@ class StreamingForeachBatchParityTests(StreamingTestsForeachBatchMixin, ReusedCo
         super().test_streaming_foreach_batch_graceful_stop()
 
     def test_nested_dataframes(self):
+        # Tests that closured DataFrames and batch DataFrames can both be used
+        # inside foreachBatch. In Connect, batch_df runs in a separate stream session,
+        # so we use saveAsTable (visible cross-session) instead of temp views.
         def curried_function(df):
             def inner(batch_df, batch_id):
-                df.createOrReplaceTempView("updates")
-                batch_df.createOrReplaceTempView("batch_updates")
+                df.write.format("parquet").mode("overwrite").saveAsTable(
+                    "nested_df_updates"
+                )
+                batch_df.write.format("parquet").mode("overwrite").saveAsTable(
+                    "nested_df_batch_updates"
+                )
 
             return inner
 
+        q = None
         try:
             df = self.spark.readStream.format("text").load("python/test_support/sql/streaming")
             other_df = self.spark.range(100)
             q = df.writeStream.foreachBatch(curried_function(other_df)).start()
             q.processAllAvailable()
-            collected = self.spark.sql("select * from batch_updates").collect()
-            self.assertTrue(len(collected), 2)
-            self.assertEqual(100, self.spark.sql("select * from updates").count())
+            collected = self.spark.sql("select * from nested_df_batch_updates").collect()
+            self.assertTrue(len(collected) > 0)
+            self.assertEqual(100, self.spark.sql("select * from nested_df_updates").count())
         finally:
             if q:
                 q.stop()
+            self.spark.sql("DROP TABLE IF EXISTS nested_df_updates")
+            self.spark.sql("DROP TABLE IF EXISTS nested_df_batch_updates")
 
     def test_pickling_error(self):
         class NoPickle:

@@ -3510,7 +3510,7 @@ class SparkConnectPlanner(
       }
     }
 
-    // This is filled when a foreach batch runner started for Python.
+    // This is filled when a foreachBatch runner is started (Python or Scala).
     var foreachBatchRunnerCleaner: Option[AutoCloseable] = None
     // Filled when foreachBatch is used, to set query id after query starts.
     var foreachBatchQueryIdRef: Option[AtomicReference[String]] = None
@@ -3526,9 +3526,10 @@ class SparkConnectPlanner(
           fn
 
         case StreamingForeachFunction.FunctionCase.SCALA_FUNCTION =>
-          val (fn, queryIdRef) = StreamingForeachBatchHelper.scalaForeachBatchWrapper(
+          val (fn, cleaner, queryIdRef) = StreamingForeachBatchHelper.scalaForeachBatchWrapper(
             writeOp.getForeachBatch.getScalaFunction.getPayload.toByteArray,
             sessionHolder)
+          foreachBatchRunnerCleaner = Some(cleaner)
           foreachBatchQueryIdRef = Some(queryIdRef)
           fn
 
@@ -3565,7 +3566,7 @@ class SparkConnectPlanner(
       executeHolder.operationId)
     // Set the query id so the sanity check in dataFrameCachingWrapper can use it.
     foreachBatchQueryIdRef.foreach(_.set(query.id.toString))
-    // Register the runner with the query if Python foreachBatch is enabled.
+    // Register the cleaner with the query if foreachBatch is used.
     foreachBatchRunnerCleaner.foreach { cleaner =>
       sessionHolder.streamingForeachBatchRunnerCleanerCache.registerCleanerForQuery(
         query,
