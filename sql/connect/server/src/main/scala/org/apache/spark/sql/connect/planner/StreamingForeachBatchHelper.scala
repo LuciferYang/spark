@@ -20,6 +20,7 @@ import java.io.EOFException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.atomic.AtomicReference
 
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
@@ -66,16 +67,25 @@ object StreamingForeachBatchHelper extends Logging {
    */
   private def dataFrameCachingWrapper(
       fn: FnArgsWithId => Unit,
-      sessionHolder: SessionHolder): ForeachBatchFnType = { (df: DataFrame, batchId: Long) =>
+      sessionHolder: SessionHolder,
+      queryIdRef: AtomicReference[String]): ForeachBatchFnType = { (df: DataFrame, batchId: Long) =>
     {
       val dfId = UUID.randomUUID().toString
-      // TODO: Add query id to the log.
       logInfo(
         log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
           log"Caching DataFrame with id ${MDC(DATAFRAME_ID, dfId)}")
 
-      // TODO(SPARK-44462): Sanity check there is no other active DataFrame for this query.
-      //  The query id needs to be saved in the cache for this check.
+      // Sanity check: remove any stale DataFrame left over from a previous batch for this query.
+      val queryId = queryIdRef.get()
+      if (queryId != null) {
+        Option(sessionHolder.dataFrameQueryIndex.put(queryId, dfId)).foreach { staleDfId =>
+          logWarning(
+            log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
+              log"[queryId: ${MDC(QUERY_ID, queryId)}] " +
+              log"Stale DataFrame ${MDC(DATAFRAME_ID, staleDfId)} found in cache. Removing it.")
+          sessionHolder.removeCachedDataFrame(staleDfId)
+        }
+      }
 
       sessionHolder.cacheDataFrameById(dfId, df)
       try {
@@ -85,6 +95,10 @@ object StreamingForeachBatchHelper extends Logging {
           log"[session: ${MDC(SESSION_ID, sessionHolder.sessionId)}] " +
             log"Removing DataFrame with id ${MDC(DATAFRAME_ID, dfId)} from the cache")
         sessionHolder.removeCachedDataFrame(dfId)
+        // Clean up query-to-dfId mapping.
+        if (queryId != null) {
+          sessionHolder.dataFrameQueryIndex.remove(queryId, dfId)
+        }
       }
     }
   }
@@ -98,14 +112,13 @@ object StreamingForeachBatchHelper extends Logging {
    */
   def scalaForeachBatchWrapper(
       payloadBytes: Array[Byte],
-      sessionHolder: SessionHolder): ForeachBatchFnType = {
+      sessionHolder: SessionHolder): (ForeachBatchFnType, AtomicReference[String]) = {
     val foreachBatchPkt =
       Utils.deserialize[ForeachWriterPacket](payloadBytes, Utils.getContextOrSparkClassLoader)
     val fn = foreachBatchPkt.foreachWriter.asInstanceOf[(Dataset[Any], Long) => Unit]
     val encoder = foreachBatchPkt.datasetEncoder.asInstanceOf[AgnosticEncoder[Any]]
-    // TODO(SPARK-44462): Set up Spark Connect session.
-    // Do we actually need this for the first version?
-    dataFrameCachingWrapper(
+    val queryIdRef = new AtomicReference[String]()
+    val wrappedFn = dataFrameCachingWrapper(
       (args: FnArgsWithId) => {
         // dfId is not used, see hack comment above.
         try {
@@ -123,18 +136,22 @@ object StreamingForeachBatchHelper extends Logging {
             throw t
         }
       },
-      sessionHolder)
+      sessionHolder,
+      queryIdRef)
+    (wrappedFn, queryIdRef)
   }
 
   /**
    * Starts up Python worker and initializes it with Python function. Returns a foreachBatch
    * function that sets up the session and Dataframe cache and and interacts with the Python
-   * worker to execute user's function. In addition, it returns an AutoClosable. The caller must
-   * ensure it is closed so that worker process and related resources are released.
+   * worker to execute user's function. In addition, it returns an AutoClosable and an
+   * AtomicReference for setting the query id. The caller must ensure it is closed so that worker
+   * process and related resources are released.
    */
   def pythonForeachBatchWrapper(
       pythonFn: SimplePythonFunction,
-      sessionHolder: SessionHolder): (ForeachBatchFnType, AutoCloseable) = {
+      sessionHolder: SessionHolder): (ForeachBatchFnType, AutoCloseable, AtomicReference[String]) =
+  {
 
     val port = SparkConnectService.localPort
     var connectUrl = s"sc://localhost:$port/;user_id=${sessionHolder.userId}"
@@ -154,15 +171,9 @@ object StreamingForeachBatchHelper extends Logging {
 
     val (dataOut, dataIn) = runner.init()
 
-    val foreachBatchRunnerFn: FnArgsWithId => Unit = (args: FnArgsWithId) => {
+    val queryIdRef = new AtomicReference[String]()
 
-      // TODO(SPARK-44462): A new session id pointing to args.df.sparkSession needs to be created.
-      //     This is because MicroBatch execution clones the session during start.
-      //     The session attached to the foreachBatch dataframe is different from the one the one
-      //     the query was started with. `sessionHolder` here contains the latter.
-      //     Another issue with not creating new session id: foreachBatch worker keeps
-      //     the session alive. The session mapping at Connect server does not expire and query
-      //     keeps running even if the original client disappears. This keeps the query running.
+    val foreachBatchRunnerFn: FnArgsWithId => Unit = (args: FnArgsWithId) => {
 
       PythonWorkerUtils.writeUTF(args.dfId, dataOut)
       dataOut.writeLong(args.batchId)
@@ -201,7 +212,10 @@ object StreamingForeachBatchHelper extends Logging {
       }
     }
 
-    (dataFrameCachingWrapper(foreachBatchRunnerFn, sessionHolder), RunnerCleaner(runner))
+    (
+      dataFrameCachingWrapper(foreachBatchRunnerFn, sessionHolder, queryIdRef),
+      RunnerCleaner(runner),
+      queryIdRef)
   }
 
   /**

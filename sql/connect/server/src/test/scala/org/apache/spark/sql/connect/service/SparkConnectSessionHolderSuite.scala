@@ -239,9 +239,9 @@ class SparkConnectSessionHolderSuite extends SharedSparkSession {
       SparkConnectService.start(spark.sparkContext)
 
       val pythonFn = dummyPythonFunction(sessionHolder)(streamingForeachBatchFunction)
-      val (fn1, cleaner1) =
+      val (fn1, cleaner1, _) =
         StreamingForeachBatchHelper.pythonForeachBatchWrapper(pythonFn, sessionHolder)
-      val (fn2, cleaner2) =
+      val (fn2, cleaner2, _) =
         StreamingForeachBatchHelper.pythonForeachBatchWrapper(pythonFn, sessionHolder)
 
       val query1 = spark.readStream
