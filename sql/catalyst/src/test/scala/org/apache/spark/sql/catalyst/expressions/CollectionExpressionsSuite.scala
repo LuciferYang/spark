@@ -1997,6 +1997,73 @@ class CollectionExpressionsSuite
         checkEvaluation(ElementAt(mapNested, Literal(2)), Map(20 -> 200))
         checkEvaluation(ElementAt(mapNested, Literal(3)), null)
 
+        // Decimal keys
+        val decType = DecimalType(10, 2)
+        val d1 = Decimal("1.00")
+        val d2 = Decimal("2.50")
+        val d3 = Decimal("3.75")
+        val decimalMap = Literal.create(
+          Map(d1 -> 10, d2 -> 20, d3 -> 30),
+          MapType(decType, IntegerType))
+        checkEvaluation(ElementAt(decimalMap, Literal(d1, decType)), 10)
+        checkEvaluation(ElementAt(decimalMap, Literal(d2, decType)), 20)
+        checkEvaluation(ElementAt(decimalMap, Literal(d3, decType)), 30)
+        checkEvaluation(ElementAt(decimalMap, Literal(Decimal("9.99"), decType)), null)
+
+        // Decimal with high precision
+        val decType2 = DecimalType(38, 18)
+        val d4 = Decimal("12345678901234567890.123456789012345678")
+        val d5 = Decimal("99999999999999999999.999999999999999999")
+        val bigDecimalMap = Literal.create(
+          Map(d4 -> 100, d5 -> 200),
+          MapType(decType2, IntegerType))
+        checkEvaluation(ElementAt(bigDecimalMap, Literal(d4, decType2)), 100)
+        checkEvaluation(ElementAt(bigDecimalMap, Literal(d5, decType2)), 200)
+        checkEvaluation(ElementAt(bigDecimalMap,
+          Literal(Decimal("0.000000000000000001"), decType2)), null)
+
+        // Decimal zero key
+        val zeroDecMap = Literal.create(
+          Map(Decimal("0.00") -> 99, d1 -> 10),
+          MapType(decType, IntegerType))
+        checkEvaluation(ElementAt(zeroDecMap, Literal(Decimal("0.00"), decType)), 99)
+        checkEvaluation(ElementAt(zeroDecMap, Literal(d1, decType)), 10)
+
+        // Decimal negative keys
+        val negDecMap = Literal.create(
+          Map(Decimal("-1.50") -> 10, Decimal("-99.99") -> 20, d1 -> 30),
+          MapType(decType, IntegerType))
+        checkEvaluation(ElementAt(negDecMap, Literal(Decimal("-1.50"), decType)), 10)
+        checkEvaluation(ElementAt(negDecMap, Literal(Decimal("-99.99"), decType)), 20)
+        checkEvaluation(ElementAt(negDecMap, Literal(d1, decType)), 30)
+        checkEvaluation(ElementAt(negDecMap, Literal(Decimal("1.50"), decType)), null)
+
+        // Decimal key with null value
+        val decNullValMap = Literal.create(
+          Map(d1 -> null, d2 -> 20),
+          MapType(decType, IntegerType))
+        checkEvaluation(ElementAt(decNullValMap, Literal(d1, decType)), null)
+        checkEvaluation(ElementAt(decNullValMap, Literal(d2, decType)), 20)
+
+        // Decimal at compact/BigDecimal boundary (precision=18)
+        val decType18 = DecimalType(18, 0)
+        val boundary1 = Decimal(999999999999999999L)
+        val boundary2 = Decimal(-999999999999999999L)
+        val boundaryMap = Literal.create(
+          Map(boundary1 -> 100, boundary2 -> 200),
+          MapType(decType18, IntegerType))
+        checkEvaluation(ElementAt(boundaryMap, Literal(boundary1, decType18)), 100)
+        checkEvaluation(ElementAt(boundaryMap, Literal(boundary2, decType18)), 200)
+        checkEvaluation(ElementAt(boundaryMap, Literal(Decimal(0L), decType18)), null)
+
+        // Decimal duplicate keys
+        val decKeys = new GenericArrayData(Array(d1, d2, d1))
+        val decValues = new GenericArrayData(Array(10, 20, 30))
+        val dupDecMapData = new ArrayBasedMapData(decKeys, decValues)
+        val dupDecMap = Literal.create(dupDecMapData, MapType(decType, IntegerType))
+        checkEvaluation(ElementAt(dupDecMap, Literal(d1, decType)), 10)
+        checkEvaluation(ElementAt(dupDecMap, Literal(d2, decType)), 20)
+
         // Array Keys
         val arrayType = ArrayType(IntegerType)
         val arrayMap = Literal.create(

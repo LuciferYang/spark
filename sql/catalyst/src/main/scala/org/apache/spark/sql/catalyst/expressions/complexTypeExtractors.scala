@@ -531,7 +531,7 @@ trait GetMapValueUtil extends BinaryExpression with ImplicitCastInputTypes {
     case BooleanType | ByteType | ShortType | IntegerType | LongType |
          FloatType | DoubleType | DateType | TimestampType |
          TimestampNTZType | _: YearMonthIntervalType |
-         _: DayTimeIntervalType => true
+         _: DayTimeIntervalType | _: DecimalType => true
     case st: StringType if st.supportsBinaryEquality => true
     case _ => false
   }
