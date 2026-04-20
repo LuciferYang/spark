@@ -25,13 +25,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
 import org.apache.spark.{InterruptibleIterator, Partition, SparkContext, SparkException, TaskContext}
-import org.apache.spark.rdd.{EmptyRDD, PartitionwiseSampledRDD, RDD, SQLPartitioningAwareUnionRDD}
+import org.apache.spark.internal.LogKeys
+import org.apache.spark.rdd.{EmptyRDD, PartitionwiseSampledRDD, RDD, SQLPartitioningAwareUnionRDD, UnionPartition, UnionRDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.execution.joins.{ShuffledHashJoinExec, SortMergeJoinExec}
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.types.{LongType, StructType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -415,7 +417,7 @@ case class SampleExec(
               |   java.util.Random random = new java.util.Random(${resolvedSeed}L);
               |   long randomSeed = random.nextLong();
               |   int loopCount = 0;
-              |   while (loopCount < partitionIndex) {
+              |   while (loopCount < ${ctx.currentPartitionIndexVar}) {
               |     randomSeed = random.nextLong();
               |     loopCount += 1;
               |   }
@@ -438,7 +440,7 @@ case class SampleExec(
       val sampler = ctx.addMutableState(s"$samplerClass<UnsafeRow>", "sampler",
         v => s"""
           | $v = new $samplerClass<UnsafeRow>($lowerBound, $upperBound, false);
-          | $v.setSeed(${resolvedSeed}L + partitionIndex);
+          | $v.setSeed(${resolvedSeed}L + ${ctx.currentPartitionIndexVar});
          """.stripMargin.trim)
 
       s"""
@@ -535,9 +537,10 @@ case class RangeExec(range: org.apache.spark.sql.catalyst.plans.logical.Range)
     // The default size of a batch, which must be positive integer
     val batchSize = 1000
 
-    val initRangeFuncName = ctx.addNewFunction("initRange",
+    val initRangeName = ctx.freshName("initRange")
+    val initRangeFuncName = ctx.addNewFunction(initRangeName,
       s"""
-        | private void initRange(int idx) {
+        | private void $initRangeName(int idx) {
         |   $BigInt index = $BigInt.valueOf(idx);
         |   $BigInt numSlice = $BigInt.valueOf(${numSlices}L);
         |   $BigInt numElement = $BigInt.valueOf(${numElements.toLong}L);
@@ -625,7 +628,7 @@ case class RangeExec(range: org.apache.spark.sql.catalyst.plans.logical.Range)
       | // initialize Range
       | if (!$initTerm) {
       |   $initTerm = true;
-      |   $initRangeFuncName(partitionIndex);
+      |   $initRangeFuncName(${ctx.currentPartitionIndexVar});
       | }
       |
       | while ($loopCondition) {
@@ -728,7 +731,7 @@ case class RangeExec(range: org.apache.spark.sql.catalyst.plans.logical.Range)
  * If we change how this is implemented physically, we'd need to update
  * [[org.apache.spark.sql.catalyst.plans.logical.Union.maxRowsPerPartition]].
  */
-case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan {
+case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSupport {
   // updating nullability to make all the children consistent
   override def output: Seq[Attribute] = {
     children.map(_.output).transpose.map { attrs =>
@@ -806,6 +809,206 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan {
     }
   }
 
+  @transient private lazy val perChildProjections: IndexedSeq[Seq[NamedExpression]] =
+    children.toIndexedSeq.map { child =>
+      child.output.zip(output).map { case (src, tgt) =>
+        val projected: Expression =
+          if (src.dataType == tgt.dataType) src
+          else Cast(src, tgt.dataType, ansiEnabled = conf.ansiEnabled)
+        Alias(projected, tgt.name)(
+          exprId = tgt.exprId,
+          qualifier = tgt.qualifier,
+          explicitMetadata = Some(tgt.metadata))
+      }
+    }
+
+  private def canCodegenProjection(proj: NamedExpression): Boolean = proj match {
+    case _: AttributeReference => true
+    case Alias(_: AttributeReference, _) => true
+    case Alias(cast: Cast, _) =>
+      cast.evalMode match {
+        case EvalMode.LEGACY => Cast.canCast(cast.child.dataType, cast.dataType)
+        case EvalMode.ANSI => Cast.canAnsiCast(cast.child.dataType, cast.dataType)
+        case EvalMode.TRY => Cast.canTryCast(cast.child.dataType, cast.dataType)
+      }
+    case _ => false
+  }
+
+  override def supportCodegen: Boolean = {
+    val reason = supportCodegenFailureReason
+    if (reason.isEmpty) true
+    else {
+      logDebug(log"UnionExec codegen skipped: " +
+        log"reason=${MDC(LogKeys.REASON, reason.get)}, " +
+        log"numChildren=${MDC(LogKeys.NUM_CHILDREN, children.size)}\n" +
+        log"${MDC(LogKeys.TREE_NODE, treeString)}")
+      false
+    }
+  }
+
+  /** Returns Some(reason) when codegen is skipped; None when enabled. */
+  private def supportCodegenFailureReason: Option[String] = {
+    if (!conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
+      Some("disabled")
+    } else if (!outputPartitioning.isInstanceOf[UnknownPartitioning]) {
+      Some("partitioning-aware")
+    } else if (children.exists(_.exists(_.isInstanceOf[UnionExec]))) {
+      Some("nested-union")
+    } else if (children.exists(_.exists(UnionExec.isKnownMultiInputRDDCodegen))) {
+      Some("multi-rdd-child")
+    } else if (hasAnyPartitionIndexDependentChild) {
+      Some("partition-index-dependent-child")
+    } else if (children.size > conf.getConf(SQLConf.WHOLESTAGE_UNION_MAX_CHILDREN)) {
+      Some("max-children-exceeded")
+    } else if (supportsColumnar) {
+      Some("columnar")
+    } else if (!perChildProjections.forall(_.forall(canCodegenProjection))) {
+      Some("projection-not-codegenable")
+    } else {
+      None
+    }
+  }
+
+  // Memoized: `supportCodegen` is called multiple times during planning.
+  @transient private lazy val hasAnyPartitionIndexDependentChild: Boolean =
+    children.exists(UnionExec.hasPartitionIndexDependentCodegen)
+
+  // Driver-side state set by `doProduce` and read by `doConsume`; accessed
+  // only during single-threaded code emission.
+  @transient private var currentEmittingChild: Int = -1
+
+  // Only populated when fusion is active; `doConsume` is the sole incrementer.
+  override lazy val metrics: Map[String, SQLMetric] =
+    if (conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
+      Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
+    } else {
+      Map.empty
+    }
+
+  // Builds a plain `UnionRDD` directly (not `SparkContext.union`) to preserve
+  // a 1:1 partition-to-child mapping via `UnionPartition.parentRddIndex`.
+  @transient private lazy val unionedInputRDD: RDD[InternalRow] = {
+    val childRDDs: Seq[RDD[InternalRow]] = children.map { c =>
+      val cs = c.asInstanceOf[CodegenSupport]
+      val rdds = cs.inputRDDs()
+      require(rdds.size == 1,
+        s"UnionExec.inputRDDs: child ${c.nodeName} returned ${rdds.size} RDDs")
+      rdds.head
+    }
+    new UnionRDD(sparkContext, childRDDs)
+  }
+
+  override def inputRDDs(): Seq[RDD[InternalRow]] = Seq(unionedInputRDD)
+
+  override protected def doProduce(ctx: CodegenContext): String = {
+    // Per-global-partition lookup: which direct child this partition belongs to.
+    val partitionToChild: Array[Int] = unionedInputRDD.partitions.map {
+      case up: UnionPartition[_] => up.parentRddIndex
+      case other =>
+        throw SparkException.internalError(
+          s"UnionExec: Unexpected partition type ${other.getClass.getName}")
+    }
+    val p2cRef = ctx.addReferenceObj("partitionToChild", partitionToChild)
+    val childIndexVar = ctx.freshName("unionChildIdx")
+
+    // Per-global-partition lookup: the partition's index within its child RDD.
+    val partitionToLocalIdx: Array[Int] = {
+      val counts = new Array[Int](children.size)
+      partitionToChild.indices.foreach { g =>
+        counts(partitionToChild(g)) += 1
+      }
+      val boundaries = counts.scanLeft(0)(_ + _)
+      partitionToChild.indices.map { g =>
+        g - boundaries(partitionToChild(g))
+      }.toArray
+    }
+    val p2lRef = ctx.addReferenceObj("partitionToLocalIdx", partitionToLocalIdx)
+
+    // Each child's produce output is wrapped in its own helper method. The
+    // outer `switch` in `doProduce`'s return value dispatches to the helper.
+    // Without this, the fused method's bytecode grows linearly with the
+    // number of children and quickly exceeds HotSpot's per-method limit,
+    // forcing the whole stage to run interpreted.
+    //
+    // `partitionIndex` is passed as a parameter (shadowing the superclass
+    // field) rather than read from the enclosing scope. `addNewFunction` may
+    // spill helpers into a nested class when the outer class fills up, and a
+    // nested class cannot access the protected
+    // `BufferedRowIterator.partitionIndex` field. Using the parameter name
+    // `partitionIndex` keeps any child-emitted reference to that identifier
+    // resolving locally.
+    val savedPartIdxVar = ctx.currentPartitionIndexVar
+    val cases = try {
+      children.zipWithIndex.map { case (c, i) =>
+        currentEmittingChild = i
+        ctx.currentPartitionIndexVar = s"((int[]) $p2lRef)[partitionIndex]"
+        val producedCode = c.asInstanceOf[CodegenSupport].produce(ctx, this)
+        val helper = ctx.freshName("unionChildProcess")
+        val qualifiedHelper = ctx.addNewFunction(helper,
+          s"""
+             |private void $helper(int partitionIndex) throws java.io.IOException {
+             |  $producedCode
+             |}
+           """.stripMargin)
+        s"""case $i: {
+           |  $qualifiedHelper(partitionIndex);
+           |  break;
+           |}""".stripMargin
+      }
+    } finally {
+      currentEmittingChild = -1
+      ctx.currentPartitionIndexVar = savedPartIdxVar
+    }
+
+    s"""
+       |int $childIndexVar = ((int[]) $p2cRef)[partitionIndex];
+       |switch ($childIndexVar) {
+       |  ${cases.mkString("\n")}
+       |  default:
+       |    throw new java.lang.IllegalStateException(
+       |      "UnionExec: Unexpected childIndex=" + $childIndexVar);
+       |}
+     """.stripMargin
+  }
+
+  override def doConsume(
+      ctx: CodegenContext, input: Seq[ExprCode], row: ExprCode): String = {
+    require(currentEmittingChild >= 0,
+      "UnionExec.doConsume invoked outside doProduce emission window")
+    val i = currentEmittingChild
+    val projs = perChildProjections(i)
+    val bound = BindReferences.bindReferences(projs, children(i).output)
+
+    // Route BoundReference reads through `currentVars` (the incoming row is
+    // delivered as variables under WSCG, not via ctx.INPUT_ROW).
+    ctx.currentVars = input
+    ctx.INPUT_ROW = null
+    val projectedExprCodes = bound.map(_.genCode(ctx))
+
+    // Force any non-deterministic expression to evaluate exactly once per row.
+    val nonDetAttrs = projs.zip(bound).collect {
+      case (na, exp) if !exp.deterministic => na.toAttribute
+    }
+    val forcedEval = evaluateRequiredVariables(
+      output, projectedExprCodes, AttributeSet(nonDetAttrs))
+
+    val numOutput = metricTerm(ctx, "numOutputRows")
+    s"""
+       |$forcedEval
+       |$numOutput.add(1L);
+       |${consume(ctx, projectedExprCodes)}
+     """.stripMargin
+  }
+
+  // True if any child requires result copying; the default throws for
+  // multi-child operators and is unsuitable here.
+  override def needCopyResult: Boolean =
+    children.exists(_.asInstanceOf[CodegenSupport].needCopyResult)
+
+  // `doConsume` handles projection and emission; the parent's `consume` driver
+  // decides which output columns to materialize.
+  override def usedInputs: AttributeSet = AttributeSet.empty
+
   protected override def doExecute(): RDD[InternalRow] = {
     if (outputPartitioning.isInstanceOf[UnknownPartitioning]) {
       sparkContext.union(children.map(_.execute()))
@@ -828,6 +1031,28 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan {
 
   override protected def withNewChildrenInternal(newChildren: IndexedSeq[SparkPlan]): UnionExec =
     copy(children = newChildren)
+}
+
+object UnionExec {
+  /**
+   * Codegen operators that return more than one RDD from `inputRDDs()`.
+   * `UnionExec`'s fusion assumes each direct child contributes one RDD.
+   */
+  def isKnownMultiInputRDDCodegen(p: SparkPlan): Boolean = p match {
+    case _: SortMergeJoinExec => true
+    case _: ShuffledHashJoinExec => true
+    case _ => false
+  }
+
+  /**
+   * True if any expression in the subtree is [[Nondeterministic]]. Such
+   * expressions may embed the raw `partitionIndex` field via
+   * `addPartitionInitializationStatement`, which would read the global
+   * UnionRDD index instead of the child-local one under fusion.
+   */
+  def hasPartitionIndexDependentCodegen(p: SparkPlan): Boolean = p.exists {
+    plan => plan.expressions.exists(_.exists(_.isInstanceOf[Nondeterministic]))
+  }
 }
 
 /**

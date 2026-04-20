@@ -2484,6 +2484,34 @@ object SQLConf {
     .booleanConf
     .createWithDefault(true)
 
+  val WHOLESTAGE_UNION_CODEGEN_ENABLED =
+    buildConf("spark.sql.codegen.union.enabled")
+      .internal()
+      .doc("When true, UnionExec participates in whole-stage codegen on its " +
+        "non-partitioning-aware path: the parent and all children fuse into a " +
+        "single WholeStageCodegenExec stage. No effect when " +
+        "`spark.sql.codegen.wholeStage` is false.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
+  val WHOLESTAGE_UNION_MAX_CHILDREN = {
+    val key = "spark.sql.codegen.union.maxChildren"
+    buildConf(key)
+      .internal()
+      .doc("Maximum number of UnionExec children eligible for whole-stage " +
+        "codegen fusion. Unions with more children fall back to per-child " +
+        s"codegen stages. Only takes effect when " +
+        s"`${WHOLESTAGE_UNION_CODEGEN_ENABLED.key}` is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .intConf
+      .checkValue(v => v >= 2,
+        s"The value of $key must be >= 2")
+      .createWithDefault(64)
+  }
+
   val WHOLESTAGE_MAX_NUM_FIELDS = buildConf("spark.sql.codegen.maxFields")
     .internal()
     .doc("The maximum number of fields (including nested fields) that will be supported before" +
