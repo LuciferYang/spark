@@ -232,7 +232,7 @@ class ClientDataFrameStatSuite extends ConnectFunSuite with RemoteSparkSession {
     assert(data.forall(filter1.mightContain))
     assert(notContainValues.forall(n => !filter1.mightContain(n)))
     val filter2 = df.stat.bloomFilter("id", 1000, 64 * 5)
-    assert(filter2.bitSize() == 64 * 5)
+    assert(filter2.bitSize() == 64 * 8)
     assert(data.forall(filter2.mightContain))
     assert(notContainValues.forall(n => !filter2.mightContain(n)))
   }

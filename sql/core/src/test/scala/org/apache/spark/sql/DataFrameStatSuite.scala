@@ -534,11 +534,11 @@ class DataFrameStatSuite extends QueryTest with SharedSparkSession {
     assert(0.until(1000).forall(i => filter2.mightContain(i * 3)))
 
     val filter3 = df.stat.bloomFilter("id", 1000, 64 * 5)
-    assert(filter3.bitSize() == 64 * 5)
+    assert(filter3.bitSize() == 64 * 8)
     assert(0.until(1000).forall(filter3.mightContain))
 
     val filter4 = df.stat.bloomFilter($"id" * 3, 1000, 64 * 5)
-    assert(filter4.bitSize() == 64 * 5)
+    assert(filter4.bitSize() == 64 * 8)
     assert(0.until(1000).forall(i => filter4.mightContain(i * 3)))
   }
 

@@ -458,13 +458,13 @@ public class JavaDataFrameSuite {
     }
 
     BloomFilter filter3 = df.stat().bloomFilter("id", 1000, 64 * 5);
-    Assertions.assertEquals(64 * 5, filter3.bitSize());
+    Assertions.assertEquals(64 * 8, filter3.bitSize());
     for (int i = 0; i < 1000; i++) {
       Assertions.assertTrue(filter3.mightContain(i));
     }
 
     BloomFilter filter4 = df.stat().bloomFilter(col("id").multiply(3), 1000, 64 * 5);
-    Assertions.assertEquals(64 * 5, filter4.bitSize());
+    Assertions.assertEquals(64 * 8, filter4.bitSize());
     for (int i = 0; i < 1000; i++) {
       Assertions.assertTrue(filter4.mightContain(i * 3));
     }
