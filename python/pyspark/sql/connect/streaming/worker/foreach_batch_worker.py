@@ -30,6 +30,7 @@ from pyspark.serializers import (
     CPickleSerializer,
 )
 from pyspark import worker
+from pyspark.errors import PySparkAssertionError
 from pyspark.sql.connect.session import SparkSession
 from pyspark.util import handle_worker_exception
 from typing import IO
@@ -56,7 +57,7 @@ def main(infile: IO, outfile: IO) -> None:
             stream_url = connect_url + ";session_id=" + stream_session_id
             spark = SparkSession.builder.remote(stream_url).create()
             if spark.session_id != stream_session_id:
-                raise RuntimeError(
+                raise PySparkAssertionError(
                     f"Stream session ID mismatch: expected {stream_session_id}, "
                     f"got {spark.session_id}"
                 )
@@ -91,7 +92,7 @@ def main(infile: IO, outfile: IO) -> None:
         connect_url_init = connect_url + ";session_id=" + session_id
         spark_connect_session = SparkSession.builder.remote(connect_url_init).getOrCreate()
         if spark_connect_session.session_id != session_id:
-            raise RuntimeError(
+            raise PySparkAssertionError(
                 f"Parent session ID mismatch: expected {session_id}, "
                 f"got {spark_connect_session.session_id}"
             )
