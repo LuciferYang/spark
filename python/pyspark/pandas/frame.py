@@ -829,6 +829,13 @@ class DataFrame(Frame, Generic[T]):
                 internal = InternalFrame(
                     spark_frame=sdf,
                     index_spark_columns=[scol_for(sdf, SPARK_DEFAULT_INDEX_NAME)],
+                    index_fields=(
+                        None
+                        if LooseVersion(pd.__version__) < "3.0.0"
+                        # Explicitly specify the dtype as "object" to avoid converting to `nan`
+                        # due to pandas 3's default string type (`str`) behavior.
+                        else [InternalField(np.dtype("object"))]
+                    ),
                     column_labels=new_column_labels,
                     column_label_names=self._internal.column_label_names,
                 )
@@ -4994,7 +5001,13 @@ defaultdict(<class 'list'>, {'col..., 'col...})]
                     spark_frame=sdf,
                     index_spark_columns=[scol_for(sdf, SPARK_DEFAULT_INDEX_NAME)],
                     index_names=[None],
-                    index_fields=[None],
+                    index_fields=(
+                        [None]
+                        if LooseVersion(pd.__version__) < "3.0.0"
+                        # Explicitly specify the dtype as "object" to avoid converting to `nan`
+                        # due to pandas 3's default string type (`str`) behavior.
+                        else [InternalField(np.dtype("object"))]
+                    ),
                     data_spark_columns=[
                         scol_for(sdf, col) for col in self._internal.data_spark_column_names
                     ],
@@ -7059,7 +7072,7 @@ defaultdict(<class 'list'>, {'col..., 'col...})]
                 index_map[colname] = None
             internal = InternalFrame(
                 spark_frame=sdf,
-                index_spark_columns=[scol_for(sdf, col) for col in index_map.keys()],
+                index_spark_columns=[scol_for(sdf, col) for col in index_map],
                 index_names=list(index_map.values()),
                 column_label_names=[columns],
             )
@@ -9765,7 +9778,7 @@ defaultdict(<class 'list'>, {'col..., 'col...})]
         applied = []
         if is_dict_like(dtype):
             dtype_dict = cast(Dict[Name, Union[str, Dtype]], dtype)
-            for col_name in dtype_dict.keys():
+            for col_name in dtype_dict:
                 if col_name not in self.columns:
                     raise KeyError(
                         "Only a column name can be used for the key in a dtype mappings argument."
@@ -13299,6 +13312,10 @@ defaultdict(<class 'list'>, {'col..., 'col...})]
             nonlocal should_return_series
             nonlocal series_name
             nonlocal should_return_scalar
+            if inplace and LooseVersion(pd.__version__) >= "3.0.0":
+                # pandas 3 can reject inplace eval on a read-only batch frame,
+                # so evaluate against a writable copy.
+                pdf = pdf.copy()
             result_inner = pdf.eval(expr, inplace=inplace)
             if inplace:
                 result_inner = pdf
@@ -14022,7 +14039,7 @@ defaultdict(<class 'list'>, {'col..., 'col...})]
         elif isinstance(key, Series):
             return self.loc[key.astype(bool)]
         elif isinstance(key, slice):
-            if any(type(n) == int or None for n in [key.start, key.stop]):
+            if any(isinstance(n, int) or None for n in [key.start, key.stop]):
                 # Seems like pandas Frame always uses int as positional search when slicing
                 # with ints.
                 return self.iloc[key]
