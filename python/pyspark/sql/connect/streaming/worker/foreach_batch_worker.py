@@ -61,9 +61,7 @@ def main(infile: IO, outfile: IO) -> None:
                     f"Stream session ID mismatch: expected {stream_session_id}, "
                     f"got {spark.session_id}"
                 )
-            print(
-                f"{log_name} Created new session for stream_session_id {stream_session_id}"
-            )
+            print(f"{log_name} Created new session for stream_session_id {stream_session_id}")
         print(
             f"{log_name} Started batch {batch_id} with DF id {df_id} "
             f"and session id {stream_session_id}"

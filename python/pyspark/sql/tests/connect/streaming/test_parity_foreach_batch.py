@@ -39,9 +39,7 @@ class StreamingForeachBatchParityTests(StreamingTestsForeachBatchMixin, ReusedCo
         # so we use saveAsTable (visible cross-session) instead of temp views.
         def curried_function(df):
             def inner(batch_df, batch_id):
-                df.write.format("parquet").mode("overwrite").saveAsTable(
-                    "nested_df_updates"
-                )
+                df.write.format("parquet").mode("overwrite").saveAsTable("nested_df_updates")
                 batch_df.write.format("parquet").mode("overwrite").saveAsTable(
                     "nested_df_batch_updates"
                 )
