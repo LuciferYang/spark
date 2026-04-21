@@ -48,11 +48,12 @@ object StreamingForeachBatchHelper extends Logging {
   type ForeachBatchFnType = (DataFrame, Long) => Unit
 
   /**
-   * Wraps the per-stream cloned `SparkSession` produced by `StreamExecution.sparkSessionForStream`
-   * in its own `SessionHolder` and registers it with `SparkConnectSessionManager`. The cloned
-   * session id is pinned on the first batch and shared by all subsequent batches of the same
-   * streaming query, so the Python worker can resolve `CachedRemoteRelation` for the batch
-   * DataFrame against the cloned session rather than the root session.
+   * Wraps the per-stream cloned `SparkSession` produced by
+   * `StreamExecution.sparkSessionForStream` in its own `SessionHolder` and registers it with
+   * `SparkConnectSessionManager`. The cloned session id is pinned on the first batch and shared
+   * by all subsequent batches of the same streaming query, so the Python worker can resolve
+   * `CachedRemoteRelation` for the batch DataFrame against the cloned session rather than the
+   * root session.
    *
    * Lifecycle is driven by the query: created on first batch, closed on query termination via
    * `ForeachBatchCleaner`. Not designed for concurrent batches (streaming runs them serially).
