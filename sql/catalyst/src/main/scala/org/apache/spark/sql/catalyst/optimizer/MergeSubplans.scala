@@ -186,9 +186,7 @@ object MergeSubplans extends Rule[LogicalPlan] {
 
           levelFromSubqueries = levelFromSubqueries.max(level + 1)
 
-          val mergedOutput = mergeResult.outputMap(planWithReferences.output.head)
-          val outputIndex =
-            mergeResult.mergedPlan.plan.output.indexWhere(_.exprId == mergedOutput.exprId)
+          val outputIndex = mergeResult.outputMap(planWithReferences.output.head)
           ScalarSubqueryReference(
             level,
             mergeResult.mergedPlanIndex,
@@ -210,9 +208,7 @@ object MergeSubplans extends Rule[LogicalPlan] {
 
         val mergeResult = getPlanMerger(planMergers, level).merge(aggregateWithReferences, false)
 
-        val mergedOutput = aggregateWithReferences.output.map(mergeResult.outputMap)
-        val outputIndices =
-          mergedOutput.map(a => mergeResult.mergedPlan.plan.output.indexWhere(_.exprId == a.exprId))
+        val outputIndices = aggregateWithReferences.output.map(mergeResult.outputMap)
         val aggregateReference = NonGroupingAggregateReference(
           level,
           mergeResult.mergedPlanIndex,
