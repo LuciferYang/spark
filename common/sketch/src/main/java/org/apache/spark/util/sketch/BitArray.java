@@ -50,10 +50,22 @@ final class BitArray {
     this.bitCount = bitCount;
   }
 
-  /** Returns true if the bit changed value. */
+  /**
+   * Sets the bit at {@code index}. Returns {@code true} if the bit changed value.
+   *
+   * <p>This is the hot path for {@code BloomFilter.put}. Compared with the
+   * "get + branch + set + increment" sequence, we do a single word load, OR in
+   * the bit, store back, and derive the change status from the pre-image via
+   * {@code (old & mask) == 0}. One fewer array read per call, shorter dependency
+   * chain, and {@link #cardinality()} remains O(1) because we only bump the
+   * counter when a bit actually flipped.
+   */
   boolean set(long index) {
-    if (!get(index)) {
-      data[(int) (index >>> 6)] |= (1L << index);
+    int wordIdx = (int) (index >>> 6);
+    long mask = 1L << index;
+    long old = data[wordIdx];
+    data[wordIdx] = old | mask;
+    if ((old & mask) == 0) {
       bitCount++;
       return true;
     }
