@@ -3109,7 +3109,7 @@ with cte as (
 select * from cte
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [concat_ws( , utf8_lcase#x, utf8_lcase#x) AS concat_ws(' ' collate UTF8_LCASE, utf8_lcase, utf8_lcase)#x]
 :        +- SubqueryAlias spark_catalog.default.t5
@@ -3156,7 +3156,7 @@ select (
 -- !query analysis
 Project [scalar-subquery#x [] AS scalarsubquery()#x]
 :  +- WithCTE
-:     :- CTERelationDef xxxx, false
+:     :- CTERelationDef xxxx, false, false
 :     :  +- SubqueryAlias cte
 :     :     +- Project [concat_ws( , utf8_lcase#x, utf8_lcase#x) AS concat_ws(' ' collate UTF8_LCASE, utf8_lcase, utf8_lcase)#x]
 :     :        +- SubqueryAlias spark_catalog.default.t5

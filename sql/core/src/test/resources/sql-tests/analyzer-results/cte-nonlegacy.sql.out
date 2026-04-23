@@ -15,10 +15,10 @@ WithCTE
 :  +- SubqueryAlias t
 :     +- Project [1#x]
 :        +- SubqueryAlias t2
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 +- Project [1#x]
    +- SubqueryAlias t
-      +- CTERelationRef xxxx, true, [1#x], false, false, 1
+      +- CTERelationRef xxxx, true, [1#x], false, false
 
 
 -- !query
@@ -37,7 +37,7 @@ Aggregate [max(c#x) AS max(c)#x]
       :           +- OneRowRelation
       +- Project [c#x]
          +- SubqueryAlias t
-            +- CTERelationRef xxxx, true, [c#x], false, false, 1
+            +- CTERelationRef xxxx, true, [c#x], false, false
 
 
 -- !query
@@ -54,7 +54,7 @@ Project [scalar-subquery#x [] AS scalarsubquery()#x]
 :     :        +- OneRowRelation
 :     +- Project [1#x]
 :        +- SubqueryAlias t
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 +- OneRowRelation
 
 
@@ -106,8 +106,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
   "errorClass" : "TABLE_OR_VIEW_NOT_FOUND",
   "sqlState" : "42P01",
   "messageParameters" : {
-    "relationName" : "`cte`",
-    "searchPath" : "[`system`.`builtin`, `system`.`session`, `spark_catalog`.`default`]"
+    "relationName" : "`cte`"
   },
   "queryContext" : [ {
     "objectType" : "",
@@ -172,11 +171,11 @@ WithCTE
 :        :           :           +- OneRowRelation
 :        :           +- Project [c#x]
 :        :              +- SubqueryAlias t
-:        :                 +- CTERelationRef xxxx, true, [c#x], false, false, 1
+:        :                 +- CTERelationRef xxxx, true, [c#x], false, false
 :        +- OneRowRelation
 +- Project [scalarsubquery()#x]
    +- SubqueryAlias t2
-      +- CTERelationRef xxxx, true, [scalarsubquery()#x], false, false, 1
+      +- CTERelationRef xxxx, true, [scalarsubquery()#x], false, false
 
 
 -- !query
@@ -226,7 +225,7 @@ WithCTE
    +- SubqueryAlias __auto_generated_subquery_name
       +- Project [c#x]
          +- SubqueryAlias t
-            +- CTERelationRef xxxx, true, [c#x], false, false, 1
+            +- CTERelationRef xxxx, true, [c#x], false, false
 
 
 -- !query
@@ -255,7 +254,7 @@ WithCTE
          +- SubqueryAlias __auto_generated_subquery_name
             +- Project [c#x]
                +- SubqueryAlias t
-                  +- CTERelationRef xxxx, true, [c#x], false, false, 1
+                  +- CTERelationRef xxxx, true, [c#x], false, false
 
 
 -- !query
@@ -290,7 +289,7 @@ WithCTE
          +- SubqueryAlias __auto_generated_subquery_name
             +- Project [c#x]
                +- SubqueryAlias t
-                  +- CTERelationRef xxxx, true, [c#x], false, false, 1
+                  +- CTERelationRef xxxx, true, [c#x], false, false
 
 
 -- !query
@@ -393,14 +392,14 @@ WithCTE
 :  +- SubqueryAlias t
 :     +- Project [1#x]
 :        +- SubqueryAlias t2
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 :- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t2
 :     +- Project [2 AS 2#x]
 :        +- OneRowRelation
 +- Project [1#x]
    +- SubqueryAlias t
-      +- CTERelationRef xxxx, true, [1#x], false, false, 1
+      +- CTERelationRef xxxx, true, [1#x], false, false
 
 
 -- !query
@@ -463,15 +462,15 @@ WithCTE
 :  +- SubqueryAlias t3
 :     +- Project [1#x]
 :        +- SubqueryAlias t1
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 :- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias t2
 :     +- Project [1#x]
 :        +- SubqueryAlias t3
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 +- Project [1#x]
    +- SubqueryAlias t2
-      +- CTERelationRef xxxx, true, [1#x], false, false, 1
+      +- CTERelationRef xxxx, true, [1#x], false, false
 
 
 -- !query
@@ -494,12 +493,12 @@ WithCTE
 :  +- SubqueryAlias cte_inner
 :     +- Project [1#x]
 :        +- SubqueryAlias cte_outer
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 +- Project [1#x]
    +- SubqueryAlias __auto_generated_subquery_name
       +- Project [1#x]
          +- SubqueryAlias cte_inner
-            +- CTERelationRef xxxx, true, [1#x], false, false, 1
+            +- CTERelationRef xxxx, true, [1#x], false, false
 
 
 -- !query
@@ -527,19 +526,19 @@ WithCTE
 :  +- SubqueryAlias cte_inner_inner
 :     +- Project [1#x]
 :        +- SubqueryAlias cte_outer
-:           +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:           +- CTERelationRef xxxx, true, [1#x], false, false
 :- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte_inner
 :     +- Project [1#x]
 :        +- SubqueryAlias __auto_generated_subquery_name
 :           +- Project [1#x]
 :              +- SubqueryAlias cte_inner_inner
-:                 +- CTERelationRef xxxx, true, [1#x], false, false, 1
+:                 +- CTERelationRef xxxx, true, [1#x], false, false
 +- Project [1#x]
    +- SubqueryAlias __auto_generated_subquery_name
       +- Project [1#x]
          +- SubqueryAlias cte_inner
-            +- CTERelationRef xxxx, true, [1#x], false, false, 1
+            +- CTERelationRef xxxx, true, [1#x], false, false
 
 
 -- !query
@@ -561,8 +560,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
   "errorClass" : "TABLE_OR_VIEW_NOT_FOUND",
   "sqlState" : "42P01",
   "messageParameters" : {
-    "relationName" : "`cte_invisible_inner`",
-    "searchPath" : "[`system`.`builtin`, `system`.`session`, `spark_catalog`.`default`]"
+    "relationName" : "`cte_invisible_inner`"
   },
   "queryContext" : [ {
     "objectType" : "",
@@ -595,8 +593,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
   "errorClass" : "TABLE_OR_VIEW_NOT_FOUND",
   "sqlState" : "42P01",
   "messageParameters" : {
-    "relationName" : "`cte_invisible_inner`",
-    "searchPath" : "[`system`.`builtin`, `system`.`session`, `spark_catalog`.`default`]"
+    "relationName" : "`cte_invisible_inner`"
   },
   "queryContext" : [ {
     "objectType" : "",
