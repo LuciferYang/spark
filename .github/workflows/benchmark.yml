@@ -28,7 +28,7 @@ on:
         default: '*'
       jdk-17:
         type: boolean
-        description: 'JDK version: 17'
+        description: 'JDK version: 17 (default if none selected)'
         required: true
         default: true
       jdk-21:
@@ -89,7 +89,7 @@ jobs:
         if [ "${{ inputs.jdk-17 }}" = "true" ]; then jdks=$(echo "$jdks" | jq -c '. + ["17"]'); fi
         if [ "${{ inputs.jdk-21 }}" = "true" ]; then jdks=$(echo "$jdks" | jq -c '. + ["21"]'); fi
         if [ "${{ inputs.jdk-25 }}" = "true" ]; then jdks=$(echo "$jdks" | jq -c '. + ["25"]'); fi
-        if [ "$jdks" = "[]" ]; then echo "Error: At least one JDK version must be selected" >&2; exit 1; fi
+        if [ "$jdks" = "[]" ]; then jdks='["17"]'; fi
         echo "jdk-matrix=$jdks" >> $GITHUB_OUTPUT
 
   # Any TPC-DS related updates on this job need to be applied to tpcds-1g job of build_and_test.yml as well
