@@ -28,17 +28,17 @@ on:
         default: '*'
       jdk-17:
         type: boolean
-        description: 'JDK 17'
+        description: 'JDK version: 17'
         required: true
         default: true
       jdk-21:
         type: boolean
-        description: 'JDK 21'
+        description: 'JDK version: 21'
         required: true
         default: false
       jdk-25:
         type: boolean
-        description: 'JDK 25'
+        description: 'JDK version: 25'
         required: true
         default: false
       scala:
