@@ -62,12 +62,21 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   /**
    * Checks whether a CTE definition should be auto-cached based on heuristics.
    *
-   * Three gates, all of which must pass:
+   * Four gates, all of which must pass:
    *
-   *   1. `isExpensiveEnough` - the CTE body must contain a Join, Aggregate,
+   *   1. `cteDef.deterministic` - the CTE body must be deterministic. Caching
+   *      a CTE containing `rand()`, `current_timestamp()`, etc. would let a
+   *      later query reuse the previously-materialised values via the shared
+   *      `CacheManager.lookupCachedData`, changing SQL semantics across query
+   *      boundaries. Within-query reuse of a non-deterministic multi-ref CTE
+   *      remains correct because `ReplaceCTERefWithRepartition` (the fallback
+   *      when the auto-cache carve-out is skipped) shares the single
+   *      materialisation via shuffle within the query.
+   *
+   *   2. `isExpensiveEnough` - the CTE body must contain a Join, Aggregate,
    *      Sort, or Window. Cheap scan-only CTEs are not worth materialising.
    *
-   *   2. `!cteDef.correlatedSubqueryRef` - the CTE must NOT have any reference
+   *   3. `!cteDef.correlatedSubqueryRef` - the CTE must NOT have any reference
    *      that originally appeared inside a correlated subquery expression.
    *      `TagCorrelatedCTERefs` populates this flag in an early optimizer
    *      batch BEFORE `RewriteCorrelatedScalarSubquery` decorrelates the
@@ -75,10 +84,11 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    *      cannot be distinguished structurally from q24a's user-written
    *      `cs1 join cs2` self-join at this point in the pipeline.
    *
-   *   3. `!hasDivergentPredicates` - placeholder, see method doc.
+   *   4. `!hasDivergentPredicates` - placeholder, see method doc.
    */
   private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
-    !cteDef.correlatedSubqueryRef &&
+    cteDef.deterministic &&
+      !cteDef.correlatedSubqueryRef &&
       !hasDivergentPredicates(cteDef) &&
       isExpensiveEnough(cteDef.child)
   }
