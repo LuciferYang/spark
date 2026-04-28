@@ -86,7 +86,9 @@ object PartitionPruning extends Rule[LogicalPlan] with PredicateHelper with Join
           None
         }
       case (resExp, r @ ExtractV2Scan(scan: FileScan)) =>
-        // SPARK-30628: V2 file sources are DPP-eligible on partition columns.
+        // SPARK-30628: FileScan doesn't implement SupportsRuntimeV2Filtering, so the case
+        // above doesn't catch it. Partition columns are filterable at runtime via
+        // FileScan.planInputPartitionsWithRuntimeFilters, so DPP is eligible on them.
         val partitionFieldNames = scan.readPartitionSchema.fieldNames.toSet
         val partitionColumns = AttributeSet(
           r.output.filter(a => partitionFieldNames.contains(a.name)))

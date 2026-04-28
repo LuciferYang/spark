@@ -31,10 +31,6 @@ import org.apache.spark.sql.test.SharedSparkSession
  * These tests exercise V2 file scans (e.g. ParquetScan) -- distinct from the in-memory V2
  * catalog used by [[org.apache.spark.sql.DynamicPartitionPruningV2Suite]] and from the V2
  * iterative-pushdown work covered by [[DataSourceV2EnhancedRuntimePartitionFilterSuite]].
- *
- * The TDD entry-point test below proves that
- * [[org.apache.spark.sql.execution.dynamicpruning.PartitionPruning.getFilterableTableScan]]
- * recognises a `DataSourceV2ScanRelation` over a `FileScan` as DPP-eligible.
  */
 class DataSourceV2FileSourceDPPSuite extends QueryTest with SharedSparkSession {
 
@@ -47,7 +43,9 @@ class DataSourceV2FileSourceDPPSuite extends QueryTest with SharedSparkSession {
       SQLConf.DYNAMIC_PARTITION_PRUNING_FALLBACK_FILTER_RATIO.key -> "2")(thunk)
   }
 
-  // Returns the optimized logical plan of the given SQL string after standard DPP setup.
+  // Writes a partitioned `fact` and an unpartitioned `dim` parquet table and registers them
+  // as temp views. `fact` has 100 rows across 10 partitions (10 rows each); `dim` has 10 rows
+  // with `dim_id` and `dim_val` both in [0, 10).
   private def writeFactAndDim(dir: java.io.File): Unit = {
     val factPath = new java.io.File(dir, "fact").getCanonicalPath
     val dimPath = new java.io.File(dir, "dim").getCanonicalPath
@@ -192,11 +190,11 @@ class DataSourceV2FileSourceDPPSuite extends QueryTest with SharedSparkSession {
   }
 
   test("scalar subquery filter on partition column does not wrap in DynamicPruning") {
-    // Regression guard for defect 4.1 of the c6cd78d5211 design (PartitionPruning wrapping
-    // scalar subqueries in DynamicPruningExpression). Subquery partition pruning for V2 file
-    // sources is not yet implemented at this commit -- so the optimized plan should contain
-    // NO DynamicPruning instances. When a future commit adds the rule, runtime filters must
-    // appear as raw ScalarSubquery/ExecScalarSubquery expressions, not wrapped in DynamicPruning.
+    // Scalar-subquery filters on partition columns must NOT be wrapped in DynamicPruning.
+    // They reach the scan as raw ScalarSubquery / ExecScalarSubquery expressions; partition
+    // pruning happens at runtime via FileScan.planInputPartitionsWithRuntimeFilters, not via
+    // the DPP rule. Wrapping in DynamicPruning would route them through a path that assumes
+    // a DPP-style broadcast subquery and breaks the scalar-subquery semantics.
     withDppV2Conf {
       withTempDir { dir =>
         writeFactAndDim(dir)

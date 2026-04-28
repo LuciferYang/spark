@@ -168,7 +168,10 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       // planInputPartitionsWithRuntimeFilters (SPARK-30628 for V2 file sources).
       val effectiveRuntimeFilterAttrs = relation.scan match {
         case fs: FileScan =>
-          // SPARK-30628: V2 file sources expose partition columns as runtime-filterable.
+          // SPARK-30628: FileScan doesn't implement SupportsRuntimeV2Filtering, so
+          // relation.runtimeFilterAttrs is empty for it. Recover the eligible attributes
+          // from the partition schema -- those are the columns FileScan can actually filter
+          // on at runtime via planInputPartitionsWithRuntimeFilters.
           val partitionFieldNames = fs.readPartitionSchema.fieldNames.toSet
           AttributeSet(relation.output.filter(a => partitionFieldNames.contains(a.name)))
         case _ => relation.runtimeFilterAttrs

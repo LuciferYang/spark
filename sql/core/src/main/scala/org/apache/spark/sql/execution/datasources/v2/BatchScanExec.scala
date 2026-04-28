@@ -63,10 +63,10 @@ case class BatchScanExec(
   @transient private[sql] lazy val filteredPartitions: Seq[Option[InputPartition]] = {
     val originalPartitioning = outputPartitioning
 
-    // SPARK-30628: V2 file scans don't implement SupportsRuntimeV2Filtering. Apply runtime
-    // filters directly via FileScan.planInputPartitionsWithRuntimeFilters using a Catalyst
-    // expression interface; this avoids the V2-Predicate translation step that would lose
-    // information for UDF / RLIKE / complex expressions.
+    // SPARK-30628: V2 file scans don't implement SupportsRuntimeV2Filtering, so route
+    // runtime filters through FileScan.planInputPartitionsWithRuntimeFilters as Catalyst
+    // expressions. This preserves DynamicPruningExpression and scalar-subquery semantics
+    // that V2-Predicate translation would drop.
     val (filtered, newPartitions) = scan match {
       case fs: FileScan if runtimeFilters.nonEmpty =>
         (true, fs.planInputPartitionsWithRuntimeFilters(runtimeFilters))
