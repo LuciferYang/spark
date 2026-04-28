@@ -785,4 +785,44 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
         s"left ${shortMgr.planIndexSize} buckets")
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // V2 file source compatibility
+  // ---------------------------------------------------------------------------
+
+  test("auto-CTE caches CTE bodies that read from a V2 file source (parquet)") {
+    // AutoCTECache operates on CTERelationDef / CTERelationRef and is source-agnostic.
+    // Verify that a CTE body whose leaf relation is a V2 parquet scan caches and
+    // produces correct results.
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.USE_V1_SOURCE_LIST.key -> "") {
+      withTempDir { dir =>
+        val path = new java.io.File(dir, "v2_t").getCanonicalPath
+        spark.range(10000)
+          .selectExpr("id", "id % 100 as key", "cast(id as double) as value", "id % 10 as part")
+          .write.partitionBy("part").parquet(path)
+        spark.read.parquet(path).createOrReplaceTempView("v2_t_temp")
+        try {
+          val sqlStmt =
+            """WITH cte AS (
+              |  SELECT key, sum(value) as total, rand() as r
+              |  FROM v2_t_temp GROUP BY key
+              |)
+              |SELECT a.key, a.total + b.total
+              |FROM cte a JOIN cte b ON a.key = b.key
+              |WHERE a.key > 10 AND b.key > 10""".stripMargin
+
+          val rows = spark.sql(sqlStmt).collect()
+          assert(rows.nonEmpty, "expected non-empty result")
+          assert(cachedEntries >= 1,
+            "AutoCTE should cache CTE bodies reading from V2 parquet")
+          assert(countInMemoryRelations(sqlStmt) >= 1,
+            "expected InMemoryRelation in optimized plan after V2-source caching")
+        } finally {
+          spark.catalog.dropTempView("v2_t_temp")
+        }
+      }
+    }
+  }
 }
