@@ -239,11 +239,19 @@ object PushDownUtils extends Logging {
       output: Seq[AttributeReference],
       outputPartitioning: Partitioning,
       originalPartitions: => Seq[InputPartition]): Seq[Option[InputPartition]] = {
-    val filtered = pushRuntimeFilters(scan, runtimeFilters, table, output)
+    // SPARK-30628: V2 file scans don't implement SupportsRuntimeV2Filtering, so route
+    // runtime filters through FileScan.planInputPartitionsWithRuntimeFilters as Catalyst
+    // expressions. This preserves DynamicPruningExpression and scalar-subquery semantics
+    // that V2-Predicate translation would drop.
+    val (filtered, newPartitions) = scan match {
+      case fs: FileScan if runtimeFilters.nonEmpty =>
+        (true, fs.planInputPartitionsWithRuntimeFilters(runtimeFilters))
+      case _ =>
+        val pushed = pushRuntimeFilters(scan, runtimeFilters, table, output)
+        // call toBatch again to get filtered partitions
+        (pushed, if (pushed) scan.toBatch.planInputPartitions() else Array.empty[InputPartition])
+    }
     if (filtered) {
-      // call toBatch again to get filtered partitions
-      val newPartitions = scan.toBatch.planInputPartitions()
-
       outputPartitioning match {
         case k: KeyedPartitioning =>
           if (newPartitions.exists(!_.isInstanceOf[HasPartitionKey])) {

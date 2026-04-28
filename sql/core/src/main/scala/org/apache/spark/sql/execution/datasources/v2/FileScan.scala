@@ -144,8 +144,10 @@ trait FileScan extends Scan
       "Location" -> locationDesc)
   }
 
-  protected def partitions: Seq[FilePartition] = {
-    val selectedPartitions = fileIndex.listFiles(partitionFilters, dataFilters)
+  protected def partitions: Seq[FilePartition] = partitionsImpl(partitionFilters)
+
+  protected def partitionsImpl(allPartitionFilters: Seq[Expression]): Seq[FilePartition] = {
+    val selectedPartitions = fileIndex.listFiles(allPartitionFilters, dataFilters)
     val maxSplitBytes = FilePartition.maxSplitBytes(sparkSession, selectedPartitions)
     val partitionAttributes = toAttributes(fileIndex.partitionSchema)
     val attributeMap = partitionAttributes.map(a => normalizeName(a.name) -> a).toMap
@@ -190,6 +192,21 @@ trait FileScan extends Scan
 
   override def planInputPartitions(): Array[InputPartition] = {
     partitions.toArray
+  }
+
+  /**
+   * SPARK-30628: produce InputPartitions taking additional runtime filters into account.
+   * Called by `BatchScanExec.filteredPartitions` with DPP and scalar-subquery filters that
+   * must apply on top of the scan's compile-time `partitionFilters`. Returns the same
+   * partitions as `planInputPartitions()` when `extraFilters` is empty.
+   */
+  def planInputPartitionsWithRuntimeFilters(
+      extraFilters: Seq[Expression]): Array[InputPartition] = {
+    if (extraFilters.isEmpty) {
+      planInputPartitions()
+    } else {
+      partitionsImpl(partitionFilters ++ extraFilters).toArray
+    }
   }
 
   override def estimateStatistics(): Statistics = {
