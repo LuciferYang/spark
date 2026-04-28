@@ -63,10 +63,19 @@ case class BatchScanExec(
   @transient private[sql] lazy val filteredPartitions: Seq[Option[InputPartition]] = {
     val originalPartitioning = outputPartitioning
 
-    val filtered = PushDownUtils.pushRuntimeFilters(scan, runtimeFilters, table, output)
+    // SPARK-30628: V2 file scans don't implement SupportsRuntimeV2Filtering. Apply runtime
+    // filters directly via FileScan.planInputPartitionsWithRuntimeFilters using a Catalyst
+    // expression interface; this avoids the V2-Predicate translation step that would lose
+    // information for UDF / RLIKE / complex expressions.
+    val (filtered, newPartitions) = scan match {
+      case fs: FileScan if runtimeFilters.nonEmpty =>
+        (true, fs.planInputPartitionsWithRuntimeFilters(runtimeFilters))
+      case _ =>
+        val pushed = PushDownUtils.pushRuntimeFilters(scan, runtimeFilters, table, output)
+        // call toBatch again to get filtered partitions
+        (pushed, if (pushed) scan.toBatch.planInputPartitions() else Array.empty[InputPartition])
+    }
     if (filtered) {
-      // call toBatch again to get filtered partitions
-      val newPartitions = scan.toBatch.planInputPartitions()
 
       originalPartitioning match {
         case k: KeyedPartitioning =>
