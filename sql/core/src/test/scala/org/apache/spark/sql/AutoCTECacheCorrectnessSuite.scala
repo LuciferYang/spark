@@ -787,6 +787,57 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
   }
 
   // ---------------------------------------------------------------------------
+  // Determinism gate (cross-query reuse correctness)
+  // ---------------------------------------------------------------------------
+
+  test("auto-CTE does NOT cache CTE bodies containing non-deterministic expressions") {
+    // A CTE body whose projection includes rand() is non-deterministic.
+    // Caching it would let a later query reuse the previously-materialised
+    // random values via CacheManager.lookupCachedData, changing SQL semantics
+    // across query boundaries. shouldAutoCache must reject such CTEs.
+    // NOTE: outer query must reference `r` so ColumnPruning does not strip
+    // the rand() expression from the CTE body before shouldAutoCache fires.
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH cte AS (
+          |  SELECT key, rand() as r, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT a.key, a.total + b.total, a.r + b.r
+          |FROM cte a JOIN cte b ON a.key = b.key
+          |WHERE a.key > 10 AND b.key > 10""".stripMargin
+
+      spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "Non-deterministic CTE body must NOT be auto-cached " +
+          s"(got $cachedEntries cached entries)")
+      assert(countInMemoryRelations(sql) == 0,
+        "Non-deterministic CTE body must NOT produce InMemoryRelation in optimized plan")
+    }
+  }
+
+  test("non-deterministic CTE: cross-query rand() values are not reused") {
+    // Stronger semantic check: running the same non-deterministic CTE query
+    // twice must produce different rand() values. If the cache leaked across
+    // queries, the second run would observe the first run's frozen randoms.
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      val sql =
+        """WITH cte AS (
+          |  SELECT key, rand() as r FROM auto_cte_corr_test GROUP BY key
+          |)
+          |SELECT key, r FROM cte ORDER BY key LIMIT 5""".stripMargin
+
+      val firstRun = spark.sql(sql).collect().map(_.getDouble(1)).toSeq
+      val secondRun = spark.sql(sql).collect().map(_.getDouble(1)).toSeq
+      assert(firstRun != secondRun,
+        "rand() across two runs of the same CTE query must differ; " +
+          s"got identical values $firstRun in both runs (cross-query cache leak)")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // V2 file source compatibility
   // ---------------------------------------------------------------------------
 

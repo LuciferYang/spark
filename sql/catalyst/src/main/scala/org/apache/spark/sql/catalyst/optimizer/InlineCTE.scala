@@ -66,14 +66,21 @@ case class InlineCTE(
     // auto-cache rule has nothing left to materialize on real workloads (TPC-DS
     // CTEs are virtually all deterministic).
     //
-    // EXCEPTION: if the CTE has a reference inside a correlated subquery
-    // (`correlatedSubqueryRef = true`), `ReplaceCTERefWithCache` will refuse
-    // to cache it. We must NOT skip inlining in that case, otherwise the
-    // CTE survives into `ReplaceCTERefWithRepartition`, which produces an
-    // unresolved plan because the multi-reference is not deduped here.
-    // Inlining correlated-ref CTEs is the safe baseline behavior.
+    // EXCEPTIONS:
+    //   - If the CTE has a reference inside a correlated subquery
+    //     (`correlatedSubqueryRef = true`), `ReplaceCTERefWithCache` will refuse
+    //     to cache it. We must NOT skip inlining in that case, otherwise the
+    //     CTE survives into `ReplaceCTERefWithRepartition`, which produces an
+    //     unresolved plan because the multi-reference is not deduped here.
+    //     Inlining correlated-ref CTEs is the safe baseline behavior.
+    //   - If the CTE body is non-deterministic, `ReplaceCTERefWithCache` will
+    //     refuse to cache it (cross-query reuse would change semantics). We
+    //     must NOT skip inlining here either; the standard non-deterministic
+    //     fallback below keeps the CTE so `ReplaceCTERefWithRepartition` can
+    //     share it via shuffle within the query.
     if (refCount > 1 &&
         SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
+        cteDef.deterministic &&
         !cteDef.correlatedSubqueryRef &&
         isAutoCacheEligible(cteDef.child)) {
       return false
