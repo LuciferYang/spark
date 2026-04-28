@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.read.SupportsRuntimeV2Filtering
 import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.v2.ExtractV2Scan
+import org.apache.spark.sql.execution.datasources.v2.{ExtractV2Scan, FileScan}
 /**
  * Dynamic partition pruning optimization is performed based on the type and
  * selectivity of the join operation. During query optimization, we insert a
@@ -81,6 +81,16 @@ object PartitionPruning extends Rule[LogicalPlan] with PredicateHelper with Join
         val filterAttrs = V2ExpressionUtils.resolveAttributeRefs(
           scan.filterAttributes, r.output)
         if (resExp.references.subsetOf(filterAttrs)) {
+          Some(r)
+        } else {
+          None
+        }
+      case (resExp, r @ ExtractV2Scan(scan: FileScan)) =>
+        // SPARK-30628: V2 file sources are DPP-eligible on partition columns.
+        val partitionFieldNames = scan.readPartitionSchema.fieldNames.toSet
+        val partitionColumns = AttributeSet(
+          r.output.filter(a => partitionFieldNames.contains(a.name)))
+        if (resExp.references.subsetOf(partitionColumns)) {
           Some(r)
         } else {
           None

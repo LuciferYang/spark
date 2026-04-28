@@ -27,7 +27,7 @@ import org.apache.spark.internal.LogKeys.EXPR
 import org.apache.spark.sql.catalyst.analysis.{ResolvedIdentifier, ResolvedNamespace, ResolvedPartitionSpec, ResolvedPersistentView, ResolvedTable, ResolvedTempView}
 import org.apache.spark.sql.catalyst.catalog.CatalogUtils
 import org.apache.spark.sql.catalyst.expressions
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, DynamicPruning, Expression, NamedExpression, Not, Or, PredicateHelper, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeSet, DynamicPruning, Expression, NamedExpression, Not, Or, PredicateHelper, SubqueryExpression}
 import org.apache.spark.sql.catalyst.expressions.Literal.TrueLiteral
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -164,12 +164,20 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       // Extract scalar subquery filters on runtime-filterable columns for runtime pushdown.
       // These filters stay in postScanFilters for correctness (FilterExec above scan),
       // but are also routed into runtimeFilters so BatchScanExec can use them for
-      // partition pruning via SupportsRuntimeV2Filtering.filter().
-      val scalarSubqueryFilters = if (relation.runtimeFilterAttrs.nonEmpty) {
+      // partition pruning via SupportsRuntimeV2Filtering.filter() or via FileScan's
+      // planInputPartitionsWithRuntimeFilters (SPARK-30628 for V2 file sources).
+      val effectiveRuntimeFilterAttrs = relation.scan match {
+        case fs: FileScan =>
+          // SPARK-30628: V2 file sources expose partition columns as runtime-filterable.
+          val partitionFieldNames = fs.readPartitionSchema.fieldNames.toSet
+          AttributeSet(relation.output.filter(a => partitionFieldNames.contains(a.name)))
+        case _ => relation.runtimeFilterAttrs
+      }
+      val scalarSubqueryFilters = if (effectiveRuntimeFilterAttrs.nonEmpty) {
         postScanFilters.filter { f =>
           f.containsPattern(SCALAR_SUBQUERY) &&
             f.references.nonEmpty &&
-            f.references.subsetOf(relation.runtimeFilterAttrs)
+            f.references.subsetOf(effectiveRuntimeFilterAttrs)
         }
       } else {
         Seq.empty
