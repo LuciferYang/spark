@@ -4095,6 +4095,7 @@ object SQLConf {
         "count(DISTINCT c) > 1`). Only fires when the consumer projects only the equi-key " +
         "columns (cardinality reduction is sound for key-set consumers). Default false.")
       .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
       .createWithDefault(false)
 
@@ -4109,6 +4110,7 @@ object SQLConf {
         "exceeds the saved join cost. Default 1 GiB (1073741824 bytes); tune lower if " +
         "benchmark data confirms the rewrite wins at smaller scales.")
       .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .bytesConf(ByteUnit.BYTE)
       .createWithDefaultString("1g")
 
