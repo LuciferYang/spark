@@ -277,7 +277,12 @@ abstract class Optimizer(catalogManager: CatalogManager)
       ColumnPruning,
       CollapseProject,
       RemoveRedundantAliases,
-      RemoveNoopOperators),
+      RemoveNoopOperators,
+      // SelfJoinToAggregate must run AFTER RewritePredicateSubquery (which turns IN/EXISTS
+      // into LeftSemi/LeftAnti joins -- the parent shape this rule requires) AND AFTER
+      // ColumnPruning / CollapseProject (which produce the canonical
+      // `Project([equi-keys], Inner self-join)` shape under the LeftSemi/LeftAnti).
+      SelfJoinToAggregate),
     // This batch must be executed after the `RewriteSubquery` batch, which creates joins.
     Batch("NormalizeFloatingNumbers", Once, NormalizeFloatingNumbers),
     Batch("ReplaceUpdateFieldsExpression", Once, ReplaceUpdateFieldsExpression)))

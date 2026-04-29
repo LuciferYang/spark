@@ -4086,6 +4086,32 @@ object SQLConf {
         "The threshold of window group limit must be -1, 0 or positive integer.")
       .createWithDefault(1000)
 
+  val SELF_JOIN_TO_AGGREGATE_ENABLED =
+    buildConf("spark.sql.optimizer.selfJoinToAggregate.enabled")
+      .internal()
+      .doc("When true, rewrites self-join with non-equi residual on a non-key column " +
+        "(e.g. `t1 INNER JOIN t1 t2 ON t1.k = t2.k AND t1.c <> t2.c`) into a GROUP BY " +
+        "HAVING aggregation (`SELECT k FROM t1 WHERE c IS NOT NULL GROUP BY k HAVING " +
+        "count(DISTINCT c) > 1`). Only fires when the consumer projects only the equi-key " +
+        "columns (cardinality reduction is sound for key-set consumers). Default false.")
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(false)
+
+  val SELF_JOIN_TO_AGGREGATE_MIN_TABLE_SIZE =
+    buildConf("spark.sql.optimizer.selfJoinToAggregate.minTableSizeInBytes")
+      .internal()
+      .doc("Cost gate for SelfJoinToAggregate: skip the rewrite when the inner self-join's " +
+        "input relation is smaller than this size. At smaller sizes the original Inner " +
+        "self-join's cost is dominated by setup overhead (BroadcastHashJoin, ReusedExchange), " +
+        "and the rewrite's `count(DISTINCT)` GROUP BY -- which lowers via " +
+        "`RewriteDistinctAggregates` to an Expand + two-stage Aggregate -- adds overhead that " +
+        "exceeds the saved join cost. Default 1 GiB (1073741824 bytes); tune lower if " +
+        "benchmark data confirms the rewrite wins at smaller scales.")
+      .version("4.2.0")
+      .bytesConf(ByteUnit.BYTE)
+      .createWithDefaultString("1g")
+
   val SESSION_WINDOW_BUFFER_IN_MEMORY_THRESHOLD =
     buildConf("spark.sql.sessionWindow.buffer.in.memory.threshold")
       .internal()
@@ -8039,6 +8065,10 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
   def windowExecBufferSpillSizeThreshold: Long = getConf(WINDOW_EXEC_BUFFER_SIZE_SPILL_THRESHOLD)
 
   def windowGroupLimitThreshold: Int = getConf(WINDOW_GROUP_LIMIT_THRESHOLD)
+
+  def selfJoinToAggregateEnabled: Boolean = getConf(SELF_JOIN_TO_AGGREGATE_ENABLED)
+
+  def selfJoinToAggregateMinTableSize: Long = getConf(SELF_JOIN_TO_AGGREGATE_MIN_TABLE_SIZE)
 
   def sessionWindowBufferInMemoryThreshold: Int = getConf(SESSION_WINDOW_BUFFER_IN_MEMORY_THRESHOLD)
 
