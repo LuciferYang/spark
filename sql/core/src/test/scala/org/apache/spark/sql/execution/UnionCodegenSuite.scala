@@ -65,6 +65,19 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
   }
 
   // ---------------------------------------------------------------------------
+  // Configuration smoke
+  // ---------------------------------------------------------------------------
+
+  test("SPARK-56482: SQLConf keys are pinned under wholeStage namespace") {
+    // Pins the user-visible config keys so a future symbol rename does not
+    // silently change the published key string.
+    assert(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED.key ==
+      "spark.sql.codegen.wholeStage.union.enabled")
+    assert(SQLConf.WHOLESTAGE_UNION_MAX_CHILDREN.key ==
+      "spark.sql.codegen.wholeStage.union.maxChildren")
+  }
+
+  // ---------------------------------------------------------------------------
   // Plan-shape tests
   // ---------------------------------------------------------------------------
 
@@ -174,6 +187,22 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
     }
   }
 
+  test("SPARK-56482: type widening decimal precision (different scale)") {
+    // decimal(5,0) union decimal(10,2) -> decimal(10,2) per
+    // DecimalPrecisionTypeCoercion.widerDecimalType (scale=max(0,2)=2,
+    // precision=scale+max(p1-s1,p2-s2)=2+max(5,8)=10). WidenSetOperationTypes
+    // inserts a Project(Cast) on each child to align both precision AND scale,
+    // so the physical UnionExec sees matching child output dataTypes.
+    val build = () => {
+      val a = rangeDF(3).select(col("id").cast(DecimalType(5, 0)).as("v"))
+      val b = rangeDF(3).select(col("id").cast(DecimalType(10, 2)).as("v"))
+      a.union(b)
+    }
+    assert(unionInsideWSCG(build().filter(col("v") >= 0)),
+      "decimal precision/scale widening should still fuse into one WSCG stage")
+    assertFlagParity(() => build().orderBy("v"))
+  }
+
   test("SPARK-56482: nullability widening top-level") {
     assertFlagParity { () =>
       val a = rangeDF(3).select(col("id").as("v"))
@@ -182,6 +211,77 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
         StructType(Seq(StructField("v", LongType, nullable = true))))
       a.union(b).orderBy("v")
     }
+  }
+
+  test("SPARK-56482: widening union with filter fuses into one WSCG stage") {
+    // Plan-shape check that fusion is actually taken when types differ at the
+    // user level (forcing `WidenSetOperationTypes` to insert Project(Cast)
+    // above each child). Uses `.filter` rather than `.orderBy` so the plan
+    // has no Exchange and AQE does not wrap it.
+    val a = rangeDF(3).select(col("id").cast(IntegerType).as("v"))
+    val b = rangeDF(3).select(col("id").as("v"))
+    val df = a.union(b).filter(col("v") >= 0)
+    assert(unionInsideWSCG(df),
+      "widened-children Union should fuse with filter into a single WSCG stage")
+    checkAnswer(df, Seq(Row(0L), Row(1L), Row(2L), Row(0L), Row(1L), Row(2L)))
+  }
+
+  test("SPARK-56482: nested-nullability mismatch falls back to non-codegen") {
+    // `Union.allChildrenCompatible` ignores nested nullability when checking
+    // child compatibility, so `WidenSetOperationTypes` does NOT insert Casts
+    // for children differing only in struct field / array containsNull /
+    // map valueContainsNull. `UnionExec.output` then merges those nested
+    // nullabilities, producing a `tgt.dataType` that does not equal any
+    // child's `src.dataType`. Codegen must fall back to the non-codegen
+    // `doExecute` path, not crash.
+    val structInner = StructType(Seq(StructField("f", IntegerType, nullable = false)))
+    val structOuterNotNull = StructType(Seq(StructField("s", structInner, nullable = false)))
+    val structInnerNullable =
+      StructType(Seq(StructField("f", IntegerType, nullable = true)))
+    val structOuterNullable =
+      StructType(Seq(StructField("s", structInnerNullable, nullable = false)))
+    val a = spark.createDataFrame(
+      java.util.Arrays.asList(Row(Row(1)), Row(Row(2))), structOuterNotNull)
+    val b = spark.createDataFrame(
+      java.util.Arrays.asList(Row(Row(3)), Row(Row(4))), structOuterNullable)
+    val df = a.union(b)
+    assert(!unionInsideWSCG(df),
+      "Nested-nullability mismatch must fall back to non-codegen")
+    val unionExec = df.queryExecution.executedPlan.collectFirst {
+      case u: UnionExec => u
+    }.get
+    assert(!unionExec.metrics.contains("numOutputRows"),
+      "numOutputRows metric must not be registered when fusion is denied")
+    checkAnswer(df,
+      Seq(Row(Row(1)), Row(Row(2)), Row(Row(3)), Row(Row(4))))
+  }
+
+  test("SPARK-56482: array containsNull mismatch falls back to non-codegen") {
+    // ArrayType.containsNull is the array analog of struct field nullability:
+    // `Union.allChildrenCompatible` ignores it, `WidenSetOperationTypes` does
+    // not insert a Cast, and `UnionExec.output` merges the flag, so the
+    // codegen path must fall back to `doExecute`.
+    val schemaNotNull =
+      StructType(Seq(StructField("a", ArrayType(IntegerType, containsNull = false))))
+    val schemaNullable =
+      StructType(Seq(StructField("a", ArrayType(IntegerType, containsNull = true))))
+    val a = spark.createDataFrame(
+      java.util.Arrays.asList(Row(java.util.Arrays.asList(1, 2))), schemaNotNull)
+    val b = spark.createDataFrame(
+      java.util.Arrays.asList(Row(java.util.Arrays.asList(3, 4))), schemaNullable)
+    val df = a.union(b)
+    assert(!unionInsideWSCG(df),
+      "Array containsNull mismatch must fall back to non-codegen")
+    val unionExec = df.queryExecution.executedPlan.collectFirst {
+      case u: UnionExec => u
+    }.get
+    assert(!unionExec.metrics.contains("numOutputRows"),
+      "numOutputRows metric must not be registered when fusion is denied")
+    val collectedArrays = df.collect()
+      .map(_.getList[Int](0).toArray.toSeq)
+      .toSet
+    assert(collectedArrays == Set(Seq(1, 2), Seq(3, 4)),
+      s"Expected the union of both array rows, got $collectedArrays")
   }
 
   // ---------------------------------------------------------------------------

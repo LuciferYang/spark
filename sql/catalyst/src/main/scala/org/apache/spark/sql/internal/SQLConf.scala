@@ -2485,24 +2485,28 @@ object SQLConf {
     .createWithDefault(true)
 
   val WHOLESTAGE_UNION_CODEGEN_ENABLED =
-    buildConf("spark.sql.codegen.union.enabled")
+    buildConf("spark.sql.codegen.wholeStage.union.enabled")
       .internal()
-      .doc("When true, UnionExec participates in whole-stage codegen on its " +
-        "non-partitioning-aware path: the parent and all children fuse into a " +
-        "single WholeStageCodegenExec stage. No effect when " +
-        "`spark.sql.codegen.wholeStage` is false.")
+      .doc("When both this conf and `spark.sql.codegen.wholeStage` are true, " +
+        "UnionExec participates in whole-stage codegen on its " +
+        "non-partitioning-aware path: the parent and all children fuse into " +
+        "a single WholeStageCodegenExec stage.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
       .createWithDefault(false)
 
   val WHOLESTAGE_UNION_MAX_CHILDREN = {
-    val key = "spark.sql.codegen.union.maxChildren"
+    val key = "spark.sql.codegen.wholeStage.union.maxChildren"
     buildConf(key)
       .internal()
       .doc("Maximum number of UnionExec children eligible for whole-stage " +
-        "codegen fusion. Unions with more children fall back to per-child " +
-        s"codegen stages. Only takes effect when " +
+        "codegen fusion. Each child is emitted as its own helper method " +
+        "(which already insulates per-child code from the JVM's per-method " +
+        "bytecode limit), so this conf instead bounds class-level costs of " +
+        "the fused stage: total bytecode size, constant pool growth, and " +
+        "JIT compilation time. Unions with more children fall back to " +
+        "per-child codegen stages. Only effective when " +
         s"`${WHOLESTAGE_UNION_CODEGEN_ENABLED.key}` is true.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)

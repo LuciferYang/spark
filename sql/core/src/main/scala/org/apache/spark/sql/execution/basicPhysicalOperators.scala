@@ -809,29 +809,72 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
+  // `WidenSetOperationTypes` inserts a `Project(Cast)` above each analyzed
+  // child whose dataType differs from the widened set type, so on the codegen
+  // path `src.dataType == tgt.dataType` holds for every entry that reaches
+  // this method. We therefore emit a bare `Alias(src, ...)` (no wrapping
+  // `Cast`) and let the Alias remap each child attribute to the union's
+  // output exprId/name/metadata. Children that bypass `WidenSetOperationTypes`
+  // (e.g., when only nested nullability differs) are filtered out by
+  // `supportCodegenFailureReason` via `allChildOutputDataTypesMatch` before
+  // this lazy val is forced, so the assert below is a defensive guard, not a
+  // condition users can hit.
   @transient private lazy val perChildProjections: IndexedSeq[Seq[NamedExpression]] =
     children.toIndexedSeq.map { child =>
       child.output.zip(output).map { case (src, tgt) =>
-        val projected: Expression =
-          if (src.dataType == tgt.dataType) src
-          else Cast(src, tgt.dataType, ansiEnabled = conf.ansiEnabled)
-        Alias(projected, tgt.name)(
+        assert(src.dataType == tgt.dataType,
+          s"UnionExec child output dataType ${src.dataType} does not match " +
+            s"union output dataType ${tgt.dataType}; supportCodegen should " +
+            "have returned false via the 'type-mismatch' reason.")
+        Alias(src, tgt.name)(
           exprId = tgt.exprId,
           qualifier = tgt.qualifier,
           explicitMetadata = Some(tgt.metadata))
       }
     }
 
-  private def canCodegenProjection(proj: NamedExpression): Boolean = proj match {
-    case _: AttributeReference => true
-    case Alias(_: AttributeReference, _) => true
-    case Alias(cast: Cast, _) =>
-      cast.evalMode match {
-        case EvalMode.LEGACY => Cast.canCast(cast.child.dataType, cast.dataType)
-        case EvalMode.ANSI => Cast.canAnsiCast(cast.child.dataType, cast.dataType)
-        case EvalMode.TRY => Cast.canTryCast(cast.child.dataType, cast.dataType)
-      }
-    case _ => false
+  // Memoized: true iff every child output dataType is structurally equal
+  // (including all nested nullabilities) to the corresponding union output
+  // dataType. `Union.allChildrenCompatible` ignores nested nullability, so
+  // children differing only there keep `Union.resolved = true` and bypass
+  // `WidenSetOperationTypes`; `UnionExec.output` merges them via
+  // `StructType.unionLikeMerge`, leaving src/tgt mismatched. Such cases fall
+  // back to `doExecute`, which only unions row RDDs.
+  @transient private lazy val allChildOutputDataTypesMatch: Boolean =
+    children.forall { c =>
+      c.output.zip(output).forall { case (src, tgt) => src.dataType == tgt.dataType }
+    }
+
+  // Memoized: `supportCodegen` is called multiple times during planning.
+  @transient private lazy val hasAnyPartitionIndexDependentChild: Boolean =
+    children.exists(UnionExec.hasPartitionIndexDependentCodegen)
+
+  // Memoized: `supportCodegen` (called by `CollapseCodegenStages`) and
+  // `metrics` both consult this. Memoization is safe because UnionExec is a
+  // case class -- AQE/replan/`withNewChildren` produce a fresh instance with
+  // its own lazy state, so a stale verdict cannot leak across plans. For a
+  // single instance, conf and children are stable, so one evaluation suffices
+  // and avoids re-walking children/partitioning on every query of the gate.
+  @transient private lazy val supportCodegenFailureReason: Option[String] = {
+    if (!conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
+      Some("union-codegen-disabled")
+    } else if (!outputPartitioning.isInstanceOf[UnknownPartitioning]) {
+      Some("partitioning-aware")
+    } else if (children.exists(_.exists(_.isInstanceOf[UnionExec]))) {
+      Some("nested-union")
+    } else if (children.exists(_.exists(UnionExec.isKnownMultiInputRDDCodegen))) {
+      Some("multi-rdd-child")
+    } else if (hasAnyPartitionIndexDependentChild) {
+      Some("partition-index-dependent-child")
+    } else if (children.size > conf.getConf(SQLConf.WHOLESTAGE_UNION_MAX_CHILDREN)) {
+      Some("max-children-exceeded")
+    } else if (supportsColumnar) {
+      Some("columnar")
+    } else if (!allChildOutputDataTypesMatch) {
+      Some("type-mismatch")
+    } else {
+      None
+    }
   }
 
   override def supportCodegen: Boolean = {
@@ -846,40 +889,12 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
-  /** Returns Some(reason) when codegen is skipped; None when enabled. */
-  private def supportCodegenFailureReason: Option[String] = {
-    if (!conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
-      Some("disabled")
-    } else if (!outputPartitioning.isInstanceOf[UnknownPartitioning]) {
-      Some("partitioning-aware")
-    } else if (children.exists(_.exists(_.isInstanceOf[UnionExec]))) {
-      Some("nested-union")
-    } else if (children.exists(_.exists(UnionExec.isKnownMultiInputRDDCodegen))) {
-      Some("multi-rdd-child")
-    } else if (hasAnyPartitionIndexDependentChild) {
-      Some("partition-index-dependent-child")
-    } else if (children.size > conf.getConf(SQLConf.WHOLESTAGE_UNION_MAX_CHILDREN)) {
-      Some("max-children-exceeded")
-    } else if (supportsColumnar) {
-      Some("columnar")
-    } else if (!perChildProjections.forall(_.forall(canCodegenProjection))) {
-      Some("projection-not-codegenable")
-    } else {
-      None
-    }
-  }
-
-  // Memoized: `supportCodegen` is called multiple times during planning.
-  @transient private lazy val hasAnyPartitionIndexDependentChild: Boolean =
-    children.exists(UnionExec.hasPartitionIndexDependentCodegen)
-
-  // Driver-side state set by `doProduce` and read by `doConsume`; accessed
-  // only during single-threaded code emission.
-  @transient private var currentEmittingChild: Int = -1
-
-  // Only populated when fusion is active; `doConsume` is the sole incrementer.
+  // Only populated when fusion will actually run; `doConsume` is the sole
+  // incrementer. Keying off `supportCodegenFailureReason` (not just the conf)
+  // keeps the metric out of the SQL UI for plans that fall back to
+  // `doExecute`, where the non-codegen path never updates it.
   override lazy val metrics: Map[String, SQLMetric] =
-    if (conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
+    if (supportCodegenFailureReason.isEmpty) {
       Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
     } else {
       Map.empty
@@ -899,6 +914,10 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
   }
 
   override def inputRDDs(): Seq[RDD[InternalRow]] = Seq(unionedInputRDD)
+
+  // Driver-side cursor written by `doProduce` and read by `doConsume` during
+  // single-threaded code emission; resets to -1 once emission completes.
+  @transient private var currentEmittingChild: Int = -1
 
   override protected def doProduce(ctx: CodegenContext): String = {
     // Per-global-partition lookup: which direct child this partition belongs to.
