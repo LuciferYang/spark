@@ -841,7 +841,7 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
 
   // Memoized: `supportCodegen` is called multiple times during planning.
-  @transient private lazy val hasAnyPartitionIndexDependentChild: Boolean =
+  @transient private lazy val hasAnyPartitionIndexDependentDescendant: Boolean =
     children.exists(UnionExec.hasPartitionIndexDependentCodegen)
 
   // Memoized: consulted by `supportCodegen` (called multiple times by
@@ -857,7 +857,7 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
       Some("nested-union")
     } else if (children.exists(_.exists(UnionExec.isKnownMultiInputRDDCodegen))) {
       Some("multi-rdd-child")
-    } else if (hasAnyPartitionIndexDependentChild) {
+    } else if (hasAnyPartitionIndexDependentDescendant) {
       Some("partition-index-dependent-child")
     } else if (children.size > conf.getConf(SQLConf.WHOLESTAGE_UNION_MAX_CHILDREN)) {
       Some("max-children-exceeded")
@@ -894,6 +894,9 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
 
   // Builds a plain `UnionRDD` directly (not `SparkContext.union`) to preserve
   // a 1:1 partition-to-child mapping via `UnionPartition.parentRddIndex`.
+  // The `require` below is a backstop: any multi-RDD `CodegenSupport`
+  // operator missing from `isKnownMultiInputRDDCodegen` will trip here
+  // instead of falling back gracefully.
   @transient private lazy val unionedInputRDD: RDD[InternalRow] = {
     val childRDDs: Seq[RDD[InternalRow]] = children.map { c =>
       val cs = c.asInstanceOf[CodegenSupport]
@@ -912,28 +915,20 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
   @transient private var currentEmittingChild: Int = -1
 
   override protected def doProduce(ctx: CodegenContext): String = {
-    // Per-global-partition lookup: which direct child this partition belongs to.
-    val partitionToChild: Array[Int] = unionedInputRDD.partitions.map {
-      case up: UnionPartition[_] => up.parentRddIndex
-      case other =>
-        throw SparkException.internalError(
-          s"UnionExec: Unexpected partition type ${other.getClass.getName}")
-    }
+    // For each partition of the unioned RDD, record its owning child and its
+    // index within that child's RDD. Read both fields directly off the
+    // `UnionPartition` so the lookup arrays do not assume `UnionRDD` lays
+    // partitions out in child order.
+    val (partitionToChild, partitionToLocalIdx) =
+      unionedInputRDD.partitions.map {
+        case up: UnionPartition[_] => (up.parentRddIndex, up.parentPartition.index)
+        case other =>
+          throw SparkException.internalError(
+            s"UnionExec: Unexpected partition type ${other.getClass.getName}")
+      }.unzip
     val p2cRef = ctx.addReferenceObj("partitionToChild", partitionToChild)
-    val childIndexVar = ctx.freshName("unionChildIdx")
-
-    // Per-global-partition lookup: the partition's index within its child RDD.
-    val partitionToLocalIdx: Array[Int] = {
-      val counts = new Array[Int](children.size)
-      partitionToChild.indices.foreach { g =>
-        counts(partitionToChild(g)) += 1
-      }
-      val boundaries = counts.scanLeft(0)(_ + _)
-      partitionToChild.indices.map { g =>
-        g - boundaries(partitionToChild(g))
-      }.toArray
-    }
     val p2lRef = ctx.addReferenceObj("partitionToLocalIdx", partitionToLocalIdx)
+    val childIndexVar = ctx.freshName("unionChildIdx")
 
     // Each child's produce output is wrapped in its own helper method. The
     // outer `switch` in `doProduce`'s return value dispatches to the helper.
@@ -987,8 +982,11 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     require(currentEmittingChild >= 0,
       "UnionExec.doConsume invoked outside doProduce emission window")
     val i = currentEmittingChild
-    val projs = perChildProjections(i)
-    val bound = BindReferences.bindReferences(projs, children(i).output)
+    // The wrapped child in each `perChildProjections(i)` element is always an
+    // `Attribute`, which is deterministic by definition; no
+    // `evaluateRequiredVariables` call is needed to force single-evaluation
+    // of non-deterministic expressions.
+    val bound = BindReferences.bindReferences(perChildProjections(i), children(i).output)
 
     // Route BoundReference reads through `currentVars` (the incoming row is
     // delivered as variables under WSCG, not via ctx.INPUT_ROW).
@@ -996,16 +994,8 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     ctx.INPUT_ROW = null
     val projectedExprCodes = bound.map(_.genCode(ctx))
 
-    // Force any non-deterministic expression to evaluate exactly once per row.
-    val nonDetAttrs = projs.zip(bound).collect {
-      case (na, exp) if !exp.deterministic => na.toAttribute
-    }
-    val forcedEval = evaluateRequiredVariables(
-      output, projectedExprCodes, AttributeSet(nonDetAttrs))
-
     val numOutput = metricTerm(ctx, "numOutputRows")
     s"""
-       |$forcedEval
        |$numOutput.add(1L);
        |${consume(ctx, projectedExprCodes)}
      """.stripMargin
