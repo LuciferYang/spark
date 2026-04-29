@@ -1,0 +1,86 @@
+================================================================================================
+Fixed-size bulk reads
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.19+10-LTS on Linux 6.17.0-1010-azure
+AMD EPYC 9V74 80-Core Processor
+Fixed-size bulk reads:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+readBooleans                                          0              0           0      24348.7           0.0       1.0X
+readBytes                                             0              0           0       4656.2           0.2       0.2X
+readShorts                                            0              0           0       2486.0           0.4       0.1X
+readIntegers                                          0              0           0      11417.5           0.1       0.5X
+readLongs                                             0              0           0       5474.4           0.2       0.2X
+readFloats                                            0              0           0      11248.3           0.1       0.5X
+readDoubles                                           0              0           0       5546.1           0.2       0.2X
+
+
+================================================================================================
+Conversion bulk reads
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.19+10-LTS on Linux 6.17.0-1010-azure
+AMD EPYC 9V74 80-Core Processor
+Conversion bulk reads:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+readUnsignedIntegers                                  1              1           0       1252.5           0.8       1.0X
+readUnsignedLongs                                    14             14           0         74.0          13.5       0.1X
+readIntegersWithRebase, no rebase needed              0              0           0       2841.9           0.4       2.3X
+readLongsWithRebase, no rebase needed                 0              0           0       2299.5           0.4       1.8X
+
+
+================================================================================================
+Variable-length reads
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.19+10-LTS on Linux 6.17.0-1010-azure
+AMD EPYC 9V74 80-Core Processor
+Variable-length reads:                    Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+readBinary, payloadLen=8                             11             11           0         93.1          10.7       1.0X
+readBinary, payloadLen=32                            12             12           0         90.3          11.1       1.0X
+readBinary, payloadLen=128                           13             13           0         79.5          12.6       0.9X
+readBinary, payloadLen=512                           31             32           0         33.5          29.9       0.4X
+
+
+================================================================================================
+Single-value reads
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.19+10-LTS on Linux 6.17.0-1010-azure
+AMD EPYC 9V74 80-Core Processor
+Single-value reads:                       Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+readBoolean                                           0              0           0       2258.3           0.4       1.0X
+readByte                                              1              1           0       1139.7           0.9       0.5X
+readShort                                             1              1           0       1163.2           0.9       0.5X
+readInteger                                           1              1           0       1163.0           0.9       0.5X
+readLong                                              1              1           0       1163.2           0.9       0.5X
+readFloat                                             1              1           0       1163.2           0.9       0.5X
+readDouble                                            1              1           0       1163.2           0.9       0.5X
+
+
+================================================================================================
+Skip
+================================================================================================
+
+OpenJDK 64-Bit Server VM 17.0.19+10-LTS on Linux 6.17.0-1010-azure
+AMD EPYC 9V74 80-Core Processor
+Skip:                                     Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+skipBinary, payloadLen=8                              4              4           0        244.0           4.1       1.0X
+skipBinary, payloadLen=32                             4              4           0        242.9           4.1       1.0X
+skipBinary, payloadLen=128                           11             11           0         98.2          10.2       0.4X
+skipBinary, payloadLen=512                           11             11           0         95.6          10.5       0.4X
+skipFixedLenByteArray, len=4                          0              0           0   34952533.3           0.0  143276.2X
+skipFixedLenByteArray, len=16                         0              0           0   34952533.3           0.0  143276.2X
+skipFixedLenByteArray, len=64                         0              0           0   34952533.3           0.0  143276.2X
+skipBooleans                                          0              0           0   34952533.3           0.0  143276.2X
+skipBytes                                             0              0           0   34952533.3           0.0  143276.2X
+skipShorts                                            0              0           0   34952533.3           0.0  143276.2X
+skipIntegers                                          0              0           0   34952533.3           0.0  143276.2X
+skipLongs                                             0              0           0   34952533.3           0.0  143276.2X
+skipFloats                                            0              0           0   34952533.3           0.0  143276.2X
+skipDoubles                                           0              0           0   34952533.3           0.0  143276.2X
+
+
