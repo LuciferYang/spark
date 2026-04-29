@@ -191,8 +191,8 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
     // decimal(5,0) union decimal(10,2) -> decimal(10,2) per
     // DecimalPrecisionTypeCoercion.widerDecimalType (scale=max(0,2)=2,
     // precision=scale+max(p1-s1,p2-s2)=2+max(5,8)=10). WidenSetOperationTypes
-    // inserts a Project(Cast) on each child to align both precision AND scale,
-    // so the physical UnionExec sees matching child output dataTypes.
+    // aligns both precision and scale, so the physical UnionExec sees
+    // matching child output dataTypes.
     val build = () => {
       val a = rangeDF(3).select(col("id").cast(DecimalType(5, 0)).as("v"))
       val b = rangeDF(3).select(col("id").cast(DecimalType(10, 2)).as("v"))
@@ -227,13 +227,10 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
   }
 
   test("SPARK-56482: nested-nullability mismatch falls back to non-codegen") {
-    // `Union.allChildrenCompatible` ignores nested nullability when checking
-    // child compatibility, so `WidenSetOperationTypes` does NOT insert Casts
-    // for children differing only in struct field / array containsNull /
-    // map valueContainsNull. `UnionExec.output` then merges those nested
-    // nullabilities, producing a `tgt.dataType` that does not equal any
-    // child's `src.dataType`. Codegen must fall back to the non-codegen
-    // `doExecute` path, not crash.
+    // Children differ only in nested struct nullability, which
+    // `WidenSetOperationTypes` does not align (see `allChildOutputDataTypesMatch`
+    // in `UnionExec`). The codegen path must fall back to `doExecute` rather
+    // than crash on the resulting type mismatch.
     val structInner = StructType(Seq(StructField("f", IntegerType, nullable = false)))
     val structOuterNotNull = StructType(Seq(StructField("s", structInner, nullable = false)))
     val structInnerNullable =
@@ -258,9 +255,7 @@ class UnionCodegenSuite extends QueryTest with SharedSparkSession {
 
   test("SPARK-56482: array containsNull mismatch falls back to non-codegen") {
     // ArrayType.containsNull is the array analog of struct field nullability:
-    // `Union.allChildrenCompatible` ignores it, `WidenSetOperationTypes` does
-    // not insert a Cast, and `UnionExec.output` merges the flag, so the
-    // codegen path must fall back to `doExecute`.
+    // skipped by `WidenSetOperationTypes`, so the codegen path must fall back.
     val schemaNotNull =
       StructType(Seq(StructField("a", ArrayType(IntegerType, containsNull = false))))
     val schemaNullable =

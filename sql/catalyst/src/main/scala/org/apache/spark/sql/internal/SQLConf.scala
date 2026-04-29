@@ -2501,12 +2501,11 @@ object SQLConf {
     buildConf(key)
       .internal()
       .doc("Maximum number of UnionExec children eligible for whole-stage " +
-        "codegen fusion. Each child is emitted as its own helper method " +
-        "(which already insulates per-child code from the JVM's per-method " +
-        "bytecode limit), so this conf instead bounds class-level costs of " +
-        "the fused stage: total bytecode size, constant pool growth, and " +
-        "JIT compilation time. Unions with more children fall back to " +
-        "per-child codegen stages. Only effective when " +
+        "codegen fusion. Each child is emitted as its own helper method, so " +
+        "this conf bounds class-level costs of the fused stage (total " +
+        "bytecode size, constant pool growth, JIT compilation time) rather " +
+        "than the JVM per-method bytecode limit. Unions with more children " +
+        "fall back to per-child codegen stages. Only effective when " +
         s"`${WHOLESTAGE_UNION_CODEGEN_ENABLED.key}` is true.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)

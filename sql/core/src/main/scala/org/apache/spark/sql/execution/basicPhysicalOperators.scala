@@ -809,16 +809,12 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
-  // `WidenSetOperationTypes` inserts a `Project(Cast)` above each analyzed
-  // child whose dataType differs from the widened set type, so on the codegen
-  // path `src.dataType == tgt.dataType` holds for every entry that reaches
-  // this method. We therefore emit a bare `Alias(src, ...)` (no wrapping
-  // `Cast`) and let the Alias remap each child attribute to the union's
-  // output exprId/name/metadata. Children that bypass `WidenSetOperationTypes`
-  // (e.g., when only nested nullability differs) are filtered out by
-  // `supportCodegenFailureReason` via `allChildOutputDataTypesMatch` before
-  // this lazy val is forced, so the assert below is a defensive guard, not a
-  // condition users can hit.
+  // `WidenSetOperationTypes` inserts a `Project(Cast)` above each child whose
+  // dataType differs from the widened set type, so on the codegen path
+  // `src.dataType == tgt.dataType` holds. The Alias only remaps each child
+  // attribute onto the union's output exprId/name/metadata. Mismatched cases
+  // are gated upstream by `allChildOutputDataTypesMatch`, so the assert is a
+  // defensive guard.
   @transient private lazy val perChildProjections: IndexedSeq[Seq[NamedExpression]] =
     children.toIndexedSeq.map { child =>
       child.output.zip(output).map { case (src, tgt) =>
@@ -833,13 +829,12 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
       }
     }
 
-  // Memoized: true iff every child output dataType is structurally equal
-  // (including all nested nullabilities) to the corresponding union output
-  // dataType. `Union.allChildrenCompatible` ignores nested nullability, so
-  // children differing only there keep `Union.resolved = true` and bypass
-  // `WidenSetOperationTypes`; `UnionExec.output` merges them via
-  // `StructType.unionLikeMerge`, leaving src/tgt mismatched. Such cases fall
-  // back to `doExecute`, which only unions row RDDs.
+  // True iff every child output dataType matches the corresponding union
+  // output dataType, including all nested nullabilities.
+  // `Union.allChildrenCompatible` ignores nested nullability, so children
+  // differing only there bypass `WidenSetOperationTypes`; `UnionExec.output`
+  // then merges those flags via `StructType.unionLikeMerge`, leaving src/tgt
+  // mismatched.
   @transient private lazy val allChildOutputDataTypesMatch: Boolean =
     children.forall { c =>
       c.output.zip(output).forall { case (src, tgt) => src.dataType == tgt.dataType }
@@ -849,12 +844,10 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
   @transient private lazy val hasAnyPartitionIndexDependentChild: Boolean =
     children.exists(UnionExec.hasPartitionIndexDependentCodegen)
 
-  // Memoized: `supportCodegen` (called by `CollapseCodegenStages`) and
-  // `metrics` both consult this. Memoization is safe because UnionExec is a
-  // case class -- AQE/replan/`withNewChildren` produce a fresh instance with
-  // its own lazy state, so a stale verdict cannot leak across plans. For a
-  // single instance, conf and children are stable, so one evaluation suffices
-  // and avoids re-walking children/partitioning on every query of the gate.
+  // Memoized: consulted by `supportCodegen` (called multiple times by
+  // `CollapseCodegenStages`) and by `metrics`. Conf and children are stable
+  // for a given UnionExec instance; cross-plan staleness is impossible since
+  // UnionExec is a case class and `withNewChildren` produces a fresh instance.
   @transient private lazy val supportCodegenFailureReason: Option[String] = {
     if (!conf.getConf(SQLConf.WHOLESTAGE_UNION_CODEGEN_ENABLED)) {
       Some("union-codegen-disabled")
@@ -889,10 +882,9 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
-  // Only populated when fusion will actually run; `doConsume` is the sole
-  // incrementer. Keying off `supportCodegenFailureReason` (not just the conf)
-  // keeps the metric out of the SQL UI for plans that fall back to
-  // `doExecute`, where the non-codegen path never updates it.
+  // Registered only when fusion will actually run, so plans that fall back
+  // to `doExecute` (which never updates the metric) do not surface a
+  // 0-valued row count in the SQL UI. `doConsume` is the sole incrementer.
   override lazy val metrics: Map[String, SQLMetric] =
     if (supportCodegenFailureReason.isEmpty) {
       Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
