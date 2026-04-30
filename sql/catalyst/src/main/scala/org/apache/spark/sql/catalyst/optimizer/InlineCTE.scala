@@ -136,7 +136,10 @@ case class InlineCTE(
 
     val threshold = SQLConf.get.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
     try {
-      plan.stats.sizeInBytes.toLong >= threshold
+      // BigInt comparison; do not call .toLong. Without CBO + column stats,
+      // multi-way join size estimates compound past Long.MaxValue and
+      // BigInt#toLong silently wraps. See AutoCTECache.isExpensiveEnough.
+      plan.stats.sizeInBytes >= BigInt(threshold)
     } catch {
       // NonFatal: swallow stats-provider bugs, let fatal errors propagate.
       // Permissive fallback for consistency with
