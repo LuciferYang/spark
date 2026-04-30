@@ -196,25 +196,45 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           // Leave for ReplaceCTERefWithRepartition (preserves shuffle reuse)
           skippedDefs += cteDef.copy(child = resolvedChild)
         } else {
-          // If the body still references sibling CTEs that we did NOT cache
-          // (e.g. a runtime-filter CTE injected by InjectRuntimeFilter, or a
-          // merged-subplan CTE from MergeSubplans, sitting alongside ssales
-          // in q24a), wrap the body with WithCTE before handing it to
-          // CacheManager. CacheManager.cacheQuery rebuilds the plan via
-          // InMemoryRelation -> optimizedPlan -> Analyzer -> InlineCTE, and
-          // InlineCTE.buildCTEMap throws `key not found: <id>` when it walks
-          // an unresolved CTERelationRef whose CTERelationDef is not in
-          // scope. The wrapper restores scope; InlineCTE will then inline
+          // Cache the *pre-pushdown* body so the cache shape stays stable
+          // across queries with different per-reference predicates.
+          // PushdownPredicatesAndPruneColumnsForCTEDef merges per-reference
+          // filters via OR and pushes the result into the body as a
+          // top-level Filter. Caching that Filter-wrapped body would yield
+          // a query-specific canonical plan and prevent cross-query reuse
+          // (e.g. q39a uses d_moy IN (1,2), q39b uses d_moy IN (4,5);
+          // cached bodies diverge so each query rebuilds the cache).
+          //
+          // The pre-pushdown body is preserved by
+          // PushdownPredicatesAndPruneColumnsForCTEDef in
+          // `cteDef.originalPlanWithPredicates._1`. We use it as the cache
+          // body and Project to `cteDef.output` to retain column pruning.
+          // Per-reference predicates remain above the CTERelationRef
+          // (substituted with the InMemoryRelation), so the cache scan
+          // pushes them down at execution time -- semantically equivalent
+          // to the previous behaviour, with a possibly larger cache and
+          // genuine cross-query reuse.
+          val resolvedCacheBody = replaceWithCache(spark, prePushdownBody(cteDef), cteMap)
+
+          // If the body still references sibling CTEs that we did NOT
+          // cache (e.g. a runtime-filter CTE from InjectRuntimeFilter or a
+          // merged-subplan CTE from MergeSubplans, sitting alongside the
+          // cached one in q24a), wrap the body with WithCTE before handing
+          // it to CacheManager. CacheManager.cacheQuery rebuilds the plan
+          // via InMemoryRelation -> optimizedPlan -> Analyzer -> InlineCTE
+          // and InlineCTE.buildCTEMap throws `key not found: <id>` when it
+          // walks an unresolved CTERelationRef whose CTERelationDef is not
+          // in scope. The wrapper restores scope; InlineCTE then inlines
           // the sibling defs into the cached body.
           //
           // Defensive guard: when the body (or a sibling we'd put in the
-          // wrapper) references CTE defs from outside this WithCTE scope -
-          // e.g. an outer-scope skipped def in a nested WithCTE - the wrap
-          // is insufficient and the rebuild would still crash. In that case
-          // skip caching this cteDef and let ReplaceCTERefWithRepartition
-          // handle it via shuffle reuse. Common case (q24a flat WithCTE):
-          // guard does not fire and wrap proceeds.
-          val unresolved = collectCTERefIds(resolvedChild) -- cteMap.keys
+          // wrapper) references CTE defs from outside this WithCTE scope --
+          // e.g. an outer-scope skipped def in a nested WithCTE -- the
+          // wrap is insufficient and the rebuild would still crash. In
+          // that case skip caching this cteDef and let
+          // ReplaceCTERefWithRepartition handle it via shuffle reuse.
+          // Common case (q24a flat WithCTE): guard does not fire.
+          val unresolved = collectCTERefIds(resolvedCacheBody) -- cteMap.keys
           val skippedIds = skippedDefs.iterator.map(_.id).toSet
           val transitiveRefs =
             skippedDefs.flatMap(d => collectCTERefIds(d.child)).toSet
@@ -225,9 +245,9 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
             skippedDefs += cteDef.copy(child = resolvedChild)
           } else {
             val cacheBody: LogicalPlan = if (unresolved.nonEmpty) {
-              WithCTE(resolvedChild, skippedDefs.toSeq)
+              WithCTE(resolvedCacheBody, skippedDefs.toSeq)
             } else {
-              resolvedChild
+              resolvedCacheBody
             }
 
             val cacheManager = spark.sharedState.cacheManager
@@ -237,7 +257,7 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
               .map { cached =>
                 // Cache hit -- refresh TTL for the matching entry
                 autoCTEManager.recordAccessByPlan(cacheBody)
-                cached.cachedRepresentation.withOutput(resolvedChild.output)
+                cached.cachedRepresentation.withOutput(resolvedCacheBody.output)
               }
               .getOrElse {
                 cacheManager.cacheQuery(
@@ -247,8 +267,8 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
                   StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
                 autoCTEManager.trackEntry(cteDef.id, cacheBody)
                 cacheManager.lookupCachedData(spark, cacheBody)
-                  .map(_.cachedRepresentation.withOutput(resolvedChild.output))
-                  .getOrElse(resolvedChild)
+                  .map(_.cachedRepresentation.withOutput(resolvedCacheBody.output))
+                  .getOrElse(resolvedCacheBody)
               }
 
             cteMap.put(cteDef.id, cachedPlan)
@@ -289,6 +309,31 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
         }
 
     case _ => plan
+  }
+
+  /**
+   * Returns the CTE body to cache, stripped of the OR-merged per-reference
+   * predicate that `PushdownPredicatesAndPruneColumnsForCTEDef` injects
+   * into `cteDef.child`. This keeps the cached canonical plan stable
+   * across queries that reference the CTE with different downstream
+   * filters, enabling cross-query reuse via
+   * `CacheManager.lookupCachedData`.
+   *
+   * Column pruning is retained via a `Project` to `cteDef.output` so the
+   * cache footprint is no larger than the columns the references actually
+   * need. When `cteDef.originalPlanWithPredicates` is `None`, the rule
+   * never fired, so `cteDef.child` is itself the un-pushdown body.
+   */
+  private def prePushdownBody(cteDef: CTERelationDef): LogicalPlan = {
+    cteDef.originalPlanWithPredicates match {
+      case Some((originalPlan, _)) =>
+        if (originalPlan.output == cteDef.output) {
+          originalPlan
+        } else {
+          Project(cteDef.output, originalPlan)
+        }
+      case None => cteDef.child
+    }
   }
 
   /**

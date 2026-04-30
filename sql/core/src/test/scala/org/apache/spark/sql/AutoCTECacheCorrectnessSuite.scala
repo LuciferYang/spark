@@ -876,4 +876,93 @@ class AutoCTECacheCorrectnessSuite extends QueryTest with SharedSparkSession {
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Cross-query cache reuse (q39a / q39b shape)
+  // ---------------------------------------------------------------------------
+  // PushdownPredicatesAndPruneColumnsForCTEDef merges per-reference filters
+  // with OR and pushes them into the CTE body. Caching that post-pushdown body
+  // gives a query-specific canonical plan so two queries that reference the
+  // same CTE body with different downstream filters never share the cache.
+  // ReplaceCTERefWithCache caches `cteDef.originalPlanWithPredicates._1`
+  // instead, which is the body before pushdown -- canonically equal across
+  // such queries -- so the second query hits the existing cache.
+
+  test("cross-query reuse: two queries with different per-ref filters share cache") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      // Two queries with the same CTE body shape but different per-reference
+      // filters on the join column. Without the pre-pushdown caching change,
+      // the second query would build a separate cache entry. With the change,
+      // the second query reads from the first query's cache.
+      val sql1 =
+        """WITH agg AS (
+          |  SELECT key, col1, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key, col1
+          |)
+          |SELECT a.key, a.total, b.total FROM
+          |  (SELECT key, total FROM agg WHERE col1 = 1) a
+          |  JOIN
+          |  (SELECT key, total FROM agg WHERE col1 = 2) b
+          |  ON a.key = b.key""".stripMargin
+      val sql2 =
+        """WITH agg AS (
+          |  SELECT key, col1, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key, col1
+          |)
+          |SELECT a.key, a.total, b.total FROM
+          |  (SELECT key, total FROM agg WHERE col1 = 3) a
+          |  JOIN
+          |  (SELECT key, total FROM agg WHERE col1 = 4) b
+          |  ON a.key = b.key""".stripMargin
+
+      spark.sharedState.autoCTECacheManager.clearAll(spark)
+      val df1 = spark.sql(sql1)
+      df1.collect()
+      val rel1 = df1.queryExecution.optimizedPlan.collect {
+        case r: InMemoryRelation => r
+      }
+      assert(rel1.nonEmpty, "First query must produce at least one InMemoryRelation")
+      val df2 = spark.sql(sql2)
+      df2.collect()
+      val rel2 = df2.queryExecution.optimizedPlan.collect {
+        case r: InMemoryRelation => r
+      }
+      val builders = (rel1 ++ rel2)
+        .map(r => System.identityHashCode(r.cacheBuilder)).distinct
+      assert(builders.size == 1,
+        "q1 and q2 must share a single CachedRDDBuilder; got " +
+        s"${builders.size} distinct builders. Without caching the " +
+        "pre-pushdown body, divergent OR-merged per-reference predicates " +
+        "land inside the cached plan and produce query-specific canonical " +
+        "forms that defeat CacheManager.lookupCachedData.")
+    }
+  }
+
+  test("flag off: pre-pushdown rewrite is bypassed and behaviour is unchanged") {
+    prepareData()
+    // The pre-pushdown body rewrite lives inside replaceWithCache, which is
+    // only reached when AUTO_REUSED_CTE_ENABLED=true. With it off, the rule
+    // returns the plan untouched; PushdownPredicatesAndPruneColumnsForCTEDef
+    // and ReplaceCTERefWithRepartition operate on the post-pushdown body as
+    // before. Guard: no cache entries, query produces results.
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "false") {
+      val sql =
+        """WITH agg AS (
+          |  SELECT key, col1, sum(value) as total
+          |  FROM auto_cte_corr_test GROUP BY key, col1
+          |)
+          |SELECT a.key, a.total, b.total FROM
+          |  (SELECT key, total FROM agg WHERE col1 = 1) a
+          |  JOIN
+          |  (SELECT key, total FROM agg WHERE col1 = 2) b
+          |  ON a.key = b.key""".stripMargin
+      spark.sharedState.autoCTECacheManager.clearAll(spark)
+      val rows = spark.sql(sql).collect()
+      assert(cachedEntries == 0,
+        "AUTO_REUSED_CTE_ENABLED=false must produce no auto-CTE entries " +
+        "regardless of the pre-pushdown body rewrite")
+      assert(rows != null, "query must still execute and produce results")
+    }
+  }
 }
