@@ -163,7 +163,13 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
 
     val threshold = conf.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
     try {
-      plan.stats.sizeInBytes.toLong >= threshold
+      // Compare BigInt to BigInt; never call .toLong. Without CBO + column
+      // stats, the size estimate for multi-way joins compounds via
+      // SizeInBytesOnlyStatsPlanVisitor and routinely exceeds Long.MaxValue.
+      // BigInt#toLong silently wraps (sometimes negative, sometimes positive)
+      // which would either reject very large CTEs or accept absurd sizes
+      // depending on the wrap.
+      plan.stats.sizeInBytes >= BigInt(threshold)
     } catch {
       // Permissive fallback: if stats computation throws (a stats provider
       // bug, an unbound subquery, etc.) we err on the side of caching. The
