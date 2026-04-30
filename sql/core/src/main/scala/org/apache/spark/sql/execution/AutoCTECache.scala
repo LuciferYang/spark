@@ -196,23 +196,40 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           // Leave for ReplaceCTERefWithRepartition (preserves shuffle reuse)
           skippedDefs += cteDef.copy(child = resolvedChild)
         } else {
+          // If the body still references sibling CTEs that we did NOT cache
+          // (e.g. a runtime-filter CTE injected by InjectRuntimeFilter, or a
+          // merged-subplan CTE from MergeSubplans, sitting alongside ssales
+          // in q24a), wrap the body with WithCTE before handing it to
+          // CacheManager. CacheManager.cacheQuery rebuilds the plan via
+          // InMemoryRelation -> optimizedPlan -> Analyzer -> InlineCTE, and
+          // InlineCTE.buildCTEMap throws `key not found: <id>` when it walks
+          // an unresolved CTERelationRef whose CTERelationDef is not in
+          // scope. The wrapper restores scope; InlineCTE will then inline
+          // the sibling defs into the cached body.
+          val unresolved = collectCTERefIds(resolvedChild) -- cteMap.keys
+          val cacheBody: LogicalPlan = if (unresolved.nonEmpty) {
+            WithCTE(resolvedChild, skippedDefs.toSeq)
+          } else {
+            resolvedChild
+          }
+
           val cacheManager = spark.sharedState.cacheManager
           val autoCTEManager = spark.sharedState.autoCTECacheManager
           val cachedPlan = cacheManager
-            .lookupCachedData(spark, resolvedChild)
+            .lookupCachedData(spark, cacheBody)
             .map { cached =>
               // Cache hit -- refresh TTL for the matching entry
-              autoCTEManager.recordAccessByPlan(resolvedChild)
+              autoCTEManager.recordAccessByPlan(cacheBody)
               cached.cachedRepresentation.withOutput(resolvedChild.output)
             }
             .getOrElse {
               cacheManager.cacheQuery(
                 spark,
-                resolvedChild,
+                cacheBody,
                 tableName = Some(s"auto_cte_${cteDef.id}"),
                 StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
-              autoCTEManager.trackEntry(cteDef.id, resolvedChild)
-              cacheManager.lookupCachedData(spark, resolvedChild)
+              autoCTEManager.trackEntry(cteDef.id, cacheBody)
+              cacheManager.lookupCachedData(spark, cacheBody)
                 .map(_.cachedRepresentation.withOutput(resolvedChild.output))
                 .getOrElse(resolvedChild)
             }
@@ -254,6 +271,29 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
         }
 
     case _ => plan
+  }
+
+  /**
+   * Collects all `CTERelationRef.cteId`s reachable from `plan`, including
+   * those inside subquery expressions (scalar subqueries, IN/EXISTS, etc.).
+   * Used by `replaceWithCache` to decide whether the cached body needs a
+   * `WithCTE` wrapper.
+   */
+  private def collectCTERefIds(plan: LogicalPlan): Set[Long] = {
+    val ids = scala.collection.mutable.HashSet.empty[Long]
+    plan.foreach {
+      case r: CTERelationRef => ids += r.cteId
+      case _ =>
+    }
+    plan.foreach { p =>
+      p.expressions.foreach { e =>
+        e.foreach {
+          case sq: SubqueryExpression => ids ++= collectCTERefIds(sq.plan)
+          case _ =>
+        }
+      }
+    }
+    ids.toSet
   }
 }
 
