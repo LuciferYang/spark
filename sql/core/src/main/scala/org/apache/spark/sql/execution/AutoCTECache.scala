@@ -326,13 +326,21 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
    */
   private def prePushdownBody(cteDef: CTERelationDef): LogicalPlan = {
     cteDef.originalPlanWithPredicates match {
-      case Some((originalPlan, _)) =>
+      // The pre-pushdown body may contain non-deterministic expressions
+      // (e.g. `rand()`) that column pruning later strips out, leaving
+      // `cteDef.child` deterministic but `originalPlan` not. Caching the
+      // non-deterministic body would let two queries see different rand
+      // seeds in the cached canonical plan, defeating cross-query reuse.
+      // Fall back to `cteDef.child` (post-pushdown) in that case -- the
+      // existing pre-fix behaviour, where pruning had already eliminated
+      // the non-deterministic columns.
+      case Some((originalPlan, _)) if originalPlan.deterministic =>
         if (originalPlan.output == cteDef.output) {
           originalPlan
         } else {
           Project(cteDef.output, originalPlan)
         }
-      case None => cteDef.child
+      case _ => cteDef.child
     }
   }
 
