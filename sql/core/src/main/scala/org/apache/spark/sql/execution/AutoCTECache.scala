@@ -206,35 +206,53 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
           // an unresolved CTERelationRef whose CTERelationDef is not in
           // scope. The wrapper restores scope; InlineCTE will then inline
           // the sibling defs into the cached body.
+          //
+          // Defensive guard: when the body (or a sibling we'd put in the
+          // wrapper) references CTE defs from outside this WithCTE scope -
+          // e.g. an outer-scope skipped def in a nested WithCTE - the wrap
+          // is insufficient and the rebuild would still crash. In that case
+          // skip caching this cteDef and let ReplaceCTERefWithRepartition
+          // handle it via shuffle reuse. Common case (q24a flat WithCTE):
+          // guard does not fire and wrap proceeds.
           val unresolved = collectCTERefIds(resolvedChild) -- cteMap.keys
-          val cacheBody: LogicalPlan = if (unresolved.nonEmpty) {
-            WithCTE(resolvedChild, skippedDefs.toSeq)
+          val skippedIds = skippedDefs.iterator.map(_.id).toSet
+          val transitiveRefs =
+            skippedDefs.flatMap(d => collectCTERefIds(d.child)).toSet
+          val outOfScope =
+            (unresolved ++ transitiveRefs) -- cteMap.keys -- skippedIds
+
+          if (outOfScope.nonEmpty) {
+            skippedDefs += cteDef.copy(child = resolvedChild)
           } else {
-            resolvedChild
+            val cacheBody: LogicalPlan = if (unresolved.nonEmpty) {
+              WithCTE(resolvedChild, skippedDefs.toSeq)
+            } else {
+              resolvedChild
+            }
+
+            val cacheManager = spark.sharedState.cacheManager
+            val autoCTEManager = spark.sharedState.autoCTECacheManager
+            val cachedPlan = cacheManager
+              .lookupCachedData(spark, cacheBody)
+              .map { cached =>
+                // Cache hit -- refresh TTL for the matching entry
+                autoCTEManager.recordAccessByPlan(cacheBody)
+                cached.cachedRepresentation.withOutput(resolvedChild.output)
+              }
+              .getOrElse {
+                cacheManager.cacheQuery(
+                  spark,
+                  cacheBody,
+                  tableName = Some(s"auto_cte_${cteDef.id}"),
+                  StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
+                autoCTEManager.trackEntry(cteDef.id, cacheBody)
+                cacheManager.lookupCachedData(spark, cacheBody)
+                  .map(_.cachedRepresentation.withOutput(resolvedChild.output))
+                  .getOrElse(resolvedChild)
+              }
+
+            cteMap.put(cteDef.id, cachedPlan)
           }
-
-          val cacheManager = spark.sharedState.cacheManager
-          val autoCTEManager = spark.sharedState.autoCTECacheManager
-          val cachedPlan = cacheManager
-            .lookupCachedData(spark, cacheBody)
-            .map { cached =>
-              // Cache hit -- refresh TTL for the matching entry
-              autoCTEManager.recordAccessByPlan(cacheBody)
-              cached.cachedRepresentation.withOutput(resolvedChild.output)
-            }
-            .getOrElse {
-              cacheManager.cacheQuery(
-                spark,
-                cacheBody,
-                tableName = Some(s"auto_cte_${cteDef.id}"),
-                StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
-              autoCTEManager.trackEntry(cteDef.id, cacheBody)
-              cacheManager.lookupCachedData(spark, cacheBody)
-                .map(_.cachedRepresentation.withOutput(resolvedChild.output))
-                .getOrElse(resolvedChild)
-            }
-
-          cteMap.put(cteDef.id, cachedPlan)
         }
       }
       val newChild = replaceWithCache(spark, child, cteMap)
