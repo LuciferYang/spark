@@ -42,6 +42,18 @@ import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
  *  - Definition/Repetition levels
  *  - Dictionary ids.
  *  - Boolean type values of Parquet DataPageV2
+ *
+ * <h2>No-filter / with-filter dispatch</h2>
+ *
+ * Each of {@link #readBatchInternal}, {@link #readBatchInternalWithDefLevels}, and
+ * {@link #readBatchRepeatedInternal} is a tiny dispatcher that selects a specialized
+ * body based on {@link ParquetReadState#hasNoRowRanges()}. The split is most effective
+ * when the dispatch decision is stable for the lifetime of a JVM: either consistently
+ * no row-index pushdown, or consistently with. Mixed workloads that combine row-index
+ * pushdown scans (driven by Parquet column-index / page-index filtering or explicit
+ * row-index ranges) with scans without pushdown will yield a bimodal dispatcher branch
+ * profile; in that regime the dispatcher is compiled as a real conditional and the
+ * small dispatch cost persists.
  */
 public final class VectorizedRleValuesReader extends ValuesReader
     implements VectorizedValuesReader {
@@ -202,6 +214,69 @@ public final class VectorizedRleValuesReader extends ValuesReader
       WritableColumnVector nulls,
       VectorizedValuesReader valueReader,
       ParquetVectorUpdater updater) {
+    if (state.hasNoRowRanges()) {
+      readBatchInternalNoFilter(state, values, nulls, valueReader, updater);
+    } else {
+      readBatchInternalWithFilter(state, values, nulls, valueReader, updater);
+    }
+  }
+
+  /**
+   * No-row-range-filter specialization of {@link #readBatchInternal}. Drops the
+   * per-iteration range-overlap logic that is degenerate when no row-index filter
+   * is active (range is permanently {@code [Long.MIN_VALUE, Long.MAX_VALUE]}).
+   * Kept small so C2 can inline it on the hot path.
+   */
+  private void readBatchInternalNoFilter(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
+
+    long rowId = state.rowId;
+    int leftInBatch = state.rowsToReadInBatch;
+    int leftInPage = state.valuesToReadInPage;
+
+    while (leftInBatch > 0 && leftInPage > 0) {
+      if (currentCount == 0 && !readNextGroup()) break;
+      int n = Math.min(leftInBatch, Math.min(leftInPage, this.currentCount));
+
+      switch (mode) {
+        case RLE -> {
+          if (currentValue == state.maxDefinitionLevel) {
+            updater.readValues(n, state.valueOffset, values, valueReader);
+          } else {
+            nulls.putNulls(state.valueOffset, n);
+          }
+          state.valueOffset += n;
+        }
+        case PACKED ->
+          readPackedBatch(n, state, values, nulls, valueReader, updater);
+      }
+      state.levelOffset += n;
+      leftInBatch -= n;
+      rowId += n;
+      leftInPage -= n;
+      currentCount -= n;
+    }
+
+    state.rowsToReadInBatch = leftInBatch;
+    state.valuesToReadInPage = leftInPage;
+    state.rowId = rowId;
+  }
+
+  /**
+   * Row-range-filter path of {@link #readBatchInternal}. Applies the per-iteration
+   * range-overlap logic to skip non-matching rows. Selected when
+   * {@code state.hasNoRowRanges()} returns {@code false}.
+   */
+  private void readBatchInternalWithFilter(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
 
     long rowId = state.rowId;
     int leftInBatch = state.rowsToReadInBatch;
@@ -314,6 +389,63 @@ public final class VectorizedRleValuesReader extends ValuesReader
       WritableColumnVector defLevels,
       VectorizedValuesReader valueReader,
       ParquetVectorUpdater updater) {
+    if (state.hasNoRowRanges()) {
+      readBatchInternalWithDefLevelsNoFilter(
+        state, values, nulls, defLevels, valueReader, updater);
+    } else {
+      readBatchInternalWithDefLevelsWithFilter(
+        state, values, nulls, defLevels, valueReader, updater);
+    }
+  }
+
+  /**
+   * No-row-range-filter specialization of {@link #readBatchInternalWithDefLevels}.
+   * Drops the per-iteration range-overlap logic; otherwise identical to the with-filter
+   * variant.
+   */
+  private void readBatchInternalWithDefLevelsNoFilter(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      WritableColumnVector defLevels,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
+
+    long rowId = state.rowId;
+    int leftInBatch = state.rowsToReadInBatch;
+    int leftInPage = state.valuesToReadInPage;
+
+    while (leftInBatch > 0 && leftInPage > 0) {
+      if (currentCount == 0 && !readNextGroup()) break;
+      int n = Math.min(leftInBatch, Math.min(leftInPage, this.currentCount));
+
+      readValuesN(n, state, defLevels, values, nulls, valueReader, updater);
+
+      state.levelOffset += n;
+      leftInBatch -= n;
+      rowId += n;
+      leftInPage -= n;
+      currentCount -= n;
+      defLevels.addElementsAppended(n);
+    }
+
+    state.rowsToReadInBatch = leftInBatch;
+    state.valuesToReadInPage = leftInPage;
+    state.rowId = rowId;
+  }
+
+  /**
+   * Row-range-filter path of {@link #readBatchInternalWithDefLevels}. Applies the
+   * per-iteration range-overlap logic to skip non-matching rows. Selected when
+   * {@code state.hasNoRowRanges()} returns {@code false}.
+   */
+  private void readBatchInternalWithDefLevelsWithFilter(
+      ParquetReadState state,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      WritableColumnVector defLevels,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
 
     long rowId = state.rowId;
     int leftInBatch = state.rowsToReadInBatch;
@@ -415,6 +547,156 @@ public final class VectorizedRleValuesReader extends ValuesReader
    * @param valuesReused whether 'values' vector is reused for 'nulls'
    */
   public void readBatchRepeatedInternal(
+      ParquetReadState state,
+      WritableColumnVector repLevels,
+      VectorizedRleValuesReader defLevelsReader,
+      WritableColumnVector defLevels,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      boolean valuesReused,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
+    if (state.hasNoRowRanges()) {
+      readBatchRepeatedInternalNoFilter(state, repLevels, defLevelsReader, defLevels,
+        values, nulls, valuesReused, valueReader, updater);
+    } else {
+      readBatchRepeatedInternalWithFilter(state, repLevels, defLevelsReader, defLevels,
+        values, nulls, valuesReused, valueReader, updater);
+    }
+  }
+
+  /**
+   * No-row-range-filter specialization of {@link #readBatchRepeatedInternal}. The only
+   * setter that flips {@code state.shouldSkip} to {@code true} is
+   * {@code DefLevelProcessor.skipValues}, which is called exclusively from the
+   * with-filter branches; with no filter it remains {@code false} throughout, so the
+   * per-iteration range checks are dropped and the {@code shouldSkip}-gated appends
+   * become unconditional.
+   */
+  private void readBatchRepeatedInternalNoFilter(
+      ParquetReadState state,
+      WritableColumnVector repLevels,
+      VectorizedRleValuesReader defLevelsReader,
+      WritableColumnVector defLevels,
+      WritableColumnVector values,
+      WritableColumnVector nulls,
+      boolean valuesReused,
+      VectorizedValuesReader valueReader,
+      ParquetVectorUpdater updater) {
+
+    int leftInBatch = state.rowsToReadInBatch;
+    int leftInPage = state.valuesToReadInPage;
+    long rowId = state.rowId;
+
+    DefLevelProcessor defLevelProcessor = new DefLevelProcessor(defLevelsReader, state, defLevels,
+      values, nulls, valuesReused, valueReader, updater);
+
+    while ((leftInBatch > 0 || !state.lastListCompleted) && leftInPage > 0) {
+      if (currentCount == 0 && !readNextGroup()) break;
+
+      // Values to read in the current RLE/PACKED block, must be <= what's left in the page
+      int valuesLeftInBlock = Math.min(leftInPage, currentCount);
+
+      switch (mode) {
+        case RLE -> {
+          if (currentValue == 0) {
+            // Top-level rows: with no row-range filter, every row is read directly.
+            if (leftInBatch == 0) {
+              state.lastListCompleted = true;
+            } else {
+              int n = Math.min(leftInBatch, valuesLeftInBlock);
+              repLevels.appendInts(n, 0);
+              defLevelProcessor.readValues(n);
+              rowId += n;
+              currentCount -= n;
+              leftInBatch -= n;
+              leftInPage -= n;
+            }
+          } else {
+            // Not a top-level row: always include (shouldSkip cannot be true in no-filter mode).
+            repLevels.appendInts(valuesLeftInBlock, currentValue);
+            state.numBatchedDefLevels += valuesLeftInBlock;
+            leftInPage -= valuesLeftInBlock;
+            currentCount -= valuesLeftInBlock;
+          }
+        }
+        case PACKED -> {
+          state.rowsToReadInBatch = leftInBatch;
+          state.rowId = rowId;
+          int consumed = readPackedBatchRepeatedNoFilter(
+            valuesLeftInBlock, state, repLevels, defLevelProcessor);
+          leftInBatch = state.rowsToReadInBatch;
+          rowId = state.rowId;
+          leftInPage -= consumed;
+          currentCount -= consumed;
+          currentBufferIdx += consumed;
+        }
+      }
+    }
+
+    // Process all the batched def levels
+    defLevelProcessor.finish();
+
+    state.rowsToReadInBatch = leftInBatch;
+    state.valuesToReadInPage = leftInPage;
+    state.rowId = rowId;
+  }
+
+  /**
+   * PACKED-branch decode for {@link #readBatchRepeatedInternalNoFilter}, mirroring the
+   * {@link #readPackedBatch} / {@link #readPackedBatchWithDefLevels} extraction pattern.
+   * Extracted to keep the parent body under HotSpot's {@code FreqInlineSize=325} byte
+   * inlining threshold so the parent itself remains inlinable from its callers.
+   *
+   * <p>State channel: the caller writes {@code state.rowsToReadInBatch} and {@code state.rowId}
+   * before the call; the helper reads them, mutates its local copies, and writes both fields
+   * back before returning. The helper also writes {@code state.lastListCompleted = true} when
+   * a top-level row boundary is reached with no remaining batch capacity, and accumulates
+   * {@code state.numBatchedDefLevels} for inner-list values. The {@code int} return is the
+   * number of buffer values consumed in this call.
+   *
+   * <p>Unlike {@link #readPackedBatch}, this helper does not advance the
+   * {@code currentBufferIdx} field; it reads the field's current value to index into
+   * {@code currentBuffer} and leaves field advancement to the caller (via the returned
+   * consumed count).
+   */
+  private int readPackedBatchRepeatedNoFilter(
+      int valuesLeftInBlock,
+      ParquetReadState state,
+      WritableColumnVector repLevels,
+      DefLevelProcessor defLevelProcessor) {
+    int leftInBatch = state.rowsToReadInBatch;
+    long rowId = state.rowId;
+    int i = 0;
+    for (; i < valuesLeftInBlock; i++) {
+      int currentValue = currentBuffer[currentBufferIdx + i];
+      if (currentValue == 0) {
+        if (leftInBatch == 0) {
+          state.lastListCompleted = true;
+          break;
+        }
+        // Top-level row: always read in no-filter mode.
+        leftInBatch--;
+        repLevels.appendInt(0);
+        defLevelProcessor.readValues(1);
+        rowId++;
+      } else {
+        repLevels.appendInt(currentValue);
+        state.numBatchedDefLevels += 1;
+      }
+    }
+    state.rowsToReadInBatch = leftInBatch;
+    state.rowId = rowId;
+    return i;
+  }
+
+  /**
+   * Row-range-filter path of {@link #readBatchRepeatedInternal}. Applies per-iteration
+   * range-overlap logic to skip non-matching top-level rows in both RLE and PACKED
+   * modes, and uses {@code state.shouldSkip} to coalesce skipped def levels. Selected
+   * when {@code state.hasNoRowRanges()} returns {@code false}.
+   */
+  private void readBatchRepeatedInternalWithFilter(
       ParquetReadState state,
       WritableColumnVector repLevels,
       VectorizedRleValuesReader defLevelsReader,

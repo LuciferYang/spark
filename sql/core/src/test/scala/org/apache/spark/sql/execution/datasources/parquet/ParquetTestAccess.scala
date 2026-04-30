@@ -35,7 +35,8 @@ import org.apache.spark.util.SparkClassUtils
  * without widening production visibility.
  *
  * Currently bridges:
- *   - `ParquetReadState` (constructor + `resetForNewBatch` + `resetForNewPage`)
+ *   - `ParquetReadState` (constructor + `resetForNewBatch` + `resetForNewPage`
+ *     + `hasNoRowRanges`)
  *   - `VectorizedRleValuesReader.readBatch` (5-arg overload not exposed publicly)
  *   - `ParquetVectorUpdaterFactory` (constructor)
  *   - `VectorizedDeltaByteArrayReader` (no-arg constructor)
@@ -66,6 +67,12 @@ object ParquetTestAccess {
   private val resetForNewPageMethod = {
     val m = stateCls.getDeclaredMethod(
       "resetForNewPage", Integer.TYPE, java.lang.Long.TYPE)
+    m.setAccessible(true)
+    m
+  }
+
+  private val hasNoRowRangesMethod = {
+    val m = stateCls.getDeclaredMethod("hasNoRowRanges")
     m.setAccessible(true)
     m
   }
@@ -105,6 +112,10 @@ object ParquetTestAccess {
       resetForNewPageMethod.invoke(
         state, Int.box(totalValuesInPage), Long.box(pageFirstRowIndex))
     } catch { case e: ReflectiveOperationException => throw rethrow(e) }
+
+  def hasNoRowRanges(state: AnyRef): Boolean =
+    try { hasNoRowRangesMethod.invoke(state).asInstanceOf[java.lang.Boolean].booleanValue() }
+    catch { case e: ReflectiveOperationException => throw rethrow(e) }
 
   def readBatch(
       reader: VectorizedRleValuesReader,

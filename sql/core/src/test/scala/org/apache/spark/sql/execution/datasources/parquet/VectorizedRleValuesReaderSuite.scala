@@ -31,6 +31,17 @@ import org.apache.spark.sql.types.IntegerType
  * Focused correctness tests for `VectorizedRleValuesReader.readBatch` PACKED-mode decoding,
  * covering patterns the P0 optimization cares about: run boundaries, batch boundaries, and
  * nested def-level grouping. Uses the same reflection bridge as the benchmark.
+ *
+ * Dispatcher coverage notes:
+ *   - Tests that pass `null` rowIndexes (the default) route through the NoFilter branch
+ *     of `readBatchInternal` (when `withDefLevels=false`) or
+ *     `readBatchInternalWithDefLevels` (when `withDefLevels=true`).
+ *   - `runAndAssertFiltered` routes through the WithFilter branch of `readBatchInternal`
+ *     by default; with `withDefLevels=true`, through `readBatchInternalWithDefLevels`'s
+ *     WithFilter branch.
+ *   - The repeated/nested path (`readBatchRepeatedInternal*`) is exercised end-to-end by
+ *     `ParquetVectorizedSuite`, not directly here, since this suite calls only the 5-arg
+ *     `readBatch` overload.
  */
 class VectorizedRleValuesReaderSuite extends SparkFunSuite {
 
@@ -123,10 +134,233 @@ class VectorizedRleValuesReaderSuite extends SparkFunSuite {
     runAndAssertFiltered(defLevels, maxDef = 1, includedPositions = included)
   }
 
+  test("PACKED with defLevels: row-index filtering routes through WithDefLevelsWithFilter") {
+    val n = 256
+    val defLevels = Array.tabulate(n)(i => if ((i / 3) % 2 == 0) 0 else 1)
+    val included = ((20 to 60) ++ (140 to 180)).toArray
+    runAndAssertFiltered(
+      defLevels, maxDef = 1, includedPositions = included, withDefLevels = true)
+  }
+
+  test("PACKED with defLevels: empty rowIndexes iterator skips all rows " +
+    "(WithDefLevelsWithFilter skip-only path)") {
+    // Same boundary as the 5-arg empty-iterator test, but routed through the WithDefLevels
+    // dispatcher branch to exercise readBatchInternalWithDefLevelsWithFilter's
+    // END_ROW_RANGE skip-only path (where every iteration calls skipValues, and
+    // readValuesN is never invoked).
+    val n = 256
+    val defLevels = Array.tabulate(n)(i => i & 1)
+    val bitWidth = 1
+    val encoded = encodeRle(defLevels, bitWidth)
+    val nonNullCount = defLevels.count(_ == 1)
+    val plainBytes = plainIntBytes(nonNullCount)(valueAt)
+
+    val reader = new VectorizedRleValuesReader(bitWidth, false)
+    reader.initFromPage(n, ByteBufferInputStream.wrap(ByteBuffer.wrap(encoded)))
+    val valueReader = new VectorizedPlainValuesReader
+    valueReader.initFromPage(
+      nonNullCount, ByteBufferInputStream.wrap(ByteBuffer.wrap(plainBytes)))
+
+    val state = ParquetTestAccess.newState(
+      intColumnDescriptor(maxDef = 1), isRequired = false,
+      longIterator(Array.emptyIntArray))
+    ParquetTestAccess.resetForNewPage(state, n, 0L)
+
+    val batchSize = 64
+    val values = new OnHeapColumnVector(batchSize, IntegerType)
+    val defLevelsVec = new OnHeapColumnVector(batchSize, IntegerType)
+    // Pre-fill defLevelsVec with a sentinel so a regression that incorrectly writes a
+    // valid def-level value (e.g., 0) is still detectable. `0` is a real def-level and
+    // matches the zero-init default; without poisoning we cannot distinguish unwritten
+    // cells from spurious writes of 0.
+    val sentinel = -1
+    var k = 0
+    while (k < batchSize) { defLevelsVec.putInt(k, sentinel); k += 1 }
+
+    ParquetTestAccess.resetForNewBatch(state, batchSize)
+    ParquetTestAccess.readBatch(
+      reader, state, values, defLevelsVec, valueReader, integerUpdater)
+
+    assert(values.numNulls() == 0,
+      "no row matched the filter; putNulls/putNull should not have been called")
+    var j = 0
+    while (j < batchSize) {
+      assert(!values.isNullAt(j), s"values cell $j unexpectedly marked null")
+      assert(values.getInt(j) == 0, s"values cell $j unexpectedly written")
+      assert(defLevelsVec.getInt(j) == sentinel,
+        s"defLevels cell $j unexpectedly overwritten: ${defLevelsVec.getInt(j)}")
+      j += 1
+    }
+  }
+
+  test("multi-page filtered: row-index ranges spanning pages " +
+    "(WithFilter resetForNewPage continuity)") {
+    // Two pages, page indices 0-127 and 128-255. Filter selects positions in both pages
+    // (range 50-200 spans the page boundary at 128). Verifies that resetForNewPage
+    // correctly carries the WithFilter state across pages and that the row-range cursor
+    // advances based on the absolute pageFirstRowIndex, not per-page-relative positions.
+    val pageSize = 128
+    val page1 = Array.tabulate(pageSize)(i => i & 1)
+    val page2 = Array.tabulate(pageSize)(i => (i + 1) & 1)
+    val combined = page1 ++ page2
+    val included = (50 to 200).toArray
+    val bitWidth = 1
+    val nonNullCount = combined.count(_ == 1)
+
+    val state = ParquetTestAccess.newState(
+      intColumnDescriptor(maxDef = 1), isRequired = false, longIterator(included))
+
+    val size = included.length
+    val values = new OnHeapColumnVector(size, IntegerType)
+    ParquetTestAccess.resetForNewBatch(state, size)
+
+    // Drive both pages through the same state with separate readers/value-readers.
+    val reader = new VectorizedRleValuesReader(bitWidth, false)
+    var pageFirstRow = 0L
+    var globalNonNullSeen = 0
+    Seq(page1, page2).foreach { page =>
+      val pageEncoded = encodeRle(page, bitWidth)
+      val pageNonNullCount = page.count(_ == 1)
+      val plainBytesForPage = plainIntBytes(pageNonNullCount)(i => valueAt(globalNonNullSeen + i))
+      reader.initFromPage(page.length,
+        ByteBufferInputStream.wrap(ByteBuffer.wrap(pageEncoded)))
+      val valueReader = new VectorizedPlainValuesReader
+      valueReader.initFromPage(pageNonNullCount,
+        ByteBufferInputStream.wrap(ByteBuffer.wrap(plainBytesForPage)))
+      ParquetTestAccess.resetForNewPage(state, page.length, pageFirstRow)
+      ParquetTestAccess.readBatch(reader, state, values, null, valueReader, integerUpdater)
+      pageFirstRow += page.length
+      globalNonNullSeen += pageNonNullCount
+    }
+    // Self-check on the test fixture: confirms the per-page partitioning of
+    // non-null counts equals the count over the concatenated input. Tautological by
+    // construction (combined = page1 ++ page2), but guards against a future edit
+    // that splits pages incorrectly.
+    assert(globalNonNullSeen == nonNullCount, "internal: page partition incorrect")
+
+    val prefixNonNulls = combined.scanLeft(0) { (c, d) =>
+      c + (if (d == 1) 1 else 0)
+    }
+    var j = 0
+    while (j < size) {
+      val p = included(j)
+      if (combined(p) == 1) {
+        assert(!values.isNullAt(j), s"included pos $p (output $j) should be non-null")
+        val expected = valueAt(prefixNonNulls(p))
+        assert(values.getInt(j) == expected,
+          s"included pos $p (output $j): got ${values.getInt(j)}, expected $expected")
+      } else {
+        assert(values.isNullAt(j), s"included pos $p (output $j) should be null")
+      }
+      j += 1
+    }
+  }
+
   test("multi-page: reader reinitialized between pages, state carried via resetForNewPage") {
     val page1 = Array.tabulate(128)(i => i & 1)
     val page2 = Array.fill(64)(1) ++ Array.tabulate(64)(i => i & 1)
     runAndAssertMultiPage(Seq(page1, page2), maxDef = 1, batchSize = 64)
+  }
+
+  test("dispatcher: hasNoRowRanges with null vs empty vs non-empty rowIndexes iterator") {
+    val descriptor = intColumnDescriptor(maxDef = 1)
+    // null rowIndexes: no filter installed, NoFilter dispatcher branch.
+    val nullState = ParquetTestAccess.newState(descriptor, isRequired = false, null)
+    assert(ParquetTestAccess.hasNoRowRanges(nullState),
+      "null rowIndexes must report hasNoRowRanges == true")
+
+    // Empty (but non-null) iterator: filter installed but selects nothing. WithFilter branch.
+    val emptyState = ParquetTestAccess.newState(
+      descriptor, isRequired = false, longIterator(Array.emptyIntArray))
+    assert(!ParquetTestAccess.hasNoRowRanges(emptyState),
+      "empty rowIndexes iterator must report hasNoRowRanges == false")
+
+    // Non-empty iterator: filter installed, selects listed rows. WithFilter branch.
+    val nonEmptyState = ParquetTestAccess.newState(
+      descriptor, isRequired = false, longIterator(Array(0, 5, 10)))
+    assert(!ParquetTestAccess.hasNoRowRanges(nonEmptyState),
+      "non-empty rowIndexes iterator must report hasNoRowRanges == false")
+  }
+
+  test("PACKED: empty rowIndexes iterator routes to WithFilter and skips all rows") {
+    // Boundary case for the dispatcher: an empty (but non-null) iterator routes to the
+    // WithFilter branch with currentRange = END_ROW_RANGE = (Long.MAX_VALUE, Long.MIN_VALUE).
+    // The first range check (rowId + n < rangeStart) is true for every iteration, so
+    // skipValues is called repeatedly until the page is drained. Verifies the END_ROW_RANGE
+    // skip path completes without exception when batchSize > 0.
+    val n = 256
+    val defLevels = Array.tabulate(n)(i => i & 1)
+    val bitWidth = 1
+    val encoded = encodeRle(defLevels, bitWidth)
+    val nonNullCount = defLevels.count(_ == 1)
+    val plainBytes = plainIntBytes(nonNullCount)(valueAt)
+
+    val reader = new VectorizedRleValuesReader(bitWidth, false)
+    reader.initFromPage(n, ByteBufferInputStream.wrap(ByteBuffer.wrap(encoded)))
+    val valueReader = new VectorizedPlainValuesReader
+    valueReader.initFromPage(
+      nonNullCount, ByteBufferInputStream.wrap(ByteBuffer.wrap(plainBytes)))
+
+    val state = ParquetTestAccess.newState(
+      intColumnDescriptor(maxDef = 1), isRequired = false,
+      longIterator(Array.emptyIntArray))
+    assert(!ParquetTestAccess.hasNoRowRanges(state),
+      "empty iterator should route to WithFilter")
+    ParquetTestAccess.resetForNewPage(state, n, 0L)
+
+    val batchSize = 64
+    val values = new OnHeapColumnVector(batchSize, IntegerType)
+    ParquetTestAccess.resetForNewBatch(state, batchSize)
+    ParquetTestAccess.readBatch(reader, state, values, null, valueReader, integerUpdater)
+    // Reader must not write anything when no row matches. `OnHeapColumnVector` zeroes its
+    // backing arrays at construction, so a freshly-allocated vector reports `numNulls == 0`,
+    // `isNullAt(j) == false`, and `getInt(j) == 0` for every cell. A regression that
+    // erroneously calls `putInt` with a real `valueAt` (which is non-zero, see `valueAt`)
+    // or `putNull(s)` while iterating the page would change one of these.
+    assert(values.numNulls() == 0,
+      "no row matched the filter; putNulls/putNull should not have been called")
+    var j = 0
+    while (j < batchSize) {
+      assert(!values.isNullAt(j), s"cell $j unexpectedly marked null")
+      assert(values.getInt(j) == 0, s"cell $j unexpectedly written: ${values.getInt(j)}")
+      j += 1
+    }
+  }
+
+  test("non-repeated dispatcher: empty batch (leftInBatch == 0) is a no-op for both branches") {
+    // Pins the contract that the while-loop guard (`leftInBatch > 0 && leftInPage > 0`)
+    // in readBatchInternal* short-circuits on entry when the caller passes batchSize == 0.
+    // Exercises both branches of the non-repeated dispatcher: null rowIndexes -> NoFilter,
+    // empty iterator -> WithFilter. The repeated dispatcher (readBatchRepeatedInternal*)
+    // has a different guard `(leftInBatch > 0 || !state.lastListCompleted) && leftInPage > 0`
+    // and is not exercised by this test; that path is covered end-to-end by
+    // `ParquetVectorizedSuite`.
+    val n = 16
+    val defLevels = Array.tabulate(n)(i => i & 1)
+    val bitWidth = 1
+    val encoded = encodeRle(defLevels, bitWidth)
+    val nonNullCount = defLevels.count(_ == 1)
+    val plainBytes = plainIntBytes(nonNullCount)(valueAt)
+
+    Seq(
+      "noFilter" -> null,
+      "withFilter" -> longIterator(Array.emptyIntArray)
+    ).foreach { case (label, iter) =>
+      val reader = new VectorizedRleValuesReader(bitWidth, false)
+      reader.initFromPage(n, ByteBufferInputStream.wrap(ByteBuffer.wrap(encoded)))
+      val valueReader = new VectorizedPlainValuesReader
+      valueReader.initFromPage(
+        nonNullCount, ByteBufferInputStream.wrap(ByteBuffer.wrap(plainBytes)))
+      val state = ParquetTestAccess.newState(
+        intColumnDescriptor(maxDef = 1), isRequired = false, iter)
+      ParquetTestAccess.resetForNewPage(state, n, 0L)
+      // Zero-sized vector: any write would throw, so the assertion is implicit on success.
+      val values = new OnHeapColumnVector(0, IntegerType)
+      ParquetTestAccess.resetForNewBatch(state, 0)
+      ParquetTestAccess.readBatch(
+        reader, state, values, null, valueReader, integerUpdater)
+      assert(values.numNulls() == 0, s"$label: empty-batch readBatch must not write nulls")
+    }
   }
 }
 
@@ -206,12 +440,14 @@ private object VectorizedRleValuesReaderSuite {
   /**
    * Variant of `runAndAssert` that passes a `rowIndexes` iterator so the reader only emits
    * rows at the listed positions. Verifies that skipped value positions advance the value
-   * reader correctly and that included rows map to the expected values in order.
+   * reader correctly and that included rows map to the expected values in order. When
+   * `withDefLevels` is true, also asserts the def-level vector matches the source.
    */
   private def runAndAssertFiltered(
       defLevels: Array[Int],
       maxDef: Int,
-      includedPositions: Array[Int]): Unit = {
+      includedPositions: Array[Int],
+      withDefLevels: Boolean = false): Unit = {
     val n = defLevels.length
     val bitWidth = if (maxDef == 0) 0 else 32 - Integer.numberOfLeadingZeros(maxDef)
     val encoded = if (bitWidth == 0) Array.emptyByteArray else encodeRle(defLevels, bitWidth)
@@ -229,8 +465,11 @@ private object VectorizedRleValuesReaderSuite {
 
     val size = includedPositions.length
     val values = new OnHeapColumnVector(size, IntegerType)
+    val defLevelsVec = new OnHeapColumnVector(size, IntegerType)
     ParquetTestAccess.resetForNewBatch(state, size)
-    ParquetTestAccess.readBatch(reader, state, values, null, valueReader, integerUpdater)
+    val defLevelsArg: WritableColumnVector = if (withDefLevels) defLevelsVec else null
+    ParquetTestAccess.readBatch(
+      reader, state, values, defLevelsArg, valueReader, integerUpdater)
 
     val prefixNonNulls = defLevels.scanLeft(0) { (c, d) =>
       c + (if (d == maxDef) 1 else 0)
@@ -246,6 +485,12 @@ private object VectorizedRleValuesReaderSuite {
           s"included pos $p (output $j): got ${values.getInt(j)}, expected $expected")
       } else {
         assert(values.isNullAt(j), s"included pos $p (output $j) should be null")
+      }
+      if (withDefLevels) {
+        assert(
+          defLevelsVec.getInt(j) == defLevels(p),
+          s"defLevel at included pos $p (output $j): got ${defLevelsVec.getInt(j)}, " +
+            s"expected ${defLevels(p)}")
       }
       j += 1
     }

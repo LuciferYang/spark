@@ -162,6 +162,17 @@ final class ParquetReadState {
   }
 
   /**
+   * Returns {@code true} iff no row-index iterator was provided for this column, i.e.
+   * {@code rowRanges == null}. In this mode {@link #nextRange()} leaves the current range
+   * permanently at {@code MAX_ROW_RANGE = [Long.MIN_VALUE, Long.MAX_VALUE]}, so the
+   * range-overlap logic is degenerate and callers can select a specialized no-filter
+   * read path.
+   */
+  boolean hasNoRowRanges() {
+    return rowRanges == null;
+  }
+
+  /**
    * Advance to the next range.
    */
   void nextRange() {
