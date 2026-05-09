@@ -1,11 +1,11 @@
 TakeOrderedAndProject [channel,i_brand_id,i_class_id,i_category_id,sum(sales),sum(number_sales)]
   WholeStageCodegen (116)
-    HashAggregate [channel,i_brand_id,i_class_id,i_category_id,spark_grouping_id,sum,isEmpty,sum] [sum(sales),sum(number_salesL),sum(sales),sum(number_sales),sum,isEmpty,sum]
+    HashAggregate [channel,i_brand_id,i_class_id,i_category_id,spark_grouping_id,_pushed_sum_sales,_pushed_sum_number_sales] [sum(_pushed_sum_sales),sum(_pushed_sum_number_salesL),sum(sales),sum(number_sales),sum,isEmpty,sum]
       InputAdapter
         Exchange [channel,i_brand_id,i_class_id,i_category_id,spark_grouping_id] #1
           WholeStageCodegen (115)
-            HashAggregate [channel,i_brand_id,i_class_id,i_category_id,spark_grouping_id,sales,number_sales] [sum,isEmpty,sum,sum,isEmpty,sum]
-              Expand [sales,number_sales,channel,i_brand_id,i_class_id,i_category_id]
+            Expand [channel,i_brand_id,i_class_id,i_category_id,_pushed_sum_sales,_pushed_sum_number_sales]
+              HashAggregate [channel,i_brand_id,i_class_id,i_category_id,sales,number_sales] [sum(sales),sum(number_salesL),_pushed_sum_sales,_pushed_sum_number_sales,sum,isEmpty,sum]
                 InputAdapter
                   Union
                     WholeStageCodegen (38)
