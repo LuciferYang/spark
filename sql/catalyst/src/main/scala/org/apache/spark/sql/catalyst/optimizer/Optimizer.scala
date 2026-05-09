@@ -247,6 +247,7 @@ abstract class Optimizer(catalogManager: CatalogManager)
       RewriteDistinctAggregates),
     Batch("Partial Aggregation Optimization", Once,
       PushPartialAggregationThroughJoin,
+      PushPartialAggregationThroughExpand,
       DeduplicateRightSideOfLeftSemiAntiJoin),
     Batch("Object Expressions Optimization", fixedPoint,
       EliminateMapObjects,

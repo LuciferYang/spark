@@ -2,8 +2,8 @@
 TakeOrderedAndProject (30)
 +- * HashAggregate (29)
    +- Exchange (28)
-      +- * HashAggregate (27)
-         +- * Expand (26)
+      +- * Expand (27)
+         +- * HashAggregate (26)
             +- * Project (25)
                +- * BroadcastHashJoin Inner BuildRight (24)
                   :- * Project (19)
@@ -147,31 +147,31 @@ Join condition: None
 Output [6]: [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#18, s_state#16]
 Input [8]: [ss_item_sk#1, ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, s_state#16, i_item_sk#17, i_item_id#18]
 
-(26) Expand [codegen id : 5]
+(26) HashAggregate [codegen id : 5]
 Input [6]: [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#18, s_state#16]
-Arguments: [[ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#18, s_state#16, 0], [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#18, null, 1], [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, null, null, 3]], [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#19, s_state#20, spark_grouping_id#21]
+Keys [2]: [i_item_id#18, s_state#16]
+Functions [8]: [sum(ss_quantity#4), count(ss_quantity#4), sum(UnscaledValue(ss_list_price#5)), count(UnscaledValue(ss_list_price#5)), sum(UnscaledValue(ss_coupon_amt#7)), count(UnscaledValue(ss_coupon_amt#7)), sum(UnscaledValue(ss_sales_price#6)), count(UnscaledValue(ss_sales_price#6))]
+Aggregate Attributes [8]: [sum(ss_quantity#4)#19, count(ss_quantity#4)#20, sum(UnscaledValue(ss_list_price#5))#21, count(UnscaledValue(ss_list_price#5))#22, sum(UnscaledValue(ss_coupon_amt#7))#23, count(UnscaledValue(ss_coupon_amt#7))#24, sum(UnscaledValue(ss_sales_price#6))#25, count(UnscaledValue(ss_sales_price#6))#26]
+Results [10]: [i_item_id#18, s_state#16, sum(ss_quantity#4)#19 AS _pushed_avg_sum_ss_quantity#27, count(ss_quantity#4)#20 AS _pushed_avg_count_ss_quantity#28, sum(UnscaledValue(ss_list_price#5))#21 AS _pushed_avg_sum_ss_list_price#29, count(UnscaledValue(ss_list_price#5))#22 AS _pushed_avg_count_ss_list_price#30, sum(UnscaledValue(ss_coupon_amt#7))#23 AS _pushed_avg_sum_ss_coupon_amt#31, count(UnscaledValue(ss_coupon_amt#7))#24 AS _pushed_avg_count_ss_coupon_amt#32, sum(UnscaledValue(ss_sales_price#6))#25 AS _pushed_avg_sum_ss_sales_price#33, count(UnscaledValue(ss_sales_price#6))#26 AS _pushed_avg_count_ss_sales_price#34]
 
-(27) HashAggregate [codegen id : 5]
-Input [7]: [ss_quantity#4, ss_list_price#5, ss_sales_price#6, ss_coupon_amt#7, i_item_id#19, s_state#20, spark_grouping_id#21]
-Keys [3]: [i_item_id#19, s_state#20, spark_grouping_id#21]
-Functions [4]: [partial_avg(ss_quantity#4), partial_avg(UnscaledValue(ss_list_price#5)), partial_avg(UnscaledValue(ss_coupon_amt#7)), partial_avg(UnscaledValue(ss_sales_price#6))]
-Aggregate Attributes [8]: [sum#22, count#23, sum#24, count#25, sum#26, count#27, sum#28, count#29]
-Results [11]: [i_item_id#19, s_state#20, spark_grouping_id#21, sum#30, count#31, sum#32, count#33, sum#34, count#35, sum#36, count#37]
+(27) Expand [codegen id : 5]
+Input [10]: [i_item_id#18, s_state#16, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34]
+Arguments: [[i_item_id#18, s_state#16, 0, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34], [i_item_id#18, null, 1, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34], [null, null, 3, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34]], [i_item_id#35, s_state#36, spark_grouping_id#37, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34]
 
 (28) Exchange
-Input [11]: [i_item_id#19, s_state#20, spark_grouping_id#21, sum#30, count#31, sum#32, count#33, sum#34, count#35, sum#36, count#37]
-Arguments: hashpartitioning(i_item_id#19, s_state#20, spark_grouping_id#21, 5), ENSURE_REQUIREMENTS, [plan_id=4]
+Input [11]: [i_item_id#35, s_state#36, spark_grouping_id#37, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34]
+Arguments: hashpartitioning(i_item_id#35, s_state#36, spark_grouping_id#37, 5), ENSURE_REQUIREMENTS, [plan_id=4]
 
 (29) HashAggregate [codegen id : 6]
-Input [11]: [i_item_id#19, s_state#20, spark_grouping_id#21, sum#30, count#31, sum#32, count#33, sum#34, count#35, sum#36, count#37]
-Keys [3]: [i_item_id#19, s_state#20, spark_grouping_id#21]
-Functions [4]: [avg(ss_quantity#4), avg(UnscaledValue(ss_list_price#5)), avg(UnscaledValue(ss_coupon_amt#7)), avg(UnscaledValue(ss_sales_price#6))]
-Aggregate Attributes [4]: [avg(ss_quantity#4)#38, avg(UnscaledValue(ss_list_price#5))#39, avg(UnscaledValue(ss_coupon_amt#7))#40, avg(UnscaledValue(ss_sales_price#6))#41]
-Results [7]: [i_item_id#19, s_state#20, cast((shiftright(spark_grouping_id#21, 0) & 1) as tinyint) AS g_state#42, avg(ss_quantity#4)#38 AS agg1#43, cast((avg(UnscaledValue(ss_list_price#5))#39 / 100.0) as decimal(11,6)) AS agg2#44, cast((avg(UnscaledValue(ss_coupon_amt#7))#40 / 100.0) as decimal(11,6)) AS agg3#45, cast((avg(UnscaledValue(ss_sales_price#6))#41 / 100.0) as decimal(11,6)) AS agg4#46]
+Input [11]: [i_item_id#35, s_state#36, spark_grouping_id#37, _pushed_avg_sum_ss_quantity#27, _pushed_avg_count_ss_quantity#28, _pushed_avg_sum_ss_list_price#29, _pushed_avg_count_ss_list_price#30, _pushed_avg_sum_ss_coupon_amt#31, _pushed_avg_count_ss_coupon_amt#32, _pushed_avg_sum_ss_sales_price#33, _pushed_avg_count_ss_sales_price#34]
+Keys [3]: [i_item_id#35, s_state#36, spark_grouping_id#37]
+Functions [8]: [sum(_pushed_avg_sum_ss_quantity#27), sum(_pushed_avg_count_ss_quantity#28), sum(_pushed_avg_sum_ss_list_price#29), sum(_pushed_avg_count_ss_list_price#30), sum(_pushed_avg_sum_ss_coupon_amt#31), sum(_pushed_avg_count_ss_coupon_amt#32), sum(_pushed_avg_sum_ss_sales_price#33), sum(_pushed_avg_count_ss_sales_price#34)]
+Aggregate Attributes [8]: [sum(_pushed_avg_sum_ss_quantity#27)#38, sum(_pushed_avg_count_ss_quantity#28)#39, sum(_pushed_avg_sum_ss_list_price#29)#40, sum(_pushed_avg_count_ss_list_price#30)#41, sum(_pushed_avg_sum_ss_coupon_amt#31)#42, sum(_pushed_avg_count_ss_coupon_amt#32)#43, sum(_pushed_avg_sum_ss_sales_price#33)#44, sum(_pushed_avg_count_ss_sales_price#34)#45]
+Results [7]: [i_item_id#35, s_state#36, cast((shiftright(spark_grouping_id#37, 0) & 1) as tinyint) AS g_state#46, (cast(sum(_pushed_avg_sum_ss_quantity#27)#38 as double) / cast(sum(_pushed_avg_count_ss_quantity#28)#39 as double)) AS agg1#47, cast(((cast(sum(_pushed_avg_sum_ss_list_price#29)#40 as double) / cast(sum(_pushed_avg_count_ss_list_price#30)#41 as double)) / 100.0) as decimal(11,6)) AS agg2#48, cast(((cast(sum(_pushed_avg_sum_ss_coupon_amt#31)#42 as double) / cast(sum(_pushed_avg_count_ss_coupon_amt#32)#43 as double)) / 100.0) as decimal(11,6)) AS agg3#49, cast(((cast(sum(_pushed_avg_sum_ss_sales_price#33)#44 as double) / cast(sum(_pushed_avg_count_ss_sales_price#34)#45 as double)) / 100.0) as decimal(11,6)) AS agg4#50]
 
 (30) TakeOrderedAndProject
-Input [7]: [i_item_id#19, s_state#20, g_state#42, agg1#43, agg2#44, agg3#45, agg4#46]
-Arguments: 100, [i_item_id#19 ASC NULLS FIRST, s_state#20 ASC NULLS FIRST], [i_item_id#19, s_state#20, g_state#42, agg1#43, agg2#44, agg3#45, agg4#46]
+Input [7]: [i_item_id#35, s_state#36, g_state#46, agg1#47, agg2#48, agg3#49, agg4#50]
+Arguments: 100, [i_item_id#35 ASC NULLS FIRST, s_state#36 ASC NULLS FIRST], [i_item_id#35, s_state#36, g_state#46, agg1#47, agg2#48, agg3#49, agg4#50]
 
 ===== Subqueries =====
 
@@ -184,22 +184,22 @@ BroadcastExchange (35)
 
 
 (31) Scan parquet spark_catalog.default.date_dim
-Output [2]: [d_date_sk#14, d_year#47]
+Output [2]: [d_date_sk#14, d_year#51]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2002), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_year:int>
 
 (32) ColumnarToRow [codegen id : 1]
-Input [2]: [d_date_sk#14, d_year#47]
+Input [2]: [d_date_sk#14, d_year#51]
 
 (33) Filter [codegen id : 1]
-Input [2]: [d_date_sk#14, d_year#47]
-Condition : ((isnotnull(d_year#47) AND (d_year#47 = 2002)) AND isnotnull(d_date_sk#14))
+Input [2]: [d_date_sk#14, d_year#51]
+Condition : ((isnotnull(d_year#51) AND (d_year#51 = 2002)) AND isnotnull(d_date_sk#14))
 
 (34) Project [codegen id : 1]
 Output [1]: [d_date_sk#14]
-Input [2]: [d_date_sk#14, d_year#47]
+Input [2]: [d_date_sk#14, d_year#51]
 
 (35) BroadcastExchange
 Input [1]: [d_date_sk#14]
