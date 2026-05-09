@@ -260,11 +260,14 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
                 cached.cachedRepresentation.withOutput(resolvedCacheBody.output)
               }
               .getOrElse {
+                val storageLevel = StorageLevel
+                  .fromString(conf.getConf(SQLConf.AUTO_CTE_CACHE_STORAGE_LEVEL))
+                  .withEvictionPriority(-1)
                 cacheManager.cacheQuery(
                   spark,
                   cacheBody,
                   tableName = Some(s"auto_cte_${cteDef.id}"),
-                  StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
+                  storageLevel)
                 autoCTEManager.trackEntry(cteDef.id, cacheBody)
                 cacheManager.lookupCachedData(spark, cacheBody)
                   .map(_.cachedRepresentation.withOutput(resolvedCacheBody.output))
