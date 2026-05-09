@@ -1,11 +1,11 @@
 TakeOrderedAndProject [i_item_id,s_state,g_state,agg1,agg2,agg3,agg4]
   WholeStageCodegen (6)
-    HashAggregate [i_item_id,s_state,spark_grouping_id,sum,count,sum,count,sum,count,sum,count] [avg(ss_quantity),avg(UnscaledValue(ss_list_price)),avg(UnscaledValue(ss_coupon_amt)),avg(UnscaledValue(ss_sales_price)),g_state,agg1,agg2,agg3,agg4,sum,count,sum,count,sum,count,sum,count]
+    HashAggregate [i_item_id,s_state,spark_grouping_id,_pushed_avg_sum_ss_quantity,_pushed_avg_count_ss_quantity,_pushed_avg_sum_ss_list_price,_pushed_avg_count_ss_list_price,_pushed_avg_sum_ss_coupon_amt,_pushed_avg_count_ss_coupon_amt,_pushed_avg_sum_ss_sales_price,_pushed_avg_count_ss_sales_price] [sum(_pushed_avg_sum_ss_quantity),sum(_pushed_avg_count_ss_quantityL),sum(_pushed_avg_sum_ss_list_price),sum(_pushed_avg_count_ss_list_priceL),sum(_pushed_avg_sum_ss_coupon_amt),sum(_pushed_avg_count_ss_coupon_amtL),sum(_pushed_avg_sum_ss_sales_price),sum(_pushed_avg_count_ss_sales_priceL),g_state,agg1,agg2,agg3,agg4,sum,sum,sum,sum,sum,sum,sum,sum]
       InputAdapter
         Exchange [i_item_id,s_state,spark_grouping_id] #1
           WholeStageCodegen (5)
-            HashAggregate [i_item_id,s_state,spark_grouping_id,ss_quantity,ss_list_price,ss_coupon_amt,ss_sales_price] [sum,count,sum,count,sum,count,sum,count,sum,count,sum,count,sum,count,sum,count]
-              Expand [ss_quantity,ss_list_price,ss_sales_price,ss_coupon_amt,i_item_id,s_state]
+            Expand [i_item_id,s_state,_pushed_avg_sum_ss_quantity,_pushed_avg_count_ss_quantity,_pushed_avg_sum_ss_list_price,_pushed_avg_count_ss_list_price,_pushed_avg_sum_ss_coupon_amt,_pushed_avg_count_ss_coupon_amt,_pushed_avg_sum_ss_sales_price,_pushed_avg_count_ss_sales_price]
+              HashAggregate [i_item_id,s_state,ss_quantity,ss_list_price,ss_coupon_amt,ss_sales_price] [sum(ss_quantity),count(ss_quantity),sum(UnscaledValue(ss_list_price)),count(UnscaledValue(ss_list_price)),sum(UnscaledValue(ss_coupon_amt)),count(UnscaledValue(ss_coupon_amt)),sum(UnscaledValue(ss_sales_price)),count(UnscaledValue(ss_sales_price)),_pushed_avg_sum_ss_quantity,_pushed_avg_count_ss_quantity,_pushed_avg_sum_ss_list_price,_pushed_avg_count_ss_list_price,_pushed_avg_sum_ss_coupon_amt,_pushed_avg_count_ss_coupon_amt,_pushed_avg_sum_ss_sales_price,_pushed_avg_count_ss_sales_price,sum,count,sum,count,sum,count,sum,count]
                 Project [ss_quantity,ss_list_price,ss_sales_price,ss_coupon_amt,i_item_id,s_state]
                   BroadcastHashJoin [ss_item_sk,i_item_sk]
                     Project [ss_item_sk,ss_quantity,ss_list_price,ss_sales_price,ss_coupon_amt,s_state]

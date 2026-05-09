@@ -1383,12 +1383,12 @@ object SQLConf {
     buildConf("spark.sql.optimizer.partialAggregationOptimization.benefitRatio")
       .internal()
       .doc("The reduction ratio lower than this config will introduce partial aggregations " +
-        "before join.")
+        "before join or below an Expand operator.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .doubleConf
       .checkValue(r => r >= 0 && r <= 1.0, "The benefit ratio must be positive number.")
-      .createWithDefault(0.3)
+      .createWithDefault(0.4)
 
   val ESCAPED_STRING_LITERALS = buildConf("spark.sql.parser.escapedStringLiterals")
     .internal()
