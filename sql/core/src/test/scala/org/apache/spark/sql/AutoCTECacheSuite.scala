@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql
 
+import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
+import org.apache.spark.storage.StorageLevel
 
 class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
 
@@ -140,6 +142,53 @@ class AutoCTECacheSuite extends QueryTest with SharedSparkSession {
       spark.sql(sql).collect()
       assert(spark.sharedState.autoCTECacheManager.numEntries == 0,
         "Should not cache scan-only CTE (not expensive enough)")
+    }
+  }
+
+  private def autoCTEStorageLevels(sqlText: String): Seq[StorageLevel] =
+    spark.sql(sqlText).queryExecution.optimizedPlan.collect {
+      case r: InMemoryRelation
+          if r.cacheBuilder.tableName.exists(_.startsWith("auto_cte_")) =>
+        r.cacheBuilder.storageLevel
+    }.distinct
+
+  test("storage level: default is MEMORY_ONLY with eviction priority -1") {
+    prepareData()
+    withSQLConf(SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true") {
+      spark.sql(cachableCteSQL).collect()
+      val levels = autoCTEStorageLevels(cachableCteSQL)
+      assert(levels.length == 1, s"expected one auto-CTE level, got $levels")
+      assert(levels.head == StorageLevel.MEMORY_ONLY.withEvictionPriority(-1))
+    }
+  }
+
+  test("storage level: custom value is honored") {
+    prepareData()
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.AUTO_CTE_CACHE_STORAGE_LEVEL.key -> "MEMORY_AND_DISK") {
+      spark.sql(cachableCteSQL).collect()
+      val levels = autoCTEStorageLevels(cachableCteSQL)
+      assert(levels.length == 1)
+      assert(levels.head == StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
+    }
+  }
+
+  test("storage level: invalid value rejected at conf-set time") {
+    intercept[IllegalArgumentException] {
+      withSQLConf(SQLConf.AUTO_CTE_CACHE_STORAGE_LEVEL.key -> "NOT_A_LEVEL") {}
+    }
+  }
+
+  test("storage level: lowercase value is normalized") {
+    prepareData()
+    withSQLConf(
+      SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
+      SQLConf.AUTO_CTE_CACHE_STORAGE_LEVEL.key -> "memory_and_disk") {
+      spark.sql(cachableCteSQL).collect()
+      val levels = autoCTEStorageLevels(cachableCteSQL)
+      assert(levels.length == 1)
+      assert(levels.head == StorageLevel.MEMORY_AND_DISK.withEvictionPriority(-1))
     }
   }
 

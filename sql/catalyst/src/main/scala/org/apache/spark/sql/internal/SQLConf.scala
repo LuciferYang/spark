@@ -4637,6 +4637,21 @@ object SQLConf {
       .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
       .createWithDefaultString("1m")
 
+  val AUTO_CTE_CACHE_STORAGE_LEVEL =
+    buildConf("spark.sql.auto.cte.cache.storageLevel")
+      .doc(
+        "Storage level for auto-cached CTE entries. Valid values are any " +
+        "StorageLevel name (e.g., MEMORY_ONLY, MEMORY_AND_DISK, DISK_ONLY). " +
+        "Auto-CTE caches always run with eviction priority -1 (lower than " +
+        "user-issued cache calls) regardless of the level chosen here, so " +
+        "they yield to user caches under memory pressure. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .stringConf
+      .transform(_.toUpperCase(Locale.ROOT))
+      .checkValues(StorageLevelMapper.values.map(_.name()).toSet)
+      .createWithDefault(StorageLevelMapper.MEMORY_ONLY.name())
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +
