@@ -51,16 +51,16 @@ import org.apache.spark.sql.types.{DecimalType, LongType, NumericType}
  *
  * Per-function decomposition (the partial alias name pattern is `_pushed_<fn>_<refs>`,
  * e.g. `_pushed_sum_v` for `sum(v)`):
- *  - `Sum(x)`     → outer `Sum(partial)`              inner `Sum(x)`
- *  - `Count(x)`   → outer `Sum(partial)`              inner `Count(x)`
- *  - `Min(x)`     → outer `Min(partial)`              inner `Min(x)`
- *  - `Max(x)`     → outer `Max(partial)`              inner `Max(x)`
- *  - `First(x)`   → outer `First(partial)`            inner `First(x)`
- *  - `Last(x)`    → outer `Last(partial)`             inner `Last(x)`
- *  - `BitAndAgg`  → same shape as `Min`               ditto
- *  - `BitOrAgg`   → same shape as `Min`               ditto
- *  - `BitXorAgg`  → same shape as `Min`               ditto
- *  - `Avg(x)`     → outer `Sum(partial_sum) / Sum(partial_count)`,
+ *  - `Sum(x)`     -> outer `Sum(partial)`              inner `Sum(x)`
+ *  - `Count(x)`   -> outer `Sum(partial)`              inner `Count(x)`
+ *  - `Min(x)`     -> outer `Min(partial)`              inner `Min(x)`
+ *  - `Max(x)`     -> outer `Max(partial)`              inner `Max(x)`
+ *  - `First(x)`   -> outer `First(partial)`            inner `First(x)`
+ *  - `Last(x)`    -> outer `Last(partial)`             inner `Last(x)`
+ *  - `BitAndAgg`  -> same shape as `Min`               ditto
+ *  - `BitOrAgg`   -> same shape as `Min`               ditto
+ *  - `BitXorAgg`  -> same shape as `Min`               ditto
+ *  - `Avg(x)`     -> outer `Sum(partial_sum) / Sum(partial_count)`,
  *                   inner produces both `Sum(x)` and `Count(x)`.
  *
  * Eligibility guards (each implemented in [[isEligible]]):
@@ -84,13 +84,13 @@ import org.apache.spark.sql.types.{DecimalType, LongType, NumericType}
  * back to `1.0`, so the rewrite fires only if the configured benefitRatio is also
  * `1.0` (i.e., the cost gate is intentionally disabled).
  *
- * The rule is idempotent — once a `PartialAggregate` (or any other [[AggregateBase]])
+ * The rule is idempotent - once a `PartialAggregate` (or any other [[AggregateBase]])
  * is in place below `Expand`, the second pass will not rewrite again because the
  * idempotency guard rejects that shape.
  *
  * Pass-through classification is computed via [[AttributeSet.intersect]]
  * (`ExprId`-only semantics) rather than `expand.producedAttributes`, which relies on
- * `Seq.diff`'s full `.equals` — later optimizer passes can adjust an attribute's
+ * `Seq.diff`'s full `.equals` - later optimizer passes can adjust an attribute's
  * nullability or metadata while preserving its `ExprId`, breaking value equality but
  * not the identity we care about here.
  */
@@ -173,6 +173,24 @@ object PushPartialAggregationThroughExpand extends Rule[LogicalPlan] {
    * `benefitRatio * input row count`. Falls back to a ratio of `1.0` (no compression)
    * when statistics are unavailable, which means the rule fires only if the configured
    * threshold is also `1.0`.
+   *
+   * K' is bounded by the minimum of two upper bounds:
+   *  1. [[AggregateEstimation]]'s cross-product cap: `min(prod_i distinct(d_i), R)`.
+   *     This is exact when grouping columns are independent but saturates at `R`
+   *     whenever the product exceeds `R`, which masks compression in correlated
+   *     OLAP shapes (q22 groups by `i_product_name / i_brand / i_class / i_category`
+   *     - all functionally determined by `item`, so true K' is ~ `i_product_name`'s
+   *     distinct count, not the product).
+   *  2. An exponential-backoff bound: with distinct counts sorted desc
+   *     `d1 >= d2 >= ... >= dk`,
+   *         K' <= d1 * d2^(1/2) * d3^(1/4) * ... * dk^(1/2^(k-1)),
+   *     also capped at `R`. This dampens secondary dimensions in proportion to their
+   *     position, which closely tracks the partially-correlated case typical of
+   *     ROLLUP/CUBE/GROUPING SETS dimension hierarchies. It is always <= the
+   *     cross-product, so taking the min is a strict improvement.
+   *
+   * (The bound choice is local to this cost gate; [[AggregateEstimation]] itself is
+   * unchanged, so downstream planning estimates are unaffected.)
    */
   private def passesCostGate(expand: Expand, dimensions: Seq[Attribute]): Boolean = {
     val originRowCount = expand.child.stats.rowCount
@@ -180,9 +198,31 @@ object PushPartialAggregationThroughExpand extends Rule[LogicalPlan] {
     // Empty `aggregateExpressions` is safe because AggregateEstimation derives the
     // estimate solely from `groupingExpressions`.
     val aggregatedRowCount = Aggregate(dimensions, Nil, expand.child).stats.rowCount
-    val ratio = if (originRowCount.nonEmpty && aggregatedRowCount.nonEmpty &&
-        originRowCount.get > 0) {
-      aggregatedRowCount.get.toDouble / originRowCount.get.toDouble
+
+    val expBackoffK: Option[BigInt] = originRowCount.filter(_ > 0).flatMap { rc =>
+      val perDimDc: Seq[BigInt] = dimensions.flatMap { d =>
+        expand.child.stats.attributeStats.get(d).flatMap(_.distinctCount)
+      }
+      if (perDimDc.size != dimensions.size || perDimDc.isEmpty) {
+        None
+      } else {
+        // Compute the geometric damping product by halving the exponent each step,
+        // rather than recomputing `math.pow(0.5, i)` for every iteration.
+        var product = 1.0
+        var exponent = 1.0
+        perDimDc.sortBy(-_).foreach { dc =>
+          product *= math.pow(dc.toDouble, exponent)
+          exponent *= 0.5
+        }
+        Some(BigInt(math.min(product, rc.toDouble).toLong.max(1L)))
+      }
+    }
+
+    val effectiveK: Option[BigInt] =
+      Seq(aggregatedRowCount, expBackoffK).flatten.reduceOption(_ min _)
+
+    val ratio = if (originRowCount.nonEmpty && effectiveK.nonEmpty && originRowCount.get > 0) {
+      effectiveK.get.toDouble / originRowCount.get.toDouble
     } else {
       1.0
     }

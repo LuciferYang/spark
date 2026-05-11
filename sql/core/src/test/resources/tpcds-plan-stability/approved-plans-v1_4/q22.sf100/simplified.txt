@@ -1,11 +1,11 @@
 TakeOrderedAndProject [qoh,i_product_name,i_brand,i_class,i_category]
   WholeStageCodegen (8)
-    HashAggregate [i_product_name,i_brand,i_class,i_category,spark_grouping_id,sum,count] [avg(inv_quantity_on_hand),qoh,sum,count]
+    HashAggregate [i_product_name,i_brand,i_class,i_category,spark_grouping_id,_pushed_avg_sum_inv_quantity_on_hand,_pushed_avg_count_inv_quantity_on_hand] [sum(_pushed_avg_sum_inv_quantity_on_hand),sum(_pushed_avg_count_inv_quantity_on_handL),qoh,sum,sum]
       InputAdapter
         Exchange [i_product_name,i_brand,i_class,i_category,spark_grouping_id] #1
           WholeStageCodegen (7)
-            HashAggregate [i_product_name,i_brand,i_class,i_category,spark_grouping_id,inv_quantity_on_hand] [sum,count,sum,count]
-              Expand [inv_quantity_on_hand,i_product_name,i_brand,i_class,i_category]
+            Expand [i_product_name,i_brand,i_class,i_category,_pushed_avg_sum_inv_quantity_on_hand,_pushed_avg_count_inv_quantity_on_hand]
+              HashAggregate [i_product_name,i_brand,i_class,i_category,inv_quantity_on_hand] [sum(inv_quantity_on_hand),count(inv_quantity_on_hand),_pushed_avg_sum_inv_quantity_on_hand,_pushed_avg_count_inv_quantity_on_hand,sum,count]
                 Project [inv_quantity_on_hand,i_product_name,i_brand,i_class,i_category]
                   SortMergeJoin [inv_item_sk,i_item_sk]
                     InputAdapter
