@@ -552,6 +552,44 @@ class JoinEstimationSuite extends StatsEstimationTestBase {
     assert(join.stats == expectedStats)
   }
 
+  test("SPARK-XXXXX: inner join propagates non-key column stats with partial counts") {
+    // A non-key column that has distinctCount but is missing nullCount used to be dropped
+    // entirely from the inner join's output stats (because the input filter required full
+    // `hasCountStats`). After the relaxation, its distinctCount and min/max still survive
+    // the join - `updateCountStats` returns `None` for the count fields that were already
+    // missing, so the output is internally consistent.
+    val partialAttr = attr("partial")
+    val partialStat = ColumnStat(
+      distinctCount = Some(7), min = Some(1), max = Some(10),
+      nullCount = None, avgLen = Some(4), maxLen = Some(4))
+
+    val leftTable = StatsTestPlan(
+      outputList = Seq(nameToAttr("key-1-5"), partialAttr),
+      rowCount = 5,
+      attributeStats = AttributeMap(
+        Seq(nameToColInfo("key-1-5"), partialAttr -> partialStat)))
+
+    val join = Join(leftTable, table2, Inner,
+      Some(EqualTo(nameToAttr("key-1-5"), nameToAttr("key-1-2"))), JoinHint.NONE)
+
+    val joinStats = join.stats
+    val outStats = joinStats.attributeStats
+    val partialOut = outStats(partialAttr)
+    // distinctCount survives - non-key columns are not dropped just because nullCount is
+    // absent. min / max also propagate. nullCount stays unset.
+    assert(partialOut.distinctCount.isDefined,
+      "partial-stat non-key column should propagate distinctCount through inner join")
+    assert(partialOut.min === Some(1))
+    assert(partialOut.max === Some(10))
+    assert(partialOut.nullCount.isEmpty,
+      "missing input nullCount should remain unset in the output")
+
+    // Sanity: the equi-join key still gets its post-join stat as before.
+    val keyOut = outStats(nameToAttr("key-1-5"))
+    assert(keyOut.distinctCount === Some(2))
+    assert(keyOut.min === Some(1) && keyOut.max === Some(2))
+  }
+
   test("SPARK-33018 Fix estimate statistics issue if child has 0 bytes") {
     case class MyStatsTestPlan(
         outputList: Seq[Attribute],

@@ -90,6 +90,14 @@ case class JoinEstimation(join: Join) extends Logging {
       val attributesWithStat = join.output.filter(a =>
         inputAttrStats.get(a).map(_.hasCountStats).getOrElse(false))
       val (fromLeft, fromRight) = attributesWithStat.partition(join.left.outputSet.contains(_))
+      // For inner / cross non-cartesian joins we want to preserve column stats for any output
+      // attribute that has *some* input statistics, not just those with full count stats. This
+      // rescues per-attribute distinctCount / min / max for non-key columns through join chains
+      // and matches the Cartesian-product branch below, which already propagates the full
+      // `inputAttrStats` regardless of `hasCountStats`. `updateOutputStats` then calls
+      // `ColumnStat.updateCountStats`, which already handles missing count fields by returning
+      // `None` for the corresponding output field.
+      val attributesWithAnyStat = join.output.filter(inputAttrStats.contains)
 
       val outputStats: Seq[(Attribute, ColumnStat)] = if (outputRows == 0) {
         // The output is empty, we don't need to keep column stats.
@@ -134,8 +142,11 @@ case class JoinEstimation(join: Join) extends Logging {
             inputAttrStats.toSeq
           case _ =>
             assert(joinType == Inner || joinType == Cross)
-            // Update column stats from both sides for inner or cross join.
-            updateOutputStats(outputRows, attributesWithStat, inputAttrStats, keyStatsAfterJoin)
+            // Update column stats from both sides for inner or cross join. We propagate any
+            // attribute that has *some* input stats (see `attributesWithAnyStat` above) so
+            // that partial stats (e.g. distinctCount without nullCount, or min/max only)
+            // survive the join.
+            updateOutputStats(outputRows, attributesWithAnyStat, inputAttrStats, keyStatsAfterJoin)
         }
       }
 
