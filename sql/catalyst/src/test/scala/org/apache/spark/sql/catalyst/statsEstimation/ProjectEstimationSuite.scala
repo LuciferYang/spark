@@ -20,8 +20,9 @@ package org.apache.spark.sql.catalyst.statsEstimation
 import java.sql.{Date, Timestamp}
 
 import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, AttributeReference, Literal}
+import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.{CharVarcharCodegenUtils, DateTimeUtils}
 import org.apache.spark.sql.types._
 
 
@@ -161,6 +162,65 @@ class ProjectEstimationSuite extends StatsEstimationTestBase {
       rowCount = Some(2),
       attributeStats = toAttributeMap(expectedColStats2, proj2))
     assert(proj2.stats == expectedStats2)
+  }
+
+  test("SPARK-XXXXX: propagate count stats through CharVarcharCodegenUtils.readSidePadding") {
+    // For CHAR(N) columns Spark wraps each scan with
+    //   StaticInvoke(CharVarcharCodegenUtils, "readSidePadding", attr, Literal(N))
+    // under an Alias. Right-padding is injective on row values, so distinctCount and
+    // nullCount must be preserved through this alias; min/max change with padding so they
+    // are dropped; avgLen/maxLen become the declared length.
+    val src = AttributeReference("c_raw", StringType)()
+    val srcStat = ColumnStat(
+      distinctCount = Some(7), min = Some("a"), max = Some("z"),
+      nullCount = Some(2), avgLen = Some(3), maxLen = Some(5))
+
+    val child = StatsTestPlan(
+      outputList = Seq(src),
+      rowCount = 100,
+      attributeStats = AttributeMap(Seq(src -> srcStat)))
+
+    val padded = StaticInvoke(
+      classOf[CharVarcharCodegenUtils],
+      StringType,
+      "readSidePadding",
+      src :: Literal(10) :: Nil,
+      returnNullable = false)
+    val alias = Alias(padded, "c")()
+    val proj = Project(Seq(alias), child)
+
+    val outStat = proj.stats.attributeStats(alias.toAttribute)
+    assert(outStat.distinctCount === Some(7), "distinctCount preserved through padding")
+    assert(outStat.nullCount === Some(2), "nullCount preserved through padding")
+    assert(outStat.min.isEmpty, "min dropped because padding changes string ordering")
+    assert(outStat.max.isEmpty, "max dropped because padding changes string ordering")
+    assert(outStat.avgLen === Some(10), "avgLen set to padded length")
+    assert(outStat.maxLen === Some(10), "maxLen set to padded length")
+  }
+
+  test("SPARK-XXXXX: readSidePadding fallback when src attr has no stats") {
+    // When the underlying attribute is missing from attributeStats, the readSidePadding
+    // case must NOT fire — alias-of-Attribute and foldable cases already don't, and the
+    // new case shouldn't either (no source to inherit counts from).
+    val src = AttributeReference("c_raw", StringType)()
+
+    val child = StatsTestPlan(
+      outputList = Seq(src),
+      rowCount = 100,
+      attributeStats = AttributeMap(Nil))
+
+    val padded = StaticInvoke(
+      classOf[CharVarcharCodegenUtils],
+      StringType,
+      "readSidePadding",
+      src :: Literal(10) :: Nil,
+      returnNullable = false)
+    val alias = Alias(padded, "c")()
+    val proj = Project(Seq(alias), child)
+
+    // Project should still produce a Statistics with no per-attr stat for the alias.
+    assert(proj.stats.attributeStats.get(alias.toAttribute).isEmpty,
+      "no stat synthesized when source attribute has no stat")
   }
 
   private def checkProjectStats(
