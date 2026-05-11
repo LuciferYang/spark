@@ -17,10 +17,24 @@
 
 package org.apache.spark.sql.catalyst.statsEstimation
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeMap, AttributeReference}
+import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, AttributeReference, Literal}
 import org.apache.spark.sql.catalyst.plans.logical
-import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, Union}
+import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, LeafNode, LogicalPlan, Project, Statistics, Union}
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
+
+/**
+ * A test-only leaf plan whose [[Statistics]] carry only `sizeInBytes`, no `rowCount` and no
+ * per-attribute stats. Used to model the "deep plan whose stats failed to propagate" scenario
+ * - when this is the child of a [[Project]], `ProjectEstimation` returns `None` and falls
+ * through to `SizeInBytesOnlyStatsPlanVisitor`, which does NOT populate `attributeStats`.
+ */
+private case class NoStatsLeaf(override val output: Seq[Attribute])
+    extends LeafNode with MultiInstanceRelation {
+  override def computeStats(): Statistics = Statistics(sizeInBytes = 100)
+  override def newInstance(): LogicalPlan = copy(output = output.map(_.newInstance()))
+}
 
 class UnionEstimationSuite extends StatsEstimationTestBase {
 
@@ -337,6 +351,76 @@ class UnionEstimationSuite extends StatsEstimationTestBase {
     val keyStat = unionStats.attributeStats(union.output.head)
     assert(keyStat.distinctCount === Some(6),
       "distinctCount should be capped at rowCount=6, not max(500,300)=500")
+  }
+
+  test("SPARK-XXXXX: synthesize distinctCount from foldable Project alias in Union child") {
+    // Mirrors the q5-style pattern: each Union branch tags its rows with a literal channel
+    // via `Project(Literal('x') AS channel, child)`. The Project's child here has no
+    // rowCount and no attributeStats (mimicking a deeply-nested plan where upstream stats
+    // failed to propagate). ProjectEstimation returns None in that situation, so the literal
+    // alias's stat would normally be lost - the new Union-level fallback rescues
+    // distinctCount = 1 for the channel column.
+    val storeAlias = Alias(Literal(UTF8String.fromString("store channel"), StringType), "channel")()
+    val catalogAlias =
+      Alias(Literal(UTF8String.fromString("catalog channel"), StringType), "channel")()
+    val webAlias = Alias(Literal(UTF8String.fromString("web channel"), StringType), "channel")()
+
+    val p1 = Project(Seq(storeAlias), NoStatsLeaf(Nil))
+    val p2 = Project(Seq(catalogAlias), NoStatsLeaf(Nil))
+    val p3 = Project(Seq(webAlias), NoStatsLeaf(Nil))
+
+    // Sanity check: each branch's stats lack attributeStats for the literal alias.
+    Seq(p1, p2, p3).foreach { p =>
+      assert(p.stats.attributeStats.get(p.output.head).isEmpty,
+        "ProjectEstimation should return no per-attribute stats when child has no rowCount")
+    }
+
+    val union = Union(Seq(p1, p2, p3))
+    val stats = union.stats
+    val channelStat = stats.attributeStats(union.output.head)
+    // Each branch contributes distinctCount = 1 for the literal; max = 1.
+    assert(channelStat.distinctCount === Some(1),
+      "literal-aliased Union output should propagate distinctCount = 1")
+    assert(channelStat.nullCount === Some(0),
+      "non-null literal aliases should contribute nullCount = 0 per branch")
+  }
+
+  test("SPARK-XXXXX: literal alias fallback omits nullCount when child rowCount missing") {
+    // Null literals need rowCount to derive nullCount per branch. When the child has no
+    // rowCount, the fallback returns distinctCount = 0 but leaves nullCount unset so the
+    // foldLeft in `computeColumnStats` correctly degrades to None.
+    val nullAlias1 = Alias(Literal(null, StringType), "c")()
+    val nullAlias2 = Alias(Literal(null, StringType), "c")()
+    val p1 = Project(Seq(nullAlias1), NoStatsLeaf(Nil))
+    val p2 = Project(Seq(nullAlias2), NoStatsLeaf(Nil))
+
+    val union = Union(Seq(p1, p2))
+    val cStat = union.stats.attributeStats(union.output.head)
+    assert(cStat.distinctCount === Some(0))
+    assert(cStat.nullCount.isEmpty,
+      "nullCount should be None when child rowCount is unavailable")
+  }
+
+  test("SPARK-XXXXX: non-Project child without stats still produces no stats") {
+    // Regression: the fallback should only trigger for Project. A child that's not a Project
+    // and has no attributeStats must still drop distinctCount, matching prior behavior.
+    val sz = Some(BigInt(1024))
+    val attrInt = AttributeReference("cint", IntegerType)()
+
+    val child1 = StatsTestPlan(
+      outputList = Seq(attrInt),
+      rowCount = 5,
+      attributeStats = AttributeMap(Nil),
+      size = sz)
+    val child2 = StatsTestPlan(
+      outputList = Seq(AttributeReference("cint1", IntegerType)()),
+      rowCount = 5,
+      attributeStats = AttributeMap(Nil),
+      size = sz)
+
+    val union = Union(Seq(child1, child2))
+    assert(union.stats.attributeStats.get(union.output.head).isEmpty,
+      "no fallback should fire when children are not Projects with foldable aliases")
   }
 
   test("SPARK-56047: hasCountStats is true when both distinctCount and nullCount propagated") {
