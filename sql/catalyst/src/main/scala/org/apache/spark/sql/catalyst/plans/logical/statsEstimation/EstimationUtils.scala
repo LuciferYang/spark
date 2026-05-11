@@ -20,8 +20,10 @@ package org.apache.spark.sql.catalyst.plans.logical.statsEstimation
 import scala.collection.mutable.ArrayBuffer
 import scala.math.BigDecimal.RoundingMode
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, EmptyRow, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, Concat, EmptyRow, Expression, Literal}
+import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.catalyst.util.CharVarcharCodegenUtils
 import org.apache.spark.sql.types.{DecimalType, _}
 
 object EstimationUtils {
@@ -87,6 +89,49 @@ object EstimationUtils {
     expressions.collect {
       case alias @ Alias(attr: Attribute, _) if attributeStats.contains(attr) =>
         alias.toAttribute -> attributeStats(attr)
+      // Right-side padding for CHAR(N) reads -- `Alias(StaticInvoke(CharVarcharCodegenUtils,
+      // "readSidePadding", attr, N))` -- is an injective transform of a single attribute.
+      // It maps null to null and distinct values to distinct values (every distinct input
+      // produces a distinct fixed-length padded output). distinctCount and nullCount are
+      // therefore exactly preserved. min/max are dropped because right-padding can change
+      // string ordering, and the exact post-padding length is taken from the literal width
+      // argument (the CHAR column's declared length) when it is an Int literal.
+      case alias @ Alias(StaticInvoke(
+          cls, _, "readSidePadding", (src: Attribute) :: Literal(n: Int, _) :: Nil,
+          _, _, _, _, _), _)
+          if cls == classOf[CharVarcharCodegenUtils] && attributeStats.contains(src) =>
+        val srcStat = attributeStats(src)
+        val paddedLen = Some(n.toLong)
+        alias.toAttribute -> ColumnStat(
+          distinctCount = srcStat.distinctCount,
+          min = None,
+          max = None,
+          nullCount = srcStat.nullCount,
+          avgLen = paddedLen.orElse(srcStat.avgLen),
+          maxLen = paddedLen.orElse(srcStat.maxLen))
+      // Concat with a single non-foldable Attribute and all other parts non-null foldable
+      // (typically literal prefixes/suffixes used to tag UNION branches, e.g.
+      //   `Alias(Concat(Literal("store_"), s_store_id), "id")`).
+      // For string, binary, and array `Concat`, distinct attribute values produce distinct
+      // results when the surrounding parts are constants, and any null input propagates
+      // to a null result. distinctCount and nullCount are therefore preserved exactly so
+      // long as no foldable part itself evaluates to null. Otherwise the output would be
+      // entirely null and the propagation would be wrong; we conservatively skip.
+      case alias @ Alias(c: Concat, _) if c.deterministic &&
+          (c.children.filterNot(_.foldable) match {
+            case (src: Attribute) :: Nil => attributeStats.contains(src)
+            case _ => false
+          }) &&
+          c.children.filter(_.foldable).forall(_.eval(EmptyRow) != null) =>
+        val src = c.children.collectFirst { case a: Attribute if !a.foldable => a }.get
+        val srcStat = attributeStats(src)
+        alias.toAttribute -> ColumnStat(
+          distinctCount = srcStat.distinctCount,
+          min = None,
+          max = None,
+          nullCount = srcStat.nullCount,
+          avgLen = None,
+          maxLen = None)
       case alias @ Alias(expr: Expression, _) if expr.foldable && expr.deterministic =>
         val value = expr.eval(EmptyRow)
         val size = expr.dataType.defaultSize

@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.catalyst.plans.logical.statsEstimation
 
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeMap}
-import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, Statistics, Union}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, EmptyRow}
+import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, LogicalPlan, Project, Statistics, Union}
 import org.apache.spark.sql.catalyst.types.PhysicalDataType
 import org.apache.spark.sql.types._
 
@@ -54,6 +54,49 @@ object UnionEstimation {
   }
 
   /**
+   * Returns the [[ColumnStat]] for the given child's output at position `idx`. Primary source
+   * is the child's `attributeStats`. As a fallback, when the child is a [[Project]] whose
+   * projection at `idx` is `Alias(foldable, _)` (e.g. `'store channel' AS channel`), we
+   * synthesize the column stat directly from the foldable value. This rescues distinctCount
+   * propagation for literal-tagged columns in UNION ALL pipelines even when other parts of
+   * the child's stats failed to compute.
+   */
+  private def childColumnStat(child: LogicalPlan, idx: Int): Option[ColumnStat] = {
+    val outAttr = child.output(idx)
+    child.stats.attributeStats.get(outAttr).orElse {
+      child match {
+        case Project(projectList, _) =>
+          projectList.lift(idx).flatMap {
+            case Alias(expr, _) if expr.foldable && expr.deterministic =>
+              val value = expr.eval(EmptyRow)
+              val size = expr.dataType.defaultSize
+              if (value == null) {
+                // Null literal: distinctCount = 0; nullCount uses the child's rowCount when
+                // known so that downstream foldLeft over children can sum it.
+                Some(ColumnStat(
+                  distinctCount = Some(0),
+                  min = None,
+                  max = None,
+                  nullCount = child.stats.rowCount,
+                  avgLen = Some(size),
+                  maxLen = Some(size)))
+              } else {
+                Some(ColumnStat(
+                  distinctCount = Some(1),
+                  min = Some(value),
+                  max = Some(value),
+                  nullCount = Some(0),
+                  avgLen = Some(size),
+                  maxLen = Some(size)))
+              }
+            case _ => None
+          }
+        case _ => None
+      }
+    }
+  }
+
+  /**
    * For each output column, compute min/max, nullCount, and distinctCount in a single pass.
    * Min and max are computed as the overall min/max across children (only for supported types),
    * nullCount is summed, and distinctCount is estimated as the max across children (capped by
@@ -71,8 +114,12 @@ object UnionEstimation {
       outputRows: Option[BigInt]): Seq[(Attribute, ColumnStat)] = {
     // For each child, look up the ColumnStat for each of its output attributes.
     // After transposing, maybeColStats(i) holds the ColumnStat (if available) contributed
-    // by the i-th child for the current output column.
-    union.output.zip(union.children.map(c => c.output.map(c.stats.attributeStats.get)).transpose)
+    // by the i-th child for the current output column. `childColumnStat` provides a fallback
+    // for literal-aliased columns when the child's stats are otherwise missing.
+    union.output.zip(
+      union.children
+        .map(c => c.output.indices.map(idx => childColumnStat(c, idx)))
+        .transpose)
       .flatMap {
         case (outputAttr, maybeColStats) =>
           val maybeMinMax: Option[(Any, Any)] = if (isTypeSupported(outputAttr.dataType)) {
