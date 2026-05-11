@@ -20,7 +20,7 @@ package org.apache.spark.sql.catalyst.plans.logical.statsEstimation
 import scala.collection.mutable.ArrayBuffer
 import scala.math.BigDecimal.RoundingMode
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, EmptyRow, Expression, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, Concat, EmptyRow, Expression, Literal}
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.CharVarcharCodegenUtils
@@ -109,6 +109,29 @@ object EstimationUtils {
           nullCount = srcStat.nullCount,
           avgLen = paddedLen.orElse(srcStat.avgLen),
           maxLen = paddedLen.orElse(srcStat.maxLen))
+      // Concat with a single non-foldable Attribute and all other parts non-null foldable
+      // (typically literal prefixes/suffixes used to tag UNION branches, e.g.
+      //   `Alias(Concat(Literal("store_"), s_store_id), "id")`).
+      // For string, binary, and array `Concat`, distinct attribute values produce distinct
+      // results when the surrounding parts are constants, and any null input propagates
+      // to a null result. distinctCount and nullCount are therefore preserved exactly so
+      // long as no foldable part itself evaluates to null. Otherwise the output would be
+      // entirely null and the propagation would be wrong; we conservatively skip.
+      case alias @ Alias(c: Concat, _) if c.deterministic &&
+          (c.children.filterNot(_.foldable) match {
+            case (src: Attribute) :: Nil => attributeStats.contains(src)
+            case _ => false
+          }) &&
+          c.children.filter(_.foldable).forall(_.eval(EmptyRow) != null) =>
+        val src = c.children.collectFirst { case a: Attribute if !a.foldable => a }.get
+        val srcStat = attributeStats(src)
+        alias.toAttribute -> ColumnStat(
+          distinctCount = srcStat.distinctCount,
+          min = None,
+          max = None,
+          nullCount = srcStat.nullCount,
+          avgLen = None,
+          maxLen = None)
       case alias @ Alias(expr: Expression, _) if expr.foldable && expr.deterministic =>
         val value = expr.eval(EmptyRow)
         val size = expr.dataType.defaultSize

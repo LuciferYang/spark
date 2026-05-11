@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.statsEstimation
 
 import java.sql.{Date, Timestamp}
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, AttributeReference, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, AttributeReference, Concat, Literal, Upper}
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{CharVarcharCodegenUtils, DateTimeUtils}
@@ -200,7 +200,7 @@ class ProjectEstimationSuite extends StatsEstimationTestBase {
 
   test("SPARK-XXXXX: readSidePadding fallback when src attr has no stats") {
     // When the underlying attribute is missing from attributeStats, the readSidePadding
-    // case must NOT fire — alias-of-Attribute and foldable cases already don't, and the
+    // case must NOT fire: alias-of-Attribute and foldable cases already don't, and the
     // new case shouldn't either (no source to inherit counts from).
     val src = AttributeReference("c_raw", StringType)()
 
@@ -221,6 +221,98 @@ class ProjectEstimationSuite extends StatsEstimationTestBase {
     // Project should still produce a Statistics with no per-attr stat for the alias.
     assert(proj.stats.attributeStats.get(alias.toAttribute).isEmpty,
       "no stat synthesized when source attribute has no stat")
+  }
+
+  test("SPARK-XXXXX: propagate count stats through Concat with a single attribute child") {
+    // Tag-with-prefix pattern used in UNION ALL TPC-DS queries:
+    //   `Alias(Concat(Literal("store_"), s_store_id), "id")`.
+    // Cardinality is preserved on the underlying attribute (literal prefixes/suffixes don't
+    // collapse distinct inputs and don't create extra distincts); nulls propagate.
+    val src = AttributeReference("k", StringType)()
+    val srcStat = ColumnStat(
+      distinctCount = Some(5), min = Some("a"), max = Some("z"),
+      nullCount = Some(1), avgLen = Some(3), maxLen = Some(5))
+
+    val child = StatsTestPlan(
+      outputList = Seq(src),
+      rowCount = 100,
+      attributeStats = AttributeMap(Seq(src -> srcStat)))
+
+    // Pattern 1: literal prefix, attr suffix.
+    val alias1 = Alias(Concat(Seq(Literal("store_"), src)), "id")()
+    val proj1 = Project(Seq(alias1), child)
+    val stat1 = proj1.stats.attributeStats(alias1.toAttribute)
+    assert(stat1.distinctCount === Some(5))
+    assert(stat1.nullCount === Some(1))
+    assert(stat1.min.isEmpty && stat1.max.isEmpty)
+
+    // Pattern 2: attr prefix, literal suffix.
+    val alias2 = Alias(Concat(Seq(src, Literal("_v"))), "id")()
+    val proj2 = Project(Seq(alias2), child)
+    val stat2 = proj2.stats.attributeStats(alias2.toAttribute)
+    assert(stat2.distinctCount === Some(5))
+    assert(stat2.nullCount === Some(1))
+
+    // Pattern 3: literals on both sides.
+    val alias3 = Alias(Concat(Seq(Literal("a_"), src, Literal("_z"))), "id")()
+    val proj3 = Project(Seq(alias3), child)
+    val stat3 = proj3.stats.attributeStats(alias3.toAttribute)
+    assert(stat3.distinctCount === Some(5))
+    assert(stat3.nullCount === Some(1))
+  }
+
+  test("SPARK-XXXXX: Concat with multiple attributes does NOT propagate") {
+    // Two attributes: cardinality could be up to dc1 * dc2, which we can't safely
+    // estimate here. The case must skip rather than guess.
+    val a = AttributeReference("a", StringType)()
+    val b = AttributeReference("b", StringType)()
+    val statA = ColumnStat(distinctCount = Some(3), nullCount = Some(0))
+    val statB = ColumnStat(distinctCount = Some(4), nullCount = Some(0))
+
+    val child = StatsTestPlan(
+      outputList = Seq(a, b),
+      rowCount = 100,
+      attributeStats = AttributeMap(Seq(a -> statA, b -> statB)))
+
+    val alias = Alias(Concat(Seq(a, b)), "k")()
+    val proj = Project(Seq(alias), child)
+    assert(proj.stats.attributeStats.get(alias.toAttribute).isEmpty,
+      "Concat with multiple non-foldable children should not get synthesized stats")
+  }
+
+  test("SPARK-XXXXX: Concat with a null foldable part does NOT propagate src counts") {
+    // If any foldable part evaluates to null, `Concat` returns null for every row, so
+    // propagating `nullCount = src.nullCount` would be wrong (the output is all null).
+    // We conservatively skip and rely on size-only fallback.
+    val a = AttributeReference("a", StringType)()
+    val statA = ColumnStat(distinctCount = Some(5), nullCount = Some(0))
+
+    val child = StatsTestPlan(
+      outputList = Seq(a),
+      rowCount = 100,
+      attributeStats = AttributeMap(Seq(a -> statA)))
+
+    val alias = Alias(Concat(Seq(Literal(null, StringType), a)), "k")()
+    val proj = Project(Seq(alias), child)
+    assert(proj.stats.attributeStats.get(alias.toAttribute).isEmpty,
+      "Concat with a null foldable part must not propagate src counts")
+  }
+
+  test("SPARK-XXXXX: Concat with non-Attribute non-foldable child does NOT propagate") {
+    // The non-foldable child is `Upper(a)`, a function that can collapse distincts, so
+    // we have no safe propagation rule. The case must skip.
+    val a = AttributeReference("a", StringType)()
+    val statA = ColumnStat(distinctCount = Some(5), nullCount = Some(0))
+
+    val child = StatsTestPlan(
+      outputList = Seq(a),
+      rowCount = 100,
+      attributeStats = AttributeMap(Seq(a -> statA)))
+
+    val alias = Alias(Concat(Seq(Literal("x_"), Upper(a))), "k")()
+    val proj = Project(Seq(alias), child)
+    assert(proj.stats.attributeStats.get(alias.toAttribute).isEmpty,
+      "non-foldable non-Attribute child must not match the Concat-injective fast path")
   }
 
   private def checkProjectStats(
