@@ -18,11 +18,12 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.catalyst.expressions.{Add, Alias, AttributeReference, Literal, Rand}
+import org.apache.spark.sql.catalyst.expressions.{Add, Alias, AttributeMap, AttributeReference, Literal, Rand}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Average, Complete, Count, Max, Min, Sum}
 import org.apache.spark.sql.catalyst.plans.PlanTest
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
+import org.apache.spark.sql.catalyst.statsEstimation.StatsTestPlan
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, LongType}
 
@@ -37,7 +38,7 @@ class PushPartialAggregationThroughExpandSuite extends PlanTest {
   //   SELECT a, b, sum(v) FROM t GROUP BY ROLLUP(a, b)
   // i.e. an Aggregate over an Expand over a Project that materializes the group-by
   // aliases. The Aggregate's grouping references the newInstance grouping attrs and
-  // gid, NOT the original child columns -- this is the realistic shape.
+  // gid, NOT the original child columns - this is the realistic shape.
   private def rollupAggOverExpand(): (Aggregate, Expand) = {
     val a = AttributeReference("a", IntegerType)()
     val b = AttributeReference("b", IntegerType)()
@@ -89,7 +90,7 @@ class PushPartialAggregationThroughExpandSuite extends PlanTest {
     SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
     SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "1.0")(body)
 
-  test("disabled by master switch -- does not rewrite") {
+  test("disabled by master switch - does not rewrite") {
     val (agg, _) = rollupAggOverExpand()
     val optimized = withSQLConf(
         SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "false")(
@@ -123,7 +124,7 @@ class PushPartialAggregationThroughExpandSuite extends PlanTest {
     }
   }
 
-  test("idempotent -- second pass does not re-rewrite") {
+  test("idempotent - second pass does not re-rewrite") {
     withRuleEnabled {
       val (agg, _) = rollupAggOverExpand()
       val once = Optimize.execute(agg)
@@ -223,13 +224,121 @@ class PushPartialAggregationThroughExpandSuite extends PlanTest {
     }
   }
 
+  test("cost gate still rejects when both cross-product and exp-backoff saturate at R") {
+    // Both bounds saturate at the input row count when per-dim distinct counts and the
+    // number of dims combine such that even the dampened product exceeds R. With
+    // `distinctCount = 400` on each of dims a / b (combined with the alias copies that
+    // `Project` keeps in `expand.child.output`, this becomes six dims with dc = 400) and
+    // R = 1000:
+    //   cross-product = 400^6 = 4.1x10^15 -> capped at 1000.
+    //   exp-backoff   = 400 * 400^(1/2) * 400^(1/4) * 400^(1/8) * 400^(1/16) * 400^(1/32)
+    //                 ~= 400 * 20 * 4.47 * 2.11 * 1.45 * 1.20 ~= 130_788 -> capped at 1000.
+    // Both saturate at K' = 1000, K'/R = 1.0. Rule should not fire at threshold 0.5.
+    val a = AttributeReference("a", IntegerType)()
+    val b = AttributeReference("b", IntegerType)()
+    val v = AttributeReference("v", IntegerType)()
+    val rowCount = 1000L
+    val statsPlan = StatsTestPlan(
+      outputList = Seq(a, b, v),
+      rowCount = rowCount,
+      attributeStats = AttributeMap(Seq(
+        a -> ColumnStat(distinctCount = Some(400), min = Some(1), max = Some(400),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)),
+        b -> ColumnStat(distinctCount = Some(400), min = Some(1), max = Some(400),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)),
+        v -> ColumnStat(distinctCount = Some(1000), min = Some(1), max = Some(1000),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)))))
+
+    val aAlias = Alias(a, "a")()
+    val bAlias = Alias(b, "b")()
+    val project = Project(Seq(a, b, v, aAlias, bAlias), statsPlan)
+    val aPrime = aAlias.toAttribute.newInstance().withNullability(true)
+    val bPrime = bAlias.toAttribute.newInstance().withNullability(true)
+    val gid = AttributeReference("spark_grouping_id", LongType, nullable = false)()
+    val projections = Seq(
+      Seq(a, b, v, aAlias.toAttribute, bAlias.toAttribute, Literal(0L)),
+      Seq(a, b, v, aAlias.toAttribute, Literal(null, IntegerType), Literal(1L)),
+      Seq(a, b, v, Literal(null, IntegerType), Literal(null, IntegerType), Literal(3L)))
+    val expand = Expand(projections, Seq(a, b, v, aPrime, bPrime, gid), project)
+    val agg = Aggregate(
+      groupingExpressions = Seq(aPrime, bPrime, gid),
+      aggregateExpressions = Seq(aPrime, bPrime,
+        Alias(AggregateExpression(Sum(v), Complete, isDistinct = false), "sum_v")()),
+      child = expand)
+
+    withSQLConf(
+        SQLConf.CBO_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "0.5") {
+      assert(!hasPreAgg(Optimize.execute(agg)),
+        "saturated K' under both bounds - rewrite should still be rejected at 0.5")
+    }
+  }
+
+  test("cost gate exp-backoff fires when cross-product saturates but backoff doesn't") {
+    // The rule's `computeDimensions` uses `expand.child.output.filterNot(measure_refs)`,
+    // so with the standard `Project([a, b, c, v, aAlias, bAlias, cAlias], _)` shape the
+    // synthetic dimension set has SIX entries (originals + alias copies), each with
+    // distinctCount = 20. Then:
+    //   cross-product = 20^6 = 64M capped at R = 1000 -> 1000, K'/R = 1.0.
+    //   exp-backoff   = 20 * 20^(1/2) * 20^(1/4) * 20^(1/8) * 20^(1/16) * 20^(1/32)
+    //                 ~= 20 * 4.47 * 2.11 * 1.45 * 1.20 * 1.10 ~= 365 -> 365, K'/R ~= 0.365.
+    // 0.365 < 0.5, so the rewrite fires with the exp-backoff bound active.
+    val a = AttributeReference("a", IntegerType)()
+    val b = AttributeReference("b", IntegerType)()
+    val c = AttributeReference("c", IntegerType)()
+    val v = AttributeReference("v", IntegerType)()
+    val rowCount = 1000L
+    val statsPlan = StatsTestPlan(
+      outputList = Seq(a, b, c, v),
+      rowCount = rowCount,
+      attributeStats = AttributeMap(Seq(
+        a -> ColumnStat(distinctCount = Some(20), min = Some(1), max = Some(20),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)),
+        b -> ColumnStat(distinctCount = Some(20), min = Some(1), max = Some(20),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)),
+        c -> ColumnStat(distinctCount = Some(20), min = Some(1), max = Some(20),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)),
+        v -> ColumnStat(distinctCount = Some(1000), min = Some(1), max = Some(1000),
+          nullCount = Some(0), avgLen = Some(4), maxLen = Some(4)))))
+
+    val aAlias = Alias(a, "a")()
+    val bAlias = Alias(b, "b")()
+    val cAlias = Alias(c, "c")()
+    val project = Project(Seq(a, b, c, v, aAlias, bAlias, cAlias), statsPlan)
+    val aPrime = aAlias.toAttribute.newInstance().withNullability(true)
+    val bPrime = bAlias.toAttribute.newInstance().withNullability(true)
+    val cPrime = cAlias.toAttribute.newInstance().withNullability(true)
+    val gid = AttributeReference("spark_grouping_id", LongType, nullable = false)()
+    val projections = Seq(
+      Seq(a, b, c, v, aAlias.toAttribute, bAlias.toAttribute, cAlias.toAttribute, Literal(0L)),
+      Seq(a, b, c, v, aAlias.toAttribute, bAlias.toAttribute, Literal(null, IntegerType),
+        Literal(1L)),
+      Seq(a, b, c, v, Literal(null, IntegerType), Literal(null, IntegerType),
+        Literal(null, IntegerType), Literal(7L)))
+    val expand = Expand(projections, Seq(a, b, c, v, aPrime, bPrime, cPrime, gid), project)
+    val agg = Aggregate(
+      groupingExpressions = Seq(aPrime, bPrime, cPrime, gid),
+      aggregateExpressions = Seq(aPrime, bPrime, cPrime,
+        Alias(AggregateExpression(Sum(v), Complete, isDistinct = false), "sum_v")()),
+      child = expand)
+
+    withSQLConf(
+        SQLConf.CBO_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "0.5") {
+      assert(hasPreAgg(Optimize.execute(agg)),
+        "exp-backoff K' ~= 365 < R = 1000, K'/R ~= 0.37 < 0.5 - rewrite should fire")
+    }
+  }
+
   test("cost gate skips when stats are missing and benefitRatio < 1.0") {
     withSQLConf(
         SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
         SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "0.5") {
       val (agg, _) = rollupAggOverExpand()
       assert(!hasPreAgg(Optimize.execute(agg)),
-        "LocalRelation has no column stats -- cost gate should skip the rewrite")
+        "LocalRelation has no column stats - cost gate should skip the rewrite")
     }
   }
 }
