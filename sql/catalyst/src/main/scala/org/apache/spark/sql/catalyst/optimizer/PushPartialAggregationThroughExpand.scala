@@ -17,12 +17,12 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeSet, Cast, Divide, Expression, ExprId, NamedExpression, NumericEvalContext}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Average, BitAndAgg, BitOrAgg, BitXorAgg, Complete, Count, First, Last, Max, Min, Sum}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, Expression, ExprId, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.optimizer.PartialAggregationDecomposition.{decompose, supportedAgg}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, AggregateBase, Expand, FinalAggregate, LogicalPlan, PartialAggregate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.AGGREGATE
-import org.apache.spark.sql.types.{DecimalType, LongType, NumericType}
 
 /**
  * Push the heavy part of an aggregation through [[Expand]] (the operator behind
@@ -46,22 +46,15 @@ import org.apache.spark.sql.types.{DecimalType, LongType, NumericType}
  * This rule is part of the broader partial-aggregation push-down framework introduced
  * by [[PushPartialAggregationThroughJoin]] and described in Modi et al., "New Query
  * Optimization Techniques in the Spark Engine of Azure Synapse", VLDB 2022. It shares
- * the same gating conf [[SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED]] and the
- * same cost model conf [[SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO]].
+ * the same gating conf
+ * [[org.apache.spark.sql.internal.SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED]] and
+ * the same cost model conf
+ * [[org.apache.spark.sql.internal.SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO]].
  *
- * Per-function decomposition (the partial alias name pattern is `_pushed_<fn>_<refs>`,
- * e.g. `_pushed_sum_v` for `sum(v)`):
- *  - `Sum(x)`     -> outer `Sum(partial)`              inner `Sum(x)`
- *  - `Count(x)`   -> outer `Sum(partial)`              inner `Count(x)`
- *  - `Min(x)`     -> outer `Min(partial)`              inner `Min(x)`
- *  - `Max(x)`     -> outer `Max(partial)`              inner `Max(x)`
- *  - `First(x)`   -> outer `First(partial)`            inner `First(x)`
- *  - `Last(x)`    -> outer `Last(partial)`             inner `Last(x)`
- *  - `BitAndAgg`  -> same shape as `Min`               ditto
- *  - `BitOrAgg`   -> same shape as `Min`               ditto
- *  - `BitXorAgg`  -> same shape as `Min`               ditto
- *  - `Avg(x)`     -> outer `Sum(partial_sum) / Sum(partial_count)`,
- *                   inner produces both `Sum(x)` and `Count(x)`.
+ * Per-function decomposition is shared with [[PushPartialAggregationThroughUnion]] via
+ * [[PartialAggregationDecomposition]]; see that object's scaladoc for the function table
+ * and the rationale for preserving fields like `Sum.evalContext`, `Average.evalMode`, and
+ * `First`/`Last.ignoreNulls`.
  *
  * Eligibility guards (each implemented in [[isEligible]]):
  *  1. The outer aggregate has at least one [[AggregateExpression]].
@@ -135,25 +128,6 @@ object PushPartialAggregationThroughExpand extends Rule[LogicalPlan] {
 
     val measureExprIds: Set[ExprId] = measureRefs.map(_.exprId).toSet
     expand.child.output.exists(a => !measureExprIds.contains(a.exprId))
-  }
-
-  private def supportedAgg(ae: AggregateExpression): Boolean = ae match {
-    // Average accepts NumericType and AnsiIntervalType inputs. Decimal Average is
-    // intentionally excluded for now: matching `Average.evaluateExpression`'s
-    // precision exactly requires applying `DecimalPrecision` coercion to the
-    // rewritten Divide, which is not done here. Non-Decimal numeric Avg uses the
-    // simple `Sum(x) / Count(x)` decomposition. (TODO: extend to Decimal in a
-    // follow-up by mirroring `Average.evaluateExpression` end-to-end.)
-    case AggregateExpression(Average(child, _), Complete, false, None, _) =>
-      child.dataType match {
-        case _: DecimalType => false
-        case _: NumericType => true
-        case _ => false
-      }
-    case AggregateExpression(_: Sum | _: Count | _: Min | _: Max |
-        _: First | _: Last | _: BitAndAgg | _: BitOrAgg | _: BitXorAgg,
-        Complete, false, None, _) => true
-    case _ => false
   }
 
   // ---------------------------------------------------------------------------
@@ -234,110 +208,12 @@ object PushPartialAggregationThroughExpand extends Rule[LogicalPlan] {
   // ---------------------------------------------------------------------------
 
   /**
-   * For each top-level [[AggregateExpression]] in `outerAgg`, decompose it into:
-   *  - one or more partial-aggregate aliases to add to the lower aggregate's output;
-   *  - one replacement expression that the outer aggregate uses in place of the
-   *    original. Most functions yield a single alias and a single replacement; `Avg`
-   *    yields two aliases (sum + count) and a `Sum / Sum` replacement.
-   *
-   * For functions whose case classes carry semantics-bearing fields (`Sum.evalContext`,
-   * `Sum.resultDataType`, `Average.evalMode`, `First.ignoreNulls`, `Last.ignoreNulls`),
-   * those fields are propagated to the outer expression so the rewrite preserves the
-   * original ANSI / TRY behavior, output type, and null handling.
+   * Per-aggregate decomposition is shared with
+   * [[PushPartialAggregationThroughUnion]] via
+   * [[PartialAggregationDecomposition]]. See that object's scaladoc for the
+   * function-by-function table and the rationale behind preserving fields like
+   * `Sum.evalContext`, `Average.evalMode`, and `First`/`Last.ignoreNulls`.
    */
-  private case class AggMapping(
-      original: AggregateExpression,
-      partials: Seq[NamedExpression],
-      replacement: Expression)
-
-  private def decompose(ae: AggregateExpression): AggMapping = ae.aggregateFunction match {
-    case sum: Sum =>
-      val partial = Alias(ae, freshName("sum", sum.child))()
-      // Preserve evalContext (ANSI / TRY) and the resolved resultDataType so the outer
-      // `Sum` keeps the original overflow semantics and output type. Mirrors v6's
-      // `PushPartialAggregationThroughJoin.replaceAliasName`.
-      val outerFn = Sum(partial.toAttribute, sum.evalContext, Some(sum.dataType))
-      AggMapping(ae, Seq(partial), AggregateExpression(outerFn, Complete, isDistinct = false))
-
-    case cnt: Count =>
-      val name = if (cnt.children.size == 1) freshName("count", cnt.children.head) else "count_star"
-      val partial = Alias(ae, name)()
-      val outerFn = Sum(partial.toAttribute, resultDataType = Some(LongType))
-      AggMapping(ae, Seq(partial), AggregateExpression(outerFn, Complete, isDistinct = false))
-
-    case Min(child) => selfCompose(ae, "min", child, Min(_))
-    case Max(child) => selfCompose(ae, "max", child, Max(_))
-    case BitAndAgg(child) => selfCompose(ae, "bit_and", child, BitAndAgg(_))
-    case BitOrAgg(child) => selfCompose(ae, "bit_or", child, BitOrAgg(_))
-    case BitXorAgg(child) => selfCompose(ae, "bit_xor", child, BitXorAgg(_))
-
-    case first: First =>
-      val partial = Alias(ae, freshName("first", first.child))()
-      AggMapping(ae, Seq(partial),
-        AggregateExpression(First(partial.toAttribute, first.ignoreNulls),
-          Complete, isDistinct = false))
-
-    case last: Last =>
-      val partial = Alias(ae, freshName("last", last.child))()
-      AggMapping(ae, Seq(partial),
-        AggregateExpression(Last(partial.toAttribute, last.ignoreNulls),
-          Complete, isDistinct = false))
-
-    case avg: Average =>
-      // Avg(x) = Sum(x) / Count(x). Pre-aggregate both, then recombine in the outer
-      // expression with a Divide cast to Avg's public dataType. Decimal Avg is
-      // excluded by `supportedAgg` (matching `Average.evaluateExpression` for
-      // Decimal requires `DecimalPrecision` coercion and `CheckOverflowInSum`,
-      // which is left as a follow-up). For non-Decimal numeric Avg:
-      //   - the inner Sum carries `Average.evalMode` (preserves ANSI / TRY) and
-      //     `Average.sumDataType` (DoubleType for non-Decimal numeric);
-      //   - the outer Sum-of-counts carries `LongType` so it cleanly merges Counts.
-      val evalCtx = NumericEvalContext(avg.evalMode)
-      val sumPartial = Alias(
-        AggregateExpression(
-          Sum(avg.child, evalCtx, Some(avg.sumDataType)),
-          Complete, isDistinct = false),
-        freshName("avg_sum", avg.child))()
-      val countPartial = Alias(
-        AggregateExpression(Count(Seq(avg.child)), Complete, isDistinct = false),
-        freshName("avg_count", avg.child))()
-      val sumOuter = AggregateExpression(
-        Sum(sumPartial.toAttribute, evalCtx, Some(avg.sumDataType)),
-        Complete, isDistinct = false)
-      val countOuter = AggregateExpression(
-        Sum(countPartial.toAttribute, resultDataType = Some(LongType)),
-        Complete, isDistinct = false)
-      val replacement = Divide(
-        Cast(sumOuter, avg.dataType), Cast(countOuter, avg.dataType))
-      AggMapping(ae, Seq(sumPartial, countPartial), replacement)
-
-    case other =>
-      // Should not happen; supportedAgg gates this, but keep the failure mode explicit.
-      throw new IllegalStateException(
-        s"PushPartialAggregationThroughExpand: unexpected aggregate function $other")
-  }
-
-  /**
-   * Helper for the trivially self-composing aggregate functions: outer fn = inner fn
-   * with the same shape, just substituting the input. Covers `Min`, `Max`,
-   * `BitAndAgg`, `BitOrAgg`, `BitXorAgg`. (`First` / `Last` need to also propagate
-   * `ignoreNulls`, so they're handled separately.)
-   */
-  private def selfCompose(
-      ae: AggregateExpression,
-      name: String,
-      child: Expression,
-      mkOuter: Attribute => AggregateFunction): AggMapping = {
-    val partial = Alias(ae, freshName(name, child))()
-    AggMapping(ae, Seq(partial),
-      AggregateExpression(mkOuter(partial.toAttribute), Complete, isDistinct = false))
-  }
-
-  private def freshName(prefix: String, expr: Expression): String = {
-    val refNames = expr.references.map(_.name).mkString("_")
-    if (refNames.isEmpty) s"_pushed_$prefix" else s"_pushed_${prefix}_$refNames"
-  }
-
   private def rewrite(
       outerAgg: Aggregate,
       expand: Expand,
