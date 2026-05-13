@@ -262,6 +262,7 @@ abstract class Optimizer(catalogManager: CatalogManager)
       PushPartialAggregationThroughJoin,
       PushPartialAggregationThroughExpand,
       PushPartialAggregationThroughUnion,
+      PushPartialAggregationThroughFilter,
       DeduplicateRightSideOfLeftSemiAntiJoin),
     Batch("Object Expressions Optimization", fixedPoint,
       EliminateMapObjects,
