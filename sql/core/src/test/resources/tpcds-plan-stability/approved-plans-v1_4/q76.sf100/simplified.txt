@@ -1,11 +1,11 @@
 TakeOrderedAndProject [channel,col_name,d_year,d_qoy,i_category,sales_cnt,sales_amt]
   WholeStageCodegen (8)
-    HashAggregate [channel,col_name,d_year,d_qoy,i_category,count,sum] [count(1),sum(UnscaledValue(ext_sales_price)),sales_cnt,sales_amt,count,sum]
+    HashAggregate [channel,col_name,d_year,d_qoy,i_category,_pushed_count,_pushed_sum_ext_sales_price] [sum(_pushed_countL),sum(_pushed_sum_ext_sales_priceL),sales_cnt,sales_amt,sum,sum]
       InputAdapter
         Exchange [channel,col_name,d_year,d_qoy,i_category] #1
           WholeStageCodegen (7)
-            HashAggregate [channel,col_name,d_year,d_qoy,i_category,ext_sales_price] [count,sum,count,sum]
-              Union
+            Union
+              HashAggregate [channel,col_name,d_year,d_qoy,i_category,ext_sales_price] [count(1),sum(UnscaledValue(ext_sales_price)),_pushed_count,_pushed_sum_ext_sales_price,count,sum]
                 Project [ss_store_sk,d_year,d_qoy,i_category,ss_ext_sales_price]
                   BroadcastHashJoin [ss_item_sk,i_item_sk]
                     Project [ss_item_sk,ss_store_sk,ss_ext_sales_price,d_year,d_qoy]
@@ -28,6 +28,7 @@ TakeOrderedAndProject [channel,col_name,d_year,d_qoy,i_category,sales_cnt,sales_
                             ColumnarToRow
                               InputAdapter
                                 Scan parquet spark_catalog.default.item [i_item_sk,i_category]
+              HashAggregate [channel,col_name,d_year,d_qoy,i_category,ext_sales_price] [count(1),sum(UnscaledValue(ext_sales_price)),_pushed_count,_pushed_sum_ext_sales_price,count,sum]
                 Project [ws_ship_customer_sk,d_year,d_qoy,i_category,ws_ext_sales_price]
                   BroadcastHashJoin [ws_item_sk,i_item_sk]
                     InputAdapter
@@ -50,6 +51,7 @@ TakeOrderedAndProject [channel,col_name,d_year,d_qoy,i_category,sales_cnt,sales_
                       ColumnarToRow
                         InputAdapter
                           Scan parquet spark_catalog.default.item [i_item_sk,i_category]
+              HashAggregate [channel,col_name,d_year,d_qoy,i_category,ext_sales_price] [count(1),sum(UnscaledValue(ext_sales_price)),_pushed_count,_pushed_sum_ext_sales_price,count,sum]
                 Project [cs_ship_addr_sk,d_year,d_qoy,i_category,cs_ext_sales_price]
                   BroadcastHashJoin [cs_item_sk,i_item_sk]
                     Project [cs_ship_addr_sk,cs_item_sk,cs_ext_sales_price,d_year,d_qoy]
