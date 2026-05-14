@@ -1,11 +1,11 @@
 TakeOrderedAndProject [d_year,sum_agg,brand_id,brand]
   WholeStageCodegen (4)
-    HashAggregate [d_year,i_brand,i_brand_id,sum] [sum(UnscaledValue(ss_net_profit)),brand_id,brand,sum_agg,sum]
+    HashAggregate [d_year,i_brand,i_brand_id,_pushed_sum_ss_net_profit] [sum(_pushed_sum_ss_net_profitL),brand_id,brand,sum_agg,sum]
       InputAdapter
         Exchange [d_year,i_brand,i_brand_id] #1
           WholeStageCodegen (3)
-            HashAggregate [d_year,i_brand,i_brand_id,ss_net_profit] [sum,sum]
-              Project [d_year,ss_net_profit,i_brand_id,i_brand]
+            HashAggregate [d_year,i_brand,i_brand_id,ss_net_profit] [sum(UnscaledValue(ss_net_profit)),_pushed_sum_ss_net_profit,sum]
+              Project [ss_net_profit,i_brand_id,i_brand,d_year]
                 BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                   Project [ss_net_profit,ss_sold_date_sk,i_brand_id,i_brand]
                     BroadcastHashJoin [ss_item_sk,i_item_sk]

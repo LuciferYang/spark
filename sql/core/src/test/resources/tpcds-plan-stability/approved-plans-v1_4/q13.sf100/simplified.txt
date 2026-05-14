@@ -1,9 +1,9 @@
 WholeStageCodegen (7)
-  HashAggregate [sum,count,sum,count,sum,count,sum] [avg(ss_quantity),avg(UnscaledValue(ss_ext_sales_price)),avg(UnscaledValue(ss_ext_wholesale_cost)),sum(UnscaledValue(ss_ext_wholesale_cost)),avg(ss_quantity),avg(ss_ext_sales_price),avg(ss_ext_wholesale_cost),sum(ss_ext_wholesale_cost),sum,count,sum,count,sum,count,sum]
+  HashAggregate [_pushed_avg_sum_ss_quantity,_pushed_avg_count_ss_quantity,_pushed_avg_sum_ss_ext_sales_price,_pushed_avg_count_ss_ext_sales_price,_pushed_avg_sum_ss_ext_wholesale_cost,_pushed_avg_count_ss_ext_wholesale_cost,_pushed_sum_ss_ext_wholesale_cost] [sum(_pushed_avg_sum_ss_quantity),sum(_pushed_avg_count_ss_quantityL),sum(_pushed_avg_sum_ss_ext_sales_price),sum(_pushed_avg_count_ss_ext_sales_priceL),sum(_pushed_avg_sum_ss_ext_wholesale_cost),sum(_pushed_avg_count_ss_ext_wholesale_costL),sum(_pushed_sum_ss_ext_wholesale_costL),avg(ss_quantity),avg(ss_ext_sales_price),avg(ss_ext_wholesale_cost),sum(ss_ext_wholesale_cost),sum,sum,sum,sum,sum,sum,sum]
     InputAdapter
       Exchange #1
         WholeStageCodegen (6)
-          HashAggregate [ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost] [sum,count,sum,count,sum,count,sum,sum,count,sum,count,sum,count,sum]
+          HashAggregate [ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost] [sum(ss_quantity),count(ss_quantity),sum(UnscaledValue(ss_ext_sales_price)),count(UnscaledValue(ss_ext_sales_price)),sum(UnscaledValue(ss_ext_wholesale_cost)),count(UnscaledValue(ss_ext_wholesale_cost)),sum(UnscaledValue(ss_ext_wholesale_cost)),_pushed_avg_sum_ss_quantity,_pushed_avg_count_ss_quantity,_pushed_avg_sum_ss_ext_sales_price,_pushed_avg_count_ss_ext_sales_price,_pushed_avg_sum_ss_ext_wholesale_cost,_pushed_avg_count_ss_ext_wholesale_cost,_pushed_sum_ss_ext_wholesale_cost,sum,count,sum,count,sum,count,sum]
             Project [ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost]
               BroadcastHashJoin [ss_addr_sk,ca_address_sk,ca_state,ss_net_profit]
                 Project [ss_addr_sk,ss_quantity,ss_ext_sales_price,ss_ext_wholesale_cost,ss_net_profit]

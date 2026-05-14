@@ -286,24 +286,24 @@ Input [6]: [ws_quantity#4, wr_reason_sk#14, wr_fee#16, wr_refunded_cash#17, r_re
 (51) HashAggregate [codegen id : 14]
 Input [4]: [ws_quantity#4, wr_fee#16, wr_refunded_cash#17, r_reason_desc#32]
 Keys [1]: [r_reason_desc#32]
-Functions [3]: [partial_avg(ws_quantity#4), partial_avg(UnscaledValue(wr_refunded_cash#17)), partial_avg(UnscaledValue(wr_fee#16))]
-Aggregate Attributes [6]: [sum#33, count#34, sum#35, count#36, sum#37, count#38]
-Results [7]: [r_reason_desc#32, sum#39, count#40, sum#41, count#42, sum#43, count#44]
+Functions [6]: [sum(ws_quantity#4), count(ws_quantity#4), sum(UnscaledValue(wr_refunded_cash#17)), count(UnscaledValue(wr_refunded_cash#17)), sum(UnscaledValue(wr_fee#16)), count(UnscaledValue(wr_fee#16))]
+Aggregate Attributes [6]: [sum(ws_quantity#4)#33, count(ws_quantity#4)#34, sum(UnscaledValue(wr_refunded_cash#17))#35, count(UnscaledValue(wr_refunded_cash#17))#36, sum(UnscaledValue(wr_fee#16))#37, count(UnscaledValue(wr_fee#16))#38]
+Results [7]: [r_reason_desc#32, sum(ws_quantity#4)#33 AS _pushed_avg_sum_ws_quantity#39, count(ws_quantity#4)#34 AS _pushed_avg_count_ws_quantity#40, sum(UnscaledValue(wr_refunded_cash#17))#35 AS _pushed_avg_sum_wr_refunded_cash#41, count(UnscaledValue(wr_refunded_cash#17))#36 AS _pushed_avg_count_wr_refunded_cash#42, sum(UnscaledValue(wr_fee#16))#37 AS _pushed_avg_sum_wr_fee#43, count(UnscaledValue(wr_fee#16))#38 AS _pushed_avg_count_wr_fee#44]
 
 (52) Exchange
-Input [7]: [r_reason_desc#32, sum#39, count#40, sum#41, count#42, sum#43, count#44]
+Input [7]: [r_reason_desc#32, _pushed_avg_sum_ws_quantity#39, _pushed_avg_count_ws_quantity#40, _pushed_avg_sum_wr_refunded_cash#41, _pushed_avg_count_wr_refunded_cash#42, _pushed_avg_sum_wr_fee#43, _pushed_avg_count_wr_fee#44]
 Arguments: hashpartitioning(r_reason_desc#32, 5), ENSURE_REQUIREMENTS, [plan_id=11]
 
 (53) HashAggregate [codegen id : 15]
-Input [7]: [r_reason_desc#32, sum#39, count#40, sum#41, count#42, sum#43, count#44]
+Input [7]: [r_reason_desc#32, _pushed_avg_sum_ws_quantity#39, _pushed_avg_count_ws_quantity#40, _pushed_avg_sum_wr_refunded_cash#41, _pushed_avg_count_wr_refunded_cash#42, _pushed_avg_sum_wr_fee#43, _pushed_avg_count_wr_fee#44]
 Keys [1]: [r_reason_desc#32]
-Functions [3]: [avg(ws_quantity#4), avg(UnscaledValue(wr_refunded_cash#17)), avg(UnscaledValue(wr_fee#16))]
-Aggregate Attributes [3]: [avg(ws_quantity#4)#45, avg(UnscaledValue(wr_refunded_cash#17))#46, avg(UnscaledValue(wr_fee#16))#47]
-Results [4]: [substr(r_reason_desc#32, 1, 20) AS substr(r_reason_desc, 1, 20)#48, avg(ws_quantity#4)#45 AS avg(ws_quantity)#49, cast((avg(UnscaledValue(wr_refunded_cash#17))#46 / 100.0) as decimal(11,6)) AS avg(wr_refunded_cash)#50, cast((avg(UnscaledValue(wr_fee#16))#47 / 100.0) as decimal(11,6)) AS avg(wr_fee)#51]
+Functions [6]: [sum(_pushed_avg_sum_ws_quantity#39), sum(_pushed_avg_count_ws_quantity#40), sum(_pushed_avg_sum_wr_refunded_cash#41), sum(_pushed_avg_count_wr_refunded_cash#42), sum(_pushed_avg_sum_wr_fee#43), sum(_pushed_avg_count_wr_fee#44)]
+Aggregate Attributes [6]: [sum(_pushed_avg_sum_ws_quantity#39)#45, sum(_pushed_avg_count_ws_quantity#40)#46, sum(_pushed_avg_sum_wr_refunded_cash#41)#47, sum(_pushed_avg_count_wr_refunded_cash#42)#48, sum(_pushed_avg_sum_wr_fee#43)#49, sum(_pushed_avg_count_wr_fee#44)#50]
+Results [4]: [substr(r_reason_desc#32, 1, 20) AS substr(r_reason_desc, 1, 20)#51, (cast(sum(_pushed_avg_sum_ws_quantity#39)#45 as double) / cast(sum(_pushed_avg_count_ws_quantity#40)#46 as double)) AS avg(ws_quantity)#52, cast(((cast(sum(_pushed_avg_sum_wr_refunded_cash#41)#47 as double) / cast(sum(_pushed_avg_count_wr_refunded_cash#42)#48 as double)) / 100.0) as decimal(11,6)) AS avg(wr_refunded_cash)#53, cast(((cast(sum(_pushed_avg_sum_wr_fee#43)#49 as double) / cast(sum(_pushed_avg_count_wr_fee#44)#50 as double)) / 100.0) as decimal(11,6)) AS avg(wr_fee)#54]
 
 (54) TakeOrderedAndProject
-Input [4]: [substr(r_reason_desc, 1, 20)#48, avg(ws_quantity)#49, avg(wr_refunded_cash)#50, avg(wr_fee)#51]
-Arguments: 100, [substr(r_reason_desc, 1, 20)#48 ASC NULLS FIRST, avg(ws_quantity)#49 ASC NULLS FIRST, avg(wr_refunded_cash)#50 ASC NULLS FIRST, avg(wr_fee)#51 ASC NULLS FIRST], [substr(r_reason_desc, 1, 20)#48, avg(ws_quantity)#49, avg(wr_refunded_cash)#50, avg(wr_fee)#51]
+Input [4]: [substr(r_reason_desc, 1, 20)#51, avg(ws_quantity)#52, avg(wr_refunded_cash)#53, avg(wr_fee)#54]
+Arguments: 100, [substr(r_reason_desc, 1, 20)#51 ASC NULLS FIRST, avg(ws_quantity)#52 ASC NULLS FIRST, avg(wr_refunded_cash)#53 ASC NULLS FIRST, avg(wr_fee)#54 ASC NULLS FIRST], [substr(r_reason_desc, 1, 20)#51, avg(ws_quantity)#52, avg(wr_refunded_cash)#53, avg(wr_fee)#54]
 
 ===== Subqueries =====
 
@@ -316,22 +316,22 @@ BroadcastExchange (59)
 
 
 (55) Scan parquet spark_catalog.default.date_dim
-Output [2]: [d_date_sk#30, d_year#52]
+Output [2]: [d_date_sk#30, d_year#55]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2000), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_year:int>
 
 (56) ColumnarToRow [codegen id : 1]
-Input [2]: [d_date_sk#30, d_year#52]
+Input [2]: [d_date_sk#30, d_year#55]
 
 (57) Filter [codegen id : 1]
-Input [2]: [d_date_sk#30, d_year#52]
-Condition : ((isnotnull(d_year#52) AND (d_year#52 = 2000)) AND isnotnull(d_date_sk#30))
+Input [2]: [d_date_sk#30, d_year#55]
+Condition : ((isnotnull(d_year#55) AND (d_year#55 = 2000)) AND isnotnull(d_date_sk#30))
 
 (58) Project [codegen id : 1]
 Output [1]: [d_date_sk#30]
-Input [2]: [d_date_sk#30, d_year#52]
+Input [2]: [d_date_sk#30, d_year#55]
 
 (59) BroadcastExchange
 Input [1]: [d_date_sk#30]
@@ -369,19 +369,19 @@ Input [3]: [cd_demo_sk#21, cd_marital_status#22, cd_education_status#23]
 Input [1]: [cd_demo_sk#21]
 Keys: []
 Functions [1]: [partial_bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)]
-Aggregate Attributes [1]: [buf#53]
-Results [1]: [buf#54]
+Aggregate Attributes [1]: [buf#56]
+Results [1]: [buf#57]
 
 (65) Exchange
-Input [1]: [buf#54]
+Input [1]: [buf#57]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=13]
 
 (66) ObjectHashAggregate
-Input [1]: [buf#54]
+Input [1]: [buf#57]
 Keys: []
 Functions [1]: [bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)#55]
-Results [1]: [bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)#55 AS bloomFilter#56]
+Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)#58]
+Results [1]: [bloom_filter_agg(xxhash64(cd_demo_sk#21, 42), 159981, 2239471, 0, 0)#58 AS bloomFilter#59]
 
 Subquery:3 Hosting operator id = 14 Hosting Expression = Subquery scalar-subquery#20, [id=#4]
 ObjectHashAggregate (73)
@@ -415,18 +415,18 @@ Input [3]: [ca_address_sk#27, ca_state#28, ca_country#29]
 Input [1]: [ca_address_sk#27]
 Keys: []
 Functions [1]: [partial_bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)]
-Aggregate Attributes [1]: [buf#57]
-Results [1]: [buf#58]
+Aggregate Attributes [1]: [buf#60]
+Results [1]: [buf#61]
 
 (72) Exchange
-Input [1]: [buf#58]
+Input [1]: [buf#61]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=14]
 
 (73) ObjectHashAggregate
-Input [1]: [buf#58]
+Input [1]: [buf#61]
 Keys: []
 Functions [1]: [bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)#59]
-Results [1]: [bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)#59 AS bloomFilter#60]
+Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)#62]
+Results [1]: [bloom_filter_agg(xxhash64(ca_address_sk#27, 42), 152837, 2153999, 0, 0)#62 AS bloomFilter#63]
 
 

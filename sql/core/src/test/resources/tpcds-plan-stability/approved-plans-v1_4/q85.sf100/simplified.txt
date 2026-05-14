@@ -1,10 +1,10 @@
 TakeOrderedAndProject [substr(r_reason_desc, 1, 20),avg(ws_quantity),avg(wr_refunded_cash),avg(wr_fee)]
   WholeStageCodegen (15)
-    HashAggregate [r_reason_desc,sum,count,sum,count,sum,count] [avg(ws_quantity),avg(UnscaledValue(wr_refunded_cash)),avg(UnscaledValue(wr_fee)),substr(r_reason_desc, 1, 20),avg(ws_quantity),avg(wr_refunded_cash),avg(wr_fee),sum,count,sum,count,sum,count]
+    HashAggregate [r_reason_desc,_pushed_avg_sum_ws_quantity,_pushed_avg_count_ws_quantity,_pushed_avg_sum_wr_refunded_cash,_pushed_avg_count_wr_refunded_cash,_pushed_avg_sum_wr_fee,_pushed_avg_count_wr_fee] [sum(_pushed_avg_sum_ws_quantity),sum(_pushed_avg_count_ws_quantityL),sum(_pushed_avg_sum_wr_refunded_cash),sum(_pushed_avg_count_wr_refunded_cashL),sum(_pushed_avg_sum_wr_fee),sum(_pushed_avg_count_wr_feeL),substr(r_reason_desc, 1, 20),avg(ws_quantity),avg(wr_refunded_cash),avg(wr_fee),sum,sum,sum,sum,sum,sum]
       InputAdapter
         Exchange [r_reason_desc] #1
           WholeStageCodegen (14)
-            HashAggregate [r_reason_desc,ws_quantity,wr_refunded_cash,wr_fee] [sum,count,sum,count,sum,count,sum,count,sum,count,sum,count]
+            HashAggregate [r_reason_desc,ws_quantity,wr_refunded_cash,wr_fee] [sum(ws_quantity),count(ws_quantity),sum(UnscaledValue(wr_refunded_cash)),count(UnscaledValue(wr_refunded_cash)),sum(UnscaledValue(wr_fee)),count(UnscaledValue(wr_fee)),_pushed_avg_sum_ws_quantity,_pushed_avg_count_ws_quantity,_pushed_avg_sum_wr_refunded_cash,_pushed_avg_count_wr_refunded_cash,_pushed_avg_sum_wr_fee,_pushed_avg_count_wr_fee,sum,count,sum,count,sum,count]
               Project [ws_quantity,wr_fee,wr_refunded_cash,r_reason_desc]
                 BroadcastHashJoin [wr_reason_sk,r_reason_sk]
                   Project [ws_quantity,wr_reason_sk,wr_fee,wr_refunded_cash]

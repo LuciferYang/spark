@@ -1,10 +1,10 @@
 TakeOrderedAndProject [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cnt1,cnt2,cnt3]
   WholeStageCodegen (17)
-    HashAggregate [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,count] [count(1),cnt1,cnt2,cnt3,count]
+    HashAggregate [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,_pushed_count,_pushed_count,_pushed_count] [sum(_pushed_countL),sum(_pushed_countL),sum(_pushed_countL),cnt1,cnt2,cnt3,sum,sum,sum]
       InputAdapter
         Exchange [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating] #1
           WholeStageCodegen (16)
-            HashAggregate [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating] [count,count]
+            HashAggregate [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating] [count(1),_pushed_count,_pushed_count,_pushed_count,count]
               Project [cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating]
                 BroadcastHashJoin [c_current_cdemo_sk,cd_demo_sk]
                   InputAdapter

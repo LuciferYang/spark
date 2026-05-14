@@ -1,9 +1,9 @@
 WholeStageCodegen (6)
-  HashAggregate [sum] [sum(ss_quantity),sum(ss_quantity),sum]
+  HashAggregate [_pushed_sum_ss_quantity] [sum(_pushed_sum_ss_quantityL),sum(ss_quantity),sum]
     InputAdapter
       Exchange #1
         WholeStageCodegen (5)
-          HashAggregate [ss_quantity] [sum,sum]
+          HashAggregate [ss_quantity] [sum(ss_quantity),_pushed_sum_ss_quantity,sum]
             Project [ss_quantity]
               BroadcastHashJoin [ss_sold_date_sk,d_date_sk]
                 Project [ss_quantity,ss_sold_date_sk]
