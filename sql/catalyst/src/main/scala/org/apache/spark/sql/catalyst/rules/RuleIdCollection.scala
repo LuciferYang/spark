@@ -169,6 +169,7 @@ object RuleIdCollection {
       "org.apache.spark.sql.catalyst.optimizer.PushPartialAggregationThroughExpand" ::
       "org.apache.spark.sql.catalyst.optimizer.PushPartialAggregationThroughFilter" ::
       "org.apache.spark.sql.catalyst.optimizer.PushPartialAggregationThroughJoin" ::
+      "org.apache.spark.sql.catalyst.optimizer.PushPartialAggregationThroughProject" ::
       "org.apache.spark.sql.catalyst.optimizer.PushPartialAggregationThroughUnion" ::
       "org.apache.spark.sql.catalyst.optimizer.ReassignLambdaVariableID" ::
       "org.apache.spark.sql.catalyst.optimizer.RemoveLiteralFromGroupExpressions" ::
