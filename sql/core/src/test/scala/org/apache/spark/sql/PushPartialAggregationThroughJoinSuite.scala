@@ -18,7 +18,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.SparkArithmeticException
-import org.apache.spark.sql.catalyst.plans.logical.PartialAggregate
+import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, PartialAggregate}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
@@ -27,6 +27,12 @@ import org.apache.spark.sql.test.SharedSparkSession
 class PushPartialAggregationThroughJoinSuite extends QueryTest
   with SharedSparkSession
   with AdaptiveSparkPlanHelper {
+
+  // This suite checks only the partials the join rule pushes. Count partials that
+  // are direct Join children (what the join/dedup rules produce), so the sibling
+  // Project rule's partials elsewhere in the plan don't perturb the counts.
+  private def numJoinPushedPartialAggs(plan: LogicalPlan): Int =
+    plan.collect { case j: Join => j.children.count(_.isInstanceOf[PartialAggregate]) }.sum
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -111,7 +117,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -164,7 +170,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -208,7 +214,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -254,7 +260,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -299,7 +305,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -366,7 +372,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                 """.stripMargin)
 
               val optimizedPlan = df.queryExecution.optimizedPlan
-              val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+              val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
               if (pushAgg) {
                 ratio match {
                   case 0.1 => assert(partialAggCnt === 0)
@@ -414,7 +420,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                   checkAnswer(df, Row(0) :: Nil)
                 } else {
                   val optimizedPlan = df.queryExecution.optimizedPlan
-                  val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+                  val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
                   if (broadcastThreshold == -1 && pushAgg) {
                     ratio match {
                       case 0.1 | 0.5 => assert(partialAggCnt === 0)
@@ -456,7 +462,7 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
                   checkAnswer(df, Row("0") :: Nil)
                 } else {
                   val optimizedPlan = df.queryExecution.optimizedPlan
-                  val partialAggCnt = optimizedPlan.collect { case p: PartialAggregate => p }.size
+                  val partialAggCnt = numJoinPushedPartialAggs(optimizedPlan)
                   if (broadcastThreshold == -1 && pushAgg) {
                     ratio match {
                       case 0.1 | 0.5 => assert(partialAggCnt === 0)

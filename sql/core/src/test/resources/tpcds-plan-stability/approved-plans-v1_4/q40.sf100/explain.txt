@@ -163,30 +163,30 @@ Join type: Inner
 Join condition: None
 
 (29) Project [codegen id : 8]
-Output [5]: [cs_sales_price#4, cr_refunded_cash#10, w_state#18, i_item_id#13, d_date#16]
+Output [5]: [cs_sales_price#4, cr_refunded_cash#10, i_item_id#13, d_date#16, w_state#18]
 Input [7]: [cs_warehouse_sk#1, cs_sales_price#4, cr_refunded_cash#10, i_item_id#13, d_date#16, w_warehouse_sk#17, w_state#18]
 
 (30) HashAggregate [codegen id : 8]
-Input [5]: [cs_sales_price#4, cr_refunded_cash#10, w_state#18, i_item_id#13, d_date#16]
+Input [5]: [cs_sales_price#4, cr_refunded_cash#10, i_item_id#13, d_date#16, w_state#18]
 Keys [2]: [w_state#18, i_item_id#13]
-Functions [2]: [partial_sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END), partial_sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)]
-Aggregate Attributes [4]: [sum#19, isEmpty#20, sum#21, isEmpty#22]
-Results [6]: [w_state#18, i_item_id#13, sum#23, isEmpty#24, sum#25, isEmpty#26]
+Functions [2]: [sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END), sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)]
+Aggregate Attributes [2]: [sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#19, sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#20]
+Results [4]: [w_state#18, i_item_id#13, sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#19 AS _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21, sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#20 AS _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22]
 
 (31) Exchange
-Input [6]: [w_state#18, i_item_id#13, sum#23, isEmpty#24, sum#25, isEmpty#26]
+Input [4]: [w_state#18, i_item_id#13, _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21, _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22]
 Arguments: hashpartitioning(w_state#18, i_item_id#13, 5), ENSURE_REQUIREMENTS, [plan_id=6]
 
 (32) HashAggregate [codegen id : 9]
-Input [6]: [w_state#18, i_item_id#13, sum#23, isEmpty#24, sum#25, isEmpty#26]
+Input [4]: [w_state#18, i_item_id#13, _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21, _pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22]
 Keys [2]: [w_state#18, i_item_id#13]
-Functions [2]: [sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END), sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)]
-Aggregate Attributes [2]: [sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#27, sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#28]
-Results [4]: [w_state#18, i_item_id#13, sum(CASE WHEN (d_date#16 < 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#27 AS sales_before#29, sum(CASE WHEN (d_date#16 >= 2000-03-11) THEN (cs_sales_price#4 - coalesce(cast(cr_refunded_cash#10 as decimal(12,2)), 0.00)) ELSE 0.00 END)#28 AS sales_after#30]
+Functions [2]: [sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21), sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22)]
+Aggregate Attributes [2]: [sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21)#23, sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22)#24]
+Results [4]: [w_state#18, i_item_id#13, sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#21)#23 AS sales_before#25, sum(_pushed_sum_d_date_cs_sales_price_cr_refunded_cash#22)#24 AS sales_after#26]
 
 (33) TakeOrderedAndProject
-Input [4]: [w_state#18, i_item_id#13, sales_before#29, sales_after#30]
-Arguments: 100, [w_state#18 ASC NULLS FIRST, i_item_id#13 ASC NULLS FIRST], [w_state#18, i_item_id#13, sales_before#29, sales_after#30]
+Input [4]: [w_state#18, i_item_id#13, sales_before#25, sales_after#26]
+Arguments: 100, [w_state#18 ASC NULLS FIRST, i_item_id#13 ASC NULLS FIRST], [w_state#18, i_item_id#13, sales_before#25, sales_after#26]
 
 ===== Subqueries =====
 
@@ -222,19 +222,19 @@ Input [2]: [i_item_sk#12, i_current_price#14]
 Input [1]: [i_item_sk#12]
 Keys: []
 Functions [1]: [partial_bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)]
-Aggregate Attributes [1]: [buf#31]
-Results [1]: [buf#32]
+Aggregate Attributes [1]: [buf#27]
+Results [1]: [buf#28]
 
 (39) Exchange
-Input [1]: [buf#32]
+Input [1]: [buf#28]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=7]
 
 (40) ObjectHashAggregate
-Input [1]: [buf#32]
+Input [1]: [buf#28]
 Keys: []
 Functions [1]: [bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)#33]
-Results [1]: [bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)#33 AS bloomFilter#34]
+Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)#29]
+Results [1]: [bloom_filter_agg(xxhash64(i_item_sk#12, 42), 1019, 24988, 0, 0)#29 AS bloomFilter#30]
 
 Subquery:2 Hosting operator id = 1 Hosting Expression = cs_sold_date_sk#5 IN dynamicpruning#6
 BroadcastExchange (44)

@@ -1,11 +1,11 @@
 WholeStageCodegen (10)
   Project [amc,pmc]
     BroadcastNestedLoopJoin
-      HashAggregate [count] [count(1),amc,count]
+      HashAggregate [_pushed_count] [sum(_pushed_countL),amc,sum]
         InputAdapter
           Exchange #1
             WholeStageCodegen (4)
-              HashAggregate [count,count]
+              HashAggregate [count(1),_pushed_count,count]
                 Project
                   BroadcastHashJoin [ws_sold_time_sk,t_time_sk]
                     Project [ws_sold_time_sk]
@@ -44,11 +44,11 @@ WholeStageCodegen (10)
       InputAdapter
         BroadcastExchange #5
           WholeStageCodegen (9)
-            HashAggregate [count] [count(1),pmc,count]
+            HashAggregate [_pushed_count] [sum(_pushed_countL),pmc,sum]
               InputAdapter
                 Exchange #6
                   WholeStageCodegen (8)
-                    HashAggregate [count,count]
+                    HashAggregate [count(1),_pushed_count,count]
                       Project
                         BroadcastHashJoin [ws_sold_time_sk,t_time_sk]
                           Project [ws_sold_time_sk]

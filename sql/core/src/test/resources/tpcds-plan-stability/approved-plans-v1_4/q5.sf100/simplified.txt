@@ -9,11 +9,11 @@ TakeOrderedAndProject [channel,id,sales,returns,profit]
                 InputAdapter
                   Union
                     WholeStageCodegen (6)
-                      HashAggregate [s_store_id,sum,sum,sum,sum] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),sales,returns,profit,channel,id,sum,sum,sum,sum]
+                      HashAggregate [s_store_id,_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss] [sum(_pushed_sum_sales_priceL),sum(_pushed_sum_return_amtL),sum(_pushed_sum_profitL),sum(_pushed_sum_net_lossL),sales,returns,profit,channel,id,sum,sum,sum,sum]
                         InputAdapter
                           Exchange [s_store_id] #2
                             WholeStageCodegen (5)
-                              HashAggregate [s_store_id,sales_price,return_amt,profit,net_loss] [sum,sum,sum,sum,sum,sum,sum,sum]
+                              HashAggregate [s_store_id,sales_price,return_amt,profit,net_loss] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss,sum,sum,sum,sum]
                                 Project [sales_price,profit,return_amt,net_loss,s_store_id]
                                   BroadcastHashJoin [store_sk,s_store_sk]
                                     Project [store_sk,sales_price,profit,return_amt,net_loss]
@@ -51,11 +51,11 @@ TakeOrderedAndProject [channel,id,sales,returns,profit]
                                               InputAdapter
                                                 Scan parquet spark_catalog.default.store [s_store_sk,s_store_id]
                     WholeStageCodegen (12)
-                      HashAggregate [cp_catalog_page_id,sum,sum,sum,sum] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),sales,returns,profit,channel,id,sum,sum,sum,sum]
+                      HashAggregate [cp_catalog_page_id,_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss] [sum(_pushed_sum_sales_priceL),sum(_pushed_sum_return_amtL),sum(_pushed_sum_profitL),sum(_pushed_sum_net_lossL),sales,returns,profit,channel,id,sum,sum,sum,sum]
                         InputAdapter
                           Exchange [cp_catalog_page_id] #5
                             WholeStageCodegen (11)
-                              HashAggregate [cp_catalog_page_id,sales_price,return_amt,profit,net_loss] [sum,sum,sum,sum,sum,sum,sum,sum]
+                              HashAggregate [cp_catalog_page_id,sales_price,return_amt,profit,net_loss] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss,sum,sum,sum,sum]
                                 Project [sales_price,profit,return_amt,net_loss,cp_catalog_page_id]
                                   BroadcastHashJoin [page_sk,cp_catalog_page_sk]
                                     Project [page_sk,sales_price,profit,return_amt,net_loss]
@@ -86,11 +86,11 @@ TakeOrderedAndProject [channel,id,sales,returns,profit]
                                               InputAdapter
                                                 Scan parquet spark_catalog.default.catalog_page [cp_catalog_page_sk,cp_catalog_page_id]
                     WholeStageCodegen (22)
-                      HashAggregate [web_site_id,sum,sum,sum,sum] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),sales,returns,profit,channel,id,sum,sum,sum,sum]
+                      HashAggregate [web_site_id,_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss] [sum(_pushed_sum_sales_priceL),sum(_pushed_sum_return_amtL),sum(_pushed_sum_profitL),sum(_pushed_sum_net_lossL),sales,returns,profit,channel,id,sum,sum,sum,sum]
                         InputAdapter
                           Exchange [web_site_id] #7
                             WholeStageCodegen (21)
-                              HashAggregate [web_site_id,sales_price,return_amt,profit,net_loss] [sum,sum,sum,sum,sum,sum,sum,sum]
+                              HashAggregate [web_site_id,sales_price,return_amt,profit,net_loss] [sum(UnscaledValue(sales_price)),sum(UnscaledValue(return_amt)),sum(UnscaledValue(profit)),sum(UnscaledValue(net_loss)),_pushed_sum_sales_price,_pushed_sum_return_amt,_pushed_sum_profit,_pushed_sum_net_loss,sum,sum,sum,sum]
                                 Project [sales_price,profit,return_amt,net_loss,web_site_id]
                                   BroadcastHashJoin [wsr_web_site_sk,web_site_sk]
                                     Project [wsr_web_site_sk,sales_price,profit,return_amt,net_loss]
