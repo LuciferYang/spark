@@ -148,20 +148,20 @@ Input [3]: [ss_quantity#4, ss_sold_date_sk#7, d_date_sk#16]
 (26) HashAggregate [codegen id : 5]
 Input [1]: [ss_quantity#4]
 Keys: []
-Functions [1]: [partial_sum(ss_quantity#4)]
-Aggregate Attributes [1]: [sum#17]
-Results [1]: [sum#18]
+Functions [1]: [sum(ss_quantity#4)]
+Aggregate Attributes [1]: [sum(ss_quantity#4)#17]
+Results [1]: [sum(ss_quantity#4)#17 AS _pushed_sum_ss_quantity#18]
 
 (27) Exchange
-Input [1]: [sum#18]
+Input [1]: [_pushed_sum_ss_quantity#18]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=4]
 
 (28) HashAggregate [codegen id : 6]
-Input [1]: [sum#18]
+Input [1]: [_pushed_sum_ss_quantity#18]
 Keys: []
-Functions [1]: [sum(ss_quantity#4)]
-Aggregate Attributes [1]: [sum(ss_quantity#4)#19]
-Results [1]: [sum(ss_quantity#4)#19 AS sum(ss_quantity)#20]
+Functions [1]: [sum(_pushed_sum_ss_quantity#18)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ss_quantity#18)#19]
+Results [1]: [sum(_pushed_sum_ss_quantity#18)#19 AS sum(ss_quantity)#20]
 
 ===== Subqueries =====
 

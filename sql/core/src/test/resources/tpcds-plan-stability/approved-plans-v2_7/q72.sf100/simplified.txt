@@ -1,10 +1,10 @@
 TakeOrderedAndProject [total_cnt,i_item_desc,w_warehouse_name,d_week_seq,no_promo,promo]
   WholeStageCodegen (21)
-    HashAggregate [i_item_desc,w_warehouse_name,d_week_seq,count] [count(1),no_promo,promo,total_cnt,count]
+    HashAggregate [i_item_desc,w_warehouse_name,d_week_seq,_pushed_count,_pushed_count,_pushed_count] [sum(_pushed_countL),sum(_pushed_countL),sum(_pushed_countL),no_promo,promo,total_cnt,sum,sum,sum]
       InputAdapter
         Exchange [i_item_desc,w_warehouse_name,d_week_seq] #1
           WholeStageCodegen (20)
-            HashAggregate [i_item_desc,w_warehouse_name,d_week_seq] [count,count]
+            HashAggregate [i_item_desc,w_warehouse_name,d_week_seq] [count(1),_pushed_count,_pushed_count,_pushed_count,count]
               Project [w_warehouse_name,i_item_desc,d_week_seq]
                 SortMergeJoin [cs_item_sk,cs_order_number,cr_item_sk,cr_order_number]
                   InputAdapter

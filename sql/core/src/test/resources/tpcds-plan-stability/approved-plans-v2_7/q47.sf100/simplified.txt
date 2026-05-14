@@ -25,11 +25,11 @@ TakeOrderedAndProject [sum_sales,avg_monthly_sales,d_moy,i_category,d_year,psum,
                                                 InputAdapter
                                                   Exchange [i_category,i_brand,s_store_name,s_company_name] #2
                                                     WholeStageCodegen (8)
-                                                      HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,sum] [sum(_pushed_sum_ss_sales_priceL),sum_sales,_w0,sum]
+                                                      HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,_pushed_sum__pushed_sum_ss_sales_price,_pushed_sum__pushed_sum_ss_sales_price] [sum(_pushed_sum__pushed_sum_ss_sales_priceL),sum(_pushed_sum__pushed_sum_ss_sales_priceL),sum_sales,_w0,sum,sum]
                                                         InputAdapter
                                                           Exchange [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy] #3
                                                             WholeStageCodegen (7)
-                                                              HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price] [sum,sum]
+                                                              HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price] [sum(_pushed_sum_ss_sales_priceL),_pushed_sum__pushed_sum_ss_sales_price,_pushed_sum__pushed_sum_ss_sales_price,sum]
                                                                 Project [s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price,i_brand,i_category]
                                                                   SortMergeJoin [ss_item_sk,i_item_sk]
                                                                     InputAdapter
@@ -87,14 +87,28 @@ TakeOrderedAndProject [sum_sales,avg_monthly_sales,d_moy,i_category,d_year,psum,
                                       InputAdapter
                                         Exchange [i_category,i_brand,s_store_name,s_company_name] #9
                                           WholeStageCodegen (20)
-                                            HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,sum] [sum(_pushed_sum_ss_sales_priceL),sum_sales,sum]
+                                            HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,_pushed_sum__pushed_sum_ss_sales_price] [sum(_pushed_sum__pushed_sum_ss_sales_priceL),sum_sales,sum]
                                               InputAdapter
-                                                ReusedExchange [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,sum] #3
+                                                Exchange [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy] #10
+                                                  WholeStageCodegen (19)
+                                                    HashAggregate [i_category,i_brand,s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price] [sum(_pushed_sum_ss_sales_priceL),_pushed_sum__pushed_sum_ss_sales_price,sum]
+                                                      Project [s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price,i_brand,i_category]
+                                                        SortMergeJoin [ss_item_sk,i_item_sk]
+                                                          InputAdapter
+                                                            WholeStageCodegen (16)
+                                                              Sort [ss_item_sk]
+                                                                InputAdapter
+                                                                  ReusedExchange [ss_item_sk,s_store_name,s_company_name,d_year,d_moy,_pushed_sum_ss_sales_price] #4
+                                                          InputAdapter
+                                                            WholeStageCodegen (18)
+                                                              Sort [i_item_sk]
+                                                                InputAdapter
+                                                                  ReusedExchange [i_item_sk,i_brand,i_category] #7
         InputAdapter
           WholeStageCodegen (35)
             Sort [i_category,i_brand,s_store_name,s_company_name,rn]
               InputAdapter
-                Exchange [i_category,i_brand,s_store_name,s_company_name,rn] #10
+                Exchange [i_category,i_brand,s_store_name,s_company_name,rn] #11
                   WholeStageCodegen (34)
                     Project [i_category,i_brand,s_store_name,s_company_name,sum_sales,rn]
                       InputAdapter

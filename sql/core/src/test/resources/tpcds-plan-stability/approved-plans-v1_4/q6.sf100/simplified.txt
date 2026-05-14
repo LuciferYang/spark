@@ -1,11 +1,11 @@
 TakeOrderedAndProject [cnt,state]
   WholeStageCodegen (14)
     Filter [cnt]
-      HashAggregate [ca_state,sum] [sum(cntL),state,cnt,sum]
+      HashAggregate [ca_state,_pushed_sum_cnt] [sum(_pushed_sum_cntL),state,cnt,sum]
         InputAdapter
           Exchange [ca_state] #1
             WholeStageCodegen (13)
-              HashAggregate [ca_state,cnt] [sum,sum]
+              HashAggregate [ca_state,cnt] [sum(cntL),_pushed_sum_cnt,sum]
                 Project [cnt,ca_state]
                   SortMergeJoin [ss_customer_sk,c_customer_sk]
                     InputAdapter
@@ -32,11 +32,11 @@ TakeOrderedAndProject [cnt,state]
                                                       BroadcastExchange #4
                                                         WholeStageCodegen (2)
                                                           Filter [avg(i_current_price)]
-                                                            HashAggregate [i_category,sum,count] [avg(UnscaledValue(i_current_price)),avg(i_current_price),sum,count]
+                                                            HashAggregate [i_category,_pushed_avg_sum_i_current_price,_pushed_avg_count_i_current_price] [sum(_pushed_avg_sum_i_current_price),sum(_pushed_avg_count_i_current_priceL),avg(i_current_price),sum,sum]
                                                               InputAdapter
                                                                 Exchange [i_category] #5
                                                                   WholeStageCodegen (1)
-                                                                    HashAggregate [i_category,i_current_price] [sum,count,sum,count]
+                                                                    HashAggregate [i_category,i_current_price] [sum(UnscaledValue(i_current_price)),count(UnscaledValue(i_current_price)),_pushed_avg_sum_i_current_price,_pushed_avg_count_i_current_price,sum,count]
                                                                       Filter [i_category]
                                                                         ColumnarToRow
                                                                           InputAdapter

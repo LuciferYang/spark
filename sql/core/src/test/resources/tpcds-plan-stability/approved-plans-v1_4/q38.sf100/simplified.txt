@@ -1,9 +1,9 @@
 WholeStageCodegen (27)
-  HashAggregate [count] [count(1),count(1),count]
+  HashAggregate [_pushed_count] [sum(_pushed_countL),count(1),sum]
     InputAdapter
       Exchange #1
         WholeStageCodegen (26)
-          HashAggregate [count,count]
+          HashAggregate [count(1),_pushed_count,count]
             Project
               SortMergeJoin [c_last_name,c_first_name,d_date,c_last_name,c_first_name,d_date]
                 InputAdapter

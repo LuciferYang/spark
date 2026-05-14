@@ -60,11 +60,11 @@ TakeOrderedAndProject [s_store_name,sum(ss_net_profit)]
                                               WholeStageCodegen (10)
                                                 Project [ca_zip]
                                                   Filter [cnt]
-                                                    HashAggregate [ca_zip,count] [count(1),ca_zip,cnt,count]
+                                                    HashAggregate [ca_zip,_pushed_count] [sum(_pushed_countL),ca_zip,cnt,sum]
                                                       InputAdapter
                                                         Exchange [ca_zip] #8
                                                           WholeStageCodegen (9)
-                                                            HashAggregate [ca_zip] [count,count]
+                                                            HashAggregate [ca_zip] [count(1),_pushed_count,count]
                                                               Project [ca_zip]
                                                                 SortMergeJoin [ca_address_sk,c_current_addr_sk]
                                                                   InputAdapter

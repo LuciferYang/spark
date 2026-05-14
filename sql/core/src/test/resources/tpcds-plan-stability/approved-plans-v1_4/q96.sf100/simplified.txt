@@ -1,9 +1,9 @@
 WholeStageCodegen (5)
-  HashAggregate [count] [count(1),count(1),count]
+  HashAggregate [_pushed_count] [sum(_pushed_countL),count(1),sum]
     InputAdapter
       Exchange #1
         WholeStageCodegen (4)
-          HashAggregate [count,count]
+          HashAggregate [count(1),_pushed_count,count]
             Project
               BroadcastHashJoin [ss_hdemo_sk,hd_demo_sk]
                 Project [ss_hdemo_sk]

@@ -120,44 +120,44 @@ Input [5]: [i_manager_id#5, ss_sales_price#12, ss_sold_date_sk#13, d_date_sk#16,
 (20) HashAggregate [codegen id : 4]
 Input [3]: [i_manager_id#5, ss_sales_price#12, d_moy#17]
 Keys [2]: [i_manager_id#5, d_moy#17]
-Functions [1]: [partial_sum(UnscaledValue(ss_sales_price#12))]
-Aggregate Attributes [1]: [sum#18]
-Results [3]: [i_manager_id#5, d_moy#17, sum#19]
+Functions [1]: [sum(UnscaledValue(ss_sales_price#12))]
+Aggregate Attributes [1]: [sum(UnscaledValue(ss_sales_price#12))#18]
+Results [4]: [i_manager_id#5, d_moy#17, sum(UnscaledValue(ss_sales_price#12))#18 AS _pushed_sum_ss_sales_price#19, sum(UnscaledValue(ss_sales_price#12))#18 AS _pushed_sum_ss_sales_price#20]
 
 (21) Exchange
-Input [3]: [i_manager_id#5, d_moy#17, sum#19]
+Input [4]: [i_manager_id#5, d_moy#17, _pushed_sum_ss_sales_price#19, _pushed_sum_ss_sales_price#20]
 Arguments: hashpartitioning(i_manager_id#5, d_moy#17, 5), ENSURE_REQUIREMENTS, [plan_id=3]
 
 (22) HashAggregate [codegen id : 5]
-Input [3]: [i_manager_id#5, d_moy#17, sum#19]
+Input [4]: [i_manager_id#5, d_moy#17, _pushed_sum_ss_sales_price#19, _pushed_sum_ss_sales_price#20]
 Keys [2]: [i_manager_id#5, d_moy#17]
-Functions [1]: [sum(UnscaledValue(ss_sales_price#12))]
-Aggregate Attributes [1]: [sum(UnscaledValue(ss_sales_price#12))#20]
-Results [3]: [i_manager_id#5, MakeDecimal(sum(UnscaledValue(ss_sales_price#12))#20,17,2) AS sum_sales#21, MakeDecimal(sum(UnscaledValue(ss_sales_price#12))#20,17,2) AS _w0#22]
+Functions [2]: [sum(_pushed_sum_ss_sales_price#19), sum(_pushed_sum_ss_sales_price#20)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ss_sales_price#19)#21, sum(_pushed_sum_ss_sales_price#20)#22]
+Results [3]: [i_manager_id#5, MakeDecimal(sum(_pushed_sum_ss_sales_price#19)#21,17,2) AS sum_sales#23, MakeDecimal(sum(_pushed_sum_ss_sales_price#20)#22,17,2) AS _w0#24]
 
 (23) Exchange
-Input [3]: [i_manager_id#5, sum_sales#21, _w0#22]
+Input [3]: [i_manager_id#5, sum_sales#23, _w0#24]
 Arguments: hashpartitioning(i_manager_id#5, 5), ENSURE_REQUIREMENTS, [plan_id=4]
 
 (24) Sort [codegen id : 6]
-Input [3]: [i_manager_id#5, sum_sales#21, _w0#22]
+Input [3]: [i_manager_id#5, sum_sales#23, _w0#24]
 Arguments: [i_manager_id#5 ASC NULLS FIRST], false, 0
 
 (25) Window
-Input [3]: [i_manager_id#5, sum_sales#21, _w0#22]
-Arguments: [avg(_w0#22) windowspecdefinition(i_manager_id#5, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS avg_monthly_sales#23], [i_manager_id#5]
+Input [3]: [i_manager_id#5, sum_sales#23, _w0#24]
+Arguments: [avg(_w0#24) windowspecdefinition(i_manager_id#5, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS avg_monthly_sales#25], [i_manager_id#5]
 
 (26) Filter [codegen id : 7]
-Input [4]: [i_manager_id#5, sum_sales#21, _w0#22, avg_monthly_sales#23]
-Condition : CASE WHEN (avg_monthly_sales#23 > 0.000000) THEN ((abs((sum_sales#21 - avg_monthly_sales#23)) / avg_monthly_sales#23) > 0.1000000000000000) ELSE false END
+Input [4]: [i_manager_id#5, sum_sales#23, _w0#24, avg_monthly_sales#25]
+Condition : CASE WHEN (avg_monthly_sales#25 > 0.000000) THEN ((abs((sum_sales#23 - avg_monthly_sales#25)) / avg_monthly_sales#25) > 0.1000000000000000) ELSE false END
 
 (27) Project [codegen id : 7]
-Output [3]: [i_manager_id#5, sum_sales#21, avg_monthly_sales#23]
-Input [4]: [i_manager_id#5, sum_sales#21, _w0#22, avg_monthly_sales#23]
+Output [3]: [i_manager_id#5, sum_sales#23, avg_monthly_sales#25]
+Input [4]: [i_manager_id#5, sum_sales#23, _w0#24, avg_monthly_sales#25]
 
 (28) TakeOrderedAndProject
-Input [3]: [i_manager_id#5, sum_sales#21, avg_monthly_sales#23]
-Arguments: 100, [i_manager_id#5 ASC NULLS FIRST, avg_monthly_sales#23 ASC NULLS FIRST, sum_sales#21 ASC NULLS FIRST], [i_manager_id#5, sum_sales#21, avg_monthly_sales#23]
+Input [3]: [i_manager_id#5, sum_sales#23, avg_monthly_sales#25]
+Arguments: 100, [i_manager_id#5 ASC NULLS FIRST, avg_monthly_sales#25 ASC NULLS FIRST, sum_sales#23 ASC NULLS FIRST], [i_manager_id#5, sum_sales#23, avg_monthly_sales#25]
 
 ===== Subqueries =====
 
@@ -170,22 +170,22 @@ BroadcastExchange (33)
 
 
 (29) Scan parquet spark_catalog.default.date_dim
-Output [3]: [d_date_sk#16, d_month_seq#24, d_moy#17]
+Output [3]: [d_date_sk#16, d_month_seq#26, d_moy#17]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [In(d_month_seq, [1200,1201,1202,1203,1204,1205,1206,1207,1208,1209,1210,1211]), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_month_seq:int,d_moy:int>
 
 (30) ColumnarToRow [codegen id : 1]
-Input [3]: [d_date_sk#16, d_month_seq#24, d_moy#17]
+Input [3]: [d_date_sk#16, d_month_seq#26, d_moy#17]
 
 (31) Filter [codegen id : 1]
-Input [3]: [d_date_sk#16, d_month_seq#24, d_moy#17]
-Condition : (d_month_seq#24 INSET 1200, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 1209, 1210, 1211 AND isnotnull(d_date_sk#16))
+Input [3]: [d_date_sk#16, d_month_seq#26, d_moy#17]
+Condition : (d_month_seq#26 INSET 1200, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 1209, 1210, 1211 AND isnotnull(d_date_sk#16))
 
 (32) Project [codegen id : 1]
 Output [2]: [d_date_sk#16, d_moy#17]
-Input [3]: [d_date_sk#16, d_month_seq#24, d_moy#17]
+Input [3]: [d_date_sk#16, d_month_seq#26, d_moy#17]
 
 (33) BroadcastExchange
 Input [2]: [d_date_sk#16, d_moy#17]

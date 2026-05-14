@@ -17,11 +17,11 @@ TakeOrderedAndProject [i_product_name]
                       WholeStageCodegen (2)
                         Project [i_manufact]
                           Filter [item_cnt]
-                            HashAggregate [i_manufact,count] [count(1),item_cnt,count]
+                            HashAggregate [i_manufact,_pushed_count] [sum(_pushed_countL),item_cnt,sum]
                               InputAdapter
                                 Exchange [i_manufact] #3
                                   WholeStageCodegen (1)
-                                    HashAggregate [i_manufact] [count,count]
+                                    HashAggregate [i_manufact] [count(1),_pushed_count,count]
                                       Project [i_manufact]
                                         Filter [i_category,i_color,i_units,i_size,i_manufact]
                                           ColumnarToRow

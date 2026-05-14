@@ -272,24 +272,24 @@ Input [7]: [c_current_cdemo_sk#2, cd_demo_sk#17, cd_gender#18, cd_marital_status
 (47) HashAggregate [codegen id : 16]
 Input [5]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22]
 Keys [5]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22]
-Functions [1]: [partial_count(1)]
-Aggregate Attributes [1]: [count#23]
-Results [6]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, count#24]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#23]
+Results [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, count(1)#23 AS _pushed_count#24, count(1)#23 AS _pushed_count#25, count(1)#23 AS _pushed_count#26]
 
 (48) Exchange
-Input [6]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, count#24]
+Input [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, _pushed_count#24, _pushed_count#25, _pushed_count#26]
 Arguments: hashpartitioning(cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, 5), ENSURE_REQUIREMENTS, [plan_id=8]
 
 (49) HashAggregate [codegen id : 17]
-Input [6]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, count#24]
+Input [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22, _pushed_count#24, _pushed_count#25, _pushed_count#26]
 Keys [5]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cd_purchase_estimate#21, cd_credit_rating#22]
-Functions [1]: [count(1)]
-Aggregate Attributes [1]: [count(1)#25]
-Results [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, count(1)#25 AS cnt1#26, cd_purchase_estimate#21, count(1)#25 AS cnt2#27, cd_credit_rating#22, count(1)#25 AS cnt3#28]
+Functions [3]: [sum(_pushed_count#24), sum(_pushed_count#25), sum(_pushed_count#26)]
+Aggregate Attributes [3]: [sum(_pushed_count#24)#27, sum(_pushed_count#25)#28, sum(_pushed_count#26)#29]
+Results [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, sum(_pushed_count#24)#27 AS cnt1#30, cd_purchase_estimate#21, sum(_pushed_count#25)#28 AS cnt2#31, cd_credit_rating#22, sum(_pushed_count#26)#29 AS cnt3#32]
 
 (50) TakeOrderedAndProject
-Input [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cnt1#26, cd_purchase_estimate#21, cnt2#27, cd_credit_rating#22, cnt3#28]
-Arguments: 100, [cd_gender#18 ASC NULLS FIRST, cd_marital_status#19 ASC NULLS FIRST, cd_education_status#20 ASC NULLS FIRST, cd_purchase_estimate#21 ASC NULLS FIRST, cd_credit_rating#22 ASC NULLS FIRST], [cd_gender#18, cd_marital_status#19, cd_education_status#20, cnt1#26, cd_purchase_estimate#21, cnt2#27, cd_credit_rating#22, cnt3#28]
+Input [8]: [cd_gender#18, cd_marital_status#19, cd_education_status#20, cnt1#30, cd_purchase_estimate#21, cnt2#31, cd_credit_rating#22, cnt3#32]
+Arguments: 100, [cd_gender#18 ASC NULLS FIRST, cd_marital_status#19 ASC NULLS FIRST, cd_education_status#20 ASC NULLS FIRST, cd_purchase_estimate#21 ASC NULLS FIRST, cd_credit_rating#22 ASC NULLS FIRST], [cd_gender#18, cd_marital_status#19, cd_education_status#20, cnt1#30, cd_purchase_estimate#21, cnt2#31, cd_credit_rating#22, cnt3#32]
 
 ===== Subqueries =====
 
@@ -325,19 +325,19 @@ Input [2]: [ca_address_sk#15, ca_state#16]
 Input [1]: [ca_address_sk#15]
 Keys: []
 Functions [1]: [partial_bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)]
-Aggregate Attributes [1]: [buf#29]
-Results [1]: [buf#30]
+Aggregate Attributes [1]: [buf#33]
+Results [1]: [buf#34]
 
 (56) Exchange
-Input [1]: [buf#30]
+Input [1]: [buf#34]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=9]
 
 (57) ObjectHashAggregate
-Input [1]: [buf#30]
+Input [1]: [buf#34]
 Keys: []
 Functions [1]: [bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)]
-Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)#31]
-Results [1]: [bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)#31 AS bloomFilter#32]
+Aggregate Attributes [1]: [bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)#35]
+Results [1]: [bloom_filter_agg(xxhash64(ca_address_sk#15, 42), 55556, 899992, 0, 0)#35 AS bloomFilter#36]
 
 Subquery:2 Hosting operator id = 6 Hosting Expression = ss_sold_date_sk#6 IN dynamicpruning#7
 BroadcastExchange (62)
@@ -348,22 +348,22 @@ BroadcastExchange (62)
 
 
 (58) Scan parquet spark_catalog.default.date_dim
-Output [3]: [d_date_sk#8, d_year#33, d_moy#34]
+Output [3]: [d_date_sk#8, d_year#37, d_moy#38]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), IsNotNull(d_moy), EqualTo(d_year,2001), GreaterThanOrEqual(d_moy,4), LessThanOrEqual(d_moy,6), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_year:int,d_moy:int>
 
 (59) ColumnarToRow [codegen id : 1]
-Input [3]: [d_date_sk#8, d_year#33, d_moy#34]
+Input [3]: [d_date_sk#8, d_year#37, d_moy#38]
 
 (60) Filter [codegen id : 1]
-Input [3]: [d_date_sk#8, d_year#33, d_moy#34]
-Condition : (((((isnotnull(d_year#33) AND isnotnull(d_moy#34)) AND (d_year#33 = 2001)) AND (d_moy#34 >= 4)) AND (d_moy#34 <= 6)) AND isnotnull(d_date_sk#8))
+Input [3]: [d_date_sk#8, d_year#37, d_moy#38]
+Condition : (((((isnotnull(d_year#37) AND isnotnull(d_moy#38)) AND (d_year#37 = 2001)) AND (d_moy#38 >= 4)) AND (d_moy#38 <= 6)) AND isnotnull(d_date_sk#8))
 
 (61) Project [codegen id : 1]
 Output [1]: [d_date_sk#8]
-Input [3]: [d_date_sk#8, d_year#33, d_moy#34]
+Input [3]: [d_date_sk#8, d_year#37, d_moy#38]
 
 (62) BroadcastExchange
 Input [1]: [d_date_sk#8]
