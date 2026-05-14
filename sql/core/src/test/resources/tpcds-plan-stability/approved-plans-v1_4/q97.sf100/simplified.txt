@@ -1,9 +1,9 @@
 WholeStageCodegen (8)
-  HashAggregate [sum,sum,sum] [sum(CASE WHEN (isnotnull(customer_sk) AND isnull(customer_sk)) THEN 1 ELSE 0 END),sum(CASE WHEN (isnull(customer_sk) AND isnotnull(customer_sk)) THEN 1 ELSE 0 END),sum(CASE WHEN (isnotnull(customer_sk) AND isnotnull(customer_sk)) THEN 1 ELSE 0 END),store_only,catalog_only,store_and_catalog,sum,sum,sum]
+  HashAggregate [_pushed_sum_customer_sk_customer_sk,_pushed_sum_customer_sk_customer_sk,_pushed_sum_customer_sk_customer_sk] [sum(_pushed_sum_customer_sk_customer_skL),sum(_pushed_sum_customer_sk_customer_skL),sum(_pushed_sum_customer_sk_customer_skL),store_only,catalog_only,store_and_catalog,sum,sum,sum]
     InputAdapter
       Exchange #1
         WholeStageCodegen (7)
-          HashAggregate [customer_sk,customer_sk] [sum,sum,sum,sum,sum,sum]
+          HashAggregate [customer_sk,customer_sk] [sum(CASE WHEN (isnotnull(customer_sk) AND isnull(customer_sk)) THEN 1 ELSE 0 END),sum(CASE WHEN (isnull(customer_sk) AND isnotnull(customer_sk)) THEN 1 ELSE 0 END),sum(CASE WHEN (isnotnull(customer_sk) AND isnotnull(customer_sk)) THEN 1 ELSE 0 END),_pushed_sum_customer_sk_customer_sk,_pushed_sum_customer_sk_customer_sk,_pushed_sum_customer_sk_customer_sk,sum,sum,sum]
             Project [customer_sk,customer_sk]
               SortMergeJoin [customer_sk,item_sk,customer_sk,item_sk]
                 InputAdapter

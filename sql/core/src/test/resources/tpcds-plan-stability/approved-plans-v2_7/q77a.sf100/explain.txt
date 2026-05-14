@@ -186,20 +186,20 @@ Input [4]: [ss_store_sk#1, ss_ext_sales_price#2, ss_net_profit#3, s_store_sk#7]
 (13) HashAggregate [codegen id : 3]
 Input [3]: [ss_ext_sales_price#2, ss_net_profit#3, s_store_sk#7]
 Keys [1]: [s_store_sk#7]
-Functions [2]: [partial_sum(UnscaledValue(ss_ext_sales_price#2)), partial_sum(UnscaledValue(ss_net_profit#3))]
-Aggregate Attributes [2]: [sum#8, sum#9]
-Results [3]: [s_store_sk#7, sum#10, sum#11]
+Functions [2]: [sum(UnscaledValue(ss_ext_sales_price#2)), sum(UnscaledValue(ss_net_profit#3))]
+Aggregate Attributes [2]: [sum(UnscaledValue(ss_ext_sales_price#2))#8, sum(UnscaledValue(ss_net_profit#3))#9]
+Results [3]: [s_store_sk#7, sum(UnscaledValue(ss_ext_sales_price#2))#8 AS _pushed_sum_ss_ext_sales_price#10, sum(UnscaledValue(ss_net_profit#3))#9 AS _pushed_sum_ss_net_profit#11]
 
 (14) Exchange
-Input [3]: [s_store_sk#7, sum#10, sum#11]
+Input [3]: [s_store_sk#7, _pushed_sum_ss_ext_sales_price#10, _pushed_sum_ss_net_profit#11]
 Arguments: hashpartitioning(s_store_sk#7, 5), ENSURE_REQUIREMENTS, [plan_id=2]
 
 (15) HashAggregate [codegen id : 8]
-Input [3]: [s_store_sk#7, sum#10, sum#11]
+Input [3]: [s_store_sk#7, _pushed_sum_ss_ext_sales_price#10, _pushed_sum_ss_net_profit#11]
 Keys [1]: [s_store_sk#7]
-Functions [2]: [sum(UnscaledValue(ss_ext_sales_price#2)), sum(UnscaledValue(ss_net_profit#3))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ss_ext_sales_price#2))#12, sum(UnscaledValue(ss_net_profit#3))#13]
-Results [3]: [s_store_sk#7, MakeDecimal(sum(UnscaledValue(ss_ext_sales_price#2))#12,17,2) AS sales#14, MakeDecimal(sum(UnscaledValue(ss_net_profit#3))#13,17,2) AS profit#15]
+Functions [2]: [sum(_pushed_sum_ss_ext_sales_price#10), sum(_pushed_sum_ss_net_profit#11)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ss_ext_sales_price#10)#12, sum(_pushed_sum_ss_net_profit#11)#13]
+Results [3]: [s_store_sk#7, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#10)#12,17,2) AS sales#14, MakeDecimal(sum(_pushed_sum_ss_net_profit#11)#13,17,2) AS profit#15]
 
 (16) Scan parquet spark_catalog.default.store_returns
 Output [4]: [sr_store_sk#16, sr_return_amt#17, sr_net_loss#18, sr_returned_date_sk#19]
@@ -245,20 +245,20 @@ Input [4]: [sr_store_sk#16, sr_return_amt#17, sr_net_loss#18, s_store_sk#21]
 (25) HashAggregate [codegen id : 6]
 Input [3]: [sr_return_amt#17, sr_net_loss#18, s_store_sk#21]
 Keys [1]: [s_store_sk#21]
-Functions [2]: [partial_sum(UnscaledValue(sr_return_amt#17)), partial_sum(UnscaledValue(sr_net_loss#18))]
-Aggregate Attributes [2]: [sum#22, sum#23]
-Results [3]: [s_store_sk#21, sum#24, sum#25]
+Functions [2]: [sum(UnscaledValue(sr_return_amt#17)), sum(UnscaledValue(sr_net_loss#18))]
+Aggregate Attributes [2]: [sum(UnscaledValue(sr_return_amt#17))#22, sum(UnscaledValue(sr_net_loss#18))#23]
+Results [3]: [s_store_sk#21, sum(UnscaledValue(sr_return_amt#17))#22 AS _pushed_sum_sr_return_amt#24, sum(UnscaledValue(sr_net_loss#18))#23 AS _pushed_sum_sr_net_loss#25]
 
 (26) Exchange
-Input [3]: [s_store_sk#21, sum#24, sum#25]
+Input [3]: [s_store_sk#21, _pushed_sum_sr_return_amt#24, _pushed_sum_sr_net_loss#25]
 Arguments: hashpartitioning(s_store_sk#21, 5), ENSURE_REQUIREMENTS, [plan_id=3]
 
 (27) HashAggregate [codegen id : 7]
-Input [3]: [s_store_sk#21, sum#24, sum#25]
+Input [3]: [s_store_sk#21, _pushed_sum_sr_return_amt#24, _pushed_sum_sr_net_loss#25]
 Keys [1]: [s_store_sk#21]
-Functions [2]: [sum(UnscaledValue(sr_return_amt#17)), sum(UnscaledValue(sr_net_loss#18))]
-Aggregate Attributes [2]: [sum(UnscaledValue(sr_return_amt#17))#26, sum(UnscaledValue(sr_net_loss#18))#27]
-Results [3]: [s_store_sk#21, MakeDecimal(sum(UnscaledValue(sr_return_amt#17))#26,17,2) AS returns#28, MakeDecimal(sum(UnscaledValue(sr_net_loss#18))#27,17,2) AS profit_loss#29]
+Functions [2]: [sum(_pushed_sum_sr_return_amt#24), sum(_pushed_sum_sr_net_loss#25)]
+Aggregate Attributes [2]: [sum(_pushed_sum_sr_return_amt#24)#26, sum(_pushed_sum_sr_net_loss#25)#27]
+Results [3]: [s_store_sk#21, MakeDecimal(sum(_pushed_sum_sr_return_amt#24)#26,17,2) AS returns#28, MakeDecimal(sum(_pushed_sum_sr_net_loss#25)#27,17,2) AS profit_loss#29]
 
 (28) BroadcastExchange
 Input [3]: [s_store_sk#21, returns#28, profit_loss#29]
@@ -300,20 +300,20 @@ Input [5]: [cs_call_center_sk#34, cs_ext_sales_price#35, cs_net_profit#36, cs_so
 (36) HashAggregate [codegen id : 10]
 Input [3]: [cs_call_center_sk#34, cs_ext_sales_price#35, cs_net_profit#36]
 Keys [1]: [cs_call_center_sk#34]
-Functions [2]: [partial_sum(UnscaledValue(cs_ext_sales_price#35)), partial_sum(UnscaledValue(cs_net_profit#36))]
-Aggregate Attributes [2]: [sum#39, sum#40]
-Results [3]: [cs_call_center_sk#34, sum#41, sum#42]
+Functions [2]: [sum(UnscaledValue(cs_ext_sales_price#35)), sum(UnscaledValue(cs_net_profit#36))]
+Aggregate Attributes [2]: [sum(UnscaledValue(cs_ext_sales_price#35))#39, sum(UnscaledValue(cs_net_profit#36))#40]
+Results [3]: [cs_call_center_sk#34, sum(UnscaledValue(cs_ext_sales_price#35))#39 AS _pushed_sum_cs_ext_sales_price#41, sum(UnscaledValue(cs_net_profit#36))#40 AS _pushed_sum_cs_net_profit#42]
 
 (37) Exchange
-Input [3]: [cs_call_center_sk#34, sum#41, sum#42]
+Input [3]: [cs_call_center_sk#34, _pushed_sum_cs_ext_sales_price#41, _pushed_sum_cs_net_profit#42]
 Arguments: hashpartitioning(cs_call_center_sk#34, 5), ENSURE_REQUIREMENTS, [plan_id=5]
 
 (38) HashAggregate [codegen id : 14]
-Input [3]: [cs_call_center_sk#34, sum#41, sum#42]
+Input [3]: [cs_call_center_sk#34, _pushed_sum_cs_ext_sales_price#41, _pushed_sum_cs_net_profit#42]
 Keys [1]: [cs_call_center_sk#34]
-Functions [2]: [sum(UnscaledValue(cs_ext_sales_price#35)), sum(UnscaledValue(cs_net_profit#36))]
-Aggregate Attributes [2]: [sum(UnscaledValue(cs_ext_sales_price#35))#43, sum(UnscaledValue(cs_net_profit#36))#44]
-Results [3]: [cs_call_center_sk#34, MakeDecimal(sum(UnscaledValue(cs_ext_sales_price#35))#43,17,2) AS sales#45, MakeDecimal(sum(UnscaledValue(cs_net_profit#36))#44,17,2) AS profit#46]
+Functions [2]: [sum(_pushed_sum_cs_ext_sales_price#41), sum(_pushed_sum_cs_net_profit#42)]
+Aggregate Attributes [2]: [sum(_pushed_sum_cs_ext_sales_price#41)#43, sum(_pushed_sum_cs_net_profit#42)#44]
+Results [3]: [cs_call_center_sk#34, MakeDecimal(sum(_pushed_sum_cs_ext_sales_price#41)#43,17,2) AS sales#45, MakeDecimal(sum(_pushed_sum_cs_net_profit#42)#44,17,2) AS profit#46]
 
 (39) Scan parquet spark_catalog.default.catalog_returns
 Output [3]: [cr_return_amount#47, cr_net_loss#48, cr_returned_date_sk#49]
@@ -341,20 +341,20 @@ Input [4]: [cr_return_amount#47, cr_net_loss#48, cr_returned_date_sk#49, d_date_
 (44) HashAggregate [codegen id : 12]
 Input [2]: [cr_return_amount#47, cr_net_loss#48]
 Keys: []
-Functions [2]: [partial_sum(UnscaledValue(cr_return_amount#47)), partial_sum(UnscaledValue(cr_net_loss#48))]
-Aggregate Attributes [2]: [sum#51, sum#52]
-Results [2]: [sum#53, sum#54]
+Functions [2]: [sum(UnscaledValue(cr_return_amount#47)), sum(UnscaledValue(cr_net_loss#48))]
+Aggregate Attributes [2]: [sum(UnscaledValue(cr_return_amount#47))#51, sum(UnscaledValue(cr_net_loss#48))#52]
+Results [2]: [sum(UnscaledValue(cr_return_amount#47))#51 AS _pushed_sum_cr_return_amount#53, sum(UnscaledValue(cr_net_loss#48))#52 AS _pushed_sum_cr_net_loss#54]
 
 (45) Exchange
-Input [2]: [sum#53, sum#54]
+Input [2]: [_pushed_sum_cr_return_amount#53, _pushed_sum_cr_net_loss#54]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=6]
 
 (46) HashAggregate [codegen id : 13]
-Input [2]: [sum#53, sum#54]
+Input [2]: [_pushed_sum_cr_return_amount#53, _pushed_sum_cr_net_loss#54]
 Keys: []
-Functions [2]: [sum(UnscaledValue(cr_return_amount#47)), sum(UnscaledValue(cr_net_loss#48))]
-Aggregate Attributes [2]: [sum(UnscaledValue(cr_return_amount#47))#55, sum(UnscaledValue(cr_net_loss#48))#56]
-Results [2]: [MakeDecimal(sum(UnscaledValue(cr_return_amount#47))#55,17,2) AS returns#57, MakeDecimal(sum(UnscaledValue(cr_net_loss#48))#56,17,2) AS profit_loss#58]
+Functions [2]: [sum(_pushed_sum_cr_return_amount#53), sum(_pushed_sum_cr_net_loss#54)]
+Aggregate Attributes [2]: [sum(_pushed_sum_cr_return_amount#53)#55, sum(_pushed_sum_cr_net_loss#54)#56]
+Results [2]: [MakeDecimal(sum(_pushed_sum_cr_return_amount#53)#55,17,2) AS returns#57, MakeDecimal(sum(_pushed_sum_cr_net_loss#54)#56,17,2) AS profit_loss#58]
 
 (47) BroadcastExchange
 Input [2]: [returns#57, profit_loss#58]
@@ -427,20 +427,20 @@ Input [4]: [ws_web_page_sk#62, ws_ext_sales_price#63, ws_net_profit#64, wp_web_p
 (62) HashAggregate [codegen id : 17]
 Input [3]: [ws_ext_sales_price#63, ws_net_profit#64, wp_web_page_sk#67]
 Keys [1]: [wp_web_page_sk#67]
-Functions [2]: [partial_sum(UnscaledValue(ws_ext_sales_price#63)), partial_sum(UnscaledValue(ws_net_profit#64))]
-Aggregate Attributes [2]: [sum#68, sum#69]
-Results [3]: [wp_web_page_sk#67, sum#70, sum#71]
+Functions [2]: [sum(UnscaledValue(ws_ext_sales_price#63)), sum(UnscaledValue(ws_net_profit#64))]
+Aggregate Attributes [2]: [sum(UnscaledValue(ws_ext_sales_price#63))#68, sum(UnscaledValue(ws_net_profit#64))#69]
+Results [3]: [wp_web_page_sk#67, sum(UnscaledValue(ws_ext_sales_price#63))#68 AS _pushed_sum_ws_ext_sales_price#70, sum(UnscaledValue(ws_net_profit#64))#69 AS _pushed_sum_ws_net_profit#71]
 
 (63) Exchange
-Input [3]: [wp_web_page_sk#67, sum#70, sum#71]
+Input [3]: [wp_web_page_sk#67, _pushed_sum_ws_ext_sales_price#70, _pushed_sum_ws_net_profit#71]
 Arguments: hashpartitioning(wp_web_page_sk#67, 5), ENSURE_REQUIREMENTS, [plan_id=9]
 
 (64) HashAggregate [codegen id : 22]
-Input [3]: [wp_web_page_sk#67, sum#70, sum#71]
+Input [3]: [wp_web_page_sk#67, _pushed_sum_ws_ext_sales_price#70, _pushed_sum_ws_net_profit#71]
 Keys [1]: [wp_web_page_sk#67]
-Functions [2]: [sum(UnscaledValue(ws_ext_sales_price#63)), sum(UnscaledValue(ws_net_profit#64))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ws_ext_sales_price#63))#72, sum(UnscaledValue(ws_net_profit#64))#73]
-Results [3]: [wp_web_page_sk#67, MakeDecimal(sum(UnscaledValue(ws_ext_sales_price#63))#72,17,2) AS sales#74, MakeDecimal(sum(UnscaledValue(ws_net_profit#64))#73,17,2) AS profit#75]
+Functions [2]: [sum(_pushed_sum_ws_ext_sales_price#70), sum(_pushed_sum_ws_net_profit#71)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ws_ext_sales_price#70)#72, sum(_pushed_sum_ws_net_profit#71)#73]
+Results [3]: [wp_web_page_sk#67, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#70)#72,17,2) AS sales#74, MakeDecimal(sum(_pushed_sum_ws_net_profit#71)#73,17,2) AS profit#75]
 
 (65) Scan parquet spark_catalog.default.web_returns
 Output [4]: [wr_web_page_sk#76, wr_return_amt#77, wr_net_loss#78, wr_returned_date_sk#79]
@@ -486,20 +486,20 @@ Input [4]: [wr_web_page_sk#76, wr_return_amt#77, wr_net_loss#78, wp_web_page_sk#
 (74) HashAggregate [codegen id : 20]
 Input [3]: [wr_return_amt#77, wr_net_loss#78, wp_web_page_sk#81]
 Keys [1]: [wp_web_page_sk#81]
-Functions [2]: [partial_sum(UnscaledValue(wr_return_amt#77)), partial_sum(UnscaledValue(wr_net_loss#78))]
-Aggregate Attributes [2]: [sum#82, sum#83]
-Results [3]: [wp_web_page_sk#81, sum#84, sum#85]
+Functions [2]: [sum(UnscaledValue(wr_return_amt#77)), sum(UnscaledValue(wr_net_loss#78))]
+Aggregate Attributes [2]: [sum(UnscaledValue(wr_return_amt#77))#82, sum(UnscaledValue(wr_net_loss#78))#83]
+Results [3]: [wp_web_page_sk#81, sum(UnscaledValue(wr_return_amt#77))#82 AS _pushed_sum_wr_return_amt#84, sum(UnscaledValue(wr_net_loss#78))#83 AS _pushed_sum_wr_net_loss#85]
 
 (75) Exchange
-Input [3]: [wp_web_page_sk#81, sum#84, sum#85]
+Input [3]: [wp_web_page_sk#81, _pushed_sum_wr_return_amt#84, _pushed_sum_wr_net_loss#85]
 Arguments: hashpartitioning(wp_web_page_sk#81, 5), ENSURE_REQUIREMENTS, [plan_id=10]
 
 (76) HashAggregate [codegen id : 21]
-Input [3]: [wp_web_page_sk#81, sum#84, sum#85]
+Input [3]: [wp_web_page_sk#81, _pushed_sum_wr_return_amt#84, _pushed_sum_wr_net_loss#85]
 Keys [1]: [wp_web_page_sk#81]
-Functions [2]: [sum(UnscaledValue(wr_return_amt#77)), sum(UnscaledValue(wr_net_loss#78))]
-Aggregate Attributes [2]: [sum(UnscaledValue(wr_return_amt#77))#86, sum(UnscaledValue(wr_net_loss#78))#87]
-Results [3]: [wp_web_page_sk#81, MakeDecimal(sum(UnscaledValue(wr_return_amt#77))#86,17,2) AS returns#88, MakeDecimal(sum(UnscaledValue(wr_net_loss#78))#87,17,2) AS profit_loss#89]
+Functions [2]: [sum(_pushed_sum_wr_return_amt#84), sum(_pushed_sum_wr_net_loss#85)]
+Aggregate Attributes [2]: [sum(_pushed_sum_wr_return_amt#84)#86, sum(_pushed_sum_wr_net_loss#85)#87]
+Results [3]: [wp_web_page_sk#81, MakeDecimal(sum(_pushed_sum_wr_return_amt#84)#86,17,2) AS returns#88, MakeDecimal(sum(_pushed_sum_wr_net_loss#85)#87,17,2) AS profit_loss#89]
 
 (77) BroadcastExchange
 Input [3]: [wp_web_page_sk#81, returns#88, profit_loss#89]
@@ -525,14 +525,14 @@ Aggregate Attributes [3]: [sum(sales#14)#94, sum(returns#32)#95, sum(profit#33)#
 Results [5]: [channel#30, id#31, cast(sum(sales#14)#94 as decimal(37,2)) AS sales#97, cast(sum(returns#32)#95 as decimal(37,2)) AS returns#98, cast(sum(profit#33)#96 as decimal(38,2)) AS profit#99]
 
 (82) ReusedExchange [Reuses operator id: 14]
-Output [3]: [s_store_sk#100, sum#101, sum#102]
+Output [3]: [s_store_sk#100, _pushed_sum_ss_ext_sales_price#101, _pushed_sum_ss_net_profit#102]
 
 (83) HashAggregate [codegen id : 31]
-Input [3]: [s_store_sk#100, sum#101, sum#102]
+Input [3]: [s_store_sk#100, _pushed_sum_ss_ext_sales_price#101, _pushed_sum_ss_net_profit#102]
 Keys [1]: [s_store_sk#100]
-Functions [2]: [sum(UnscaledValue(ss_ext_sales_price#103)), sum(UnscaledValue(ss_net_profit#104))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ss_ext_sales_price#103))#12, sum(UnscaledValue(ss_net_profit#104))#13]
-Results [3]: [s_store_sk#100, MakeDecimal(sum(UnscaledValue(ss_ext_sales_price#103))#12,17,2) AS sales#105, MakeDecimal(sum(UnscaledValue(ss_net_profit#104))#13,17,2) AS profit#106]
+Functions [2]: [sum(_pushed_sum_ss_ext_sales_price#101), sum(_pushed_sum_ss_net_profit#102)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ss_ext_sales_price#101)#103, sum(_pushed_sum_ss_net_profit#102)#104]
+Results [3]: [s_store_sk#100, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#101)#103,17,2) AS sales#105, MakeDecimal(sum(_pushed_sum_ss_net_profit#102)#104,17,2) AS profit#106]
 
 (84) ReusedExchange [Reuses operator id: 28]
 Output [3]: [s_store_sk#107, returns#108, profit_loss#109]
@@ -548,14 +548,14 @@ Output [5]: [store channel AS channel#110, s_store_sk#100 AS id#111, sales#105, 
 Input [6]: [s_store_sk#100, sales#105, profit#106, s_store_sk#107, returns#108, profit_loss#109]
 
 (87) ReusedExchange [Reuses operator id: 37]
-Output [3]: [cs_call_center_sk#114, sum#115, sum#116]
+Output [3]: [cs_call_center_sk#114, _pushed_sum_cs_ext_sales_price#115, _pushed_sum_cs_net_profit#116]
 
 (88) HashAggregate [codegen id : 37]
-Input [3]: [cs_call_center_sk#114, sum#115, sum#116]
+Input [3]: [cs_call_center_sk#114, _pushed_sum_cs_ext_sales_price#115, _pushed_sum_cs_net_profit#116]
 Keys [1]: [cs_call_center_sk#114]
-Functions [2]: [sum(UnscaledValue(cs_ext_sales_price#117)), sum(UnscaledValue(cs_net_profit#118))]
-Aggregate Attributes [2]: [sum(UnscaledValue(cs_ext_sales_price#117))#43, sum(UnscaledValue(cs_net_profit#118))#44]
-Results [3]: [cs_call_center_sk#114, MakeDecimal(sum(UnscaledValue(cs_ext_sales_price#117))#43,17,2) AS sales#119, MakeDecimal(sum(UnscaledValue(cs_net_profit#118))#44,17,2) AS profit#120]
+Functions [2]: [sum(_pushed_sum_cs_ext_sales_price#115), sum(_pushed_sum_cs_net_profit#116)]
+Aggregate Attributes [2]: [sum(_pushed_sum_cs_ext_sales_price#115)#117, sum(_pushed_sum_cs_net_profit#116)#118]
+Results [3]: [cs_call_center_sk#114, MakeDecimal(sum(_pushed_sum_cs_ext_sales_price#115)#117,17,2) AS sales#119, MakeDecimal(sum(_pushed_sum_cs_net_profit#116)#118,17,2) AS profit#120]
 
 (89) ReusedExchange [Reuses operator id: 47]
 Output [2]: [returns#121, profit_loss#122]
@@ -569,14 +569,14 @@ Output [5]: [catalog channel AS channel#123, cs_call_center_sk#114 AS id#124, sa
 Input [5]: [cs_call_center_sk#114, sales#119, profit#120, returns#121, profit_loss#122]
 
 (92) ReusedExchange [Reuses operator id: 63]
-Output [3]: [wp_web_page_sk#126, sum#127, sum#128]
+Output [3]: [wp_web_page_sk#126, _pushed_sum_ws_ext_sales_price#127, _pushed_sum_ws_net_profit#128]
 
 (93) HashAggregate [codegen id : 45]
-Input [3]: [wp_web_page_sk#126, sum#127, sum#128]
+Input [3]: [wp_web_page_sk#126, _pushed_sum_ws_ext_sales_price#127, _pushed_sum_ws_net_profit#128]
 Keys [1]: [wp_web_page_sk#126]
-Functions [2]: [sum(UnscaledValue(ws_ext_sales_price#129)), sum(UnscaledValue(ws_net_profit#130))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ws_ext_sales_price#129))#72, sum(UnscaledValue(ws_net_profit#130))#73]
-Results [3]: [wp_web_page_sk#126, MakeDecimal(sum(UnscaledValue(ws_ext_sales_price#129))#72,17,2) AS sales#131, MakeDecimal(sum(UnscaledValue(ws_net_profit#130))#73,17,2) AS profit#132]
+Functions [2]: [sum(_pushed_sum_ws_ext_sales_price#127), sum(_pushed_sum_ws_net_profit#128)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ws_ext_sales_price#127)#129, sum(_pushed_sum_ws_net_profit#128)#130]
+Results [3]: [wp_web_page_sk#126, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#127)#129,17,2) AS sales#131, MakeDecimal(sum(_pushed_sum_ws_net_profit#128)#130,17,2) AS profit#132]
 
 (94) ReusedExchange [Reuses operator id: 77]
 Output [3]: [wp_web_page_sk#133, returns#134, profit_loss#135]
@@ -619,14 +619,14 @@ Aggregate Attributes [3]: [sum(sales#140)#155, sum(returns#141)#156, sum(profit#
 Results [5]: [channel#110, null AS id#158, sum(sales#140)#155 AS sales#159, sum(returns#141)#156 AS returns#160, sum(profit#142)#157 AS profit#161]
 
 (102) ReusedExchange [Reuses operator id: 14]
-Output [3]: [s_store_sk#162, sum#163, sum#164]
+Output [3]: [s_store_sk#162, _pushed_sum_ss_ext_sales_price#163, _pushed_sum_ss_net_profit#164]
 
 (103) HashAggregate [codegen id : 55]
-Input [3]: [s_store_sk#162, sum#163, sum#164]
+Input [3]: [s_store_sk#162, _pushed_sum_ss_ext_sales_price#163, _pushed_sum_ss_net_profit#164]
 Keys [1]: [s_store_sk#162]
-Functions [2]: [sum(UnscaledValue(ss_ext_sales_price#165)), sum(UnscaledValue(ss_net_profit#166))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ss_ext_sales_price#165))#12, sum(UnscaledValue(ss_net_profit#166))#13]
-Results [3]: [s_store_sk#162, MakeDecimal(sum(UnscaledValue(ss_ext_sales_price#165))#12,17,2) AS sales#167, MakeDecimal(sum(UnscaledValue(ss_net_profit#166))#13,17,2) AS profit#168]
+Functions [2]: [sum(_pushed_sum_ss_ext_sales_price#163), sum(_pushed_sum_ss_net_profit#164)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ss_ext_sales_price#163)#165, sum(_pushed_sum_ss_net_profit#164)#166]
+Results [3]: [s_store_sk#162, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#163)#165,17,2) AS sales#167, MakeDecimal(sum(_pushed_sum_ss_net_profit#164)#166,17,2) AS profit#168]
 
 (104) ReusedExchange [Reuses operator id: 28]
 Output [3]: [s_store_sk#169, returns#170, profit_loss#171]
@@ -642,14 +642,14 @@ Output [5]: [store channel AS channel#172, s_store_sk#162 AS id#173, sales#167, 
 Input [6]: [s_store_sk#162, sales#167, profit#168, s_store_sk#169, returns#170, profit_loss#171]
 
 (107) ReusedExchange [Reuses operator id: 37]
-Output [3]: [cs_call_center_sk#176, sum#177, sum#178]
+Output [3]: [cs_call_center_sk#176, _pushed_sum_cs_ext_sales_price#177, _pushed_sum_cs_net_profit#178]
 
 (108) HashAggregate [codegen id : 61]
-Input [3]: [cs_call_center_sk#176, sum#177, sum#178]
+Input [3]: [cs_call_center_sk#176, _pushed_sum_cs_ext_sales_price#177, _pushed_sum_cs_net_profit#178]
 Keys [1]: [cs_call_center_sk#176]
-Functions [2]: [sum(UnscaledValue(cs_ext_sales_price#179)), sum(UnscaledValue(cs_net_profit#180))]
-Aggregate Attributes [2]: [sum(UnscaledValue(cs_ext_sales_price#179))#43, sum(UnscaledValue(cs_net_profit#180))#44]
-Results [3]: [cs_call_center_sk#176, MakeDecimal(sum(UnscaledValue(cs_ext_sales_price#179))#43,17,2) AS sales#181, MakeDecimal(sum(UnscaledValue(cs_net_profit#180))#44,17,2) AS profit#182]
+Functions [2]: [sum(_pushed_sum_cs_ext_sales_price#177), sum(_pushed_sum_cs_net_profit#178)]
+Aggregate Attributes [2]: [sum(_pushed_sum_cs_ext_sales_price#177)#179, sum(_pushed_sum_cs_net_profit#178)#180]
+Results [3]: [cs_call_center_sk#176, MakeDecimal(sum(_pushed_sum_cs_ext_sales_price#177)#179,17,2) AS sales#181, MakeDecimal(sum(_pushed_sum_cs_net_profit#178)#180,17,2) AS profit#182]
 
 (109) ReusedExchange [Reuses operator id: 47]
 Output [2]: [returns#183, profit_loss#184]
@@ -663,14 +663,14 @@ Output [5]: [catalog channel AS channel#185, cs_call_center_sk#176 AS id#186, sa
 Input [5]: [cs_call_center_sk#176, sales#181, profit#182, returns#183, profit_loss#184]
 
 (112) ReusedExchange [Reuses operator id: 63]
-Output [3]: [wp_web_page_sk#188, sum#189, sum#190]
+Output [3]: [wp_web_page_sk#188, _pushed_sum_ws_ext_sales_price#189, _pushed_sum_ws_net_profit#190]
 
 (113) HashAggregate [codegen id : 69]
-Input [3]: [wp_web_page_sk#188, sum#189, sum#190]
+Input [3]: [wp_web_page_sk#188, _pushed_sum_ws_ext_sales_price#189, _pushed_sum_ws_net_profit#190]
 Keys [1]: [wp_web_page_sk#188]
-Functions [2]: [sum(UnscaledValue(ws_ext_sales_price#191)), sum(UnscaledValue(ws_net_profit#192))]
-Aggregate Attributes [2]: [sum(UnscaledValue(ws_ext_sales_price#191))#72, sum(UnscaledValue(ws_net_profit#192))#73]
-Results [3]: [wp_web_page_sk#188, MakeDecimal(sum(UnscaledValue(ws_ext_sales_price#191))#72,17,2) AS sales#193, MakeDecimal(sum(UnscaledValue(ws_net_profit#192))#73,17,2) AS profit#194]
+Functions [2]: [sum(_pushed_sum_ws_ext_sales_price#189), sum(_pushed_sum_ws_net_profit#190)]
+Aggregate Attributes [2]: [sum(_pushed_sum_ws_ext_sales_price#189)#191, sum(_pushed_sum_ws_net_profit#190)#192]
+Results [3]: [wp_web_page_sk#188, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#189)#191,17,2) AS sales#193, MakeDecimal(sum(_pushed_sum_ws_net_profit#190)#192,17,2) AS profit#194]
 
 (114) ReusedExchange [Reuses operator id: 77]
 Output [3]: [wp_web_page_sk#195, returns#196, profit_loss#197]

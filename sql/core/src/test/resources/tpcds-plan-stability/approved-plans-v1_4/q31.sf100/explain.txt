@@ -195,20 +195,20 @@ Input [6]: [ss_addr_sk#1, d_qoy#7, d_year#6, _pushed_sum_ss_ext_sales_price#9, c
 (17) HashAggregate [codegen id : 6]
 Input [4]: [d_qoy#7, d_year#6, _pushed_sum_ss_ext_sales_price#9, ca_county#11]
 Keys [3]: [ca_county#11, d_qoy#7, d_year#6]
-Functions [1]: [partial_sum(_pushed_sum_ss_ext_sales_price#9)]
-Aggregate Attributes [1]: [sum#12]
-Results [4]: [ca_county#11, d_qoy#7, d_year#6, sum#13]
+Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#9)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#9)#8]
+Results [4]: [ca_county#11, d_qoy#7, d_year#6, sum(_pushed_sum_ss_ext_sales_price#9)#8 AS _pushed_sum__pushed_sum_ss_ext_sales_price#12]
 
 (18) Exchange
-Input [4]: [ca_county#11, d_qoy#7, d_year#6, sum#13]
+Input [4]: [ca_county#11, d_qoy#7, d_year#6, _pushed_sum__pushed_sum_ss_ext_sales_price#12]
 Arguments: hashpartitioning(ca_county#11, d_qoy#7, d_year#6, 5), ENSURE_REQUIREMENTS, [plan_id=3]
 
 (19) HashAggregate [codegen id : 42]
-Input [4]: [ca_county#11, d_qoy#7, d_year#6, sum#13]
+Input [4]: [ca_county#11, d_qoy#7, d_year#6, _pushed_sum__pushed_sum_ss_ext_sales_price#12]
 Keys [3]: [ca_county#11, d_qoy#7, d_year#6]
-Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#9)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#9)#8]
-Results [2]: [ca_county#11, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#9)#8,17,2) AS store_sales#14]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#12)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#12)#13]
+Results [2]: [ca_county#11, MakeDecimal(sum(_pushed_sum__pushed_sum_ss_ext_sales_price#12)#13,17,2) AS store_sales#14]
 
 (20) Scan parquet spark_catalog.default.store_sales
 Output [3]: [ss_addr_sk#15, ss_ext_sales_price#16, ss_sold_date_sk#17]
@@ -273,20 +273,20 @@ Input [6]: [ss_addr_sk#15, d_qoy#21, d_year#20, _pushed_sum_ss_ext_sales_price#2
 (33) HashAggregate [codegen id : 12]
 Input [4]: [d_qoy#21, d_year#20, _pushed_sum_ss_ext_sales_price#22, ca_county#24]
 Keys [3]: [ca_county#24, d_qoy#21, d_year#20]
-Functions [1]: [partial_sum(_pushed_sum_ss_ext_sales_price#22)]
-Aggregate Attributes [1]: [sum#25]
-Results [4]: [ca_county#24, d_qoy#21, d_year#20, sum#26]
+Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#22)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#22)#8]
+Results [4]: [ca_county#24, d_qoy#21, d_year#20, sum(_pushed_sum_ss_ext_sales_price#22)#8 AS _pushed_sum__pushed_sum_ss_ext_sales_price#25]
 
 (34) Exchange
-Input [4]: [ca_county#24, d_qoy#21, d_year#20, sum#26]
+Input [4]: [ca_county#24, d_qoy#21, d_year#20, _pushed_sum__pushed_sum_ss_ext_sales_price#25]
 Arguments: hashpartitioning(ca_county#24, d_qoy#21, d_year#20, 5), ENSURE_REQUIREMENTS, [plan_id=5]
 
 (35) HashAggregate [codegen id : 13]
-Input [4]: [ca_county#24, d_qoy#21, d_year#20, sum#26]
+Input [4]: [ca_county#24, d_qoy#21, d_year#20, _pushed_sum__pushed_sum_ss_ext_sales_price#25]
 Keys [3]: [ca_county#24, d_qoy#21, d_year#20]
-Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#22)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#22)#8]
-Results [2]: [ca_county#24, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#22)#8,17,2) AS store_sales#27]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#25)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#25)#26]
+Results [2]: [ca_county#24, MakeDecimal(sum(_pushed_sum__pushed_sum_ss_ext_sales_price#25)#26,17,2) AS store_sales#27]
 
 (36) BroadcastExchange
 Input [2]: [ca_county#24, store_sales#27]
@@ -365,20 +365,20 @@ Input [6]: [ss_addr_sk#28, d_qoy#34, d_year#33, _pushed_sum_ss_ext_sales_price#3
 (52) HashAggregate [codegen id : 19]
 Input [4]: [d_qoy#34, d_year#33, _pushed_sum_ss_ext_sales_price#35, ca_county#37]
 Keys [3]: [ca_county#37, d_qoy#34, d_year#33]
-Functions [1]: [partial_sum(_pushed_sum_ss_ext_sales_price#35)]
-Aggregate Attributes [1]: [sum#38]
-Results [4]: [ca_county#37, d_qoy#34, d_year#33, sum#39]
+Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#35)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#35)#8]
+Results [4]: [ca_county#37, d_qoy#34, d_year#33, sum(_pushed_sum_ss_ext_sales_price#35)#8 AS _pushed_sum__pushed_sum_ss_ext_sales_price#38]
 
 (53) Exchange
-Input [4]: [ca_county#37, d_qoy#34, d_year#33, sum#39]
+Input [4]: [ca_county#37, d_qoy#34, d_year#33, _pushed_sum__pushed_sum_ss_ext_sales_price#38]
 Arguments: hashpartitioning(ca_county#37, d_qoy#34, d_year#33, 5), ENSURE_REQUIREMENTS, [plan_id=8]
 
 (54) HashAggregate [codegen id : 20]
-Input [4]: [ca_county#37, d_qoy#34, d_year#33, sum#39]
+Input [4]: [ca_county#37, d_qoy#34, d_year#33, _pushed_sum__pushed_sum_ss_ext_sales_price#38]
 Keys [3]: [ca_county#37, d_qoy#34, d_year#33]
-Functions [1]: [sum(_pushed_sum_ss_ext_sales_price#35)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ss_ext_sales_price#35)#8]
-Results [3]: [ca_county#37, d_year#33, MakeDecimal(sum(_pushed_sum_ss_ext_sales_price#35)#8,17,2) AS store_sales#40]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#38)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ss_ext_sales_price#38)#39]
+Results [3]: [ca_county#37, d_year#33, MakeDecimal(sum(_pushed_sum__pushed_sum_ss_ext_sales_price#38)#39,17,2) AS store_sales#40]
 
 (55) BroadcastExchange
 Input [3]: [ca_county#37, d_year#33, store_sales#40]
@@ -457,20 +457,20 @@ Input [6]: [ws_bill_addr_sk#41, d_qoy#46, d_year#45, _pushed_sum_ws_ext_sales_pr
 (71) HashAggregate [codegen id : 26]
 Input [4]: [d_qoy#46, d_year#45, _pushed_sum_ws_ext_sales_price#48, ca_county#50]
 Keys [3]: [ca_county#50, d_qoy#46, d_year#45]
-Functions [1]: [partial_sum(_pushed_sum_ws_ext_sales_price#48)]
-Aggregate Attributes [1]: [sum#51]
-Results [4]: [ca_county#50, d_qoy#46, d_year#45, sum#52]
+Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#48)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#48)#47]
+Results [4]: [ca_county#50, d_qoy#46, d_year#45, sum(_pushed_sum_ws_ext_sales_price#48)#47 AS _pushed_sum__pushed_sum_ws_ext_sales_price#51]
 
 (72) Exchange
-Input [4]: [ca_county#50, d_qoy#46, d_year#45, sum#52]
+Input [4]: [ca_county#50, d_qoy#46, d_year#45, _pushed_sum__pushed_sum_ws_ext_sales_price#51]
 Arguments: hashpartitioning(ca_county#50, d_qoy#46, d_year#45, 5), ENSURE_REQUIREMENTS, [plan_id=11]
 
 (73) HashAggregate [codegen id : 41]
-Input [4]: [ca_county#50, d_qoy#46, d_year#45, sum#52]
+Input [4]: [ca_county#50, d_qoy#46, d_year#45, _pushed_sum__pushed_sum_ws_ext_sales_price#51]
 Keys [3]: [ca_county#50, d_qoy#46, d_year#45]
-Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#48)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#48)#47]
-Results [2]: [ca_county#50, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#48)#47,17,2) AS web_sales#53]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#51)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#51)#52]
+Results [2]: [ca_county#50, MakeDecimal(sum(_pushed_sum__pushed_sum_ws_ext_sales_price#51)#52,17,2) AS web_sales#53]
 
 (74) Scan parquet spark_catalog.default.web_sales
 Output [3]: [ws_bill_addr_sk#54, ws_ext_sales_price#55, ws_sold_date_sk#56]
@@ -535,20 +535,20 @@ Input [6]: [ws_bill_addr_sk#54, d_qoy#59, d_year#58, _pushed_sum_ws_ext_sales_pr
 (87) HashAggregate [codegen id : 32]
 Input [4]: [d_qoy#59, d_year#58, _pushed_sum_ws_ext_sales_price#60, ca_county#62]
 Keys [3]: [ca_county#62, d_qoy#59, d_year#58]
-Functions [1]: [partial_sum(_pushed_sum_ws_ext_sales_price#60)]
-Aggregate Attributes [1]: [sum#63]
-Results [4]: [ca_county#62, d_qoy#59, d_year#58, sum#64]
+Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#60)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#60)#47]
+Results [4]: [ca_county#62, d_qoy#59, d_year#58, sum(_pushed_sum_ws_ext_sales_price#60)#47 AS _pushed_sum__pushed_sum_ws_ext_sales_price#63]
 
 (88) Exchange
-Input [4]: [ca_county#62, d_qoy#59, d_year#58, sum#64]
+Input [4]: [ca_county#62, d_qoy#59, d_year#58, _pushed_sum__pushed_sum_ws_ext_sales_price#63]
 Arguments: hashpartitioning(ca_county#62, d_qoy#59, d_year#58, 5), ENSURE_REQUIREMENTS, [plan_id=13]
 
 (89) HashAggregate [codegen id : 33]
-Input [4]: [ca_county#62, d_qoy#59, d_year#58, sum#64]
+Input [4]: [ca_county#62, d_qoy#59, d_year#58, _pushed_sum__pushed_sum_ws_ext_sales_price#63]
 Keys [3]: [ca_county#62, d_qoy#59, d_year#58]
-Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#60)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#60)#47]
-Results [2]: [ca_county#62, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#60)#47,17,2) AS web_sales#65]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#63)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#63)#64]
+Results [2]: [ca_county#62, MakeDecimal(sum(_pushed_sum__pushed_sum_ws_ext_sales_price#63)#64,17,2) AS web_sales#65]
 
 (90) BroadcastExchange
 Input [2]: [ca_county#62, web_sales#65]
@@ -627,20 +627,20 @@ Input [6]: [ws_bill_addr_sk#66, d_qoy#71, d_year#70, _pushed_sum_ws_ext_sales_pr
 (106) HashAggregate [codegen id : 39]
 Input [4]: [d_qoy#71, d_year#70, _pushed_sum_ws_ext_sales_price#72, ca_county#74]
 Keys [3]: [ca_county#74, d_qoy#71, d_year#70]
-Functions [1]: [partial_sum(_pushed_sum_ws_ext_sales_price#72)]
-Aggregate Attributes [1]: [sum#75]
-Results [4]: [ca_county#74, d_qoy#71, d_year#70, sum#76]
+Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#72)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#72)#47]
+Results [4]: [ca_county#74, d_qoy#71, d_year#70, sum(_pushed_sum_ws_ext_sales_price#72)#47 AS _pushed_sum__pushed_sum_ws_ext_sales_price#75]
 
 (107) Exchange
-Input [4]: [ca_county#74, d_qoy#71, d_year#70, sum#76]
+Input [4]: [ca_county#74, d_qoy#71, d_year#70, _pushed_sum__pushed_sum_ws_ext_sales_price#75]
 Arguments: hashpartitioning(ca_county#74, d_qoy#71, d_year#70, 5), ENSURE_REQUIREMENTS, [plan_id=16]
 
 (108) HashAggregate [codegen id : 40]
-Input [4]: [ca_county#74, d_qoy#71, d_year#70, sum#76]
+Input [4]: [ca_county#74, d_qoy#71, d_year#70, _pushed_sum__pushed_sum_ws_ext_sales_price#75]
 Keys [3]: [ca_county#74, d_qoy#71, d_year#70]
-Functions [1]: [sum(_pushed_sum_ws_ext_sales_price#72)]
-Aggregate Attributes [1]: [sum(_pushed_sum_ws_ext_sales_price#72)#47]
-Results [2]: [ca_county#74, MakeDecimal(sum(_pushed_sum_ws_ext_sales_price#72)#47,17,2) AS web_sales#77]
+Functions [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#75)]
+Aggregate Attributes [1]: [sum(_pushed_sum__pushed_sum_ws_ext_sales_price#75)#76]
+Results [2]: [ca_county#74, MakeDecimal(sum(_pushed_sum__pushed_sum_ws_ext_sales_price#75)#76,17,2) AS web_sales#77]
 
 (109) BroadcastExchange
 Input [2]: [ca_county#74, web_sales#77]

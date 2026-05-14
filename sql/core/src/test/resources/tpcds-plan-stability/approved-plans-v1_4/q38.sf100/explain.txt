@@ -332,20 +332,20 @@ Input [3]: [c_last_name#8, c_first_name#7, d_date#5]
 (58) HashAggregate [codegen id : 26]
 Input: []
 Keys: []
-Functions [1]: [partial_count(1)]
-Aggregate Attributes [1]: [count#23]
-Results [1]: [count#24]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#23]
+Results [1]: [count(1)#23 AS _pushed_count#24]
 
 (59) Exchange
-Input [1]: [count#24]
+Input [1]: [_pushed_count#24]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=11]
 
 (60) HashAggregate [codegen id : 27]
-Input [1]: [count#24]
+Input [1]: [_pushed_count#24]
 Keys: []
-Functions [1]: [count(1)]
-Aggregate Attributes [1]: [count(1)#25]
-Results [1]: [count(1)#25 AS count(1)#26]
+Functions [1]: [sum(_pushed_count#24)]
+Aggregate Attributes [1]: [sum(_pushed_count#24)#25]
+Results [1]: [sum(_pushed_count#24)#25 AS count(1)#26]
 
 ===== Subqueries =====
 

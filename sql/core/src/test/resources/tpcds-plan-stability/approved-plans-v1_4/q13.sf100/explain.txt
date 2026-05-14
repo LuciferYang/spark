@@ -182,20 +182,20 @@ Input [7]: [ss_addr_sk#3, ss_quantity#5, ss_ext_sales_price#7, ss_ext_wholesale_
 (32) HashAggregate [codegen id : 6]
 Input [3]: [ss_quantity#5, ss_ext_sales_price#7, ss_ext_wholesale_cost#8]
 Keys: []
-Functions [4]: [partial_avg(ss_quantity#5), partial_avg(UnscaledValue(ss_ext_sales_price#7)), partial_avg(UnscaledValue(ss_ext_wholesale_cost#8)), partial_sum(UnscaledValue(ss_ext_wholesale_cost#8))]
-Aggregate Attributes [7]: [sum#22, count#23, sum#24, count#25, sum#26, count#27, sum#28]
-Results [7]: [sum#29, count#30, sum#31, count#32, sum#33, count#34, sum#35]
+Functions [7]: [sum(ss_quantity#5), count(ss_quantity#5), sum(UnscaledValue(ss_ext_sales_price#7)), count(UnscaledValue(ss_ext_sales_price#7)), sum(UnscaledValue(ss_ext_wholesale_cost#8)), count(UnscaledValue(ss_ext_wholesale_cost#8)), sum(UnscaledValue(ss_ext_wholesale_cost#8))]
+Aggregate Attributes [7]: [sum(ss_quantity#5)#22, count(ss_quantity#5)#23, sum(UnscaledValue(ss_ext_sales_price#7))#24, count(UnscaledValue(ss_ext_sales_price#7))#25, sum(UnscaledValue(ss_ext_wholesale_cost#8))#26, count(UnscaledValue(ss_ext_wholesale_cost#8))#27, sum(UnscaledValue(ss_ext_wholesale_cost#8))#28]
+Results [7]: [sum(ss_quantity#5)#22 AS _pushed_avg_sum_ss_quantity#29, count(ss_quantity#5)#23 AS _pushed_avg_count_ss_quantity#30, sum(UnscaledValue(ss_ext_sales_price#7))#24 AS _pushed_avg_sum_ss_ext_sales_price#31, count(UnscaledValue(ss_ext_sales_price#7))#25 AS _pushed_avg_count_ss_ext_sales_price#32, sum(UnscaledValue(ss_ext_wholesale_cost#8))#26 AS _pushed_avg_sum_ss_ext_wholesale_cost#33, count(UnscaledValue(ss_ext_wholesale_cost#8))#27 AS _pushed_avg_count_ss_ext_wholesale_cost#34, sum(UnscaledValue(ss_ext_wholesale_cost#8))#28 AS _pushed_sum_ss_ext_wholesale_cost#35]
 
 (33) Exchange
-Input [7]: [sum#29, count#30, sum#31, count#32, sum#33, count#34, sum#35]
+Input [7]: [_pushed_avg_sum_ss_quantity#29, _pushed_avg_count_ss_quantity#30, _pushed_avg_sum_ss_ext_sales_price#31, _pushed_avg_count_ss_ext_sales_price#32, _pushed_avg_sum_ss_ext_wholesale_cost#33, _pushed_avg_count_ss_ext_wholesale_cost#34, _pushed_sum_ss_ext_wholesale_cost#35]
 Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=5]
 
 (34) HashAggregate [codegen id : 7]
-Input [7]: [sum#29, count#30, sum#31, count#32, sum#33, count#34, sum#35]
+Input [7]: [_pushed_avg_sum_ss_quantity#29, _pushed_avg_count_ss_quantity#30, _pushed_avg_sum_ss_ext_sales_price#31, _pushed_avg_count_ss_ext_sales_price#32, _pushed_avg_sum_ss_ext_wholesale_cost#33, _pushed_avg_count_ss_ext_wholesale_cost#34, _pushed_sum_ss_ext_wholesale_cost#35]
 Keys: []
-Functions [4]: [avg(ss_quantity#5), avg(UnscaledValue(ss_ext_sales_price#7)), avg(UnscaledValue(ss_ext_wholesale_cost#8)), sum(UnscaledValue(ss_ext_wholesale_cost#8))]
-Aggregate Attributes [4]: [avg(ss_quantity#5)#36, avg(UnscaledValue(ss_ext_sales_price#7))#37, avg(UnscaledValue(ss_ext_wholesale_cost#8))#38, sum(UnscaledValue(ss_ext_wholesale_cost#8))#39]
-Results [4]: [avg(ss_quantity#5)#36 AS avg(ss_quantity)#40, cast((avg(UnscaledValue(ss_ext_sales_price#7))#37 / 100.0) as decimal(11,6)) AS avg(ss_ext_sales_price)#41, cast((avg(UnscaledValue(ss_ext_wholesale_cost#8))#38 / 100.0) as decimal(11,6)) AS avg(ss_ext_wholesale_cost)#42, MakeDecimal(sum(UnscaledValue(ss_ext_wholesale_cost#8))#39,17,2) AS sum(ss_ext_wholesale_cost)#43]
+Functions [7]: [sum(_pushed_avg_sum_ss_quantity#29), sum(_pushed_avg_count_ss_quantity#30), sum(_pushed_avg_sum_ss_ext_sales_price#31), sum(_pushed_avg_count_ss_ext_sales_price#32), sum(_pushed_avg_sum_ss_ext_wholesale_cost#33), sum(_pushed_avg_count_ss_ext_wholesale_cost#34), sum(_pushed_sum_ss_ext_wholesale_cost#35)]
+Aggregate Attributes [7]: [sum(_pushed_avg_sum_ss_quantity#29)#36, sum(_pushed_avg_count_ss_quantity#30)#37, sum(_pushed_avg_sum_ss_ext_sales_price#31)#38, sum(_pushed_avg_count_ss_ext_sales_price#32)#39, sum(_pushed_avg_sum_ss_ext_wholesale_cost#33)#40, sum(_pushed_avg_count_ss_ext_wholesale_cost#34)#41, sum(_pushed_sum_ss_ext_wholesale_cost#35)#42]
+Results [4]: [(cast(sum(_pushed_avg_sum_ss_quantity#29)#36 as double) / cast(sum(_pushed_avg_count_ss_quantity#30)#37 as double)) AS avg(ss_quantity)#43, cast(((cast(sum(_pushed_avg_sum_ss_ext_sales_price#31)#38 as double) / cast(sum(_pushed_avg_count_ss_ext_sales_price#32)#39 as double)) / 100.0) as decimal(11,6)) AS avg(ss_ext_sales_price)#44, cast(((cast(sum(_pushed_avg_sum_ss_ext_wholesale_cost#33)#40 as double) / cast(sum(_pushed_avg_count_ss_ext_wholesale_cost#34)#41 as double)) / 100.0) as decimal(11,6)) AS avg(ss_ext_wholesale_cost)#45, MakeDecimal(sum(_pushed_sum_ss_ext_wholesale_cost#35)#42,17,2) AS sum(ss_ext_wholesale_cost)#46]
 
 ===== Subqueries =====
 
@@ -208,22 +208,22 @@ BroadcastExchange (39)
 
 
 (35) Scan parquet spark_catalog.default.date_dim
-Output [2]: [d_date_sk#17, d_year#44]
+Output [2]: [d_date_sk#17, d_year#47]
 Batched: true
 Location [not included in comparison]/{warehouse_dir}/date_dim]
 PushedFilters: [IsNotNull(d_year), EqualTo(d_year,2001), IsNotNull(d_date_sk)]
 ReadSchema: struct<d_date_sk:int,d_year:int>
 
 (36) ColumnarToRow [codegen id : 1]
-Input [2]: [d_date_sk#17, d_year#44]
+Input [2]: [d_date_sk#17, d_year#47]
 
 (37) Filter [codegen id : 1]
-Input [2]: [d_date_sk#17, d_year#44]
-Condition : ((isnotnull(d_year#44) AND (d_year#44 = 2001)) AND isnotnull(d_date_sk#17))
+Input [2]: [d_date_sk#17, d_year#47]
+Condition : ((isnotnull(d_year#47) AND (d_year#47 = 2001)) AND isnotnull(d_date_sk#17))
 
 (38) Project [codegen id : 1]
 Output [1]: [d_date_sk#17]
-Input [2]: [d_date_sk#17, d_year#44]
+Input [2]: [d_date_sk#17, d_year#47]
 
 (39) BroadcastExchange
 Input [1]: [d_date_sk#17]

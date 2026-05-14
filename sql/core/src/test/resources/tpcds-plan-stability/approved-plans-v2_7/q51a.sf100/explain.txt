@@ -217,20 +217,20 @@ Input [5]: [ss_item_sk#20, ss_sales_price#21, ss_sold_date_sk#22, d_date_sk#23, 
 (33) HashAggregate [codegen id : 16]
 Input [3]: [ss_item_sk#20, ss_sales_price#21, d_date#24]
 Keys [2]: [ss_item_sk#20, d_date#24]
-Functions [1]: [partial_sum(UnscaledValue(ss_sales_price#21))]
-Aggregate Attributes [1]: [sum#25]
-Results [3]: [ss_item_sk#20, d_date#24, sum#26]
+Functions [1]: [sum(UnscaledValue(ss_sales_price#21))]
+Aggregate Attributes [1]: [sum(UnscaledValue(ss_sales_price#21))#25]
+Results [3]: [ss_item_sk#20, d_date#24, sum(UnscaledValue(ss_sales_price#21))#25 AS _pushed_sum_ss_sales_price#26]
 
 (34) Exchange
-Input [3]: [ss_item_sk#20, d_date#24, sum#26]
+Input [3]: [ss_item_sk#20, d_date#24, _pushed_sum_ss_sales_price#26]
 Arguments: hashpartitioning(ss_item_sk#20, d_date#24, 5), ENSURE_REQUIREMENTS, [plan_id=6]
 
 (35) HashAggregate [codegen id : 17]
-Input [3]: [ss_item_sk#20, d_date#24, sum#26]
+Input [3]: [ss_item_sk#20, d_date#24, _pushed_sum_ss_sales_price#26]
 Keys [2]: [ss_item_sk#20, d_date#24]
-Functions [1]: [sum(UnscaledValue(ss_sales_price#21))]
-Aggregate Attributes [1]: [sum(UnscaledValue(ss_sales_price#21))#27]
-Results [4]: [ss_item_sk#20 AS item_sk#28, d_date#24, MakeDecimal(sum(UnscaledValue(ss_sales_price#21))#27,17,2) AS sumss#29, ss_item_sk#20]
+Functions [1]: [sum(_pushed_sum_ss_sales_price#26)]
+Aggregate Attributes [1]: [sum(_pushed_sum_ss_sales_price#26)#27]
+Results [4]: [ss_item_sk#20 AS item_sk#28, d_date#24, MakeDecimal(sum(_pushed_sum_ss_sales_price#26)#27,17,2) AS sumss#29, ss_item_sk#20]
 
 (36) Exchange
 Input [4]: [item_sk#28, d_date#24, sumss#29, ss_item_sk#20]
