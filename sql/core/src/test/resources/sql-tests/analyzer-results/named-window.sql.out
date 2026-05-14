@@ -310,7 +310,7 @@ SELECT * FROM cte
 ORDER BY n_nationkey
 -- !query analysis
 WithCTE
-:- CTERelationDef xxxx, false
+:- CTERelationDef xxxx, false, false
 :  +- SubqueryAlias cte
 :     +- Project [n_nationkey#x, s#xL]
 :        +- Project [n_nationkey#x, s#xL, s#xL]
