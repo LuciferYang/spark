@@ -89,6 +89,7 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
     cteDef.deterministic &&
       !cteDef.correlatedSubqueryRef &&
+      !cteDef.pruningVeto &&
       !hasDivergentPredicates(cteDef) &&
       isExpensiveEnough(cteDef.child)
   }
