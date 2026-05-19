@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution
 
 import scala.collection.mutable
 
-import org.apache.spark.internal.Logging
+import org.apache.spark.internal.{Logging, LogKeys, MDC}
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
 import org.apache.spark.sql.catalyst.expressions.{Alias, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
@@ -89,6 +89,7 @@ object ReplaceCTERefWithCache extends Rule[LogicalPlan] with Logging {
   private def shouldAutoCache(cteDef: CTERelationDef): Boolean = {
     cteDef.deterministic &&
       !cteDef.correlatedSubqueryRef &&
+      !cteDef.pruningVeto &&
       !hasDivergentPredicates(cteDef) &&
       isExpensiveEnough(cteDef.child)
   }
@@ -436,7 +437,8 @@ class AutoCTECacheManager(ttlMs: Long, maxSizeBytes: Long) extends Logging {
               }
             }
           }
-          logInfo(s"Evicted auto-cached CTE ${entry.tableName}")
+          logInfo(log"Evicted auto-cached CTE " +
+            log"${MDC(LogKeys.TABLE_NAME, entry.tableName)}")
         }
       })
     if (ttlMs > 0) {

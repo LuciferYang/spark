@@ -178,6 +178,7 @@ private[spark] object LogKeys {
   case object CSV_SCHEMA_FIELD_NAME extends LogKey
   case object CSV_SCHEMA_FIELD_NAMES extends LogKey
   case object CSV_SOURCE extends LogKey
+  case object CTE_ID extends LogKey
   case object CURRENT_BATCH_ID extends LogKey
   case object CURRENT_DISK_SIZE extends LogKey
   case object CURRENT_FILE extends LogKey
