@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.execution.datasources.{PruneFileSourcePartitions, PushVariantIntoScan, SchemaPruning, V1Writes}
 import org.apache.spark.sql.execution.datasources.v2.{GroupBasedRowLevelOperationScanPlanning, OptimizeMetadataOnlyDeleteFromTable, V2ScanPartitioningAndOrdering, V2ScanRelationPushDown, V2Writes}
-import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering}
+import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering, TagPruningVetoCTE}
 import org.apache.spark.sql.execution.python.{ExtractGroupingPythonUDFFromAggregate, ExtractPythonUDFFromAggregate, ExtractPythonUDFs, ExtractPythonUDTFs}
 
 class SparkOptimizer(
@@ -57,6 +57,12 @@ class SparkOptimizer(
     // regression pattern. Must run before any rule that touches
     // SubqueryExpression structure.
     Batch("Tag Correlated CTE Refs", Once, TagCorrelatedCTERefs),
+    // Tag CTE definitions whose body contains a partitioned/runtime-filterable
+    // fact scan that would be MORE valuable as the target of outer DPP/DFP
+    // pruning than as a cached InMemoryRelation. Read by `InlineCTE` and
+    // `ReplaceCTERefWithCache`. Disabled by default; see
+    // `spark.sql.auto.cte.skipWhenPruningApplicable`.
+    Batch("Tag Pruning Veto CTE", Once, TagPruningVetoCTE),
     // Move CleanUpTempCTEInfo to after ReplaceCTERefWithCache so that
     // originalPlanWithPredicates is available for divergent-predicate detection.
     super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info"),
@@ -117,7 +123,8 @@ class SparkOptimizer(
       V2ScanRelationPushDown.ruleName,
       V2ScanPartitioningAndOrdering.ruleName,
       V2Writes.ruleName,
-      ReplaceCTERefWithRepartition.ruleName)
+      ReplaceCTERefWithRepartition.ruleName,
+      TagPruningVetoCTE.ruleName)
 
   /**
    * Optimization batches that are executed before the regular optimization batches (also before

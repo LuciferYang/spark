@@ -82,6 +82,7 @@ case class InlineCTE(
         SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
         cteDef.deterministic &&
         !cteDef.correlatedSubqueryRef &&
+        !cteDef.pruningVeto &&
         isAutoCacheEligible(cteDef.child)) {
       return false
     }

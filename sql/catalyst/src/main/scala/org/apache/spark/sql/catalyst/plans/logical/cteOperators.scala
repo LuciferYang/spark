@@ -116,6 +116,15 @@ case class UnionLoopRef(
  *                              materialising the CTE would block the per-key specialisation that
  *                              the decorrelated join can otherwise exploit via runtime filters
  *                              and predicate pushdown.
+ * @param pruningVeto If true, caching this CTE would block outer DPP/DFP pruning of its
+ *                    fact-table scans AND no in-body PartitionPruning opportunity substitutes
+ *                    for the lost outer pruning. Populated by `TagPruningVetoCTE`. Honored by
+ *                    `InlineCTE.shouldInline` (forces inlining) and by
+ *                    `ReplaceCTERefWithCache.shouldAutoCache` (refuses materialisation).
+ *                    Controlled by `spark.sql.auto.cte.skipWhenPruningApplicable` (default
+ *                    false). Structural field because the rule may re-fire across `transform`
+ *                    clone-and-modify and we need the flag to survive; precedent is
+ *                    `correlatedSubqueryRef` above.
  */
 case class CTERelationDef(
     child: LogicalPlan,
@@ -123,7 +132,8 @@ case class CTERelationDef(
     originalPlanWithPredicates: Option[(LogicalPlan, Seq[Expression])] = None,
     underSubquery: Boolean = false,
     maxDepth: Option[Int] = None,
-    correlatedSubqueryRef: Boolean = false) extends UnaryNode {
+    correlatedSubqueryRef: Boolean = false,
+    pruningVeto: Boolean = false) extends UnaryNode {
 
   final override val nodePatterns: Seq[TreePattern] = Seq(CTE)
 

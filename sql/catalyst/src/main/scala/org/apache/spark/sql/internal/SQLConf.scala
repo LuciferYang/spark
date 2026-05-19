@@ -5997,6 +5997,43 @@ object SQLConf {
       .checkValues(StorageLevelMapper.values.map(_.name()).toSet)
       .createWithDefault(StorageLevelMapper.MEMORY_ONLY.name())
 
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable")
+      .doc(
+        "When true, skip Auto-CTE caching for CTEs whose body has no in-body " +
+        "PartitionPruning opportunity but whose partitioned/runtime-filterable " +
+        "fact scans would benefit from outer DPP/DFP after inlining. Default " +
+        "true: safe because Auto-CTE itself (spark.sql.auto.reused.cte.enabled) " +
+        "defaults to false, so the veto is a no-op until a user opts into " +
+        "Auto-CTE; at that point the veto fires automatically without requiring " +
+        "a second opt-in. See TagPruningVetoCTE and PruningEligibility.")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE_DPP =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable.dpp")
+      .doc("Sub-switch enabling partition-level DPP detection in the Auto-CTE " +
+        "pruning-aware veto check. Effective only when the master switch " +
+        "spark.sql.auto.cte.skipWhenPruningApplicable is true. When both this " +
+        "and the DFP sub-switch are false, the master switch has no effect.")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE_DFP =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable.dfp")
+      .doc("Sub-switch enabling V2 SupportsRuntimeV2Filtering DFP detection in " +
+        "the Auto-CTE pruning-aware veto check. Effective only when the master " +
+        "switch spark.sql.auto.cte.skipWhenPruningApplicable is true. When both " +
+        "this and the DPP sub-switch are false, the master switch has no effect.")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(true)
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +
