@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.apache.parquet.column.values.ValuesReader;
@@ -532,17 +533,135 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
 
   @Override
   public final void readBinary(int total, WritableColumnVector v, int rowId) {
-    for (int i = 0; i < total; i++) {
+    if (total <= 0) {
+      return;
+    }
+    // Single-row reads (called per-row from BinaryUpdater.readValue in nullable/PACKED paths)
+    // bypass the bulk snapshot machinery; the mark/sliceBuffers/reset/skipFully overhead would
+    // not amortize over a single row.
+    if (total == 1) {
       int len = readInteger();
+      if (len < 0) {
+        throw new ParquetDecodingException("Negative binary length: " + len);
+      }
       ByteBuffer buffer = getBuffer(len);
       if (buffer.hasArray()) {
-        v.putByteArray(rowId + i, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
+        v.putByteArray(rowId, buffer.array(), buffer.arrayOffset() + buffer.position(), len);
       } else {
-        // Copy directly from the ByteBuffer into the column vector's backing storage,
-        // bypassing any intermediate byte[] allocation.
-        v.putByteArray(rowId + i, buffer, buffer.position(), len);
+        v.putByteArray(rowId, buffer, buffer.position(), len);
       }
+      return;
     }
+    readBinaryBulk(total, v, rowId);
+  }
+
+  /**
+   * Bulk path for {@link #readBinary(int, WritableColumnVector, int)} when {@code total >= 2}.
+   * Snapshots the remaining stream once via {@link ByteBufferInputStream#sliceBuffers}, then walks
+   * the resulting {@link ByteBuffer}s locally to avoid the per-row {@code ByteBuffer} wrapper
+   * allocation the previous {@code getBuffer(4).getInt()} / {@code getBuffer(len)} pattern
+   * incurred (two wrappers per row). {@code sliceBuffers} drains the underlying stream, so we
+   * {@code mark} beforehand and {@code reset} + {@code skipFully(consumed)} after the walk to
+   * leave the stream positioned exactly past the bytes actually consumed.
+   */
+  private void readBinaryBulk(int total, WritableColumnVector v, int rowId) {
+    int available = in.available();
+    in.mark(available);
+    List<ByteBuffer> remaining;
+    try {
+      remaining = in.sliceBuffers(available);
+    } catch (IOException e) {
+      throw new ParquetDecodingException("Failed to snapshot remaining bytes for readBinary", e);
+    }
+    for (ByteBuffer b : remaining) {
+      b.order(ByteOrder.LITTLE_ENDIAN);
+    }
+    int nBuffers = remaining.size();
+    int bufIdx = 0;
+    ByteBuffer cur = nBuffers == 0 ? null : remaining.get(0);
+    long consumed = 0;
+
+    for (int i = 0; i < total; i++) {
+      if (cur != null && cur.remaining() == 0) {
+        bufIdx = nextNonEmpty(remaining, bufIdx + 1);
+        cur = bufIdx < nBuffers ? remaining.get(bufIdx) : null;
+      }
+
+      int len;
+      if (cur != null && cur.remaining() >= 4) {
+        len = cur.getInt();
+      } else {
+        int acc = 0;
+        int shift = 0;
+        while (shift < 32) {
+          if (cur == null || cur.remaining() == 0) {
+            bufIdx = nextNonEmpty(remaining, bufIdx + 1);
+            if (bufIdx >= nBuffers) {
+              throw new ParquetDecodingException("Unexpected EOF while reading length");
+            }
+            cur = remaining.get(bufIdx);
+          }
+          acc |= (cur.get() & 0xFF) << shift;
+          shift += 8;
+        }
+        len = acc;
+      }
+      if (len < 0) {
+        throw new ParquetDecodingException("Negative binary length: " + len);
+      }
+      consumed += 4;
+
+      if (cur != null && cur.remaining() == 0) {
+        bufIdx = nextNonEmpty(remaining, bufIdx + 1);
+        cur = bufIdx < nBuffers ? remaining.get(bufIdx) : null;
+      }
+
+      if (cur != null && cur.remaining() >= len) {
+        if (cur.hasArray()) {
+          v.putByteArray(rowId + i, cur.array(), cur.arrayOffset() + cur.position(), len);
+        } else {
+          v.putByteArray(rowId + i, cur, cur.position(), len);
+        }
+        cur.position(cur.position() + len);
+      } else {
+        byte[] tmp = new byte[len];
+        int copied = 0;
+        while (copied < len) {
+          if (cur == null || cur.remaining() == 0) {
+            bufIdx = nextNonEmpty(remaining, bufIdx + 1);
+            if (bufIdx >= nBuffers) {
+              throw new ParquetDecodingException("Unexpected EOF while reading payload");
+            }
+            cur = remaining.get(bufIdx);
+          }
+          int n = Math.min(len - copied, cur.remaining());
+          cur.get(tmp, copied, n);
+          copied += n;
+        }
+        v.putByteArray(rowId + i, tmp, 0, len);
+      }
+      consumed += len;
+    }
+
+    try {
+      in.reset();
+      in.skipFully(consumed);
+    } catch (IOException e) {
+      throw new ParquetDecodingException("Failed to advance stream after readBinary", e);
+    }
+  }
+
+  /**
+   * Returns the index of the first non-empty buffer at or after {@code from},
+   * or {@code bufs.size()} if none remain.
+   */
+  private static int nextNonEmpty(List<ByteBuffer> bufs, int from) {
+    int n = bufs.size();
+    int i = from;
+    while (i < n && bufs.get(i).remaining() == 0) {
+      i++;
+    }
+    return i;
   }
 
   @Override
