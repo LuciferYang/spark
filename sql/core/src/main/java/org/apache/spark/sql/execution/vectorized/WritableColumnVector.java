@@ -452,6 +452,61 @@ public abstract class WritableColumnVector extends ColumnVector {
     return result;
   }
 
+  /**
+   * Bulk variant of {@link #putByteArray} that writes {@code count} variable-length byte
+   * values starting at {@code rowId}, all drawn from a single shared source array
+   * {@code src}. The {@code srcOffsets} and {@code lengths} arrays describe each row's
+   * window into {@code src} (both must have length &ge; {@code count}).
+   *
+   * <p>The default implementation falls back to per-row {@link #putByteArray} calls.
+   * Subclasses should override to batch the per-row bookkeeping (capacity reserve,
+   * offset/length metadata writes, {@code elementsAppended} updates), which is where the
+   * bulk win comes from at small-to-medium payload sizes; the byte copies themselves still
+   * happen per row since each value occupies a distinct slice of {@code src}.
+   *
+   * @return the offset of the first row's appended bytes within {@link #arrayData()}
+   */
+  public int putByteArrays(
+      int rowId, int count, byte[] src, int[] srcOffsets, int[] lengths) {
+    if (count <= 0) {
+      return 0;
+    }
+    // Validate inputs consistently with the optimized subclass overrides so all
+    // implementations expose the same contract: negative lengths and totals exceeding
+    // Integer.MAX_VALUE are rejected up-front rather than failing later with a less
+    // informative exception inside per-row appendBytes.
+    checkedTotalLength(lengths, count);
+    int firstResult = putByteArray(rowId, src, srcOffsets[0], lengths[0]);
+    for (int i = 1; i < count; i++) {
+      putByteArray(rowId + i, src, srcOffsets[i], lengths[i]);
+    }
+    return firstResult;
+  }
+
+  /**
+   * Sums {@code lengths[0..count-1]}, validates each entry is non-negative, and validates
+   * the total fits in an {@code int}. Used by {@link #putByteArrays} implementations for
+   * input validation; the optimized On/OffHeap overrides additionally consume the return
+   * value as the bulk-reserve size, while the default fallback discards it (validation
+   * only, since per-row {@code putByteArray} grows {@code arrayData()} incrementally).
+   */
+  protected static int checkedTotalLength(int[] lengths, int count) {
+    long totalLong = 0L;
+    for (int i = 0; i < count; i++) {
+      int len = lengths[i];
+      if (len < 0) {
+        throw new IllegalArgumentException(
+            "Negative length at index " + i + ": " + len);
+      }
+      totalLong += len;
+    }
+    if (totalLong > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          "Bulk byte-array write exceeds int range: totalBytes=" + totalLong);
+    }
+    return (int) totalLong;
+  }
+
   final int appendBytes(int length, ByteBuffer src, int srcPosition) {
     reserve(elementsAppended + length);
     int result = elementsAppended;

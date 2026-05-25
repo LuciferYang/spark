@@ -279,6 +279,85 @@ class VectorizedPlainValuesReaderSuite extends SparkFunSuite {
     assertVectorMatches(v2, twoValues)
   }
 
+  test("readBinary: bulk path throws ParquetDecodingException on negative length header") {
+    // Craft a 4-byte LE int with the sign bit set so the bulk path's inline negative-length
+    // check fires. Bulk path enters when total >= 2; pad with a valid first record so we
+    // reach the second row's length read on the bulk fast path (not the shim path).
+    val firstPayload = bytesOf("ok")
+    val firstHeader = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+      .putInt(firstPayload.length).array()
+    val negativeHeader = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+      .putInt(-1).array()
+    val bytes = firstHeader ++ firstPayload ++ negativeHeader
+    val in = ByteBufferInputStream.wrap(ByteBuffer.wrap(bytes))
+    val r = newReader(in)
+    val v = new OnHeapColumnVector(2, BinaryType)
+    val ex = intercept[ParquetDecodingException] {
+      r.readBinary(2, v, 0)
+    }
+    assert(ex.getMessage.contains("Negative binary length"),
+      s"expected negative-length message, got: ${ex.getMessage}")
+  }
+
+  test("readBinary: bulk path falls back when 4-byte length header straddles end of buffer") {
+    // The fast-path entry-condition is nBuffers == 1, but the bulk loop's early-return
+    // `limit - p < 4` (truncated header within the single buffer) is distinct from the
+    // payload-truncation case. Construct a stream where the second row's length header is
+    // partially missing from the only available buffer; expect the fallback per-row loop
+    // to surface a clean EOF.
+    val firstPayload = bytesOf("hi")
+    val firstHeader = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+      .putInt(firstPayload.length).array()
+    // Only 2 bytes of the second row's length (need 4 to decode).
+    val partialSecondHeader = Array[Byte](0x05, 0x00)
+    val bytes = firstHeader ++ firstPayload ++ partialSecondHeader
+    val in = ByteBufferInputStream.wrap(ByteBuffer.wrap(bytes))
+    val r = newReader(in)
+    val v = new OnHeapColumnVector(2, BinaryType)
+    intercept[ParquetDecodingException] {
+      r.readBinary(2, v, 0)
+    }
+  }
+
+  test("readBinary: bulk path scratch grows via doubling when prev*2 >= n") {
+    // First call seeds scratch at 64; second call needs 80 -> grow path picks
+    // max(80, 64*2=128) = 128 (the doubling branch), not n. A regression that dropped
+    // Math.max would still allocate 80, sized too small only relative to expectations
+    // but still functional. The behavioral check is correctness, not allocation size:
+    // verify both calls decode correctly through the grow boundary.
+    val first = Seq.tabulate(8)(i => bytesOf(s"f-$i"))
+    val second = Seq.tabulate(80)(i => bytesOf(s"s-$i"))
+    val all = first ++ second
+    val bytes = encodePlainBinary(all)
+    val in = ByteBufferInputStream.wrap(ByteBuffer.wrap(bytes))
+    val r = newReader(in)
+    val v = new OnHeapColumnVector(all.length, BinaryType)
+    r.readBinary(first.length, v, 0)
+    r.readBinary(second.length, v, first.length)
+    assertVectorMatches(v, all)
+    assert(in.position() == bytes.length, "stream must be fully consumed")
+  }
+
+  test("readBinary: bulk path scratch arrays grow correctly across batches") {
+    // Exercises the lazy-grow logic in ensureScratchSrcOffsets / ensureScratchLengths.
+    // First call sizes scratch to the initial floor (64); a later call with a much larger
+    // batch forces a reallocation. Then a smaller batch verifies reuse without stomping.
+    val small = Seq.tabulate(8)(i => bytesOf(s"s-$i"))
+    val large = Seq.tabulate(200)(i => bytesOf(s"large-payload-$i"))
+    val tail = Seq.tabulate(16)(i => bytesOf(s"t-$i"))
+    val all = small ++ large ++ tail
+    val bytes = encodePlainBinary(all)
+    val in = ByteBufferInputStream.wrap(ByteBuffer.wrap(bytes))
+    val r = newReader(in)
+    val v = new OnHeapColumnVector(all.length, BinaryType)
+    r.readBinary(small.length, v, 0)
+    r.readBinary(large.length, v, small.length)
+    r.readBinary(tail.length, v, small.length + large.length)
+    assertVectorMatches(v, all)
+    assert(in.position() == bytes.length,
+      "stream must be fully consumed after small -> large -> small bulk reads")
+  }
+
   test("readBinary: interleaved bulk -> shim -> bulk calls on a single reader") {
     // Verifies the bulk path's mark/reset/skipFully leaves the underlying stream in a state
     // the next shim call can read from cleanly, and vice versa.
@@ -453,6 +532,34 @@ class VectorizedPlainValuesReaderSuite extends SparkFunSuite {
     val v = new OnHeapColumnVector(values.length, BinaryType)
     r.readBinary(values.length, v, 0)
     assertVectorMatches(v, values)
+  }
+
+  test("readBinary: bulk fast path with non-zero arrayOffset on the heap buffer") {
+    // Guard against an off-by-one in `tryBulkReadBinary`'s `base + p` arithmetic: if the
+    // wrapped buffer reports `arrayOffset() != 0` (which happens when upstream code slices
+    // a wrapped array), the fast path must add `base` when reading length bytes AND when
+    // recording per-row src offsets passed to putByteArrays. A regression that drops
+    // `base +` from either site reads garbage / writes the wrong slice into the vector.
+    val values = Seq(bytesOf("alpha"), bytesOf("beta"), bytesOf("gamma-extra"))
+    val payload = encodePlainBinary(values)
+    val padPrefix = 11
+    val padded = new Array[Byte](padPrefix + payload.length + 7)
+    java.util.Arrays.fill(padded, 0, padPrefix, 0x5A.toByte) // sentinel before the data
+    System.arraycopy(payload, 0, padded, padPrefix, payload.length)
+    java.util.Arrays.fill(padded, padPrefix + payload.length, padded.length, 0x6B.toByte)
+    // Slice to produce a buffer whose `arrayOffset() == padPrefix` (non-zero) and
+    // `position() == 0`. ByteBuffer.wrap(arr, off, len) alone gives arrayOffset == 0
+    // with position == off; slicing forces arrayOffset to advance.
+    val full = ByteBuffer.wrap(padded, padPrefix, payload.length).slice()
+    assert(full.arrayOffset() == padPrefix,
+      s"sliced buffer must carry non-zero arrayOffset, got ${full.arrayOffset()}")
+    val in = ByteBufferInputStream.wrap(full)
+    val r = newReader(in)
+    val v = new OnHeapColumnVector(values.length, BinaryType)
+    r.readBinary(values.length, v, 0)
+    assertVectorMatches(v, values)
+    assert(in.position() == payload.length,
+      s"stream must advance exactly past the data bytes, got ${in.position()}")
   }
 
   test("readBinary: subsequent read after bulk consumes the trailing bytes correctly") {

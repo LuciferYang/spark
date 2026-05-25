@@ -298,6 +298,173 @@ class ColumnVectorSuite extends SparkFunSuite with SQLHelper {
     verifyPutByteArray(testVector)
   }
 
+  testVectors("putByteArrays bulk write", 16, BinaryType) { testVector =>
+    // Construct a single shared source buffer with concatenated payloads of varying length,
+    // including a zero-length payload at index 3 to exercise that edge case.
+    val payloads: Seq[Array[Byte]] = Seq(
+      "alpha".getBytes("utf8"),
+      "beta".getBytes("utf8"),
+      "gamma-longer-string".getBytes("utf8"),
+      Array.emptyByteArray,
+      "delta".getBytes("utf8"),
+      Array.fill(64)('x'.toByte)
+    )
+    val count = payloads.length
+    val src = payloads.flatten.toArray
+    val srcOffsets = new Array[Int](count)
+    val lengths = new Array[Int](count)
+    var off = 0
+    for (i <- 0 until count) {
+      srcOffsets(i) = off
+      lengths(i) = payloads(i).length
+      off += payloads(i).length
+    }
+    val totalBytes = lengths.sum
+
+    // Write at rowId = 1 so a non-zero starting row is exercised.
+    val firstResult = testVector.putByteArrays(1, count, src, srcOffsets, lengths)
+    // firstResult is the offset within arrayData() of the first row's appended bytes.
+    assert(firstResult === 0,
+      s"expected first row to start at offset 0 in a fresh vector, got $firstResult")
+
+    for (i <- 0 until count) {
+      assert(testVector.getBinary(1 + i) === payloads(i),
+        s"row ${1 + i}: payload mismatch")
+    }
+    // Verify arrayData() advanced by exactly the total bytes appended.
+    assert(testVector.arrayData().getElementsAppended === totalBytes,
+      s"arrayData().elementsAppended should equal totalBytes ($totalBytes)")
+    // Parent vector's elementsAppended must NOT advance (matches putByteArray semantics).
+    assert(testVector.getElementsAppended === 0,
+      "parent vector's elementsAppended must not advance from putByteArrays")
+  }
+
+  testVectors("putByteArrays multi-call accumulation", 16, BinaryType) { testVector =>
+    val batch1: Seq[Array[Byte]] =
+      Seq("aa".getBytes("utf8"), "bbb".getBytes("utf8"), "cccc".getBytes("utf8"))
+    val batch2: Seq[Array[Byte]] = Seq("ddd".getBytes("utf8"), "eeeee".getBytes("utf8"))
+    val src1 = batch1.flatten.toArray
+    val src2 = batch2.flatten.toArray
+    val offs1 = batch1.scanLeft(0)(_ + _.length).init.toArray
+    val lens1 = batch1.map(_.length).toArray
+    val offs2 = batch2.scanLeft(0)(_ + _.length).init.toArray
+    val lens2 = batch2.map(_.length).toArray
+
+    val first1 = testVector.putByteArrays(0, batch1.length, src1, offs1, lens1)
+    val first2 = testVector.putByteArrays(batch1.length, batch2.length, src2, offs2, lens2)
+    // The second call's first row must be appended immediately after the first call's bytes.
+    assert(first1 === 0, "first batch starts at offset 0")
+    assert(first2 === lens1.sum,
+      s"second batch must start at the first batch's total bytes (${lens1.sum})")
+
+    val all = batch1 ++ batch2
+    for (i <- all.indices) {
+      assert(testVector.getBinary(i) === all(i), s"row $i mismatch after multi-call")
+    }
+    assert(testVector.arrayData().getElementsAppended === lens1.sum + lens2.sum,
+      "arrayData() must accumulate bytes across calls")
+  }
+
+  testVectors("putByteArrays count == 0 is a no-op", 4, BinaryType) { testVector =>
+    val firstResult = testVector.putByteArrays(0, 0, Array.emptyByteArray, Array.empty, Array.empty)
+    assert(firstResult === 0)
+    assert(testVector.arrayData().getElementsAppended === 0,
+      "no bytes should have been appended")
+  }
+
+  testVectors("putByteArrays all-zero lengths writes empty payloads at each row", 8, BinaryType) {
+    testVector =>
+      val count = 4
+      val lengths = new Array[Int](count) // all zeros
+      val srcOffsets = new Array[Int](count) // all zeros
+      val firstResult =
+        testVector.putByteArrays(0, count, Array.emptyByteArray, srcOffsets, lengths)
+      assert(firstResult === 0)
+      for (i <- 0 until count) {
+        assert(testVector.getBinary(i) === Array.emptyByteArray,
+          s"row $i should be an empty payload")
+      }
+      assert(testVector.arrayData().getElementsAppended === 0,
+        "no bytes should be appended when all lengths are zero")
+  }
+
+  testVectors("putByteArrays at rowId > 0 lands at the requested parent row", 16, BinaryType) {
+    testVector =>
+      // Guard against an off-by-one regression where the override forgot to add `rowId`
+      // when indexing into arrayOffsets / arrayLengths. Writes 3 rows starting at rowId = 5.
+      val payloads: Seq[Array[Byte]] =
+        Seq("one".getBytes("utf8"), "two".getBytes("utf8"), "three".getBytes("utf8"))
+      val src = payloads.flatten.toArray
+      val offs = payloads.scanLeft(0)(_ + _.length).init.toArray
+      val lens = payloads.map(_.length).toArray
+      val rowId = 5
+      val firstResult = testVector.putByteArrays(rowId, payloads.length, src, offs, lens)
+      // Return value contract: offset of the first row's appended bytes within arrayData().
+      // For a fresh vector this is 0 regardless of the parent rowId; a regression that
+      // returned `rowId` or `rowId * something` would slip past payload assertions alone.
+      assert(firstResult === 0,
+        s"firstResult must equal arrayData().elementsAppended before the call (0): $firstResult")
+      for (i <- payloads.indices) {
+        assert(testVector.getBinary(rowId + i) === payloads(i),
+          s"row ${rowId + i}: payload mismatch")
+      }
+      // Rows 0..rowId-1 must remain at default-zero length (allocator-independent: a
+      // freshly constructed WritableColumnVector with no writes to a row reports
+      // arrayLengths[row] == 0 because the underlying integer storage starts at 0 in
+      // both OnHeap (Java array) and OffHeap (we asserted via arrayData accounting).
+      // Verify via arrayData().getElementsAppended which is the sole driver of width.
+      assert(testVector.arrayData().getElementsAppended === lens.sum,
+        s"arrayData() must have advanced by exactly ${lens.sum} bytes")
+  }
+
+  testVectors("putByteArrays with non-monotonic / repeated srcOffsets (dictionary fan-out)",
+      8, BinaryType) { testVector =>
+    // Dictionary fan-out pattern: src holds a small dictionary; per-row offsets point into
+    // shared slots, including repeated and out-of-order references. Verifies the override
+    // does not assume monotonic src advancement.
+    val src = "AAAA::BB:CCCC".getBytes("utf8") // slots: "AAAA" @0, "BB" @6, "CCCC" @9
+    val rows: Seq[(Int, Int)] = Seq(
+      (9, 4),  // "CCCC"
+      (0, 4),  // "AAAA"
+      (6, 2),  // "BB"
+      (9, 4),  // "CCCC" (repeated)
+      (0, 4)   // "AAAA" (repeated)
+    )
+    val offs = rows.map(_._1).toArray
+    val lens = rows.map(_._2).toArray
+    val expected = rows.map { case (o, l) => src.slice(o, o + l) }
+    testVector.putByteArrays(0, rows.length, src, offs, lens)
+    for (i <- rows.indices) {
+      assert(testVector.getBinary(i) === expected(i), s"row $i: payload mismatch")
+    }
+    assert(testVector.arrayData().getElementsAppended === lens.sum,
+      "arrayData() must advance by total bytes across all rows")
+  }
+
+  testVectors("putByteArrays rejects total > Integer.MAX_VALUE", 4, BinaryType) { testVector =>
+    // Two lengths that together exceed Integer.MAX_VALUE. The src array is intentionally tiny;
+    // the overflow check fires before any allocation/copy.
+    val huge = Integer.MAX_VALUE - 10
+    val lengths = Array(huge, huge)
+    val srcOffsets = Array(0, 0)
+    val ex = intercept[IllegalArgumentException] {
+      testVector.putByteArrays(0, 2, Array.emptyByteArray, srcOffsets, lengths)
+    }
+    assert(ex.getMessage.contains("exceeds int range"),
+      s"expected overflow message, got: ${ex.getMessage}")
+  }
+
+  testVectors("putByteArrays rejects negative length entry", 4, BinaryType) { testVector =>
+    val lengths = Array(4, -1, 4)
+    val srcOffsets = Array(0, 0, 0)
+    val src = Array[Byte](1, 2, 3, 4)
+    val ex = intercept[IllegalArgumentException] {
+      testVector.putByteArrays(0, 3, src, srcOffsets, lengths)
+    }
+    assert(ex.getMessage.contains("Negative length at index 1"),
+      s"expected per-index negative-length message, got: ${ex.getMessage}")
+  }
+
   testVectors("putBytes from ByteBuffer", 16, ByteType) { testVector =>
     val data = Array[Byte](10, 20, 30, 40, 50, 60, 70, 80)
 

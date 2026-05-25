@@ -599,6 +599,36 @@ public final class OnHeapColumnVector extends WritableColumnVector {
     return result;
   }
 
+  /**
+   * Bulk override: pre-computes the total byte count, reserves capacity once on the
+   * underlying {@code arrayData()}, then copies each row's bytes and writes its per-row
+   * offset/length metadata in a tight loop without re-entering the per-row
+   * {@link #putByteArray} -&gt; {@code appendBytes} -&gt; {@code reserve} call chain.
+   */
+  @Override
+  public int putByteArrays(
+      int rowId, int count, byte[] src, int[] srcOffsets, int[] lengths) {
+    if (count <= 0) {
+      return 0;
+    }
+    int total = checkedTotalLength(lengths, count);
+    OnHeapColumnVector dst = (OnHeapColumnVector) arrayData();
+    dst.reserve(dst.elementsAppended + total);
+    final int firstResult = dst.elementsAppended;
+    final byte[] dstData = dst.byteData;
+    int destOff = firstResult;
+    for (int i = 0; i < count; i++) {
+      int len = lengths[i];
+      System.arraycopy(src, srcOffsets[i], dstData, destOff, len);
+      arrayOffsets[rowId + i] = destOff;
+      arrayLengths[rowId + i] = len;
+      destOff += len;
+    }
+    // Mirror OffHeap form: declarative final value rather than loop-induction-dependent.
+    dst.elementsAppended = firstResult + total;
+    return firstResult;
+  }
+
   // Spilt this function out since it is the slow path.
   @Override
   protected void reserveInternal(int newCapacity) {

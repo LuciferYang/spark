@@ -46,6 +46,12 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
   private int bitOffset;
   private byte currentByte = 0;
 
+  // Scratch arrays reused across {@link #readBinaryBulk} invocations to avoid per-batch
+  // allocation when the bulk-write fast path is taken (single heap-backed source buffer
+  // covering all rows). Sized lazily and grown as needed.
+  private int[] scratchSrcOffsets;
+  private int[] scratchLengths;
+
   public VectorizedPlainValuesReader() {
   }
 
@@ -577,6 +583,27 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
       b.order(ByteOrder.LITTLE_ENDIAN);
     }
     int nBuffers = remaining.size();
+
+    // Fast path: a single heap-backed source buffer covers the entire batch. Pre-scan
+    // lengths into scratch arrays, then make ONE bulk call to {@link
+    // WritableColumnVector#putByteArrays} that batches the per-row offset/length metadata
+    // writes (and capacity reserves) instead of paying that overhead N times.
+    if (nBuffers == 1) {
+      ByteBuffer only = remaining.get(0);
+      if (only.hasArray()) {
+        long consumedBulk = tryBulkReadBinary(total, v, rowId, only);
+        if (consumedBulk >= 0) {
+          try {
+            in.reset();
+            in.skipFully(consumedBulk);
+          } catch (IOException e) {
+            throw new ParquetDecodingException("Failed to advance stream after readBinary", e);
+          }
+          return;
+        }
+      }
+    }
+
     int bufIdx = 0;
     ByteBuffer cur = nBuffers == 0 ? null : remaining.get(0);
     long consumed = 0;
@@ -649,6 +676,63 @@ public class VectorizedPlainValuesReader extends ValuesReader implements Vectori
     } catch (IOException e) {
       throw new ParquetDecodingException("Failed to advance stream after readBinary", e);
     }
+  }
+
+  /**
+   * Bulk fast path for {@link #readBinaryBulk}: when the entire batch lives in a single
+   * heap-backed source buffer, pre-scan all {@code total} length integers (4 bytes each,
+   * little-endian) into {@link #scratchLengths} while recording each payload's absolute
+   * offset within the source array into {@link #scratchSrcOffsets}, then dispatch one
+   * {@link WritableColumnVector#putByteArrays} call.
+   *
+   * @return total bytes consumed (length headers + payloads) on success, or {@code -1}
+   *         if the bulk attempt is not viable (e.g. truncated stream) so the caller falls
+   *         back to the per-row loop.
+   */
+  private long tryBulkReadBinary(int total, WritableColumnVector v, int rowId, ByteBuffer buf) {
+    int[] offs = ensureScratchSrcOffsets(total);
+    int[] lens = ensureScratchLengths(total);
+    byte[] arr = buf.array();
+    int base = buf.arrayOffset();
+    int p = buf.position();
+    int limit = buf.limit();
+    for (int i = 0; i < total; i++) {
+      if (limit - p < 4) {
+        return -1L;
+      }
+      int len = (arr[base + p] & 0xFF)
+              | ((arr[base + p + 1] & 0xFF) << 8)
+              | ((arr[base + p + 2] & 0xFF) << 16)
+              | ((arr[base + p + 3] & 0xFF) << 24);
+      if (len < 0) {
+        throw new ParquetDecodingException("Negative binary length: " + len);
+      }
+      p += 4;
+      if (limit - p < len) {
+        return -1L;
+      }
+      offs[i] = base + p;
+      lens[i] = len;
+      p += len;
+    }
+    v.putByteArrays(rowId, total, arr, offs, lens);
+    return (long) (p - buf.position());
+  }
+
+  private int[] ensureScratchSrcOffsets(int n) {
+    if (scratchSrcOffsets == null || scratchSrcOffsets.length < n) {
+      int prev = scratchSrcOffsets == null ? 64 : scratchSrcOffsets.length * 2;
+      scratchSrcOffsets = new int[Math.max(n, prev)];
+    }
+    return scratchSrcOffsets;
+  }
+
+  private int[] ensureScratchLengths(int n) {
+    if (scratchLengths == null || scratchLengths.length < n) {
+      int prev = scratchLengths == null ? 64 : scratchLengths.length * 2;
+      scratchLengths = new int[Math.max(n, prev)];
+    }
+    return scratchLengths;
   }
 
   /**

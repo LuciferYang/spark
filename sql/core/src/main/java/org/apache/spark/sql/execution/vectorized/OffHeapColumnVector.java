@@ -633,6 +633,42 @@ public final class OffHeapColumnVector extends WritableColumnVector {
     return result;
   }
 
+  /**
+   * Bulk override: pre-computes the total byte count, reserves capacity once on the
+   * underlying {@code arrayData()}, copies each row's bytes via {@code Platform.copyMemory},
+   * and writes per-row offset/length metadata in a tight loop. The metadata writes are still
+   * {@code 2*count} {@code Platform.putInt} calls (each row needs a distinct off-heap
+   * offset/length pair), but the {@code reserve} and {@code elementsAppended} bookkeeping
+   * collapses from {@code N} round-trips to one, and the absence of per-row
+   * {@link #putByteArray} -&gt; {@code appendBytes} method dispatch lets C2 keep the metadata
+   * writes in a tight intrinsified loop.
+   */
+  @Override
+  public int putByteArrays(
+      int rowId, int count, byte[] src, int[] srcOffsets, int[] lengths) {
+    if (count <= 0) {
+      return 0;
+    }
+    int total = checkedTotalLength(lengths, count);
+    OffHeapColumnVector dst = (OffHeapColumnVector) arrayData();
+    dst.reserve(dst.elementsAppended + total);
+    final int firstResult = dst.elementsAppended;
+    final long dstBaseAddr = dst.data + firstResult;
+    int destOff = 0;
+    for (int i = 0; i < count; i++) {
+      int len = lengths[i];
+      Platform.copyMemory(
+          src, Platform.BYTE_ARRAY_OFFSET + srcOffsets[i],
+          null, dstBaseAddr + destOff,
+          len);
+      Platform.putInt(null, offsetData + 4L * (rowId + i), firstResult + destOff);
+      Platform.putInt(null, lengthData + 4L * (rowId + i), len);
+      destOff += len;
+    }
+    dst.elementsAppended = firstResult + total;
+    return firstResult;
+  }
+
   // Split out the slow path.
   @Override
   protected void reserveInternal(int newCapacity) {
