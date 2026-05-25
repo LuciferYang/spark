@@ -6034,6 +6034,36 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
+  val SORT_KEY_REORDERING_ENABLED =
+    buildConf("spark.sql.sortKeyReordering.enabled")
+      .doc("When true, allow the fork-only SortKeyReordering rule to permute the " +
+        "equi-keys of a SortMergeJoinExec (and the matching direct SortExec " +
+        "children) to put the highest-NDV key first. Heuristic gain: lowers the " +
+        "prefix-tie rate on multi-key joins where the leading key has low NDV. " +
+        "Empirically the formula overstates the realised gain; measured benefit " +
+        "is workload-specific (one TPC-DS query out of ten fire-candidates " +
+        "showed a wall-time win at the only scale we tested, SF=30). Default " +
+        "false.")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(false)
+
+  val SORT_KEY_REORDERING_THRESHOLD =
+    buildConf("spark.sql.sortKeyReordering.threshold")
+      .doc("Minimum predicted comparisons(orig)/comparisons(best) ratio before " +
+        "the SortKeyReordering rule permutes an SMJ. The cost formula is " +
+        "`sum_i prod_{j<=i}(1/NDV_pi(j))` and overstates the realised reduction. " +
+        "10.0 is the natural cutoff per the bimodal distribution observed on " +
+        "TPC-DS multi-key SMJs (most predict either ratio = 1.0 or ratio >= 10, " +
+        "with nothing in between). Note: passing the predicted threshold does " +
+        "NOT guarantee realised benefit -- in our SF=30 benchmark only 1/10 " +
+        "fire-candidates produced measurable wall-time improvement.")
+      .internal()
+      .version("4.2.0")
+      .doubleConf
+      .createWithDefault(10.0)
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +
