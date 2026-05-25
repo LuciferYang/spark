@@ -189,6 +189,11 @@ case class AdaptiveSparkPlanExec(
       // of adjacent partial and final aggregate into a single `Complete` mode aggregate, which
       // `ReplaceHashWithSortAgg` can then replace with a sort aggregate when the ordering allows.
       CombineAdjacentAggregation,
+      // `SortKeyReordering` needs the SMJ/Sort pairs `EnsureRequirements` materializes. It runs
+      // before `RemoveRedundantSorts`, which would otherwise drop a sort above the join that the
+      // join's pre-permutation ordering satisfies, and before `ReplaceHashWithSortAgg`, whose
+      // sort aggregate above the join would require the original leading key first.
+      SortKeyReordering(context.session),
       ReplaceHashWithSortAgg,
       RemoveRedundantWindowGroupLimits,
       DisableUnnecessaryBucketedScan,
