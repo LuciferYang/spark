@@ -547,6 +547,9 @@ object QueryExecution {
       // sort order of each node is checked to be valid.
       ReplaceHashWithSortAgg,
       CombineAdjacentAggregation,
+      // `SortKeyReordering` needs the SMJ/Sort pairs `EnsureRequirements` materializes, and must
+      // run before `RemoveRedundantSorts` (it only rewrites direct `SortExec` children).
+      SortKeyReordering(sparkSession),
       // `RemoveRedundantSorts` and `RemoveRedundantWindowGroupLimits` needs to be added after
       // `EnsureRequirements` to guarantee the same number of partitions when instantiating
       // PartitioningCollection.
