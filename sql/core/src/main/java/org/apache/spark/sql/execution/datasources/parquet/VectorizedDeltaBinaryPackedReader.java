@@ -291,21 +291,34 @@ public class VectorizedDeltaBinaryPackedReader extends VectorizedReaderBase {
   }
 
   /**
-   * mini block has a size of 8*n, unpack 32 value each time
+   * Unpack one mini block (8*n values) from the stream. Reads the entire mini block's
+   * packed bytes in a single {@code in.slice()} call instead of one per 8-value group,
+   * then walks the resulting {@code ByteBuffer} locally -- collapsing
+   * {@code miniBlockSizeInValues / 8} wrapper allocations into one.
    *
-   * see org.apache.parquet.column.values.delta.DeltaBinaryPackingValuesReader#unpackMiniBlock
+   * @see org.apache.parquet.column.values.delta.DeltaBinaryPackingValuesReader#unpackMiniBlock
    */
   private void unpackMiniBlock() throws IOException {
     Arrays.fill(this.unpackedValuesBuffer, 0);
     BytePackerForLong packer = Packer.LITTLE_ENDIAN.newBytePackerForLong(
         bitWidths[currentMiniBlock]);
-    for (int j = 0; j < miniBlockSizeInValues; j += 8) {
-      ByteBuffer buffer = in.slice(packer.getBitWidth());
-      if (buffer.hasArray()) {
-        packer.unpack8Values(buffer.array(),
-          buffer.arrayOffset() + buffer.position(), unpackedValuesBuffer, j);
+    int bitWidth = packer.getBitWidth();
+    int totalBytes = (miniBlockSizeInValues / 8) * bitWidth;
+    if (totalBytes > 0) {
+      ByteBuffer miniBlockBuf = in.slice(totalBytes);
+      if (miniBlockBuf.hasArray()) {
+        byte[] arr = miniBlockBuf.array();
+        int off = miniBlockBuf.arrayOffset() + miniBlockBuf.position();
+        for (int j = 0; j < miniBlockSizeInValues; j += 8) {
+          packer.unpack8Values(arr, off, unpackedValuesBuffer, j);
+          off += bitWidth;
+        }
       } else {
-        packer.unpack8Values(buffer, buffer.position(), unpackedValuesBuffer, j);
+        int pos = miniBlockBuf.position();
+        for (int j = 0; j < miniBlockSizeInValues; j += 8) {
+          packer.unpack8Values(miniBlockBuf, pos, unpackedValuesBuffer, j);
+          pos += bitWidth;
+        }
       }
     }
     remainingInMiniBlock = miniBlockSizeInValues;
