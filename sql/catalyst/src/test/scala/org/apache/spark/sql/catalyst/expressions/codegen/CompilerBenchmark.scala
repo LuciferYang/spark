@@ -135,6 +135,40 @@ object CompilerBenchmark extends BenchmarkBase {
     loader.loadClass(className)
   }
 
+  // Cached file manager wrapping a single shared StandardJavaFileManager.
+  // We rotate the captured class bytes after each compile so the cache survives reuse.
+  private val sharedStandardFm: StandardJavaFileManager =
+    jdkCompiler.getStandardFileManager(null, null, null)
+
+  private val sharedJdkOpts: java.util.List[String] = java.util.Arrays.asList(
+    "-proc:none",        // skip annotation processing
+    "-g:none",           // skip debug info
+    "-nowarn",           // suppress warnings
+    "-implicit:none",    // do not compile implicit dependencies
+    "-Xlint:none"        // disable all lints
+  )
+
+  private def compileWithJdkOptimized(fullSource: String): Class[_] = {
+    val className = "org.apache.spark.codegen.bench.Generated"
+    val fileObject = new InMemoryJavaFileObject(className, fullSource)
+    val fileManager = new InMemoryFileManager(sharedStandardFm)
+
+    val task = jdkCompiler.getTask(
+      null,           // null Writer → swallow output, avoid StringWriter allocation
+      fileManager,
+      null,           // null DiagnosticListener → use default
+      sharedJdkOpts,
+      null,
+      Collections.singletonList(fileObject))
+
+    if (!task.call()) {
+      throw new RuntimeException("JDK compilation failed")
+    }
+
+    val loader = new InMemoryClassLoader(fileManager, Thread.currentThread().getContextClassLoader)
+    loader.loadClass(className)
+  }
+
   // ---------------------------------------------------------------
   // Code templates at different complexity levels
   // ---------------------------------------------------------------
@@ -344,69 +378,51 @@ $applyBody
   // ---------------------------------------------------------------
 
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
-    // Warm up both compilers
-    compileWithJanino(smallClassBody)
-    compileWithJdk(smallFullSource)
+    // Thorough warm-up so the JDK compiler's own JIT compilation does not skew results.
+    val large50Body = largeClassBody(50)
+    val large50Source = largeFullSource(50)
+    val large200Body = largeClassBody(200)
+    val large200Source = largeFullSource(200)
+
+    (0 until 30).foreach { _ =>
+      compileWithJanino(smallClassBody)
+      compileWithJanino(mediumClassBody)
+      compileWithJanino(large50Body)
+      compileWithJdk(smallFullSource)
+      compileWithJdk(mediumFullSource)
+      compileWithJdkOptimized(smallFullSource)
+      compileWithJdkOptimized(mediumFullSource)
+      compileWithJdkOptimized(large50Source)
+    }
 
     runBenchmark("Compiler Benchmark: Janino vs JDK JavaCompiler") {
 
       val numIters = 30
 
-      // --- Small code (~20 lines) ---
-      val smallBench = new Benchmark(
-        "Small code (trivial filter, ~20 lines)",
-        1, minNumIters = numIters, output = output)
+      def runCase(name: String, code: (String, String, String)): Unit = {
+        val (janinoBody, jdkSource, _) = code
+        val bench = new Benchmark(name, 1, minNumIters = numIters, output = output)
+        bench.addCase("Janino ClassBodyEvaluator", numIters = numIters) { _ =>
+          compileWithJanino(janinoBody)
+        }
+        bench.addCase("JDK JavaCompiler (default)", numIters = numIters) { _ =>
+          compileWithJdk(jdkSource)
+        }
+        bench.addCase("JDK JavaCompiler (optimized: reused FM + skip flags)",
+          numIters = numIters) { _ =>
+          compileWithJdkOptimized(jdkSource)
+        }
+        bench.run()
+      }
 
-      smallBench.addCase("Janino ClassBodyEvaluator", numIters = numIters) { _ =>
-        compileWithJanino(smallClassBody)
-      }
-      smallBench.addCase("JDK JavaCompiler (javax.tools)", numIters = numIters) { _ =>
-        compileWithJdk(smallFullSource)
-      }
-      smallBench.run()
-
-      // --- Medium code (~80 lines) ---
-      val medBench = new Benchmark(
-        "Medium code (projection with 10 fields, 5 methods, ~80 lines)",
-        1, minNumIters = numIters, output = output)
-
-      medBench.addCase("Janino ClassBodyEvaluator", numIters = numIters) { _ =>
-        compileWithJanino(mediumClassBody)
-      }
-      medBench.addCase("JDK JavaCompiler (javax.tools)", numIters = numIters) { _ =>
-        compileWithJdk(mediumFullSource)
-      }
-      medBench.run()
-
-      // --- Large code (50 columns, ~500 lines) ---
-      val large50Body = largeClassBody(50)
-      val large50Source = largeFullSource(50)
-      val largeBench50 = new Benchmark(
-        "Large code (50 columns, split methods, ~500 lines)",
-        1, minNumIters = numIters, output = output)
-
-      largeBench50.addCase("Janino ClassBodyEvaluator", numIters = numIters) { _ =>
-        compileWithJanino(large50Body)
-      }
-      largeBench50.addCase("JDK JavaCompiler (javax.tools)", numIters = numIters) { _ =>
-        compileWithJdk(large50Source)
-      }
-      largeBench50.run()
-
-      // --- Very large code (200 columns, ~2000 lines) ---
-      val large200Body = largeClassBody(200)
-      val large200Source = largeFullSource(200)
-      val largeBench200 = new Benchmark(
-        "Very large code (200 columns, split methods, ~2000 lines)",
-        1, minNumIters = numIters, output = output)
-
-      largeBench200.addCase("Janino ClassBodyEvaluator", numIters = numIters) { _ =>
-        compileWithJanino(large200Body)
-      }
-      largeBench200.addCase("JDK JavaCompiler (javax.tools)", numIters = numIters) { _ =>
-        compileWithJdk(large200Source)
-      }
-      largeBench200.run()
+      runCase("Small code (trivial filter, ~20 lines)",
+        (smallClassBody, smallFullSource, ""))
+      runCase("Medium code (projection with 10 fields, 5 methods, ~80 lines)",
+        (mediumClassBody, mediumFullSource, ""))
+      runCase("Large code (50 columns, split methods, ~500 lines)",
+        (large50Body, large50Source, ""))
+      runCase("Very large code (200 columns, split methods, ~2000 lines)",
+        (large200Body, large200Source, ""))
     }
   }
 }
