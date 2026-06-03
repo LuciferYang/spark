@@ -669,6 +669,18 @@ object SQLConf {
         "for using switch statements in InSet must be non-negative and less than or equal to 600")
       .createWithDefault(400)
 
+  val UNION_AGGREGATE_TO_ROLLUP_ENABLED =
+    buildConf("spark.sql.optimizer.unionAggregateToRollup.enabled")
+      .internal()
+      .doc("When true, the optimizer rewrites a UNION ALL of N aggregates whose GROUP BYs " +
+        "form a strict prefix-shrinking hierarchy into a single Aggregate with ROLLUP. " +
+        "Handles both the inner-aggregate fold pattern (sum-of-sum, max-of-max, etc.) and " +
+        "the source-aggregate pattern (each branch independently aggregates the same source).")
+      .version("4.4.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
   private val VALID_LOG_LEVELS: Array[String] = Level.values.map(_.toString)
 
   val PLAN_CHANGE_LOG_LEVEL = buildConf("spark.sql.planChangeLog.level")

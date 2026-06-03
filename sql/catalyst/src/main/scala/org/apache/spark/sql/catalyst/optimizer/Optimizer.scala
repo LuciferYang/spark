@@ -232,7 +232,10 @@ abstract class Optimizer(catalogManager: CatalogManager)
       ReplaceIntersectWithSemiJoin,
       ReplaceExceptWithFilter,
       ReplaceExceptWithAntiJoin,
-      ReplaceDistinctWithAggregate),
+      ReplaceDistinctWithAggregate,
+      // Must stay ahead of the operator-optimization batches: its guards match
+      // analyzer-shaped branches (see the rule's parseSourceBranch comment).
+      RewriteUnionAggregateAsRollup),
     Batch("Aggregate", fixedPoint,
       RemoveLiteralFromGroupExpressions,
       RemoveRepetitionFromGroupExpressions),
