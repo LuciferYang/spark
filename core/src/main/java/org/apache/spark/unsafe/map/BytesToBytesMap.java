@@ -912,6 +912,13 @@ public final class BytesToBytesMap extends MemoryConsumer {
   }
 
   /**
+   * Returns true if this map cannot safely append another new key without spilling first.
+   */
+  public boolean shouldSpillBeforeAppendNewKey() {
+    return numKeys == MAX_CAPACITY - 1 || (!canGrowArray && numKeys >= growthThreshold);
+  }
+
+  /**
    * Returns the total amount of memory, in bytes, consumed by this map's managed structures.
    */
   public long getTotalMemoryConsumption() {

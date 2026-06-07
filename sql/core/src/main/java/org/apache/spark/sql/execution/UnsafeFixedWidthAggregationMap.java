@@ -154,6 +154,18 @@ public final class UnsafeFixedWidthAggregationMap {
     return currentAggregationBuffer;
   }
 
+  public boolean containsKey(UnsafeRow key) {
+    return containsKey(key, key.hashCode());
+  }
+
+  public boolean containsKey(UnsafeRow key, int hash) {
+    return map.lookup(
+      key.getBaseObject(),
+      key.getBaseOffset(),
+      key.getSizeInBytes(),
+      hash).isDefined();
+  }
+
   /**
    * Returns an iterator over the keys and values in this map. This uses destructive iterator of
    * BytesToBytesMap. So it is illegal to call any other method on this map after `iterator()` has
@@ -225,6 +237,13 @@ public final class UnsafeFixedWidthAggregationMap {
    */
   public double getAvgHashProbesPerKey() {
     return map.getAvgHashProbesPerKey();
+  }
+
+  /**
+   * Returns whether the underlying map should be spilled before appending another new key.
+   */
+  public boolean shouldSpillBeforeAppendNewKey() {
+    return map.shouldSpillBeforeAppendNewKey();
   }
 
   /**

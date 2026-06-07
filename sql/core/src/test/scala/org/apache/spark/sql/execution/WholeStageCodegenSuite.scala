@@ -156,6 +156,37 @@ class WholeStageCodegenSuite extends SharedSparkSession
     assert(df.collect() === Array(Row(0, 1), Row(2, 1), Row(4, 1)))
   }
 
+  test("HashAggregate codegen supports regular map fallback") {
+    withSQLConf(
+      SQLConf.CODEGEN_FACTORY_MODE.key -> CodegenObjectFactoryMode.CODEGEN_ONLY.toString,
+      SQLConf.ENABLE_TWOLEVEL_AGG_MAP.key -> "false",
+      "spark.sql.TungstenAggregate.testFallbackStartsAt" -> "0, 1") {
+      val df = spark.range(0, 6, 1, 1)
+        .selectExpr("cast(id % 2 as int) as k", "id as v")
+        .groupBy("k")
+        .agg(sum("v"))
+        .orderBy("k")
+      val plan = df.queryExecution.executedPlan
+      val hashAggCode = plan.collect {
+        case stage: WholeStageCodegenExec => stage.doCodeGen()._2.body
+      }.find { code =>
+        code.contains("spillHashMapPending") &&
+          code.contains("containsKey") &&
+          code.contains("shouldSpillBeforeAppendNewKey")
+      }
+      val hashAggs = plan.collect { case agg: HashAggregateExec => agg }
+
+      assert(hashAggs.nonEmpty)
+      assert(hashAggCode.isDefined)
+      val code = hashAggCode.get
+      assert(code.contains("spillHashMapPending"))
+      assert(code.contains("containsKey"))
+      assert(code.contains("shouldSpillBeforeAppendNewKey"))
+      assert(df.collect() === Array(Row(0, 6), Row(1, 9)))
+      assert(hashAggs.exists(_.metrics("numTasksFallBacked").value == 1))
+    }
+  }
+
   test("BroadcastHashJoin should be included in WholeStageCodegen") {
     val rdd = spark.sparkContext.makeRDD(Seq(Row(1, "1"), Row(1, "1"), Row(2, "2")))
     val schema = new StructType().add("k", IntegerType).add("v", StringType)

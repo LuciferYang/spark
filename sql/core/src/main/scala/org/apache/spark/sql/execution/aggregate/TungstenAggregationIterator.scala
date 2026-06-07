@@ -191,21 +191,29 @@ class TungstenAggregationIterator(
       }
     } else {
       var i = 0
+      def spillHashMap(): Unit = {
+        val sorter = hashMap.destructAndCreateExternalSorter()
+        if (externalSorter == null) {
+          externalSorter = sorter
+        } else {
+          externalSorter.merge(sorter)
+        }
+        i = 0
+      }
+
       while (inputIter.hasNext) {
         val newInput = inputIter.next()
         val groupingKey = groupingProjection.apply(newInput)
         var buffer: UnsafeRow = null
+        if (i < fallbackStartsAt._2 && hashMap.shouldSpillBeforeAppendNewKey() &&
+            !hashMap.containsKey(groupingKey)) {
+          spillHashMap()
+        }
         if (i < fallbackStartsAt._2) {
           buffer = hashMap.getAggregationBufferFromUnsafeRow(groupingKey)
         }
         if (buffer == null) {
-          val sorter = hashMap.destructAndCreateExternalSorter()
-          if (externalSorter == null) {
-            externalSorter = sorter
-          } else {
-            externalSorter.merge(sorter)
-          }
-          i = 0
+          spillHashMap()
           buffer = hashMap.getAggregationBufferFromUnsafeRow(groupingKey)
           if (buffer == null) {
             // failed to allocate the first page

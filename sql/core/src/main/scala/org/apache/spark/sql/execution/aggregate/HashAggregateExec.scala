@@ -659,11 +659,28 @@ case class HashAggregateExec(
       case _ => ("true", "", "")
     }
 
+    val spillHashMapPending = ctx.addMutableState(CodeGenerator.JAVA_BOOLEAN, "spillHashMapPending")
+
+    val spillRegularHashMap: String =
+      s"""
+         |if ($sorterTerm == null) {
+         |  $sorterTerm = $hashMapTerm.destructAndCreateExternalSorter();
+         |} else {
+         |  $sorterTerm.merge($hashMapTerm.destructAndCreateExternalSorter());
+         |}
+         |$resetCounter
+         |$spillHashMapPending = false;
+       """.stripMargin
+
     val findOrInsertRegularHashMap: String =
       s"""
          |// generate grouping key
          |${unsafeRowKeyCode.code}
          |int $unsafeRowKeyHash = ${unsafeRowKeyCode.value}.hashCode();
+         |if ($checkFallbackForBytesToBytesMap && $spillHashMapPending &&
+         |    !$hashMapTerm.containsKey($unsafeRowKeys, $unsafeRowKeyHash)) {
+         |  $spillRegularHashMap
+         |}
          |if ($checkFallbackForBytesToBytesMap) {
          |  // try to get the buffer from hash map
          |  $unsafeRowBuffer =
@@ -672,12 +689,7 @@ case class HashAggregateExec(
          |// Can't allocate buffer from the hash map. Spill the map and fallback to sort-based
          |// aggregation after processing all input rows.
          |if ($unsafeRowBuffer == null) {
-         |  if ($sorterTerm == null) {
-         |    $sorterTerm = $hashMapTerm.destructAndCreateExternalSorter();
-         |  } else {
-         |    $sorterTerm.merge($hashMapTerm.destructAndCreateExternalSorter());
-         |  }
-         |  $resetCounter
+         |  $spillRegularHashMap
          |  // the hash map had be spilled, it should have enough memory now,
          |  // try to allocate buffer again.
          |  $unsafeRowBuffer = $hashMapTerm.getAggregationBufferFromUnsafeRow(
@@ -705,7 +717,9 @@ case class HashAggregateExec(
            |}
          """.stripMargin
       } else {
-        findOrInsertRegularHashMap
+        s"""
+           |$findOrInsertRegularHashMap
+         """.stripMargin
       }
     }
 
@@ -841,6 +855,14 @@ case class HashAggregateExec(
       }
     }
 
+    val shouldSpillRegularHashMap: String = {
+      if (isFastHashMapEnabled) {
+        s"$fastRowBuffer == null && $hashMapTerm.shouldSpillBeforeAppendNewKey()"
+      } else {
+        s"$hashMapTerm.shouldSpillBeforeAppendNewKey()"
+      }
+    }
+
     val declareRowBuffer: String = if (isFastHashMapEnabled) {
       val fastRowType = if (isVectorizedHashMapEnabled) {
         classOf[MutableColumnarRow].getName
@@ -864,6 +886,9 @@ case class HashAggregateExec(
        |$findOrInsertHashMap
        |$incCounter
        |$updateRowInHashMap
+       |if ($shouldSpillRegularHashMap) {
+       |  $spillHashMapPending = true;
+       |}
      """.stripMargin
   }
 

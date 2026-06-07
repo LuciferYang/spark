@@ -31,7 +31,11 @@ import org.apache.spark.{SparkConf, SparkFunSuite, TaskContext, TaskContextImpl}
 import org.apache.spark.internal.config.MEMORY_OFFHEAP_ENABLED
 import org.apache.spark.memory.{TaskMemoryManager, TestMemoryManager}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.catalyst.expressions.{
+  AttributeReference, Literal, MutableProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.aggregate.Count
+import org.apache.spark.sql.execution.aggregate.TungstenAggregationIterator
+import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -367,6 +371,13 @@ class UnsafeFixedWidthAggregationMapSuite
     var str = rand.nextString(1024)
     var buf = map.getAggregationBuffer(InternalRow(UTF8String.fromString(str)))
     assert(buf != null)
+    assert(map.shouldSpillBeforeAppendNewKey())
+    val existingStr = str
+    buf = map.getAggregationBuffer(InternalRow(UTF8String.fromString(existingStr)))
+    assert(buf != null)
+    buf.setInt(0, existingStr.length)
+    assert(map.shouldSpillBeforeAppendNewKey())
+
     str = rand.nextString(1024)
     buf = map.getAggregationBuffer(InternalRow(UTF8String.fromString(str)))
     assert(buf == null)
@@ -377,11 +388,66 @@ class UnsafeFixedWidthAggregationMapSuite
     var sorter: UnsafeKVExternalSorter = null
     try {
       sorter = map.destructAndCreateExternalSorter()
+      assert(!map.shouldSpillBeforeAppendNewKey())
       map.free()
     } finally {
       if (sorter != null) {
         sorter.cleanupResources()
       }
     }
+  }
+
+  testWithMemoryLeakDetection("Tungsten aggregation handles fail to grow before next key") {
+    def runAggregation(keys: Seq[String]): (Map[String, Long], Long) = {
+      memoryManager.limit(Long.MaxValue)
+      val productAttr = AttributeReference("product", StringType)()
+      val countExpr = Count(Seq(Literal(1))).toAggregateExpression()
+      val countAttr = countExpr.resultAttribute
+      val numTasksFallBacked = SQLMetrics.createMetric(
+        spark.sparkContext, "number of sort fallback tasks")
+      val rows = keys.zipWithIndex.iterator.map { case (key, index) =>
+        if (index == 1) {
+          memoryManager.limit(0)
+        }
+        InternalRow(UTF8String.fromString(key))
+      }
+      val iterator = new TungstenAggregationIterator(
+        partIndex = 0,
+        groupingExpressions = Seq(productAttr),
+        aggregateExpressions = Seq(countExpr),
+        aggregateAttributes = Seq(countAttr),
+        initialInputBufferOffset = 0,
+        resultExpressions = Seq(productAttr, countAttr),
+        newMutableProjection = MutableProjection.create,
+        originalInputAttributes = Seq(productAttr),
+        inputIter = rows,
+        testFallbackStartsAt = None,
+        numOutputRows = SQLMetrics.createMetric(spark.sparkContext, "number of output rows"),
+        peakMemory = SQLMetrics.createSizeMetric(spark.sparkContext, "peak memory"),
+        spillSize = SQLMetrics.createSizeMetric(spark.sparkContext, "spill size"),
+        avgHashProbe = SQLMetrics.createAverageMetric(
+          spark.sparkContext, "avg hash probes per key"),
+        numTasksFallBacked = numTasksFallBacked)
+      val results = iterator.map(_.copy()).toSeq.map { row =>
+        row.getString(0) -> row.getLong(1)
+      }.toMap
+
+      assert(results("key-0") == 2L)
+      assert(results.size == keys.distinct.size)
+      assert(results.values.sum == keys.size)
+      (results, numTasksFallBacked.value)
+    }
+
+    val keysBeforeFailedGrow = (0 until 8192).map(i => s"key-$i")
+    val (existingKeyResults, existingKeyFallbacks) =
+      runAggregation(keysBeforeFailedGrow :+ "key-0")
+    assert(existingKeyResults("key-0") == 2L)
+    assert(existingKeyFallbacks == 0L)
+
+    val (newKeyResults, newKeyFallbacks) =
+      runAggregation(keysBeforeFailedGrow ++ Seq("key-0", "new-key"))
+    assert(newKeyResults("key-0") == 2L)
+    assert(newKeyResults("new-key") == 1L)
+    assert(newKeyFallbacks == 1L)
   }
 }

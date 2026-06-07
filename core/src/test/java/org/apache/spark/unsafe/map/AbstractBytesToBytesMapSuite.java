@@ -509,10 +509,11 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   @Test
   public void failureToGrow() {
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 1, 1024);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 1, 4096);
     try {
       boolean success = true;
       int i;
+      assertFalse(map.shouldSpillBeforeAppendNewKey());
       for (i = 0; i < 127; i++) {
         if (i > 0) {
           memoryManager.limit(0);
@@ -524,9 +525,24 @@ public abstract class AbstractBytesToBytesMapSuite {
         if (!success) {
           break;
         }
+        if (map.shouldSpillBeforeAppendNewKey()) {
+          break;
+        }
       }
       assertTrue(i > 0);
-      Assertions.assertFalse(success);
+      assertTrue(success);
+      assertTrue(map.shouldSpillBeforeAppendNewKey());
+
+      // The append that hit the growth failure succeeds, but the next new key should fail if
+      // the caller has not spilled or reset the map.
+      final long[] arr = new long[]{i + 1L};
+      final BytesToBytesMap.Location loc = map.lookup(arr, Platform.LONG_ARRAY_OFFSET, 8);
+      Assertions.assertFalse(
+        loc.append(arr, Platform.LONG_ARRAY_OFFSET, 8, arr, Platform.LONG_ARRAY_OFFSET, 8));
+
+      memoryManager.limit(PAGE_SIZE_BYTES);
+      map.reset();
+      assertFalse(map.shouldSpillBeforeAppendNewKey());
     } finally {
       map.free();
     }
