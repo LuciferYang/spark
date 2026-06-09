@@ -6008,6 +6008,166 @@ object SQLConf {
     .booleanConf
     .createWithDefault(false)
 
+  val AUTO_REUSED_CTE_ENABLED =
+    buildConf("spark.sql.auto.reused.cte.enabled")
+      .doc(
+        "When true, non-inlined CTE definitions referenced multiple times " +
+        "are automatically cached as in-memory columnar tables on first " +
+        "execution. Subsequent references within the same query or later " +
+        "queries in the session read from cache instead of recomputing.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
+  val AUTO_CTE_CACHE_TTL =
+    buildStaticConf("spark.sql.auto.cte.cache.ttl")
+      .doc(
+        "Time-to-live for auto-cached CTE entries since last access. Entries not accessed " +
+        "within this duration stop being reused by NEW plans; their materialised blocks are " +
+        "left to ContextCleaner rather than unpersisted, because a lazy DataFrame built " +
+        "earlier may still hold the relation. Expiry keeps running after " +
+        "spark.sql.auto.reused.cte.enabled is turned off, so entries materialised while it was " +
+        "on still stop being reused. Set to 0 to disable eviction (entries " +
+        "persist until the SparkContext ends). STATIC: Guava fixes expireAfterAccess when the " +
+        "tracker is built, once per SparkContext, so a session-level SET could only ever be " +
+        "accepted and then ignored.")
+      .version("4.2.0")
+      .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
+      .createWithDefaultString("1h")
+
+  val AUTO_CTE_CACHE_MAX_SIZE =
+    buildStaticConf("spark.sql.auto.cte.cache.maxSize")
+      .doc(
+        "Maximum total estimated weight of auto-cached CTE entries, with LRU eviction when " +
+        "exceeded. Note this is an EVICTION weight, not an admission gate -- see " +
+        "spark.sql.auto.cte.cache.maxBodySizeBytes for the latter. Both -1 and 0 mean " +
+        "unlimited: Guava's maximumWeight(0) would drop every entry as it is inserted, so each " +
+        "query would pay a full materialisation and immediately throw it away, which is worse " +
+        "than the feature being off. Only effective when spark.sql.auto.reused.cte.enabled is " +
+        "true. STATIC, for the same reason as spark.sql.auto.cte.cache.ttl.")
+      .version("4.2.0")
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("-1")
+
+  val AUTO_CTE_CACHE_KEEP_MERGED_PREDICATE =
+    buildConf("spark.sql.auto.cte.cache.keepMergedPredicate")
+      .doc(
+        "Auto-CTE normally caches the CTE body as it was BEFORE " +
+        "PushdownPredicatesAndPruneColumnsForCTEDef merged the per-reference predicates into " +
+        "it, so that queries referencing the same CTE with different filters share one cache " +
+        "entry. When this is true and SOME PART of the merged predicate can be pushed below " +
+        "the body's aggregate, a predicate-carrying body is cached instead: the first " +
+        "execution reads and aggregates fewer rows, at the cost of an entry only reusable by " +
+        "queries carrying the same predicate. Which shape is cached then depends on " +
+        "spark.sql.auto.cte.cache.injectImpliedPredicate. Measured over the 18 TPC-DS queries " +
+        "whose bodies cache on local sf100 parquet, five executions each (one materializing " +
+        "round plus four cache hits): 645.3s off against 538.4s on, firing on 8 of the 18. " +
+        "Has no effect when no part of the merged predicate can cross the aggregate, or when " +
+        "any reference carries no predicate -- both keep the pre-pushdown body. Only " +
+        "effective when spark.sql.auto.reused.cte.enabled is true.")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_CACHE_INJECT_IMPLIED_PREDICATE =
+    buildConf("spark.sql.auto.cte.cache.injectImpliedPredicate")
+      .doc(
+        "Only takes effect when spark.sql.auto.cte.cache.keepMergedPredicate is true, i.e. " +
+        "when some part of the OR-merged per-reference predicate can be pushed below the CTE " +
+        "body's aggregate. That conf on its own caches the body carrying the WHOLE merged " +
+        "predicate; this one instead caches the pre-pushdown body plus ONLY the pushable " +
+        "part, as a single top-level conjunct below the pruning Project. The difference is " +
+        "whether the filter actually reaches the scans: PushPredicateThroughNonJoin splits a " +
+        "filter by top-level conjunct and judges each whole, so TPC-DS q4's merged predicate " +
+        "'(dyear = 2001 AND year_total > 0) OR (dyear = 2002)' pushes NOTHING, while the " +
+        "extracted part 'dyear = 2001 OR dyear = 2002' -- implied by it, since (A AND B) OR C " +
+        "implies A OR C -- reads only grouping columns and does push, down to date_dim. " +
+        "Correctness rests on that implication: an implied predicate cannot remove a row the " +
+        "original would have kept, and each reference still applies its own predicate above " +
+        "the cache. It also costs LESS cross-query reuse than the whole-predicate shape: the " +
+        "cache key holds only the implied part, so q39a/q39b ('(d_moy=1) OR (d_moy=2)' " +
+        "against '(d_moy=1 AND cov>1.5) OR (d_moy=2)') still share one entry, which the " +
+        "whole-predicate shape splits (q39b's first execution 896ms against 15813ms).")
+      .internal()
+      .version("4.2.0")
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_CACHE_MIN_SIZE_BYTES =
+    buildConf("spark.sql.auto.cte.cache.minSizeBytes")
+      .doc(
+        "Minimum estimated size (in bytes) of a CTE body required for it to " +
+        "be considered for auto-caching. CTEs whose `LogicalPlan.stats.sizeInBytes` " +
+        "is below this threshold are inlined as before, even if they contain " +
+        "an otherwise-expensive operator (Join / Aggregate / Sort / Window). " +
+        "This guards against caching CTEs that are structurally complex but " +
+        "operate on tiny inputs (e.g. `SELECT * FROM small_dim ORDER BY x`). " +
+        "When stats are unavailable the structural gate alone applies. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("1m")
+
+  val AUTO_CTE_CACHE_MAX_BODY_SIZE_BYTES =
+    buildConf("spark.sql.auto.cte.cache.maxBodySizeBytes")
+      .doc(
+        "Maximum estimated size (in bytes) of a CTE body that may be auto-cached. Set to -1 " +
+        "(the default) to disable the ceiling. This is an ADMISSION gate, unlike " +
+        "spark.sql.auto.cte.cache.maxSize, which is the Guava eviction weight and only decides " +
+        "what to drop after a body has already been materialized. Without a ceiling a body " +
+        "whose estimate is far larger than the storage pool is still materialized in full: " +
+        "measured on a cluster, a body estimated at 13.1 TiB against a 2.0 TiB on-heap pool, " +
+        "whose blocks never landed, so every execution recomputed it. The ceiling is off by " +
+        "default because it is not the primary defence -- the structural gate " +
+        "`ReplaceCTERefWithCache.isRowExpanding` is, and it needs no estimate. A body declined " +
+        "for this ceiling alone is tagged so ReplaceCTERefWithRepartition plugs it in per " +
+        "reference instead of adding a round-robin shuffle, which on an oversized body is the " +
+        "most expensive of the three available shapes. An unavailable estimate counts as " +
+        "exceeding the ceiling, the opposite of how the minimum treats it. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefault(-1)
+
+  val AUTO_CTE_CACHE_STORAGE_LEVEL =
+    buildConf("spark.sql.auto.cte.cache.storageLevel")
+      .doc(
+        "Storage level for auto-cached CTE entries. Valid values are any " +
+        "StorageLevel name (e.g., MEMORY_ONLY, MEMORY_AND_DISK, DISK_ONLY). " +
+        "The default MEMORY_ONLY has no " +
+        "disk fallback, so a body evicted under pressure is recomputed in full; that is the " +
+        "intended trade for this feature and it was measured, not assumed. At 100TB the " +
+        "bodies that failed to stay resident failed on SIZE (see the body-size ceiling " +
+        "spark.sql.auto.cte.cache.maxBodySizeBytes), and for those MEMORY_AND_DISK measured " +
+        "SLOWER, because the cache payload was several times the source data it replaced. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .stringConf
+      .transform(_.toUpperCase(Locale.ROOT))
+      .checkValues(StorageLevelMapper.values.map(_.name()).toSet)
+      .createWithDefault(StorageLevelMapper.MEMORY_ONLY.name())
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable")
+      .doc(
+        "When true, skip Auto-CTE caching for CTEs whose body has no in-body " +
+        "PartitionPruning opportunity but whose partitioned/runtime-filterable " +
+        "fact scans would benefit from outer DPP/DFP after inlining. Default " +
+        "true: safe because Auto-CTE itself (spark.sql.auto.reused.cte.enabled) " +
+        "defaults to false, so the veto is a no-op until a user opts into " +
+        "Auto-CTE; at that point the veto fires automatically without requiring " +
+        "a second opt-in. See TagPruningVetoCTE and PruningEligibility.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +

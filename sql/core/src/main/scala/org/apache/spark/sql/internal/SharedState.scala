@@ -34,7 +34,7 @@ import org.apache.spark.internal.LogKeys.{CONFIG, CONFIG2, PATH, VALUE}
 import org.apache.spark.sql.catalyst.analysis.RelationCache
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.errors.QueryExecutionErrors
-import org.apache.spark.sql.execution.CacheManager
+import org.apache.spark.sql.execution.{AutoCTECacheManager, CacheManager}
 import org.apache.spark.sql.execution.streaming.runtime.StreamExecution
 import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLTab, StreamingQueryStatusStore}
 import org.apache.spark.sql.internal.StaticSQLConf._
@@ -96,6 +96,23 @@ private[sql] class SharedState(
    * Class for caching query results reused in future executions.
    */
   val cacheManager: CacheManager = new CacheManager
+
+  /**
+   * Manages lifecycle of auto-cached CTE definitions.
+   *
+   * `lazy`, and reading the two entries straight off the `SparkConf`. Building it eagerly cost
+   * every application a Guava cache it may never use, and replaying the whole `SparkConf`
+   * through `SQLConf.setConfString` to read two values re-validated every registered SQL conf
+   * inside this constructor: one malformed value (`spark.sql.shuffle.partitions=abc`, or a
+   * removed conf set to a non-default) threw here, before the eagerly-built `statusStore`,
+   * SQL listener and `SQLTab` below, so the listener was never registered and the
+   * half-constructed `SharedState` was unusable. The same error used to surface later, at the
+   * first session's config merge. Both entries are `buildStaticConf`, so `conf.get` returns
+   * exactly the startup value the replay produced.
+   */
+  lazy val autoCTECacheManager: AutoCTECacheManager = new AutoCTECacheManager(
+    ttlMs = conf.get(SQLConf.AUTO_CTE_CACHE_TTL),
+    maxSizeBytes = conf.get(SQLConf.AUTO_CTE_CACHE_MAX_SIZE))
 
   /**
    * A relation cache backed by the cache manager.

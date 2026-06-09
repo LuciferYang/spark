@@ -25,8 +25,9 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.execution.datasources.{PruneFileSourcePartitions, PushVariantIntoScan, SchemaPruning, V1Writes}
 import org.apache.spark.sql.execution.datasources.v2.{GroupBasedRowLevelOperationScanPlanning, OptimizeMetadataOnlyDeleteFromTable, V2ScanPartitioningAndOrdering, V2ScanRelationPushDown, V2Writes}
-import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering}
+import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering, TagPruningVetoCTE}
 import org.apache.spark.sql.execution.python.{ExtractGroupingPythonUDFFromAggregate, ExtractPythonUDFFromAggregate, ExtractPythonUDFs, ExtractPythonUDTFs}
+import org.apache.spark.sql.internal.SQLConf
 
 class SparkOptimizer(
     catalogManager: CatalogManager,
@@ -55,7 +56,32 @@ class SparkOptimizer(
 
   override def defaultBatches: Seq[Batch] = flattenBatches(Seq(
     preOptimizationBatches,
-    super.defaultBatches,
+    // Tag CTEs whose references appear inside correlated subqueries BEFORE
+    // RewriteCorrelatedScalarSubquery decorrelates them. The tag is read by
+    // ReplaceCTERefWithCache later to skip caching for the q1/q31/q39a
+    // regression pattern. Must run before any rule that touches
+    // SubqueryExpression structure.
+    Batch("Tag Correlated CTE Refs", Once, TagCorrelatedCTERefs),
+    // Tag CTE definitions whose body contains a partitioned/runtime-filterable
+    // fact scan that would be MORE valuable as the target of outer DPP/DFP
+    // pruning than as a cached InMemoryRelation. Read by `InlineCTE` and
+    // `ReplaceCTERefWithCache`. Disabled by default; see
+    // `spark.sql.auto.cte.skipWhenPruningApplicable`.
+    Batch("Tag Pruning Veto CTE", Once, TagPruningVetoCTE),
+    // `CleanUpTempCTEInfo` normally runs at the end of the operator-optimization batch and
+    // clears `originalPlanWithPredicates`. `ReplaceCTERefWithCache.prePushdownBody` is the one
+    // reader of that field, so the batch is moved to the end of this list -- but only when the
+    // feature that reads it is on. (The comment that used to sit here cited divergent-predicate
+    // detection; `hasDivergentPredicates` is a placeholder returning false, see review item 21.)
+    // With the feature off, keeping the field alive makes every `CTERelationDef` carry a second
+    // copy of its body through the ~20 batches in between, and that copy participates in
+    // `equals`/`hashCode`/`canonicalized` while the ExprIds inside it are never normalized --
+    // `doCanonicalize` only reaches children, and this field is a plain case-class argument.
+    if (conf.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED)) {
+      super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info")
+    } else {
+      super.defaultBatches
+    },
     Batch("Optimize Metadata Only Query", Once, OptimizeMetadataOnlyQuery(catalog)),
     Batch("PartitionPruning", Once,
       PartitionPruning,
@@ -100,7 +126,8 @@ class SparkOptimizer(
       ConstantFolding,
       EliminateLimits),
     Batch("User Provided Optimizers", fixedPoint, experimentalMethods.extraOptimizations: _*),
-    Batch("Replace CTE with Repartition", Once, ReplaceCTERefWithRepartition)))
+    Batch("Replace CTE with Repartition", Once,
+      ReplaceCTERefWithCache, ReplaceCTERefWithRepartition, CleanUpTempCTEInfo)))
 
   override def nonExcludableRules: Seq[String] = super.nonExcludableRules ++
     Seq(
@@ -112,7 +139,16 @@ class SparkOptimizer(
       V2ScanRelationPushDown.ruleName,
       V2ScanPartitioningAndOrdering.ruleName,
       V2Writes.ruleName,
-      ReplaceCTERefWithRepartition.ruleName)
+      // The four auto-CTE rules are one indivisible unit. `InlineCTE`'s carve-out keys off
+      // `AUTO_REUSED_CTE_ENABLED`, not off whether these rules are present, so excluding any
+      // of them leaves a multi-reference CTE neither inlined nor cached: it falls through to
+      // `ReplaceCTERefWithRepartition`, which by its own comment produces an unresolved plan.
+      // Excluding `TagCorrelatedCTERefs` is the quiet variant -- `correlatedSubqueryRef`
+      // stays false and the q1/q31/q39a regression guard is switched off with no error.
+      ReplaceCTERefWithRepartition.ruleName,
+      ReplaceCTERefWithCache.ruleName,
+      TagCorrelatedCTERefs.ruleName,
+      TagPruningVetoCTE.ruleName)
 
   /**
    * Optimization batches that are executed before the regular optimization batches (also before

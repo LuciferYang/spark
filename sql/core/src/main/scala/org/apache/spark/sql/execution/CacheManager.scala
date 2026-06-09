@@ -170,6 +170,51 @@ class CacheManager extends Logging with AdaptiveSparkPlanHelper {
   }
 
   /**
+   * Builds the `InMemoryRelation` for `planToCache` but does NOT make it reusable: the returned
+   * entry is invisible to `lookupCachedData` until someone passes it to `registerCachedData`.
+   *
+   * This is the split auto-CTE caching needs. `cacheQuery` registers into `cachedData`, which
+   * every session sharing this `SharedState` consults through `QueryExecution.useCachedData`, so
+   * calling it from an optimizer rule made `EXPLAIN` -- or one read of `optimizedPlan` -- publish
+   * a cache entry that unrelated queries could then hit and materialise for real. Preparing here
+   * and registering at execution keeps the decision in the plan and the publication in the run.
+   *
+   * Returns `None` when there is nothing to cache (NONE level, or a `Command`).
+   */
+  private[sql] def prepareCachedData(
+      spark: SparkSession,
+      planToCache: LogicalPlan,
+      tableName: Option[String],
+      storageLevel: StorageLevel): Option[CachedData] = {
+    if (storageLevel == StorageLevel.NONE || planToCache.isInstanceOf[Command]) {
+      None
+    } else {
+      val normalized = QueryExecution.normalize(spark, planToCache)
+      val sessionWithConfigsOff = getOrCloneSessionWithConfigsOff(spark)
+      val inMemoryRelation = sessionWithConfigsOff.withActive {
+        val qe = sessionWithConfigsOff.sessionState.executePlan(planToCache)
+        InMemoryRelation(storageLevel, qe, tableName)
+      }
+      Some(CachedData(normalized, inMemoryRelation))
+    }
+  }
+
+  /**
+   * Makes an entry from `prepareCachedData` reusable. A no-op when an equal plan is already
+   * registered, which is what happens when two executions race on the same body.
+   */
+  private[sql] def registerCachedData(cd: CachedData): Unit = this.synchronized {
+    if (lookupCachedDataInternal(cd.plan).nonEmpty) {
+      CacheManager.logCacheOperation(log"Auto-CTE entry already registered:" +
+        log"${MDC(DATAFRAME_CACHE_ENTRY, cd)}")
+    } else {
+      cachedData = cd +: cachedData
+      CacheManager.logCacheOperation(log"Added Dataframe cache entry:" +
+        log"${MDC(DATAFRAME_CACHE_ENTRY, cd)}")
+    }
+  }
+
+  /**
    * Un-cache the given plan or all the cache entries that refer to the given plan.
    *
    * @param query    The [[Dataset]] to be un-cached.
@@ -324,6 +369,36 @@ class CacheManager extends Logging with AdaptiveSparkPlanHelper {
         cd.plan.exists(isMatchedPlan) && !cacheAlreadyLoaded
       })
     }
+  }
+
+  /**
+   * Drops the cache entries matching `plan` from the reuse registry WITHOUT releasing their
+   * storage blocks, and returns how many were dropped.
+   *
+   * The difference from `uncacheQuery` is who decides when the blocks go away. That method calls
+   * `CachedRDDBuilder.clearCache`, which unpersists immediately -- correct for
+   * `UNCACHE TABLE` / `Dataset.unpersist`, where the user asked for the data to be gone. It is
+   * wrong for an expiry policy: a `DataFrame` built earlier and not yet executed still holds the
+   * `InMemoryRelation`, and unpersisting under it turns its next `collect()` into a full
+   * recompute of a body that was already materialised.
+   *
+   * Removing the entry from `cachedData` is enough to stop NEW plans from reusing it, which is
+   * all an expiry policy needs to express. The blocks are then reclaimed by `ContextCleaner`
+   * once the last plan referencing the relation becomes unreachable (`RDD.persist` registers
+   * every cached RDD for GC-based cleanup, and `SparkContext.persistentRdds` holds them weakly)
+   * -- the same path that frees any `persist()`ed RDD nobody unpersisted. With
+   * `spark.cleaner.referenceTracking=false` they live until the application ends, again as for
+   * any other cached RDD.
+   *
+   * No `recacheByCondition` here, unlike `uncacheQuery`: that exists to re-plan cached queries
+   * built on top of data that just became invalid, and nothing became invalid.
+   */
+  private[sql] def stopReusing(plan: LogicalPlan): Int = this.synchronized {
+    val matched = cachedData.filter(cd => cd.plan.sameResult(plan))
+    if (matched.nonEmpty) {
+      cachedData = cachedData.filterNot(cd => matched.exists(_ eq cd))
+    }
+    matched.length
   }
 
   // Analyzes column statistics in the given cache data

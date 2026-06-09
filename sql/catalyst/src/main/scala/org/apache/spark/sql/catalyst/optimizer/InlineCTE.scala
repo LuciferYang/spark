@@ -22,9 +22,11 @@ import scala.collection.mutable
 import org.apache.spark.sql.catalyst.analysis.DeduplicateRelations
 import org.apache.spark.sql.catalyst.expressions.{Alias, OuterReference, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.logical.{CTERelationDef, CTERelationRef, Join, JoinHint, LogicalPlan, Project, Subquery, UnionLoop, WithCTE}
+import org.apache.spark.sql.catalyst.plans.logical.{AggregateBase, CTERelationDef, CTERelationRef, Distinct, Except, Intersect, Join, JoinHint, LogicalPlan, Project, Sort, Subquery, UnionLoop, Window, WithCTE}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{CTE, PLAN_EXPRESSION}
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * Inlines CTE definitions into corresponding references if either of the conditions satisfies:
@@ -55,7 +57,49 @@ case class InlineCTE(
     }
   }
 
-  private def shouldInline(cteDef: CTERelationDef, refCount: Int): Boolean = alwaysInline || {
+  private def shouldInline(
+      cteDef: CTERelationDef,
+      refCount: Int,
+      hasUnlimitedRecursionRef: Boolean): Boolean = {
+    if (alwaysInline) return true
+
+    // When auto-CTE caching is enabled, do not inline a multi-reference CTE that
+    // has an expensive body (Join / Aggregate / Sort / Window). Such CTEs are
+    // candidates for `ReplaceCTERefWithCache` to materialize as `InMemoryRelation`.
+    // Without this carve-out, every deterministic CTE is inlined here and the
+    // auto-cache rule has nothing left to materialize on real workloads (TPC-DS
+    // CTEs are virtually all deterministic).
+    //
+    // EXCEPTIONS:
+    //   - If the CTE has a reference inside a correlated subquery
+    //     (`correlatedSubqueryRef = true`), `ReplaceCTERefWithCache` will refuse
+    //     to cache it. We must NOT skip inlining in that case, otherwise the
+    //     CTE survives into `ReplaceCTERefWithRepartition`, which produces an
+    //     unresolved plan because the multi-reference is not deduped here.
+    //     Inlining correlated-ref CTEs is the safe baseline behavior.
+    //   - If the CTE body is non-deterministic, `ReplaceCTERefWithCache` will
+    //     refuse to cache it (cross-query reuse would change semantics). We
+    //     must NOT skip inlining here either; the standard non-deterministic
+    //     fallback below keeps the CTE so `ReplaceCTERefWithRepartition` can
+    //     share it via shuffle within the query.
+    //   - If any reference carries `isUnlimitedRecursion` (it sits under `LIMIT ALL`), the
+    //     `LIMIT ALL` semantics are applied by `setUnlimitedRecursion` below, and only on the
+    //     inlining path: the plan it returns is consumed where the reference is replaced by the
+    //     body, so skipping inlining discards it and `UnionLoop.limit` stays `None`. Neither
+    //     `ReplaceCTERefWithCache` nor `ReplaceCTERefWithRepartition` looks at the flag, so the
+    //     row limit silently reverts from unlimited to `spark.sql.cteRecursionRowLimit` and the
+    //     query fails with `RECURSION_ROW_LIMIT_EXCEEDED` -- a query that returns complete
+    //     results with the feature off.
+    if (refCount > 1 &&
+        SQLConf.get.getConf(SQLConf.AUTO_REUSED_CTE_ENABLED) &&
+        cteDef.deterministic &&
+        !cteDef.correlatedSubqueryRef &&
+        !cteDef.pruningVeto &&
+        !hasUnlimitedRecursionRef &&
+        isAutoCacheEligible(cteDef.child)) {
+      return false
+    }
+
     // We do not need to check enclosed `CTERelationRef`s for `deterministic` or `OuterReference`,
     // because:
     // 1) It is fine to inline a CTE if it references another CTE that is non-deterministic;
@@ -63,6 +107,115 @@ case class InlineCTE(
     refCount == 1 ||
       cteDef.deterministic ||
       cteDef.child.exists(_.expressions.exists(_.isInstanceOf[OuterReference]))
+  }
+
+  /**
+   * Returns true if the CTE body is expensive enough that
+   * `ReplaceCTERefWithCache` would consider it for caching. Two gates:
+   *
+   *   1. Structural: contains a Join / Aggregate / Sort / Window.
+   *   2. Stats: estimated `sizeInBytes` >= `AUTO_CTE_CACHE_MIN_SIZE_BYTES`.
+   *      When stats are unavailable the structural gate alone applies.
+   *
+   * IMPORTANT: This predicate, together with the `!correlatedSubqueryRef`
+   * check in the carve-out above, MUST stay in lock-step with
+   * `org.apache.spark.sql.execution.ReplaceCTERefWithCache.shouldAutoCache`
+   * (sql/core module). If `shouldAutoCache` adds a new gate, update the
+   * carve-out here to match - otherwise this rule may keep a CTE that
+   * `ReplaceCTERefWithCache` then refuses to cache, leaving it for
+   * `ReplaceCTERefWithRepartition` to handle. That fallback path produces an
+   * unresolved plan when the multi-reference CTE was not first deduplicated
+   * by InlineCTE itself, because `ReplaceCTERefWithRepartition` does not
+   * give cs1/cs2 references separate exprIds.
+   *
+   * The two call sites can see slightly different stats (InlineCTE runs
+   * earlier, before predicate pushdown shrinks the body). For clearly
+   * tiny vs clearly large CTEs the divergence is irrelevant; for
+   * borderline cases the structural gate is the primary signal.
+   *
+   * The predicate is duplicated rather than shared because catalyst cannot
+   * depend on sql/core. There is no test that catches a divergence between
+   * the two definitions; reviewers should manually verify when modifying
+   * either.
+   */
+  private def isAutoCacheEligible(plan: LogicalPlan): Boolean = {
+    val structurallyExpensive = plan.exists {
+      case _: Join => true
+      // `AggregateBase` so this agrees with `ReplaceCTERefWithCache.isExpensiveEnough`, which
+      // runs after `Batch("Partial Aggregation Optimization")` has rewritten an `Aggregate` over
+      // a join into `FinalAggregate` over `PartialAggregate`. Those three are siblings under
+      // `AggregateBase` with no subtyping between them, so matching `Aggregate` alone makes this
+      // side see a body the other side no longer recognises -- the def is kept here, declined
+      // there, and lands in the round-robin path. See `isRowExpanding`.
+      case _: AggregateBase => true
+      case _: Sort => true
+      case _: Window => true
+      case _ => false
+    }
+    if (!structurallyExpensive) return false
+
+    // Row-expanding bodies are never cached; see `isRowExpanding`. Structural, so this side
+    // reaches the same verdict as `ReplaceCTERefWithCache` despite running much earlier.
+    if (isRowExpanding(plan)) return false
+
+    // Reading statistics off a pre-pushdown V2 relation is illegal at this point.
+    // `Optimizer` documents that statistics may only be used after the
+    // `Early Filter and Projection Push-Down` batch, and `Batch("Inline CTE")` runs well before
+    // it; `DataSourceV2Relation.computeStats` enforces that by throwing under `Utils.isTesting`,
+    // while outside testing it builds a scan and estimates the UNPRUNED table. Leaving that to
+    // the `NonFatal` catch below would make this gate a no-op for every V2 source in test runs
+    // while production compared against a full-table estimate and paid an extra scan-build per
+    // CTE per query -- the two environments would gate differently, which is worse than not
+    // gating. `ReplaceCTERefWithCache` runs after pushdown and still applies the size gate
+    // there, where it is legal.
+    if (plan.exists(_.isInstanceOf[DataSourceV2Relation])) return true
+
+    val threshold = SQLConf.get.getConf(SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES)
+    try {
+      // BigInt comparison; do not call .toLong. Without CBO + column stats,
+      // multi-way join size estimates compound past Long.MaxValue and
+      // BigInt#toLong silently wraps. See AutoCTECache.isExpensiveEnough.
+      plan.stats.sizeInBytes >= BigInt(threshold)
+    } catch {
+      // NonFatal: swallow stats-provider bugs, let fatal errors propagate.
+      // Permissive fallback for consistency with
+      // ReplaceCTERefWithCache.isExpensiveEnough.
+      case scala.util.control.NonFatal(_) => true
+    }
+  }
+
+  /**
+   * Mirror of `org.apache.spark.sql.execution.ReplaceCTERefWithCache.isRowExpanding`
+   * (sql/core). True when the body has a Join with nothing above it that can collapse rows, so
+   * caching it can only store more rows than it reads.
+   *
+   * Unlike the size gates this predicate reads no statistics, which is exactly why it can live
+   * on both sides: this rule runs before predicate pushdown and column pruning, so any
+   * estimate-based gate would disagree with the cache rule's verdict, and a disagreement in
+   * this direction (keep here, decline there) is what sends a def down
+   * `ReplaceCTERefWithRepartition` -- measured at 22 min on TPC-DS q95 against 1.4 min for
+   * inlining, and an unresolved plan for q14a-shaped bodies. Mirroring an estimate-based cap
+   * was tried and rejected: `InlineCTE` runs before pushdown, its estimates are systematically
+   * larger, and q14a was killed even at a 1000 TiB threshold.
+   *
+   * Kept as a duplicate rather than shared because catalyst cannot depend on sql/core. The two
+   * copies MUST stay identical; there is no test that catches a divergence directly.
+   *
+   * `AggregateBase`, not `Aggregate`: this rule runs before the batch
+   * "Partial Aggregation Optimization" so it always sees a plain `Aggregate`, but
+   * `ReplaceCTERefWithCache` runs after it and sees `FinalAggregate` over `PartialAggregate`
+   * when `spark.sql.optimizer.partialAggregationOptimization.enabled` is on. Matching
+   * `AggregateBase` on both sides is what keeps the two verdicts identical across that rewrite.
+   */
+  private def isRowExpanding(plan: LogicalPlan): Boolean = {
+    def collapsesRows(p: LogicalPlan): Boolean = p match {
+      case _: AggregateBase => true
+      case _: Distinct => true
+      case _: Intersect => true
+      case _: Except => true
+      case _ => false
+    }
+    plan.exists(_.isInstanceOf[Join]) && !plan.exists(collapsesRows)
   }
 
   /**
@@ -108,6 +261,9 @@ case class InlineCTE(
 
       case ref: CTERelationRef =>
         cteMap(ref.cteId) = cteMap(ref.cteId).withRefCountIncreased(1)
+        if (ref.isUnlimitedRecursion) {
+          cteMap(ref.cteId) = cteMap(ref.cteId).withUnlimitedRecursionRef()
+        }
 
         // The `outerCTEId` CTE definition can either reference `cteId` definition if `cteId` is in
         // the same or in an outer `WithCTE` node, or `outerCTEId` can contain `cteId` definition if
@@ -164,7 +320,8 @@ case class InlineCTE(
           val refInfo = cteMap(cteDef.id)
           if (refInfo.refCount > 0) {
             val newDef = refInfo.cteDef.copy(child = inlineCTE(refInfo.cteDef.child, cteMap))
-            val inlineDecision = shouldInline(newDef, refInfo.refCount)
+            val inlineDecision =
+              shouldInline(newDef, refInfo.refCount, refInfo.hasUnlimitedRecursionRef)
             cteMap(cteDef.id) = cteMap(cteDef.id).copy(
               cteDef = newDef, shouldInline = inlineDecision
             )
@@ -256,16 +413,25 @@ case class InlineCTE(
  * @param shouldInline If true, this CTE relation should be inlined in the places that reference it.
  * @param container The container of a CTE definition is another CTE definition in which the
  *                  `WithCTE` node of the definition resides.
+ * @param hasUnlimitedRecursionRef True if any incoming reference carries
+ *                                 `isUnlimitedRecursion`, i.e. sits under `LIMIT ALL`. The flag
+ *                                 lives on the reference while the inline decision is made per
+ *                                 definition, so it has to be collected here.
  */
 case class CTEReferenceInfo(
     cteDef: CTERelationDef,
     refCount: Int,
     outgoingRefs: mutable.Map[Long, Int],
     shouldInline: Boolean,
-    container: Option[Long]) {
+    container: Option[Long],
+    hasUnlimitedRecursionRef: Boolean = false) {
 
   def withRefCountIncreased(count: Int): CTEReferenceInfo = {
     copy(refCount = refCount + count)
+  }
+
+  def withUnlimitedRecursionRef(): CTEReferenceInfo = {
+    copy(hasUnlimitedRecursionRef = true)
   }
 
   def withRefCountDecreased(count: Int): CTEReferenceInfo = {

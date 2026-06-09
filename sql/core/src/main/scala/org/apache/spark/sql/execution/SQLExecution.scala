@@ -225,6 +225,19 @@ object SQLExecution extends Logging {
                   sc.listenerBus.post(
                     startEvent.copy(physicalPlanDescription = planDesc, sparkPlanInfo = planInfo))
                   isExecutedPlanAvailable = true
+                  // Auto-CTE caching prepares its `InMemoryRelation`s during optimization but
+                  // publishes them for reuse only here, because this is the boundary between "a
+                  // plan was built" and "a query runs": `EXPLAIN` and a bare `optimizedPlan` read
+                  // never reach it, so neither registers an entry that other sessions sharing
+                  // this `SharedState` could hit and materialise. Placed after the plan has been
+                  // forced above -- reading `optimizedPlan` earlier in this method would recurse
+                  // through `eagerlyExecuteCommands`, which calls back into `withNewExecutionId`.
+                  // `numPending` is checked first so a query with the feature off pays one
+                  // `size()`.
+                  val autoCteCache = sparkSession.sharedState.autoCTECacheManager
+                  if (autoCteCache.numPending > 0) {
+                    autoCteCache.publishPending(sparkSession, queryExecution.optimizedPlan)
+                  }
                   f()
               }
             } catch {
