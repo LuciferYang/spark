@@ -41,12 +41,23 @@ class StorageLevel private(
     private var _useMemory: Boolean,
     private var _useOffHeap: Boolean,
     private var _deserialized: Boolean,
-    private var _replication: Int = 1)
+    private var _replication: Int = 1,
+    private var _evictionPriority: Int = 0)
   extends Externalizable {
 
-  // TODO: Also add fields for caching priority, dataset ID, and flushing.
+  // Needed by Py4J which uses Java reflection to find constructors by parameter types.
+  // Scala default parameters don't generate overloaded constructors in bytecode.
+  private[spark] def this(
+      useDisk: Boolean,
+      useMemory: Boolean,
+      useOffHeap: Boolean,
+      deserialized: Boolean,
+      replication: Int) = {
+    this(useDisk, useMemory, useOffHeap, deserialized, replication, 0)
+  }
+
   private def this(flags: Int, replication: Int) = {
-    this((flags & 8) != 0, (flags & 4) != 0, (flags & 2) != 0, (flags & 1) != 0, replication)
+    this((flags & 8) != 0, (flags & 4) != 0, (flags & 2) != 0, (flags & 1) != 0, replication, 0)
   }
 
   def this() = this(false, true, false, false)  // For deserialization
@@ -56,6 +67,7 @@ class StorageLevel private(
   def useOffHeap: Boolean = _useOffHeap
   def deserialized: Boolean = _deserialized
   def replication: Int = _replication
+  def evictionPriority: Int = _evictionPriority
 
   assert(replication < 40, "Replication restricted to be less than 40 for calculating hash codes")
 
@@ -65,7 +77,7 @@ class StorageLevel private(
   }
 
   override def clone(): StorageLevel = {
-    new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication)
+    new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication, evictionPriority)
   }
 
   override def equals(other: Any): Boolean = other match {
@@ -74,7 +86,8 @@ class StorageLevel private(
       s.useMemory == useMemory &&
       s.useOffHeap == useOffHeap &&
       s.deserialized == deserialized &&
-      s.replication == replication
+      s.replication == replication &&
+      s.evictionPriority == evictionPriority
     case _ =>
       false
   }
@@ -98,9 +111,19 @@ class StorageLevel private(
     ret
   }
 
+  // Serialization format:
+  //   v1 (original): [flags:1byte][replication:1byte]           --2 bytes
+  //   v2 (current):  [flags:1byte][replication:1byte][priority:4bytes] --6 bytes
+  // v2 always writes 6 bytes because Externalizable has no object boundaries:
+  // the reader must consume exactly the bytes the writer wrote. Conditional
+  // write would corrupt the stream when StorageLevel is embedded in a larger
+  // object. readExternal handles v1 data via try-catch (EOF on the 3rd byte).
+  // Note: driver and executors must run the same Spark version.
+
   override def writeExternal(out: ObjectOutput): Unit = SparkErrorUtils.tryOrIOException {
     out.writeByte(toInt)
     out.writeByte(_replication)
+    out.writeInt(_evictionPriority)
   }
 
   override def readExternal(in: ObjectInput): Unit = SparkErrorUtils.tryOrIOException {
@@ -110,6 +133,11 @@ class StorageLevel private(
     _useOffHeap = (flags & 2) != 0
     _deserialized = (flags & 1) != 0
     _replication = in.readByte()
+    _evictionPriority = try {
+      in.readInt()
+    } catch {
+      case _: Exception => 0
+    }
   }
 
   @throws(classOf[IOException])
@@ -120,13 +148,23 @@ class StorageLevel private(
     val memory = if (useMemory) "memory" else ""
     val heap = if (useOffHeap) "offheap" else ""
     val deserialize = if (deserialized) "deserialized" else ""
+    val priority = if (evictionPriority != 0) s"priority=$evictionPriority" else ""
 
     val output =
-      Seq(disk, memory, heap, deserialize, s"$replication replicas").filter(_.nonEmpty)
+      Seq(disk, memory, heap, deserialize, s"$replication replicas", priority).filter(_.nonEmpty)
     s"StorageLevel(${output.mkString(", ")})"
   }
 
-  override def hashCode(): Int = toInt * 41 + replication
+  override def hashCode(): Int = (toInt * 41 + replication) * 41 + evictionPriority
+
+  /**
+   * Return a new StorageLevel with the given eviction priority. Lower priority levels are
+   * evicted from memory before higher priority levels (default priority is 0).
+   */
+  def withEvictionPriority(priority: Int): StorageLevel = {
+    StorageLevel.getCachedStorageLevel(
+      new StorageLevel(useDisk, useMemory, useOffHeap, deserialized, replication, priority))
+  }
 
   def description: String = {
     var result = ""

@@ -6008,6 +6008,114 @@ object SQLConf {
     .booleanConf
     .createWithDefault(false)
 
+  val AUTO_REUSED_CTE_ENABLED =
+    buildConf("spark.sql.auto.reused.cte.enabled")
+      .doc(
+        "When true, non-inlined CTE definitions referenced multiple times " +
+        "are automatically cached as in-memory columnar tables on first " +
+        "execution. Subsequent references within the same query or later " +
+        "queries in the session read from cache instead of recomputing.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
+  val AUTO_CTE_CACHE_TTL =
+    buildConf("spark.sql.auto.cte.cache.ttl")
+      .doc(
+        "Time-to-live for auto-cached CTE entries since last access. " +
+        "Entries not accessed within this duration are evicted. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to 0 to disable eviction (entries persist until session ends).")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
+      .timeConf(java.util.concurrent.TimeUnit.MILLISECONDS)
+      .createWithDefaultString("1h")
+
+  val AUTO_CTE_CACHE_MAX_SIZE =
+    buildConf("spark.sql.auto.cte.cache.maxSize")
+      .doc(
+        "Maximum total memory for auto-cached CTE entries. LRU eviction " +
+        "when exceeded. Only effective when " +
+        "spark.sql.auto.reused.cte.enabled is true. " +
+        "Set to -1 for unlimited.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.NOT_APPLICABLE)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("-1")
+
+  val AUTO_CTE_CACHE_MIN_SIZE_BYTES =
+    buildConf("spark.sql.auto.cte.cache.minSizeBytes")
+      .doc(
+        "Minimum estimated size (in bytes) of a CTE body required for it to " +
+        "be considered for auto-caching. CTEs whose `LogicalPlan.stats.sizeInBytes` " +
+        "is below this threshold are inlined as before, even if they contain " +
+        "an otherwise-expensive operator (Join / Aggregate / Sort / Window). " +
+        "This guards against caching CTEs that are structurally complex but " +
+        "operate on tiny inputs (e.g. `SELECT * FROM small_dim ORDER BY x`). " +
+        "When stats are unavailable the structural gate alone applies. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .bytesConf(org.apache.spark.network.util.ByteUnit.BYTE)
+      .createWithDefaultString("1m")
+
+  val AUTO_CTE_CACHE_STORAGE_LEVEL =
+    buildConf("spark.sql.auto.cte.cache.storageLevel")
+      .doc(
+        "Storage level for auto-cached CTE entries. Valid values are any " +
+        "StorageLevel name (e.g., MEMORY_ONLY, MEMORY_AND_DISK, DISK_ONLY). " +
+        "Auto-CTE caches always run with eviction priority -1 (lower than " +
+        "user-issued cache calls) regardless of the level chosen here, so " +
+        "they yield to user caches under memory pressure. " +
+        "Only effective when spark.sql.auto.reused.cte.enabled is true.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .stringConf
+      .transform(_.toUpperCase(Locale.ROOT))
+      .checkValues(StorageLevelMapper.values.map(_.name()).toSet)
+      .createWithDefault(StorageLevelMapper.MEMORY_ONLY.name())
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable")
+      .doc(
+        "When true, skip Auto-CTE caching for CTEs whose body has no in-body " +
+        "PartitionPruning opportunity but whose partitioned/runtime-filterable " +
+        "fact scans would benefit from outer DPP/DFP after inlining. Default " +
+        "true: safe because Auto-CTE itself (spark.sql.auto.reused.cte.enabled) " +
+        "defaults to false, so the veto is a no-op until a user opts into " +
+        "Auto-CTE; at that point the veto fires automatically without requiring " +
+        "a second opt-in. See TagPruningVetoCTE and PruningEligibility.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE_DPP =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable.dpp")
+      .doc("Sub-switch enabling partition-level DPP detection in the Auto-CTE " +
+        "pruning-aware veto check. Effective only when the master switch " +
+        "spark.sql.auto.cte.skipWhenPruningApplicable is true. When both this " +
+        "and the DFP sub-switch are false, the master switch has no effect.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
+  val AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE_DFP =
+    buildConf("spark.sql.auto.cte.skipWhenPruningApplicable.dfp")
+      .doc("Sub-switch enabling V2 SupportsRuntimeV2Filtering DFP detection in " +
+        "the Auto-CTE pruning-aware veto check. Effective only when the master " +
+        "switch spark.sql.auto.cte.skipWhenPruningApplicable is true. When both " +
+        "this and the DPP sub-switch are false, the master switch has no effect.")
+      .internal()
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
   val LEGACY_CTE_PRECEDENCE_POLICY = buildConf("spark.sql.legacy.ctePrecedencePolicy")
     .internal()
     .doc("When LEGACY, outer CTE definitions takes precedence over inner definitions. If set to " +

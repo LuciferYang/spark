@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.execution.datasources.{PruneFileSourcePartitions, PushVariantIntoScan, SchemaPruning, V1Writes}
 import org.apache.spark.sql.execution.datasources.v2.{GroupBasedRowLevelOperationScanPlanning, OptimizeMetadataOnlyDeleteFromTable, V2ScanPartitioningAndOrdering, V2ScanRelationPushDown, V2Writes}
-import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering}
+import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering, TagPruningVetoCTE}
 import org.apache.spark.sql.execution.python.{ExtractGroupingPythonUDFFromAggregate, ExtractPythonUDFFromAggregate, ExtractPythonUDFs, ExtractPythonUDTFs}
 
 class SparkOptimizer(
@@ -55,7 +55,21 @@ class SparkOptimizer(
 
   override def defaultBatches: Seq[Batch] = flattenBatches(Seq(
     preOptimizationBatches,
-    super.defaultBatches,
+    // Tag CTEs whose references appear inside correlated subqueries BEFORE
+    // RewriteCorrelatedScalarSubquery decorrelates them. The tag is read by
+    // ReplaceCTERefWithCache later to skip caching for the q1/q31/q39a
+    // regression pattern. Must run before any rule that touches
+    // SubqueryExpression structure.
+    Batch("Tag Correlated CTE Refs", Once, TagCorrelatedCTERefs),
+    // Tag CTE definitions whose body contains a partitioned/runtime-filterable
+    // fact scan that would be MORE valuable as the target of outer DPP/DFP
+    // pruning than as a cached InMemoryRelation. Read by `InlineCTE` and
+    // `ReplaceCTERefWithCache`. Disabled by default; see
+    // `spark.sql.auto.cte.skipWhenPruningApplicable`.
+    Batch("Tag Pruning Veto CTE", Once, TagPruningVetoCTE),
+    // Move CleanUpTempCTEInfo to after ReplaceCTERefWithCache so that
+    // originalPlanWithPredicates is available for divergent-predicate detection.
+    super.defaultBatches.filterNot(_.name == "Clean Up Temporary CTE Info"),
     Batch("Optimize Metadata Only Query", Once, OptimizeMetadataOnlyQuery(catalog)),
     Batch("PartitionPruning", Once,
       PartitionPruning,
@@ -100,7 +114,8 @@ class SparkOptimizer(
       ConstantFolding,
       EliminateLimits),
     Batch("User Provided Optimizers", fixedPoint, experimentalMethods.extraOptimizations: _*),
-    Batch("Replace CTE with Repartition", Once, ReplaceCTERefWithRepartition)))
+    Batch("Replace CTE with Repartition", Once,
+      ReplaceCTERefWithCache, ReplaceCTERefWithRepartition, CleanUpTempCTEInfo)))
 
   override def nonExcludableRules: Seq[String] = super.nonExcludableRules ++
     Seq(
@@ -112,7 +127,8 @@ class SparkOptimizer(
       V2ScanRelationPushDown.ruleName,
       V2ScanPartitioningAndOrdering.ruleName,
       V2Writes.ruleName,
-      ReplaceCTERefWithRepartition.ruleName)
+      ReplaceCTERefWithRepartition.ruleName,
+      TagPruningVetoCTE.ruleName)
 
   /**
    * Optimization batches that are executed before the regular optimization batches (also before

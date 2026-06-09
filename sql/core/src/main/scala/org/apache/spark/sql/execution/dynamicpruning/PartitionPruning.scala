@@ -199,9 +199,11 @@ object PartitionPruning extends Rule[LogicalPlan] with PredicateHelper with Join
 
 
   /**
-   * Search a filtering predicate in a given logical plan
+   * Search a filtering predicate in a given logical plan.
+   * `private[spark]` so `PruningEligibility` can reuse this exact predicate
+   * when deciding whether to veto Auto-CTE caching (fork-only Path alpha).
    */
-  private def hasSelectivePredicate(plan: LogicalPlan): Boolean = {
+  private[spark] def hasSelectivePredicate(plan: LogicalPlan): Boolean = {
     plan.exists {
       case f: Filter => isLikelySelective(f.condition)
       case _ => false
