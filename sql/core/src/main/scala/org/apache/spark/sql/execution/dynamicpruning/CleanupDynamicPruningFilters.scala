@@ -51,7 +51,7 @@ object CleanupDynamicPruningFilters extends Rule[LogicalPlan] with PredicateHelp
     // Partition filters are pushed down and removed from Filter expressions for V2 sources.
     // Add this for File sources specifically, but will need to figure out generic V2 handling.
     lazy val partitionFilters = plan.collect {
-      case r@DataSourceV2ScanRelation(_, scan: FileScan, _, _, _) =>
+      case r@DataSourceV2ScanRelation(_, scan: FileScan, _, _, _, _) =>
         scan.partitionFilters
     }.flatten
 

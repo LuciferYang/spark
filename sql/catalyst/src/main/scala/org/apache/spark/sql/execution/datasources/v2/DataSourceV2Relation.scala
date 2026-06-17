@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.v2
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.analysis.{MultiInstanceRelation, NamedRelation}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeMap, AttributeReference, Expression, SortOrder}
+import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, ExposesMetadataColumns, Histogram, HistogramBin, LeafNode, LogicalPlan, Statistics}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.{quoteIfNeeded, truncatedString, CharVarcharUtils}
@@ -141,13 +142,22 @@ case class DataSourceV2Relation(
  * @param keyGroupedPartitioning if set, the partitioning expressions that are used to split the
  *                               rows in the scan across different partitions
  * @param ordering if set, the ordering provided by the scan
+ * @param pushedFilters Catalyst expressions for filters that were fully pushed to the data
+ *                      source and do not appear as post-scan filters
  */
 case class DataSourceV2ScanRelation(
     relation: DataSourceV2Relation,
     scan: Scan,
     output: Seq[AttributeReference],
     keyGroupedPartitioning: Option[Seq[Expression]] = None,
-    ordering: Option[Seq[SortOrder]] = None) extends LeafNode with NamedRelation {
+    ordering: Option[Seq[SortOrder]] = None,
+    pushedFilters: Seq[Expression] = Seq.empty) extends LeafNode with NamedRelation {
+
+  // TODO: Override validConstraints to return ExpressionSet(pushedFilters) so that pushed
+  // filters participate in constraint propagation (InferFiltersFromConstraints, PruneFilters).
+  // This changes which filters InferFiltersFromConstraints adds or removes (e.g., it may
+  // skip adding IsNotNull when the scan already implies it, or infer new filters across
+  // joins), so plan stability testing is needed first.
 
   override def name: String = relation.name
 
@@ -163,6 +173,22 @@ case class DataSourceV2ScanRelation(
       case _ =>
         Statistics(sizeInBytes = conf.defaultSizeInBytes)
     }
+  }
+
+  override def doCanonicalize(): DataSourceV2ScanRelation = {
+    this.copy(
+      relation = this.relation.copy(
+        output = this.relation.output.map(QueryPlan.normalizeExpressions(_, this.relation.output))
+      ),
+      output = this.output.map(QueryPlan.normalizeExpressions(_, this.output)),
+      keyGroupedPartitioning = keyGroupedPartitioning.map(
+        _.map(QueryPlan.normalizeExpressions(_, output))
+      ),
+      ordering = ordering.map(
+        _.map(o => o.copy(child = QueryPlan.normalizeExpressions(o.child, output)))
+      ),
+      pushedFilters = pushedFilters.map(QueryPlan.normalizeExpressions(_, output))
+    )
   }
 }
 

@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.LogKeys.{AGGREGATE_FUNCTIONS, GROUP_BY_EXPRS, POST_SCAN_FILTERS, PUSHED_FILTERS, RELATION_NAME, RELATION_OUTPUT}
 import org.apache.spark.internal.MDC
-import org.apache.spark.sql.catalyst.expressions.{aggregate, Alias, And, Attribute, AttributeMap, AttributeReference, AttributeSet, Cast, Expression, IntegerLiteral, Literal, NamedExpression, PredicateHelper, ProjectionOverSchema, SortOrder, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{aggregate, Alias, And, Attribute, AttributeMap, AttributeReference, AttributeSet, Cast, Expression, ExpressionSet, IntegerLiteral, Literal, NamedExpression, PredicateHelper, ProjectionOverSchema, SortOrder, SubqueryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.optimizer.CollapseProject
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ScanOperation}
@@ -86,6 +86,14 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper {
       }
 
       val postScanFilters = postScanFiltersWithoutSubquery ++ normalizedFiltersWithSubquery
+
+      // Compute the pushed filter expressions: the normalized filters that were fully pushed
+      // down (i.e., not in postScanFilters). These are stored on the scan relation for
+      // potential future use in constraint propagation.
+      val postScanFilterSet = ExpressionSet(postScanFiltersWithoutSubquery)
+      sHolder.pushedFilterExpressions = normalizedFiltersWithoutSubquery
+        .filterNot(postScanFilterSet.contains)
+        .filter(_.deterministic)
 
       logInfo(
         log"""
@@ -374,13 +382,18 @@ object V2ScanRelationPushDown extends Rule[LogicalPlan] with PredicateHelper {
 
       val wrappedScan = getWrappedScan(scan, sHolder)
 
-      val scanRelation = DataSourceV2ScanRelation(sHolder.relation, wrappedScan, output)
-
       val projectionOverSchema =
         ProjectionOverSchema(output.toStructType, AttributeSet(output))
       val projectionFunc = (expr: Expression) => expr transformDown {
         case projectionOverSchema(newExpr) => newExpr
       }
+
+      // Remap pushed filter attributes to the pruned output schema and drop filters
+      // whose references are no longer in the pruned output.
+      val remappedPushedFilters = sHolder.pushedFilterExpressions.map(projectionFunc)
+        .filter(_.references.subsetOf(AttributeSet(output)))
+      val scanRelation = DataSourceV2ScanRelation(sHolder.relation, wrappedScan, output,
+        pushedFilters = remappedPushedFilters)
 
       val finalFilters = normalizedFilters.map(projectionFunc)
       // bottom-most filters are put in the left of the list.
@@ -573,6 +586,8 @@ case class ScanBuilderHolder(
   var pushedAggregate: Option[Aggregation] = None
 
   var pushedAggOutputMap: AttributeMap[Expression] = AttributeMap.empty[Expression]
+
+  var pushedFilterExpressions: Seq[Expression] = Seq.empty
 }
 
 // A wrapper for v1 scan to carry the translated filters and the handled ones, along with

@@ -133,4 +133,9 @@ case class ParquetScan(
       Map("PushedAggregation" -> pushedAggregationsStr) ++
       Map("PushedGroupBy" -> pushedGroupByStr)
   }
+
+  // SupportsScanMerging hook (generic logic in FileScan): Parquet disables merging when an
+  // aggregate is pushed. (This 4.0.x backport has no variant-extraction pushdown, so unlike the
+  // upstream-master version there is no extra variant state to match in `canMergeScanStateWith`.)
+  override protected def hasAggregatePushedDown: Boolean = pushedAggregate.nonEmpty
 }
