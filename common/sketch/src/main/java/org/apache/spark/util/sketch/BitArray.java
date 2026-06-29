@@ -50,14 +50,26 @@ final class BitArray {
     this.bitCount = bitCount;
   }
 
-  /** Returns true if the bit changed value. */
+  /**
+   * Sets the bit at {@code index}. Returns {@code true} if the bit changed value.
+   *
+   * <p>This is the hot path for {@code BloomFilter.put}: it runs {@code numHashFunctions}
+   * times per inserted element. We load {@code data[wordIndex]} once and test the bit
+   * against that pre-image, instead of the previous form that read the word twice (once in
+   * {@code get}, once in the set branch). When the bit is already set we return without
+   * writing, preserving the original "no redundant store" behavior; {@link #cardinality()}
+   * stays O(1) because {@code bitCount} is only bumped when a bit actually flipped.
+   */
   boolean set(long index) {
-    if (!get(index)) {
-      data[(int) (index >>> 6)] |= (1L << index);
-      bitCount++;
-      return true;
+    int wordIndex = (int) (index >>> 6);
+    long mask = 1L << index;
+    long old = data[wordIndex];
+    if ((old & mask) != 0) {
+      return false;
     }
-    return false;
+    data[wordIndex] = old | mask;
+    bitCount++;
+    return true;
   }
 
   boolean get(long index) {
