@@ -25,7 +25,7 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.analysis.{EmptyFunctionRegistry, FakeV2SessionCatalog, NoSuchNamespaceException}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog => V1InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 class CatalogManagerSuite extends SparkFunSuite with SQLHelper {
@@ -124,6 +124,109 @@ class CatalogManagerSuite extends SparkFunSuite with SQLHelper {
         intercept[NoSuchNamespaceException] {
           catalogManager.setCurrentNamespace(Array("ns1", "ns2"))
         }
+      }
+    }
+  }
+
+  test("session catalog alias resolves to the session catalog") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    withSQLConf(SQLConf.SESSION_CATALOG_ALIAS.key -> "spark_alias_catalog") {
+      val viaAlias = catalogManager.catalog("spark_alias_catalog")
+      assert(viaAlias.name() == CatalogManager.SESSION_CATALOG_NAME)
+      // The alias resolves to the very same instance as the canonical session catalog name.
+      assert(viaAlias eq catalogManager.catalog(CatalogManager.SESSION_CATALOG_NAME))
+      // Alias comparison is case-insensitive, matching the canonical name handling.
+      assert(catalogManager.catalog("SPARK_ALIAS_CATALOG").name() ==
+        CatalogManager.SESSION_CATALOG_NAME)
+      assert(catalogManager.isCatalogRegistered("spark_alias_catalog"))
+    }
+  }
+
+  test("session catalog alias works as current/default catalog") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    withSQLConf(SQLConf.SESSION_CATALOG_ALIAS.key -> "spark_alias_catalog") {
+      catalogManager.setCurrentCatalog("spark_alias_catalog")
+      assert(catalogManager.currentCatalog.name() == CatalogManager.SESSION_CATALOG_NAME)
+
+      withSQLConf(SQLConf.DEFAULT_CATALOG.key -> "spark_alias_catalog") {
+        val freshManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+        assert(freshManager.currentCatalog.name() == CatalogManager.SESSION_CATALOG_NAME)
+      }
+    }
+  }
+
+  test("setCurrentCatalog with the session catalog alias is a noop and keeps the namespace") {
+    val v1SessionCatalog = createSessionCatalog()
+    v1SessionCatalog.createDatabase(
+      CatalogDatabase("test", "", v1SessionCatalog.getDefaultDBPath("test"), Map.empty),
+      ignoreIfExists = false)
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, v1SessionCatalog)
+    withSQLConf(SQLConf.SESSION_CATALOG_ALIAS.key -> "spark_alias_catalog") {
+      catalogManager.setCurrentNamespace(Array("test"))
+      assert(catalogManager.currentNamespace.sameElements(Array("test")))
+      // Switching to the alias while already on the (canonical) session catalog must be a noop,
+      // i.e. the current namespace must NOT be reset. Before the normalization fix, the noop
+      // guard was defeated by the alias and this reset the namespace to "default".
+      catalogManager.setCurrentCatalog("spark_alias_catalog")
+      assert(catalogManager.currentNamespace.sameElements(Array("test")))
+    }
+  }
+
+  test("setCurrentCatalog stores the canonical name so it survives the alias being unset") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    withSQLConf(
+      "spark.sql.catalog.other" -> classOf[DummyCatalog].getName,
+      SQLConf.SESSION_CATALOG_ALIAS.key -> "spark_alias_catalog") {
+      // Start on a non-session catalog so that switching to the alias actually runs the "switch"
+      // branch of setCurrentCatalog (the guard is true), exercising the storage of the
+      // normalized name into `_currentCatalogName`.
+      catalogManager.setCurrentCatalog("other")
+      catalogManager.setCurrentCatalog("spark_alias_catalog")
+    }
+    // Both configs are now unset. Because `setCurrentCatalog` normalized and stored the canonical
+    // name (not the raw alias string), resolving the current catalog must still work. If the raw
+    // alias had been stored, `currentCatalog` would call `catalog(alias)` and throw
+    // CatalogNotFoundException.
+    assert(catalogManager.currentCatalog.name() == CatalogManager.SESSION_CATALOG_NAME)
+  }
+
+  test("session catalog alias shadows a same-named registered catalog") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    withSQLConf(
+      "spark.sql.catalog.spark_alias_catalog" -> classOf[DummyCatalog].getName,
+      SQLConf.SESSION_CATALOG_ALIAS.key -> "spark_alias_catalog") {
+      // The alias branch is checked before loading a plugin, so the alias wins and resolves to
+      // the session catalog rather than the registered DummyCatalog.
+      assert(catalogManager.catalog("spark_alias_catalog").name() ==
+        CatalogManager.SESSION_CATALOG_NAME)
+    }
+  }
+
+  test("session catalog alias is not registered when unset") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    intercept[CatalogNotFoundException] {
+      catalogManager.catalog("spark_alias_catalog")
+    }
+    assert(!catalogManager.isCatalogRegistered("spark_alias_catalog"))
+  }
+
+  test("session catalog alias equal to global temp database is ignored") {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, createSessionCatalog())
+    val globalTempDB = SQLConf.get.getConf(StaticSQLConf.GLOBAL_TEMP_DATABASE)
+    withSQLConf(SQLConf.SESSION_CATALOG_ALIAS.key -> globalTempDB) {
+      // A multi-part identifier whose head equals the global temp database is handled by a
+      // dedicated branch before catalog resolution, so such an alias must be ignored here.
+      intercept[CatalogNotFoundException] {
+        catalogManager.catalog(globalTempDB)
+      }
+    }
+  }
+
+  test("an illegal session catalog alias is rejected when set") {
+    // Dotted, blank, empty, and whitespace-padded aliases are all rejected at set time.
+    Seq("a.b", " ", "", " spark_alias_catalog ").foreach { illegal =>
+      intercept[IllegalArgumentException] {
+        withSQLConf(SQLConf.SESSION_CATALOG_ALIAS.key -> illegal) {}
       }
     }
   }

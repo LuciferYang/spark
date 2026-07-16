@@ -65,6 +65,19 @@ class CatalogTestsMixin:
             self.assertEqual(db.name, "some_db")
             self.assertEqual(db.catalog, "spark_catalog")
 
+    def test_session_catalog_alias(self):
+        # SPARK-52472: an alias configured via spark.sql.sessionCatalogAlias resolves to the
+        # built-in session catalog. Resolution happens entirely on the JVM side, so the thin
+        # PySpark wrappers (setCurrentCatalog/currentCatalog) pick it up transparently.
+        spark = self.spark
+        with self.sql_conf({"spark.sql.sessionCatalogAlias": "spark_alias_catalog"}):
+            try:
+                spark.catalog.setCurrentCatalog("spark_alias_catalog")
+                # The resolved catalog's canonical name is still spark_catalog.
+                self.assertEqual(spark.catalog.currentCatalog(), "spark_catalog")
+            finally:
+                spark.catalog.setCurrentCatalog("spark_catalog")
+
     def test_list_tables(self):
         from pyspark.sql.catalog import Table
 

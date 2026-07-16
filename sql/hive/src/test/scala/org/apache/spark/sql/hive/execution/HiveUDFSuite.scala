@@ -37,6 +37,7 @@ import org.apache.spark.{SparkException, SparkFiles, TestUtils}
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row}
 import org.apache.spark.sql.catalyst.expressions.CodegenObjectFactoryMode
 import org.apache.spark.sql.catalyst.plans.logical.Project
+import org.apache.spark.sql.connector.catalog.CatalogManager.SESSION_CATALOG_NAME
 import org.apache.spark.sql.execution.WholeStageCodegenExec
 import org.apache.spark.sql.functions.{call_function, max}
 import org.apache.spark.sql.hive.test.TestHiveSingleton
@@ -564,6 +565,47 @@ class HiveUDFSuite extends QueryTest with TestHiveSingleton with SQLTestUtils {
           call_function("default.custom_avg", $"id"),
           call_function("spark_catalog.default.custom_avg", $"id")),
         Row(2.0, 2.0, 2.0))
+    }
+  }
+
+  test("SPARK-BAIDU: invoke a persistent Hive function via the session catalog alias") {
+    val testData = spark.range(5).repartition(1)
+    withSQLConf("spark.sql.sessionCatalogAlias" -> "spark_alias_catalog") {
+      withUserDefinedFunction("custom_avg" -> false) {
+        sql(s"CREATE FUNCTION custom_avg AS '${classOf[GenericUDAFAverage].getName}'")
+        // Referencing the persistent function via the alias yields the same result as the
+        // canonical session catalog name.
+        checkAnswer(
+          testData.select(
+            call_function("spark_catalog.default.custom_avg", $"id"),
+            call_function("spark_alias_catalog.default.custom_avg", $"id")),
+          Row(2.0, 2.0))
+        // The pure-SQL path resolves through the analyzer as well.
+        checkAnswer(
+          sql("SELECT spark_alias_catalog.default.custom_avg(id) FROM range(5)"),
+          Row(2.0))
+        // DESCRIBE still shows the canonical catalog name (downstream name() is always canonical).
+        checkKeywordsExist(
+          sql("DESCRIBE FUNCTION spark_alias_catalog.default.custom_avg"),
+          s"Function: $SESSION_CATALOG_NAME.default.custom_avg")
+      }
+    }
+  }
+
+  test("SPARK-BAIDU: a view whose body references the session catalog alias round-trips") {
+    withUserDefinedFunction("custom_avg" -> false) {
+      sql(s"CREATE FUNCTION custom_avg AS '${classOf[GenericUDAFAverage].getName}'")
+      withView("v_alias") {
+        // Create the view while the alias is active; CREATE VIEW captures the (modifiable) alias
+        // config into the view properties.
+        withSQLConf("spark.sql.sessionCatalogAlias" -> "spark_alias_catalog") {
+          sql("CREATE VIEW v_alias AS " +
+            "SELECT spark_alias_catalog.default.custom_avg(id) AS a FROM range(5)")
+        }
+        // Query the view with the alias NO LONGER set: it must still resolve, proving the alias
+        // config was captured into the view and replayed at view-resolution time.
+        checkAnswer(sql("SELECT a FROM v_alias"), Row(2.0))
+      }
     }
   }
 

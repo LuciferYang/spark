@@ -4495,6 +4495,25 @@ object SQLConf {
       }
       .createWithDefault("builtin")
 
+  val SESSION_CATALOG_ALIAS = buildConf("spark.sql.sessionCatalogAlias")
+    .internal()
+    .doc(s"An optional alias for the built-in session catalog ($SESSION_CATALOG_NAME). When " +
+      "set, referencing a catalog by this alias resolves to the session catalog. For example, " +
+      "if set to 'spark_alias_catalog', then 'spark_alias_catalog.db.tbl' refers to the same " +
+      s"table as '$SESSION_CATALOG_NAME.db.tbl'. The alias takes precedence: if it collides " +
+      "with a catalog registered via 'spark.sql.catalog.<name>', the alias wins and shadows " +
+      "that catalog. The alias must be a single non-blank identifier without dots, and must " +
+      "not equal the global temp database name; such values are rejected or ignored. Treat " +
+      "this as a session-start setting: changing or unsetting it after it has been used as the " +
+      "current/default catalog is not supported.")
+    .version("4.0.0")
+    .stringConf
+    .checkValue(
+      alias => alias.nonEmpty && alias == alias.trim && !alias.contains("."),
+      "The session catalog alias must be a single identifier without dots or " +
+        "surrounding whitespace.")
+    .createOptional
+
   object MapKeyDedupPolicy extends Enumeration {
     val EXCEPTION, LAST_WIN = Value
   }

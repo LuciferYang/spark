@@ -19,12 +19,13 @@ package org.apache.spark.sql.connector.catalog
 
 import scala.collection.mutable
 
-import org.apache.spark.internal.Logging
+import org.apache.spark.internal.{Logging, MDC}
+import org.apache.spark.internal.LogKeys.CATALOG_NAME
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.catalog.{SessionCatalog, TempVariableManager}
 import org.apache.spark.sql.catalyst.util.StringUtils
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 
 /**
  * A thread-safe manager for [[CatalogPlugin]]s. It tracks all the registered catalogs, and allow
@@ -46,11 +47,39 @@ class CatalogManager(
 
   private val catalogs = mutable.HashMap.empty[String, CatalogPlugin]
 
+  // Warns at most once when the configured session catalog alias collides with the global temp
+  // database name (in which case the alias is silently ignored, see `isSessionCatalogName`).
+  private val aliasGlobalTempWarned = new java.util.concurrent.atomic.AtomicBoolean(false)
+
   // TODO: create a real SYSTEM catalog to host `TempVariableManager` under the SESSION namespace.
   val tempVariableManager: TempVariableManager = new TempVariableManager
 
+  /**
+   * Returns true if `name` refers to the built-in session catalog, either by its canonical name
+   * `spark_catalog` or by the optional alias configured via `spark.sql.sessionCatalogAlias`.
+   *
+   * An alias that equals the global temp database name is ignored (a multi-part identifier whose
+   * head equals the global temp database is handled by a dedicated branch in `LookupCatalog`
+   * before catalog resolution, so such an alias would never take effect); we warn once so the
+   * misconfiguration is visible instead of failing silently.
+   */
+  private def isSessionCatalogName(name: String): Boolean = {
+    name.equalsIgnoreCase(SESSION_CATALOG_NAME) ||
+      conf.getConf(SQLConf.SESSION_CATALOG_ALIAS).exists { alias =>
+        if (alias.equalsIgnoreCase(conf.getConf(StaticSQLConf.GLOBAL_TEMP_DATABASE))) {
+          if (aliasGlobalTempWarned.compareAndSet(false, true)) {
+            logWarning(log"Session catalog alias '${MDC(CATALOG_NAME, alias)}' equals the " +
+              log"global temp database name and is therefore ignored.")
+          }
+          false
+        } else {
+          alias.equalsIgnoreCase(name)
+        }
+      }
+  }
+
   def catalog(name: String): CatalogPlugin = synchronized {
-    if (name.equalsIgnoreCase(SESSION_CATALOG_NAME)) {
+    if (isSessionCatalogName(name)) {
       v2SessionCatalog
     } else {
       catalogs.getOrElseUpdate(name, Catalogs.load(name, conf))
@@ -133,10 +162,16 @@ class CatalogManager(
   }
 
   def setCurrentCatalog(catalogName: String): Unit = synchronized {
+    // Normalize an alias of the session catalog to its canonical name, so that the noop guard
+    // below (which compares against `currentCatalog.name()`, always the canonical name) is not
+    // defeated by the alias, and `_currentCatalogName` never stores an alias string that could
+    // stop resolving if the alias config is later changed or unset.
+    val normalizedName =
+      if (isSessionCatalogName(catalogName)) SESSION_CATALOG_NAME else catalogName
     // `setCurrentCatalog` is noop if it doesn't switch to a different catalog.
-    if (currentCatalog.name() != catalogName) {
-      catalog(catalogName)
-      _currentCatalogName = Some(catalogName)
+    if (currentCatalog.name() != normalizedName) {
+      catalog(normalizedName)
+      _currentCatalogName = Some(normalizedName)
       _currentNamespace = None
       // Reset the current database of v1 `SessionCatalog` when switching current catalog, so that
       // when we switch back to session catalog, the current namespace definitely is ["default"].
