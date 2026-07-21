@@ -21,15 +21,15 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
-import org.apache.spark.sql.catalyst.expressions.{Attribute, LeafExpression, Unevaluable}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, LeafExpression, Unevaluable}
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, Statistics}
 import org.apache.spark.sql.catalyst.trees.TreePattern.{TreePattern, UNRESOLVED_FUNC, UNRESOLVED_PROCEDURE}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
-import org.apache.spark.sql.catalyst.util.CharVarcharUtils
-import org.apache.spark.sql.connector.catalog.{CatalogPlugin, FunctionCatalog, Identifier, ProcedureCatalog, Table, TableCatalog}
+import org.apache.spark.sql.catalyst.util.{removeInternalMetadata, CharVarcharUtils}
+import org.apache.spark.sql.connector.catalog.{CatalogPlugin, FunctionCatalog, Identifier, ProcedureCatalog, Table, TableCatalog, TableFunctionCatalog}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.connector.catalog.TableChange.ColumnPosition
-import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
+import org.apache.spark.sql.connector.catalog.functions.{BoundTableFunction, UnboundFunction}
 import org.apache.spark.sql.connector.catalog.procedures.Procedure
 import org.apache.spark.sql.types.{DataType, StructField}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -224,6 +224,63 @@ case class ResolvedProcedure(
     ident: Identifier,
     procedure: Procedure) extends LeafNodeWithoutStats {
   override def output: Seq[Attribute] = Nil
+}
+
+/**
+ * A scalar-argument table-valued function resolved against a [[TableFunctionCatalog]], carrying
+ * the bound function and its (foldable) scalar arguments. The optimizer rule
+ * `EvalTableValuedFunctions` replaces this with a real relation by evaluating the arguments and
+ * wrapping the function as a read-only V2 table; the analyzer rule `InvokeTableFunctions` only
+ * validates it. `output` is derived from the bound function's result schema, so the plan is
+ * considered resolved.
+ *
+ * `output` is a constructor parameter (computed once by the [[TableValuedFunctionRelation$]]
+ * factory), not a recomputed `lazy val`: this node survives into the optimizer, so `copy()` during
+ * plan transformation must preserve the SAME output attribute instances (exprIds). Recomputing
+ * `toAttributes(...)` on each copy would mint fresh exprIds and leave parent references dangling
+ * (as `DataSourceV2Relation`/`LocalRelation` also carry `output` as a field for this reason).
+ *
+ * The result schema is run through the same CHAR/VARCHAR replacement and internal-metadata
+ * stripping as [[org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation.create]], so a
+ * connector that reports CHAR/VARCHAR columns (which the engine does not support on output) or
+ * leaks internal column metadata does not surface those on the relation's output.
+ */
+case class TableValuedFunctionRelation(
+    catalog: TableFunctionCatalog,
+    ident: Identifier,
+    function: BoundTableFunction,
+    arguments: Seq[Expression],
+    output: Seq[AttributeReference])
+  extends LeafNodeWithoutStats with MultiInstanceRelation {
+
+  // Renew output attribute exprIds for self-join / duplicate-relation deduplication.
+  override def newInstance(): TableValuedFunctionRelation =
+    copy(output = output.map(_.newInstance()))
+
+  // Render the qualified function name instead of the opaque BoundTableFunction hash, so EXPLAIN
+  // and plan dumps stay stable and readable.
+  override protected def stringArgs: Iterator[Any] =
+    Iterator(catalog, ident, (catalog.name +: ident.namespace :+ ident.name).quoted, arguments)
+}
+
+object TableValuedFunctionRelation {
+  /**
+   * Builds the relation, computing its output attributes once from the bound function's result
+   * schema (CHAR/VARCHAR replaced with string, internal metadata stripped -- matching
+   * `DataSourceV2Relation.create`). Callers use this instead of the raw case-class constructor so
+   * output attributes are minted exactly once and preserved across plan copies.
+   */
+  def apply(
+      catalog: TableFunctionCatalog,
+      ident: Identifier,
+      function: BoundTableFunction,
+      arguments: Seq[Expression]): TableValuedFunctionRelation = {
+    val output = toAttributes(
+      removeInternalMetadata(
+        CharVarcharUtils.replaceCharVarcharWithStringInSchema(function.resultSchema()),
+        keepFieldIds = true))
+    new TableValuedFunctionRelation(catalog, ident, function, arguments, output)
+  }
 }
 
 /**

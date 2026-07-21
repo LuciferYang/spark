@@ -24,7 +24,7 @@ import scala.util.control.NonFatal
 import org.apache.hadoop.hive.ql.exec.{UDAF, UDF}
 import org.apache.hadoop.hive.ql.udf.generic.{AbstractGenericUDAFResolver, GenericUDF, GenericUDTF}
 
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, EvalSubqueriesForTimeTravel, InvokeProcedures, ReplaceCharWithVarchar, ResolveDataSource, ResolveEventTimeWatermark, ResolveExecuteImmediate, ResolveMetricView, ResolveSessionCatalog, ResolveTranspose}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, EvalSubqueriesForTimeTravel, InvokeProcedures, InvokeTableFunctions, ReplaceCharWithVarchar, ResolveDataSource, ResolveEventTimeWatermark, ResolveExecuteImmediate, ResolveMetricView, ResolveSessionCatalog, ResolveTranspose}
 import org.apache.spark.sql.catalyst.analysis.resolver.ResolverExtension
 import org.apache.spark.sql.catalyst.catalog.{ExternalCatalogWithListener, InvalidUDFClassException}
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExtractSemiStructuredFields}
@@ -133,6 +133,7 @@ class HiveSessionStateBuilder(
         new ResolveTranspose(session) +:
         ResolveMetricView(session) +:
         new InvokeProcedures(session) +:
+        new InvokeTableFunctions(session) +:
         ResolveExecuteImmediate(session, catalogManager) +:
         ExtractSemiStructuredFields +:
         ResolveEventTimeWatermark +:

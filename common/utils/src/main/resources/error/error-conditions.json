@@ -7591,6 +7591,12 @@
     ],
     "sqlState" : "22023"
   },
+  "TABLE_VALUED_FUNCTION_REQUIRES_FOLDABLE_ARGUMENTS" : {
+    "message" : [
+      "The table-valued function <functionName> requires all of its arguments to be constant (foldable) expressions."
+    ],
+    "sqlState" : "42K08"
+  },
   "TABLE_VALUED_FUNCTION_TOO_MANY_TABLE_ARGUMENTS" : {
     "message" : [
       "There are too many table arguments for table-valued function.",
@@ -7598,6 +7604,13 @@
       "If you want to allow it, please set \"spark.sql.allowMultipleTableArguments.enabled\" to \"true\""
     ],
     "sqlState" : "54023"
+  },
+  "TABLE_VALUED_FUNCTION_WITH_TABLE_ARGUMENT_UNSUPPORTED" : {
+    "message" : [
+      "The table-valued function <functionName> is provided by a catalog that does not yet support TABLE arguments.",
+      "Only scalar arguments are supported."
+    ],
+    "sqlState" : "0A000"
   },
   "TASK_WRITE_FAILED" : {
     "message" : [

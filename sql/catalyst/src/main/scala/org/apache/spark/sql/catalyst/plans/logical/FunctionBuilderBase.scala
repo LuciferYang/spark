@@ -19,6 +19,7 @@ package org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.analysis.Resolver
 import org.apache.spark.sql.catalyst.expressions.{Expression, NamedArgumentExpression}
 import org.apache.spark.sql.catalyst.util.ResolveDefaultColumns
+import org.apache.spark.sql.connector.catalog.functions.{BoundTableFunction, TableFunctionParameter}
 import org.apache.spark.sql.connector.catalog.procedures.{BoundProcedure, ProcedureParameter}
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.util.ArrayImplicits._
@@ -146,9 +147,27 @@ object NamedParametersSupport {
       resolver)
   }
 
+  final def defaultRearrange(
+      function: BoundTableFunction,
+      args: Seq[Expression],
+      resolver: Resolver): Seq[Expression] = {
+    defaultRearrange(
+      function.name,
+      function.parameters.map(toInputParameter).toSeq,
+      args,
+      resolver)
+  }
+
   private def toInputParameter(param: ProcedureParameter): InputParameter = {
     val defaultValueExpr = Option(param.defaultValue).map { defaultValue =>
       ResolveDefaultColumns.analyze(param.name, param.dataType, defaultValue, "CALL")
+    }
+    InputParameter(param.name, defaultValueExpr)
+  }
+
+  private def toInputParameter(param: TableFunctionParameter): InputParameter = {
+    val defaultValueExpr = Option(param.defaultValue).map { defaultValue =>
+      ResolveDefaultColumns.analyze(param.name, param.dataType, defaultValue, "TABLE_FUNCTION")
     }
     InputParameter(param.name, defaultValueExpr)
   }

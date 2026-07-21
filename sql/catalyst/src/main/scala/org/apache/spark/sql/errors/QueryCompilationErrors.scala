@@ -2462,6 +2462,18 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
       messageParameters = Map("plugin" -> plugin.name))
   }
 
+  def tableValuedFunctionWithTableArgumentUnsupportedError(functionName: String): Throwable = {
+    new AnalysisException(
+      errorClass = "TABLE_VALUED_FUNCTION_WITH_TABLE_ARGUMENT_UNSUPPORTED",
+      messageParameters = Map("functionName" -> toSQLId(functionName)))
+  }
+
+  def tableValuedFunctionRequiresFoldableArgsError(functionName: String): Throwable = {
+    new AnalysisException(
+      errorClass = "TABLE_VALUED_FUNCTION_REQUIRES_FOLDABLE_ARGUMENTS",
+      messageParameters = Map("functionName" -> toSQLId(functionName)))
+  }
+
   def missingCatalogCreateFunctionAbilityError(plugin: CatalogPlugin): Throwable = {
     new AnalysisException(
       errorClass = "MISSING_CATALOG_ABILITY.CREATE_FUNCTION",
@@ -2710,6 +2722,22 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
       errorClass = "_LEGACY_ERROR_TEMP_1198",
       messageParameters = Map(
         "unbound" -> unbound.name,
+        "arguments" -> arguments.map(_.dataType.simpleString).mkString(", "),
+        "unsupported" -> unsupported.getMessage),
+      cause = Some(unsupported))
+  }
+
+  def tableFunctionCannotProcessInputError(
+      name: String,
+      arguments: Seq[Expression],
+      unsupported: UnsupportedOperationException): Throwable = {
+    // Mirrors `functionCannotProcessInputError` (the scalar V2 function path) so a connector that
+    // rejects its input by throwing from `bind()` surfaces a clean analysis error rather than an
+    // internal error.
+    new AnalysisException(
+      errorClass = "_LEGACY_ERROR_TEMP_1198",
+      messageParameters = Map(
+        "unbound" -> name,
         "arguments" -> arguments.map(_.dataType.simpleString).mkString(", "),
         "unsupported" -> unsupported.getMessage),
       cause = Some(unsupported))

@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, SQLConfHelper}
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, NamedParametersSupport}
 import org.apache.spark.sql.connector.catalog.{
   CatalogManager,
   CatalogNotFoundException,
@@ -36,7 +36,8 @@ import org.apache.spark.sql.connector.catalog.{
   CatalogV2Util,
   Identifier,
   LookupCatalog,
-  ProcedureCatalog
+  ProcedureCatalog,
+  TableFunctionCatalog
 }
 
 /**
@@ -56,7 +57,9 @@ object FunctionType {
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.connector.catalog.functions.{
   AggregateFunction => V2AggregateFunction,
+  BoundTableFunction,
   ScalarFunction,
+  TableFunctionParameter,
   UnboundFunction
 }
 import org.apache.spark.sql.errors.{DataTypeErrorsBase, QueryCompilationErrors}
@@ -272,8 +275,11 @@ class FunctionResolution(
         if (CatalogV2Util.isSessionCatalog(catalog)) {
           Some(v1SessionCatalog.resolvePersistentTableFunction(
             ident.asFunctionIdentifier, arguments))
-        } else {
-          throw QueryCompilationErrors.missingCatalogTableValuedFunctionsAbilityError(catalog)
+        } else catalog match {
+          case tfc: TableFunctionCatalog =>
+            Some(resolveV2TableFunction(tfc, ident, arguments))
+          case _ =>
+            throw QueryCompilationErrors.missingCatalogTableValuedFunctionsAbilityError(catalog)
         }
       } catch {
         case _: NoSuchFunctionException | _: NoSuchNamespaceException |
@@ -289,6 +295,102 @@ class FunctionResolution(
   }
 
   /**
+   * Resolve a scalar-argument table-valued function against a V2 [[TableFunctionCatalog]].
+   *
+   * PR1 handles scalar arguments only. A TABLE(...) argument (carried as a
+   * [[FunctionTableSubqueryArgumentExpression]]) is rejected -- but only after the function is
+   * confirmed to exist, so that a genuine "no such function" is reported as such rather than being
+   * masked by the unsupported-table-argument error. Named arguments are supported: the function
+   * reports its
+   * [[org.apache.spark.sql.connector.catalog.functions.TableFunctionParameter parameters]] and
+   * Spark rearranges the call-site arguments into positional order (same mechanism as procedures).
+   * After rearrangement each argument is implicitly cast to the declared parameter type and the
+   * result validated, mirroring `ProcedureArgumentCoercion` + `Call.checkArgTypes`, so a type
+   * mismatch is a clean analysis-time error rather than an executor-side `ClassCastException`.
+   */
+  private def resolveV2TableFunction(
+      catalog: TableFunctionCatalog,
+      ident: Identifier,
+      arguments: Seq[Expression]): LogicalPlan = {
+    // Load first: a miss throws NoSuchFunctionException, so a genuinely absent function reports
+    // "no such function" rather than being masked by the TABLE-argument rejection below.
+    val unbound = catalog.loadTableFunction(ident)
+    // Reject a TABLE argument before binding: the function is known to exist, and a scalar-only
+    // connector should not have to handle a struct-typed TABLE argument in bind() merely for Spark
+    // to reject it -- the specific unsupported-table-argument error is clearer than whatever bind()
+    // might throw for an unexpected input shape. A TABLE argument may be passed positionally or by
+    // name (wrapped in a NamedArgumentExpression), so check both -- mirroring the wrappers that
+    // `UserDefinedPythonFunction.builder` matches.
+    val hasTableArgument = arguments.exists {
+      case _: FunctionTableSubqueryArgumentExpression => true
+      case NamedArgumentExpression(_, _: FunctionTableSubqueryArgumentExpression) => true
+      case _ => false
+    }
+    if (hasTableArgument) {
+      throw QueryCompilationErrors.tableValuedFunctionWithTableArgumentUnsupportedError(
+        (catalog.name +: ident.namespace :+ ident.name).mkString("."))
+    }
+    // Preserve by-name argument info in the bind input type so the function can pick an overload,
+    // mirroring `BindProcedures.extractInputType` (positional fields get `param$index` names, not
+    // empty names, so a connector inspecting field names sees distinct, non-empty identifiers).
+    val inputType = StructType(arguments.zipWithIndex.map {
+      case (NamedArgumentExpression(name, value), _) =>
+        StructField(name, value.dataType, value.nullable,
+          new MetadataBuilder()
+            .putBoolean(TableFunctionParameter.BY_NAME_METADATA_KEY, value = true).build())
+      case (arg, index) =>
+        StructField(s"param$index", arg.dataType, arg.nullable)
+    })
+    // A connector may validate types by throwing from bind(); translate that into a clean
+    // analysis error rather than letting it surface as an internal error (mirrors the scalar V2
+    // function path in `resolveV2Function`).
+    val bound = try {
+      unbound.bind(inputType)
+    } catch {
+      case unsupported: UnsupportedOperationException =>
+        throw QueryCompilationErrors.tableFunctionCannotProcessInputError(
+          (catalog.name +: ident.namespace :+ ident.name).mkString("."), arguments, unsupported)
+    }
+    // Rearrange named/positional arguments into the parameter order the bound function reports.
+    val rearranged =
+      NamedParametersSupport.defaultRearrange(bound, arguments, conf.resolver)
+    // Implicitly cast each argument to its declared parameter type and validate, so a mismatch is
+    // reported at analysis time (mirrors `ProcedureArgumentCoercion` + `Call.checkArgTypes`).
+    val coerced = coerceAndValidateTableFunctionArgs(catalog, ident, bound, rearranged)
+    TableValuedFunctionRelation(catalog, ident, bound, coerced)
+  }
+
+  /**
+   * Implicitly casts each rearranged scalar argument to the corresponding parameter's declared
+   * type and validates the result, throwing `UNEXPECTED_INPUT_TYPE` when a cast is not possible.
+   */
+  private def coerceAndValidateTableFunctionArgs(
+      catalog: TableFunctionCatalog,
+      ident: Identifier,
+      bound: BoundTableFunction,
+      rearranged: Seq[Expression]): Seq[Expression] = {
+    val parameters = bound.parameters()
+    // `defaultRearrange` produces exactly one argument per declared parameter; guard against a
+    // non-deterministic connector returning a different `parameters()` here, which would otherwise
+    // silently drop coercion/validation for the trailing arguments via `zip`.
+    assert(rearranged.length == parameters.length,
+      s"rearranged argument count ${rearranged.length} does not match parameter count " +
+        s"${parameters.length} for table-valued function " +
+        (catalog.name +: ident.namespace :+ ident.name).mkString("."))
+    val typeCoercion = if (conf.ansiEnabled) AnsiTypeCoercion else TypeCoercion
+    rearranged.zip(parameters).zipWithIndex.map { case ((arg, param), index) =>
+      val expectedType = param.dataType()
+      val coerced = typeCoercion.implicitCast(arg, expectedType).getOrElse(arg)
+      if (!DataType.equalsIgnoreCompatibleNullability(coerced.dataType, expectedType)) {
+        throw QueryCompilationErrors.unexpectedInputDataTypeError(
+          (catalog.name +: ident.namespace :+ ident.name).mkString("."),
+          index + 1, expectedType, arg)
+      }
+      coerced
+    }
+  }
+
+  /**
    * On table-function lookup failure, throw a clearer error if the name exists
    * as a non-table function.
    */
@@ -298,8 +400,12 @@ class FunctionResolution(
         if (v1SessionCatalog.isPersistentFunction(ident.asFunctionIdentifier)) {
           throw QueryCompilationErrors.notATableFunctionError(ident.name())
         }
-      } else if (catalog.asFunctionCatalog.functionExists(ident)) {
-        throw QueryCompilationErrors.notATableFunctionError(ident.name())
+      } else catalog match {
+        case _: TableFunctionCatalog =>
+          // A TableFunctionCatalog miss means no such TVF; nothing clearer to add here.
+        case _ if catalog.asFunctionCatalog.functionExists(ident) =>
+          throw QueryCompilationErrors.notATableFunctionError(ident.name())
+        case _ =>
       }
     } catch {
       case _: NoSuchFunctionException | _: NoSuchNamespaceException |
@@ -448,8 +554,9 @@ class FunctionResolution(
         try {
           candidate match {
             case CatalogAndIdentifier(catalog, ident) =>
-              if (catalog.asFunctionCatalog.functionExists(ident)) {
-                return FunctionType.Persistent
+              externalFunctionType(catalog, ident) match {
+                case Some(t) => return t
+                case None =>
               }
             case _ =>
           }
@@ -466,12 +573,52 @@ class FunctionResolution(
     }
 
     val CatalogAndIdentifier(catalog, ident) = relationResolution.expandIdentifier(nameParts)
-    if (catalog.asFunctionCatalog.functionExists(ident)) {
-      return FunctionType.Persistent
-    }
+    externalFunctionType(catalog, ident).getOrElse(FunctionType.NotFound)
+  }
 
-    // Function doesn't exist anywhere
-    FunctionType.NotFound
+  /**
+   * Classifies an identifier against an external catalog as a persistent scalar function
+   * ([[FunctionType.Persistent]]), a table-valued function ([[FunctionType.TableOnly]]), or
+   * neither ([[None]]). Preserves the pre-TVF behavior of raising
+   * `MISSING_CATALOG_ABILITY.FUNCTIONS` when the catalog is neither a [[FunctionCatalog]] nor a
+   * [[TableFunctionCatalog]] (so a scalar reference against a plain table catalog still reports
+   * the missing-ability error rather than a generic "unresolved routine").
+   */
+  private def externalFunctionType(
+      catalog: CatalogPlugin, ident: Identifier): Option[FunctionType] = {
+    if (catalog.isFunctionCatalog && catalog.asFunctionCatalog.functionExists(ident)) {
+      Some(FunctionType.Persistent)
+    } else if (isTableFunctionOnlyCatalog(catalog, ident)) {
+      Some(FunctionType.TableOnly)
+    } else if (!catalog.isFunctionCatalog && !catalog.isInstanceOf[TableFunctionCatalog]) {
+      // Neither a function nor a table-function catalog: raise the original FUNCTIONS ability
+      // error (asFunctionCatalog throws MISSING_CATALOG_ABILITY.FUNCTIONS).
+      catalog.asFunctionCatalog
+      None
+    } else {
+      None
+    }
+  }
+
+  /** True if `catalog` is a [[TableFunctionCatalog]] that has a TVF named `ident`.
+   *
+   *  Loads the function purely as an existence probe and discards the result. This does not
+   *  double-load against [[resolveV2TableFunction]]: a real TVF call in the FROM clause is an
+   *  `UnresolvedTableValuedFunction` that goes straight through `resolveTableFunction`, which
+   *  never calls `lookupFunctionType`. This path fires only when a name used in a SCALAR function
+   *  position turns out to be a catalog TVF, to give a clearer "not a scalar function"
+   *  diagnostic. */
+  private def isTableFunctionOnlyCatalog(catalog: CatalogPlugin, ident: Identifier): Boolean = {
+    catalog match {
+      case tfc: TableFunctionCatalog =>
+        try {
+          tfc.loadTableFunction(ident)
+          true
+        } catch {
+          case _: NoSuchFunctionException | _: NoSuchNamespaceException => false
+        }
+      case _ => false
+    }
   }
 
   private def validateFunction(

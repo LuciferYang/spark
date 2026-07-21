@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.execution.datasources.{MarkSingleTaskExecution, PruneFileSourcePartitions, PushVariantIntoScan, SchemaPruning, V1Writes}
-import org.apache.spark.sql.execution.datasources.v2.{GroupBasedRowLevelOperationScanPlanning, OptimizeMetadataOnlyDeleteFromTable, V2ScanPartitioningAndOrdering, V2ScanRelationPushDown, V2Writes}
+import org.apache.spark.sql.execution.datasources.v2.{EvalTableValuedFunctions, GroupBasedRowLevelOperationScanPlanning, OptimizeMetadataOnlyDeleteFromTable, V2ScanPartitioningAndOrdering, V2ScanRelationPushDown, V2Writes}
 import org.apache.spark.sql.execution.dynamicpruning.{CleanupDynamicPruningFilters, PartitionPruning, RowLevelOperationRuntimeGroupFiltering}
 import org.apache.spark.sql.execution.python.{ExtractGroupingPythonUDFFromAggregate, ExtractPythonUDFFromAggregate, ExtractPythonUDFs, ExtractPythonUDTFs}
 
@@ -37,6 +37,10 @@ class SparkOptimizer(
   override def earlyScanPushDownRules: Seq[Rule[LogicalPlan]] =
     // TODO: move SchemaPruning into catalyst
     Seq(
+      // Lower resolved scalar-arg V2 table-valued functions to DSv2 read relations here, after
+      // FinishAnalysis has pinned clock-/calendar-dependent arguments, and before the scan
+      // pushdown rules below so the produced relation participates in pruning/pushdown.
+      EvalTableValuedFunctions,
       SchemaPruning,
       GroupBasedRowLevelOperationScanPlanning,
       V1Writes,
@@ -111,6 +115,9 @@ class SparkOptimizer(
       ExtractPythonUDFFromAggregate.ruleName,
       ExtractGroupingPythonUDFFromAggregate.ruleName,
       ExtractPythonUDFs.ruleName,
+      // Lowers V2 table-valued function relations to read relations; excluding it would leave an
+      // unexecutable TableValuedFunctionRelation in the plan, so it must not be excludable.
+      EvalTableValuedFunctions.ruleName,
       GroupBasedRowLevelOperationScanPlanning.ruleName,
       V2ScanRelationPushDown.ruleName,
       V2ScanPartitioningAndOrdering.ruleName,

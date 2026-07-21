@@ -23,10 +23,11 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.sql.catalyst.analysis.{NoSuchFunctionException, NoSuchNamespaceException}
-import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
+import org.apache.spark.sql.connector.catalog.functions.{UnboundFunction, UnboundTableFunction}
 import org.apache.spark.sql.connector.catalog.procedures.UnboundProcedure
 
-class InMemoryCatalog extends InMemoryTableCatalog with FunctionCatalog with ProcedureCatalog {
+class InMemoryCatalog extends InMemoryTableCatalog
+  with FunctionCatalog with ProcedureCatalog with TableFunctionCatalog {
   override def dropNamespace(namespace: Array[String], cascade: Boolean): Boolean = {
     if (cascade) {
       // SPARK-55982: Remove functions and procedures in this namespace before dropping.
@@ -81,5 +82,32 @@ class InMemoryCatalog extends InMemoryTableCatalog with FunctionCatalog with Pro
 
   def clearProcedures(): Unit = {
     procedures.clear()
+  }
+
+  protected val tableFunctions: util.Map[Identifier, UnboundTableFunction] =
+    new ConcurrentHashMap[Identifier, UnboundTableFunction]()
+
+  override def listTableFunctions(namespace: Array[String]): Array[Identifier] = {
+    if (namespace.isEmpty || namespaceExists(namespace)) {
+      tableFunctions.keySet.asScala.filter(_.namespace.sameElements(namespace)).toArray
+    } else {
+      throw new NoSuchNamespaceException(namespace)
+    }
+  }
+
+  override def loadTableFunction(ident: Identifier): UnboundTableFunction = {
+    Option(tableFunctions.get(ident)) match {
+      case Some(func) => func
+      case _ => throw new NoSuchFunctionException(ident)
+    }
+  }
+
+  def createTableFunction(
+      ident: Identifier, fn: UnboundTableFunction): UnboundTableFunction = {
+    tableFunctions.put(ident, fn)
+  }
+
+  def clearTableFunctions(): Unit = {
+    tableFunctions.clear()
   }
 }
