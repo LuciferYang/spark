@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.util.control.NonFatal
 
+import org.apache.spark.SparkException
 import org.apache.spark.SparkThrowable
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
@@ -28,7 +29,8 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, SQLConfHelper}
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, NamedParametersSupport}
+import org.apache.spark.sql.catalyst.plans.logical.{Generate, LogicalPlan, NamedParametersSupport, OneRowRelation}
+import org.apache.spark.sql.catalyst.util.{removeInternalMetadata, CharVarcharUtils}
 import org.apache.spark.sql.connector.catalog.{
   CatalogManager,
   CatalogNotFoundException,
@@ -59,12 +61,15 @@ import org.apache.spark.sql.connector.catalog.functions.{
   AggregateFunction => V2AggregateFunction,
   BoundTableFunction,
   ScalarFunction,
+  SupportsTableArgument,
   TableFunctionParameter,
   UnboundFunction
 }
+import org.apache.spark.sql.connector.distributions.{ClusteredDistribution, UnspecifiedDistribution}
 import org.apache.spark.sql.errors.{DataTypeErrorsBase, QueryCompilationErrors}
 import org.apache.spark.sql.internal.connector.V1Function
 import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits._
 
 class FunctionResolution(
     override val catalogManager: CatalogManager,
@@ -295,55 +300,49 @@ class FunctionResolution(
   }
 
   /**
-   * Resolve a scalar-argument table-valued function against a V2 [[TableFunctionCatalog]].
+   * Resolve a table-valued function against a V2 [[TableFunctionCatalog]].
    *
-   * PR1 handles scalar arguments only. A TABLE(...) argument (carried as a
-   * [[FunctionTableSubqueryArgumentExpression]]) is rejected -- but only after the function is
-   * confirmed to exist, so that a genuine "no such function" is reported as such rather than being
-   * masked by the unsupported-table-argument error. Named arguments are supported: the function
-   * reports its
-   * [[org.apache.spark.sql.connector.catalog.functions.TableFunctionParameter parameters]] and
-   * Spark rearranges the call-site arguments into positional order (same mechanism as procedures).
-   * After rearrangement each argument is implicitly cast to the declared parameter type and the
-   * result validated, mirroring `ProcedureArgumentCoercion` + `Call.checkArgTypes`, so a type
-   * mismatch is a clean analysis-time error rather than an executor-side `ClassCastException`.
+   * Two shapes are supported, distinguished by whether a TABLE(...) argument (carried as a
+   * [[FunctionTableSubqueryArgumentExpression]], possibly wrapped in a [[NamedArgumentExpression]])
+   * is present:
+   *  - scalar-only: the function's bound form implements
+   *    [[org.apache.spark.sql.connector.catalog.functions.SupportsScalarInvocation]]; arguments are
+   *    rearranged, coerced, and the call becomes a [[TableValuedFunctionRelation]] (a source).
+   *  - TABLE-argument: the bound form implements
+   *    [[org.apache.spark.sql.connector.catalog.functions.SupportsTableArgument]]; the call is
+   *    lowered to `Generate(TableFunctionGenerator(...))` over the TABLE argument, so it rides the
+   *    existing analyzer TABLE-argument expansion (repartition + sort + per-group evaluation).
+   *
+   * Named arguments are supported for the scalar portion (same mechanism as procedures); a genuine
+   * "no such function" is reported before any argument-shape error because the function is loaded
+   * first.
    */
   private def resolveV2TableFunction(
       catalog: TableFunctionCatalog,
       ident: Identifier,
       arguments: Seq[Expression]): LogicalPlan = {
     // Load first: a miss throws NoSuchFunctionException, so a genuinely absent function reports
-    // "no such function" rather than being masked by the TABLE-argument rejection below.
+    // "no such function" rather than being masked by an argument-shape error below.
     val unbound = catalog.loadTableFunction(ident)
-    // Reject a TABLE argument before binding: the function is known to exist, and a scalar-only
-    // connector should not have to handle a struct-typed TABLE argument in bind() merely for Spark
-    // to reject it -- the specific unsupported-table-argument error is clearer than whatever bind()
-    // might throw for an unexpected input shape. A TABLE argument may be passed positionally or by
-    // name (wrapped in a NamedArgumentExpression), so check both -- mirroring the wrappers that
+    // A TABLE argument may be passed positionally or by name (wrapped in a
+    // NamedArgumentExpression); detect both, mirroring the wrappers that
     // `UserDefinedPythonFunction.builder` matches.
     val hasTableArgument = arguments.exists {
       case _: FunctionTableSubqueryArgumentExpression => true
       case NamedArgumentExpression(_, _: FunctionTableSubqueryArgumentExpression) => true
       case _ => false
     }
-    if (hasTableArgument) {
-      throw QueryCompilationErrors.tableValuedFunctionWithTableArgumentUnsupportedError(
-        (catalog.name +: ident.namespace :+ ident.name).mkString("."))
-    }
-    // Preserve by-name argument info in the bind input type so the function can pick an overload,
-    // mirroring `BindProcedures.extractInputType` (positional fields get `param$index` names, not
-    // empty names, so a connector inspecting field names sees distinct, non-empty identifiers).
+    // Build the bind input type: one struct field per argument, preserving by-name metadata; a
+    // TABLE argument's field carries the relation schema (a struct) tagged with
+    // TABLE_ARGUMENT_METADATA_KEY so a polymorphic bind() can locate it.
     val inputType = StructType(arguments.zipWithIndex.map {
       case (NamedArgumentExpression(name, value), _) =>
-        StructField(name, value.dataType, value.nullable,
-          new MetadataBuilder()
-            .putBoolean(TableFunctionParameter.BY_NAME_METADATA_KEY, value = true).build())
+        StructField(name, value.dataType, value.nullable, byNameMetadata(value))
       case (arg, index) =>
-        StructField(s"param$index", arg.dataType, arg.nullable)
+        StructField(s"param$index", arg.dataType, arg.nullable, positionalMetadata(arg))
     })
-    // A connector may validate types by throwing from bind(); translate that into a clean
-    // analysis error rather than letting it surface as an internal error (mirrors the scalar V2
-    // function path in `resolveV2Function`).
+    // A connector may validate types by throwing from bind(); translate that into a clean analysis
+    // error rather than letting it surface as an internal error (mirrors the scalar V2 path).
     val bound = try {
       unbound.bind(inputType)
     } catch {
@@ -351,13 +350,181 @@ class FunctionResolution(
         throw QueryCompilationErrors.tableFunctionCannotProcessInputError(
           (catalog.name +: ident.namespace :+ ident.name).mkString("."), arguments, unsupported)
     }
-    // Rearrange named/positional arguments into the parameter order the bound function reports.
+    if (hasTableArgument) {
+      resolveV2TableArgumentFunction(catalog, ident, bound, arguments)
+    } else {
+      resolveV2ScalarFunction(catalog, ident, bound, arguments)
+    }
+  }
+
+  /** Field metadata for a by-name argument; also tags a by-name TABLE argument. */
+  private def byNameMetadata(value: Expression): Metadata = {
+    val b = new MetadataBuilder()
+      .putBoolean(TableFunctionParameter.BY_NAME_METADATA_KEY, value = true)
+    if (value.isInstanceOf[FunctionTableSubqueryArgumentExpression]) {
+      b.putBoolean(TableFunctionParameter.TABLE_ARGUMENT_METADATA_KEY, value = true)
+    }
+    b.build()
+  }
+
+  /** Field metadata for a positional argument; tags a positional TABLE argument. */
+  private def positionalMetadata(arg: Expression): Metadata = {
+    if (arg.isInstanceOf[FunctionTableSubqueryArgumentExpression]) {
+      new MetadataBuilder()
+        .putBoolean(TableFunctionParameter.TABLE_ARGUMENT_METADATA_KEY, value = true).build()
+    } else {
+      Metadata.empty
+    }
+  }
+
+  /**
+   * Scalar-only path: rearrange named/positional arguments into parameter order, implicitly cast
+   * each to the declared parameter type and validate, then emit a [[TableValuedFunctionRelation]].
+   */
+  private def resolveV2ScalarFunction(
+      catalog: TableFunctionCatalog,
+      ident: Identifier,
+      bound: BoundTableFunction,
+      arguments: Seq[Expression]): LogicalPlan = {
     val rearranged =
       NamedParametersSupport.defaultRearrange(bound, arguments, conf.resolver)
-    // Implicitly cast each argument to its declared parameter type and validate, so a mismatch is
-    // reported at analysis time (mirrors `ProcedureArgumentCoercion` + `Call.checkArgTypes`).
     val coerced = coerceAndValidateTableFunctionArgs(catalog, ident, bound, rearranged)
     TableValuedFunctionRelation(catalog, ident, bound, coerced)
+  }
+
+  /**
+   * TABLE-argument path: the bound function must implement
+   * [[org.apache.spark.sql.connector.catalog.functions.SupportsTableArgument]]. The connector's
+   * `bind`-declared [[org.apache.spark.sql.connector.distributions.Distribution required
+   * distribution]] and required ordering are threaded into the call-site
+   * [[FunctionTableSubqueryArgumentExpression]] as PARTITION BY / WITH SINGLE PARTITION / ORDER BY,
+   * so the existing analyzer expansion inserts the repartition + sort. When the call site ALSO
+   * specifies partitioning, the two are validated for compatibility (mirrors the Python UDTF
+   * `applyToTableArgument`). The call is then lowered to `Generate(TableFunctionGenerator(...))`,
+   * which rides the generic TABLE-argument expansion and is executed by `TableFunctionExec`.
+   */
+  private def resolveV2TableArgumentFunction(
+      catalog: TableFunctionCatalog,
+      ident: Identifier,
+      bound: BoundTableFunction,
+      arguments: Seq[Expression]): LogicalPlan = {
+    val fnName = (catalog.name +: ident.namespace :+ ident.name).mkString(".")
+    val tableFn = bound match {
+      case t: SupportsTableArgument => t
+      case _ =>
+        // The connector accepted a TABLE argument at bind() but its bound form does not implement
+        // SupportsTableArgument, so Spark has no way to execute the transform.
+        throw QueryCompilationErrors.tableValuedFunctionWithTableArgumentUnsupportedError(fnName)
+    }
+    // Rearrange named/positional args; the TABLE argument is unwrapped from any
+    // NamedArgumentExpression by defaultRearrange, exactly like a scalar arg.
+    val rearranged =
+      NamedParametersSupport.defaultRearrange(bound, arguments, conf.resolver)
+    // A TABLE-argument function consumes ONLY the TABLE argument(s): its evaluator receives the
+    // input partition's rows and has no channel for scalar arguments. Reject a call that mixes a
+    // scalar argument with the TABLE argument, rather than silently dropping the scalar (or, worse,
+    // crashing later when the exec node treats a leading scalar as the input struct).
+    if (rearranged.exists(!_.isInstanceOf[FunctionTableSubqueryArgumentExpression])) {
+      throw QueryCompilationErrors.tableValuedFunctionTableArgumentWithScalarUnsupportedError(
+        fnName)
+    }
+    // Thread the function-declared distribution/ordering into the (single) TABLE argument.
+    val withRequired = rearranged.map {
+      case t: FunctionTableSubqueryArgumentExpression =>
+        applyRequiredMetadata(fnName, tableFn, t)
+      case other => other
+    }
+    // The number of the TABLE argument's own columns: the analyzer's expansion may append internal
+    // partition_by_N marker columns after them (for group segmentation), so the exec node needs the
+    // original count to slice each row back to the connector's expected input schema.
+    val inputColumnCount = withRequired.collectFirst {
+      case t: FunctionTableSubqueryArgumentExpression => t.plan.output.length
+    }.getOrElse {
+      // resolveV2TableArgumentFunction is only entered when a TABLE argument is present, so the
+      // TABLE argument must survive rearrangement; a miss means an internal invariant is broken.
+      throw SparkException.internalError(
+        s"Table-valued function $fnName was routed to the TABLE-argument path but no TABLE " +
+          "argument survived rearrangement.")
+    }
+    // Build the generator's output schema the same way the scalar path builds relation output:
+    // replace CHAR/VARCHAR with STRING (the engine does not support them on plan output) and strip
+    // internal metadata, mirroring `TableValuedFunctionRelation.apply` / `DataSourceV2Relation`.
+    val elementSchema = removeInternalMetadata(
+      CharVarcharUtils.replaceCharVarcharWithStringInSchema(bound.resultSchema()),
+      keepFieldIds = true)
+    val generator = TableFunctionGenerator(
+      tableFn, withRequired, elementSchema, bound.isDeterministic(), inputColumnCount)
+    Generate(
+      generator,
+      unrequiredChildIndex = Nil,
+      outer = false,
+      qualifier = None,
+      generatorOutput = Nil,
+      child = OneRowRelation())
+  }
+
+  /**
+   * Applies the function-declared required distribution and ordering to the TABLE argument,
+   * MERGING them with any call-site PARTITION BY / WITH SINGLE PARTITION / ORDER BY (a
+   * function-declared value overrides only when non-empty; the call-site value is otherwise
+   * preserved) and validating that the two do not conflict. Mirrors
+   * `PythonUDTFAnalyzeResult.applyToTableArgument`.
+   */
+  private def applyRequiredMetadata(
+      fnName: String,
+      tableFn: SupportsTableArgument,
+      t: FunctionTableSubqueryArgumentExpression): FunctionTableSubqueryArgumentExpression = {
+    val requiredDistribution = tableFn.requiredDistribution()
+    val requiredOrdering = tableFn.requiredOrdering()
+    // Only ClusteredDistribution (hash PARTITION BY) and UnspecifiedDistribution are supported.
+    // Reject any other Distribution (e.g. OrderedDistribution) loudly rather than silently
+    // dropping the requirement and running the evaluator on wrongly distributed data.
+    val partitionBy = requiredDistribution match {
+      case c: ClusteredDistribution =>
+        c.clustering().map(e => V2ExpressionUtils.toCatalyst(e, t.plan)).toImmutableArraySeq
+      case _: UnspecifiedDistribution => Seq.empty[Expression]
+      case other =>
+        throw QueryCompilationErrors.tableValuedFunctionRequiredMetadataInvalid(
+          functionName = fnName,
+          reason = s"the required distribution ${other.getClass.getSimpleName} is not supported; " +
+            "only a clustered or unspecified distribution may be requested")
+    }
+    val orderBy = if (requiredOrdering.nonEmpty) {
+      V2ExpressionUtils.toCatalystOrdering(requiredOrdering, t.plan)
+    } else {
+      Seq.empty[SortOrder]
+    }
+    // If the function requires a partitioning and the call site also specified one, that is a
+    // conflict -- the caller must remove theirs (mirrors applyToTableArgument).
+    if (partitionBy.nonEmpty && t.hasRepartitioning) {
+      throw QueryCompilationErrors.tableValuedFunctionRequiredMetadataIncompatibleWithCall(
+        functionName = fnName,
+        requestedMetadata = "specified its own required partitioning of the input table",
+        invalidFunctionCallProperty =
+          "specified the WITH SINGLE PARTITION or PARTITION BY clause; " +
+            "please remove these clauses and retry the query again.")
+    }
+    // Merge, not overwrite: a function-declared value overrides only when non-empty, otherwise the
+    // call-site PARTITION BY / ORDER BY is preserved (mirrors applyToTableArgument).
+    val newPartitionBy = if (partitionBy.nonEmpty) partitionBy else t.partitionByExpressions
+    val newOrderBy = if (orderBy.nonEmpty) orderBy else t.orderByExpressions
+    // An ordering can only be enforced when the input is partitioned: `evaluable` inserts a Sort
+    // only under a PARTITION BY or WITH SINGLE PARTITION. Evaluate this against the MERGED state --
+    // a call-site PARTITION BY / WITH SINGLE PARTITION satisfies the requirement just as a
+    // function-declared clustered distribution does. Reject only when an ordering would survive
+    // with no partitioning at all (else the requirement would be silently dropped).
+    if (newOrderBy.nonEmpty && newPartitionBy.isEmpty && !t.withSinglePartition) {
+      throw QueryCompilationErrors.tableValuedFunctionRequiredMetadataInvalid(
+        functionName = fnName,
+        reason = "the required ordering can only be applied when the input table is partitioned " +
+          "(via the function's clustered distribution or the call site's PARTITION BY / WITH " +
+          "SINGLE PARTITION clause)")
+    }
+    if (newPartitionBy.eq(t.partitionByExpressions) && newOrderBy.eq(t.orderByExpressions)) {
+      t
+    } else {
+      t.copy(partitionByExpressions = newPartitionBy, orderByExpressions = newOrderBy)
+    }
   }
 
   /**

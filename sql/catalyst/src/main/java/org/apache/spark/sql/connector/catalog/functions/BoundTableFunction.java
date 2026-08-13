@@ -25,15 +25,14 @@ import org.apache.spark.sql.types.StructType;
  * <p>
  * A bound function declares its parameters (for argument validation and by-name rearrangement),
  * its determinism, and its (possibly polymorphic) output schema. It carries NO execution method
- * itself; a concrete function additionally implements exactly one of the invocation mixins. The
- * only one available today is:
+ * itself; a concrete function additionally implements exactly one of the invocation mixins:
  * <ul>
  *   <li>{@link SupportsScalarInvocation} -- a scalar-argument function that produces a relation
  *       through a {@code ScanBuilder} (a source; reuses the DSv2 read path, column pruning,
- *       distributed execution).</li>
+ *       distributed execution);</li>
+ *   <li>{@link SupportsTableArgument} -- a function that consumes a TABLE argument and transforms
+ *       its rows.</li>
  * </ul>
- * A TABLE-argument mixin (a function that consumes a TABLE argument and transforms its rows) is
- * added in a later phase.
  * Splitting execution into mixins keeps this interface stable as capabilities are added, and lets
  * a connector implement only the invocation styles it supports.
  *

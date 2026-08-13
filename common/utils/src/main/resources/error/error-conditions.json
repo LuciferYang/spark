@@ -7597,6 +7597,13 @@
     ],
     "sqlState" : "42K08"
   },
+  "TABLE_VALUED_FUNCTION_TABLE_ARGUMENT_WITH_SCALAR_UNSUPPORTED" : {
+    "message" : [
+      "The table-valued function <functionName> was called with both a TABLE argument and one or more scalar arguments.",
+      "A table-argument function consumes only its TABLE argument; please remove the scalar arguments and retry the query."
+    ],
+    "sqlState" : "0A000"
+  },
   "TABLE_VALUED_FUNCTION_TOO_MANY_TABLE_ARGUMENTS" : {
     "message" : [
       "There are too many table arguments for table-valued function.",

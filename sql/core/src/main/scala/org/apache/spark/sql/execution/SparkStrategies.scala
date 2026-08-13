@@ -39,7 +39,7 @@ import org.apache.spark.sql.execution.aggregate.AggUtils
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{LogicalRelation, WriteFiles, WriteFilesExec}
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Relation, TableFunctionExec}
 import org.apache.spark.sql.execution.exchange.{REBALANCE_PARTITIONS_BY_COL, REBALANCE_PARTITIONS_BY_NONE, REPARTITION_BY_COL, REPARTITION_BY_NUM, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.python._
 import org.apache.spark.sql.execution.python.streaming.{FlatMapGroupsInPandasWithStateExec, TransformWithStateInPySparkExec}
@@ -51,6 +51,7 @@ import org.apache.spark.sql.execution.streaming.runtime.{StreamingExecutionRelat
 import org.apache.spark.sql.execution.streaming.sources.MemoryPlan
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.OutputMode
+import org.apache.spark.sql.types.StructType
 
 /**
  * Converts a logical plan into zero or more SparkPlans.  This API is exposed for experimenting
@@ -992,6 +993,34 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           planLater(child),
           ScriptTransformationIOSchema(ioschema)
         ) :: Nil
+      case _ => Nil
+    }
+  }
+
+  /**
+   * Plans a `Generate(TableFunctionGenerator)` -- a V2 catalog table-valued function that consumes
+   * a TABLE argument -- into a [[org.apache.spark.sql.execution.datasources.v2.TableFunctionExec]].
+   * Must run before [[BasicOperators]], whose generic `Generate` case would otherwise plan it as a
+   * `GenerateExec`. (The Python UDTF generators avoid this by being lowered to dedicated logical
+   * nodes in the `ExtractPythonUDTFs` optimizer rule before planning; this V2 path is planned
+   * directly, mirroring the spike.)
+   */
+  object TableFunctionEvals extends Strategy {
+    override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case g @ logical.Generate(gen: TableFunctionGenerator, _, _, _, _, child) =>
+        // Extract everything the executor needs from the generator HERE, on the driver: the
+        // serializable evaluator factory plus plain segmentation metadata. `TableFunctionExec`
+        // must NOT retain the generator, whose `function` (a `SupportsTableArgument`) may not be
+        // serializable and would drag the connector's function to executors when the node ships.
+        val inputStructType = gen.children.head.dataType.asInstanceOf[StructType]
+        TableFunctionExec(
+          factory = gen.function.evaluatorFactory(),
+          inputStructType = inputStructType,
+          inputColumnCount = gen.inputColumnCount,
+          partitionColumnIndexes = gen.partitionColumnIndexes,
+          functionName = gen.function.name(),
+          generatorOutput = g.generatorOutput,
+          child = planLater(child)) :: Nil
       case _ => Nil
     }
   }

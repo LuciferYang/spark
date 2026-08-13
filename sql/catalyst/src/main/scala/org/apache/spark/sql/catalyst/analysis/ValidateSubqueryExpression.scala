@@ -202,6 +202,11 @@ object ValidateSubqueryExpression
             // any decorrelation.
             case Generate(_: PythonUDTF, _, _, _, _, _: OneRowRelation)
               if SQLConf.get.getConf(SQLConf.OPTIMIZE_ONE_ROW_RELATION_SUBQUERY) =>  // Ok
+            // A V2 catalog TABLE-argument TVF is lowered to the same Generate-over-OneRowRelation
+            // shape as a Python UDTF, so a non-deterministic one is likewise rewritable by the
+            // optimizer without decorrelation.
+            case Generate(_: TableArgumentGenerator, _, _, _, _, _: OneRowRelation)
+              if SQLConf.get.getConf(SQLConf.OPTIMIZE_ONE_ROW_RELATION_SUBQUERY) =>  // Ok
             case _ =>
               expr.failAnalysis(
                 errorClass = "UNSUPPORTED_SUBQUERY_EXPRESSION_CATEGORY." +

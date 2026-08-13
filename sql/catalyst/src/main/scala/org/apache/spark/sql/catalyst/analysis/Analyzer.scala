@@ -2363,6 +2363,7 @@ class Analyzer(
               resolvedFunc match {
                 case Generate(_: PythonUDTF, _, _, _, _, _) =>
                 case Generate(_: UnresolvedPolymorphicPythonUDTF, _, _, _, _, _) =>
+                case Generate(_: TableArgumentGenerator, _, _, _, _, _) =>
                 case _ =>
                   assert(!t.hasRepartitioning,
                     "Cannot evaluate the table-valued function call because it included the " +
@@ -2428,6 +2429,12 @@ class Analyzer(
               }
               g.copy(generator = pyudtf.copy(
                 pythonUDTFPartitionColumnIndexes = Some(partitionColumnIndexes)))
+            // Propagate the PARTITION BY column ordinals (within the struct input column `c`) to a
+            // V2 TABLE-argument generator, so its exec node can segment adjacent rows into groups.
+            case g @ Generate(tvfGen: TableFunctionGenerator, _, _, _, _, _)
+                if f.partitionByExpressions.nonEmpty =>
+              g.copy(generator =
+                tvfGen.copy(partitionColumnIndexes = f.partitioningExpressionIndexes))
             case _ => tvf
           }
 

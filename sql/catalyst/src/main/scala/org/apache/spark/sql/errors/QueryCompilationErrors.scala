@@ -2468,6 +2468,13 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
       messageParameters = Map("functionName" -> toSQLId(functionName)))
   }
 
+  def tableValuedFunctionTableArgumentWithScalarUnsupportedError(
+      functionName: String): Throwable = {
+    new AnalysisException(
+      errorClass = "TABLE_VALUED_FUNCTION_TABLE_ARGUMENT_WITH_SCALAR_UNSUPPORTED",
+      messageParameters = Map("functionName" -> toSQLId(functionName)))
+  }
+
   def tableValuedFunctionRequiresFoldableArgsError(functionName: String): Throwable = {
     new AnalysisException(
       errorClass = "TABLE_VALUED_FUNCTION_REQUIRES_FOLDABLE_ARGUMENTS",

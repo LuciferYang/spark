@@ -25,8 +25,12 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.{AnalysisException, Row}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException
+import org.apache.spark.sql.catalyst.expressions.TableFunctionGenerator
+import org.apache.spark.sql.catalyst.plans.logical.{Generate, RepartitionByExpression, Sort}
 import org.apache.spark.sql.connector.catalog.{BasicInMemoryTableCatalog, Identifier, InMemoryCatalog, TableFunctionCatalog}
-import org.apache.spark.sql.connector.catalog.functions.{BoundTableFunction, SupportsScalarInvocation, TableFunctionParameter, UnboundTableFunction}
+import org.apache.spark.sql.connector.catalog.functions.{BoundTableFunction, SupportsScalarInvocation, SupportsTableArgument, TableFunctionEvaluator, TableFunctionEvaluatorFactory, TableFunctionParameter, UnboundTableFunction}
+import org.apache.spark.sql.connector.distributions.{Distribution, Distributions}
+import org.apache.spark.sql.connector.expressions.{Expression => V2Expression, Expressions, SortDirection, SortOrder => V2SortOrder}
 import org.apache.spark.sql.connector.read._
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 import org.apache.spark.sql.internal.SQLConf
@@ -300,6 +304,211 @@ class TableFunctionCatalogSuite extends SharedSparkSession with BeforeAndAfter {
         sql("SELECT * FROM tvfonly.ns.gen(3)"), Row(0L) :: Row(1L) :: Row(2L) :: Nil)
     }
   }
+
+  test("TABLE-arg TVF lowers to Generate(TableFunctionGenerator) with repartition+sort") {
+    // Step 3 checkpoint: a SupportsTableArgument function with a call-site PARTITION BY k ORDER BY
+    // ts must lower to a Generate over the TABLE argument, and the analyzer's generic
+    // TABLE-argument expansion must insert the RepartitionByExpression + Sort (the FTSAE.evaluable
+    // rewrite) so the exec node (Step 4) sees hash-partitioned, ordered input.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectgroups"), UnboundCollectGroups)
+    sql("CREATE TABLE tvf.ns.src (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.src VALUES (1, 11), (2, 20), (1, 10)")
+    val analyzed = sql(
+      "SELECT * FROM tvf.ns.collectgroups(TABLE(tvf.ns.src) PARTITION BY k ORDER BY ts)")
+      .queryExecution.analyzed
+    // The Generate sits inside a LateralSubquery (the generic TABLE-argument expansion), so descend
+    // into subquery expressions to find it.
+    val gens = analyzed.collectWithSubqueries { case g: Generate => g.generator }.collect {
+      case t: TableFunctionGenerator => t
+    }
+    assert(gens.nonEmpty, s"expected a TableFunctionGenerator, plan:\n$analyzed")
+    // The PARTITION BY column ordinal(s) within the struct input column were propagated to the
+    // generator (one per partition key). The exact ordinal (which points at the projected
+    // partitioning column within the struct) is validated end-to-end by the Step 4 grouping test.
+    assert(gens.head.partitionColumnIndexes.length == 1,
+      s"expected one partition-key ordinal, got ${gens.head.partitionColumnIndexes}")
+    // The TABLE-argument expansion inserted the repartition + sort.
+    assert(analyzed.collectWithSubqueries {
+      case r: RepartitionByExpression => r }.nonEmpty,
+      s"expected a RepartitionByExpression, plan:\n$analyzed")
+    assert(analyzed.collectWithSubqueries { case s: Sort => s }.nonEmpty,
+      s"expected a Sort, plan:\n$analyzed")
+  }
+
+  test("TABLE-arg TVF whose bound form lacks SupportsTableArgument is rejected") {
+    // A connector that accepts a TABLE argument at bind() but returns a bound function without the
+    // SupportsTableArgument mixin cannot be executed; reject with the specific error.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "gen"), UnboundGen)
+    sql("CREATE TABLE tvf.ns.t2 (id INT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT * FROM tvf.ns.gen(TABLE(tvf.ns.t2))").collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_WITH_TABLE_ARGUMENT_UNSUPPORTED")
+  }
+
+  test("TABLE-arg TVF executes: PARTITION BY k ORDER BY ts (each group once, in order)") {
+    // Step 4 end-to-end checkpoint. collectgroups emits one row per PARTITION BY group with the
+    // group's ts values comma-joined in ORDER BY order. Correct output proves: (a) rows are
+    // hash-partitioned so each k lands in one group, (b) TableFunctionExec segments adjacent rows
+    // on the partition-key ordinal, (c) intra-group ORDER BY ts is honored, (d) the connector's
+    // evaluator sees only the TABLE argument's columns (k, ts), not the internal partition_by
+    // marker column.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectgroups"), UnboundCollectGroups)
+    sql("CREATE TABLE tvf.ns.events (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.events VALUES (1, 11), (2, 20), (1, 10), (3, 30), (2, 21), (1, 12)")
+    checkAnswer(
+      sql("SELECT k, tss FROM tvf.ns.collectgroups(" +
+        "TABLE(tvf.ns.events) PARTITION BY k ORDER BY ts)"),
+      Row(1, "10,11,12") :: Row(2, "20,21") :: Row(3, "30") :: Nil)
+  }
+
+  test("TABLE-arg TVF executes: WITH SINGLE PARTITION (whole input as one group, ordered)") {
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectall"), UnboundCollectAll)
+    sql("CREATE TABLE tvf.ns.events2 (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.events2 VALUES (1, 30), (2, 10), (1, 20)")
+    // No PARTITION BY, WITH SINGLE PARTITION + ORDER BY ts: one group, all rows, ts-ordered.
+    checkAnswer(
+      sql("SELECT tss FROM tvf.ns.collectall(" +
+        "TABLE(tvf.ns.events2) WITH SINGLE PARTITION ORDER BY ts)"),
+      Row("10,20,30") :: Nil)
+  }
+
+  test("TABLE-arg TVF executes: no PARTITION BY (row count conserved)") {
+    // Without PARTITION BY, groups are per Spark-partition; a count-conserving function proves the
+    // no-partition-key path (whole task-partition is one group) works and rows are not dropped.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "countrows"), UnboundCountRows)
+    sql("CREATE TABLE tvf.ns.events3 (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.events3 VALUES (1, 1), (2, 2), (3, 3)")
+    val total = sql("SELECT cnt FROM tvf.ns.countrows(TABLE(tvf.ns.events3))")
+      .collect().map(_.getLong(0)).sum
+    assert(total == 3, s"expected 3 rows conserved across per-partition groups, got $total")
+  }
+
+  test("TABLE-arg TVF executes: function-declared requiredDistribution + requiredOrdering") {
+    // The function declares its OWN partitioning (clustered by k) and ordering (by ts) via
+    // requiredDistribution/requiredOrdering, with NO call-site PARTITION BY / ORDER BY. This drives
+    // applyRequiredMetadata's ClusteredDistribution -> PARTITION BY and requiredOrdering -> ORDER
+    // BY threading plus the V2ExpressionUtils.toCatalyst(Ordering) conversions, and must produce
+    // the same per-group ordered result as the call-site-clause path.
+    catalog.createTableFunction(
+      Identifier.of(Array("ns"), "groupbyrequired"), UnboundGroupByRequired)
+    sql("CREATE TABLE tvf.ns.events4 (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.events4 VALUES (1, 11), (2, 20), (1, 10), (3, 30), (2, 21), (1, 12)")
+    checkAnswer(
+      sql("SELECT k, tss FROM tvf.ns.groupbyrequired(TABLE(tvf.ns.events4))"),
+      Row(1, "10,11,12") :: Row(2, "20,21") :: Row(3, "30") :: Nil)
+  }
+
+  test("TABLE-arg TVF rejects a call-site PARTITION BY that conflicts with required partitioning") {
+    // groupbyrequired declares its own required partitioning; a call site that ALSO specifies
+    // PARTITION BY is a conflict and must fail analysis with the required-metadata error (mirrors
+    // the Python UDTF applyToTableArgument conflict validation).
+    catalog.createTableFunction(
+      Identifier.of(Array("ns"), "groupbyrequired"), UnboundGroupByRequired)
+    sql("CREATE TABLE tvf.ns.events5 (k INT, ts BIGINT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT k, tss FROM tvf.ns.groupbyrequired(TABLE(tvf.ns.events5) PARTITION BY k)")
+        .collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_REQUIRED_METADATA_INCOMPATIBLE_WITH_CALL")
+  }
+
+  test("TABLE-arg TVF over an empty input produces no rows") {
+    // Empty input: each (possibly empty) partition yields an empty group, and the evaluator returns
+    // an empty iterator, so the query returns no rows rather than erroring.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectgroups"), UnboundCollectGroups)
+    sql("CREATE TABLE tvf.ns.events6 (k INT, ts BIGINT) USING foo")
+    checkAnswer(
+      sql("SELECT k, tss FROM tvf.ns.collectgroups(" +
+        "TABLE(tvf.ns.events6) PARTITION BY k ORDER BY ts)"),
+      Nil)
+  }
+
+  test("TABLE-arg TVF PARTITION BY a BINARY key groups by value, not array identity") {
+    // A BINARY partition key returns a fresh byte[] per row (UnsafeRow.getBinary), whose Scala `==`
+    // is reference equality. Grouping must compare keys by VALUE (byte-wise), so two rows with the
+    // same binary key land in one group -- not one singleton group per row.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectbin"), UnboundCollectBin)
+    sql("CREATE TABLE tvf.ns.binevents (k BINARY, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.binevents VALUES " +
+      "(X'01', 11), (X'02', 30), (X'01', 10), (X'02', 21), (X'01', 12)")
+    // Expect two groups (k=X'01' with 3 rows, k=X'02' with 2 rows), each collapsed to one output
+    // row -- NOT five singleton groups.
+    checkAnswer(
+      sql("SELECT cnt FROM tvf.ns.collectbin(TABLE(tvf.ns.binevents) PARTITION BY k ORDER BY ts)"),
+      Row(3L) :: Row(2L) :: Nil)
+  }
+
+  test("TABLE-arg TVF result CHAR/VARCHAR columns are replaced with STRING on generator output") {
+    // The engine does not support CHAR/VARCHAR on plan output; the TABLE-arg path must strip them
+    // to STRING like the scalar path (DataSourceV2Relation.create / TableValuedFunctionRelation).
+    catalog.createTableFunction(Identifier.of(Array("ns"), "charout"), UnboundCharOut)
+    sql("CREATE TABLE tvf.ns.charsrc (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.charsrc VALUES (1, 1), (1, 2)")
+    val df = sql("SELECT * FROM tvf.ns.charout(TABLE(tvf.ns.charsrc) PARTITION BY k)")
+    assert(df.schema("label").dataType == DataTypes.StringType,
+      s"expected STRING, got ${df.schema("label").dataType}")
+    checkAnswer(df, Row("g") :: Nil)
+  }
+
+  test("TABLE-arg TVF that declares a non-deterministic transform is marked non-deterministic") {
+    // The generator must propagate bound.isDeterministic()=false so the optimizer does not reorder
+    // or de-duplicate the transform. Assert the analyzed generator carries deterministic = false.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "nondet"), UnboundNonDet)
+    sql("CREATE TABLE tvf.ns.ndsrc (k INT, ts BIGINT) USING foo")
+    val analyzed = sql("SELECT * FROM tvf.ns.nondet(TABLE(tvf.ns.ndsrc) PARTITION BY k)")
+      .queryExecution.analyzed
+    val gens = analyzed.collectWithSubqueries { case g: Generate => g.generator }.collect {
+      case t: TableFunctionGenerator => t
+    }
+    assert(gens.nonEmpty, s"expected a TableFunctionGenerator, plan:\n$analyzed")
+    assert(!gens.head.deterministic,
+      s"expected the generator to be non-deterministic, got deterministic=true")
+  }
+
+  test("TABLE-arg TVF requiredOrdering without a required distribution is rejected") {
+    // A function that declares requiredOrdering but leaves requiredDistribution unspecified cannot
+    // have its ordering enforced (evaluable only sorts under a partition/single-partition), so it
+    // must fail analysis rather than silently drop the ordering.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "orderonly"), UnboundOrderOnly)
+    sql("CREATE TABLE tvf.ns.oosrc (k INT, ts BIGINT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT * FROM tvf.ns.orderonly(TABLE(tvf.ns.oosrc))").collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_REQUIRED_METADATA_INVALID")
+  }
+
+  test("TABLE-arg TVF with an unsupported required distribution is rejected") {
+    // A connector may declare only a clustered or unspecified distribution. Any other Distribution
+    // (e.g. Distributions.ordered) cannot be honored by the TABLE-argument path and must fail
+    // analysis loudly rather than being silently dropped and run on wrongly distributed data.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "ordereddist"), UnboundOrderedDist)
+    sql("CREATE TABLE tvf.ns.odsrc (k INT, ts BIGINT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT * FROM tvf.ns.ordereddist(TABLE(tvf.ns.odsrc))").collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_REQUIRED_METADATA_INVALID")
+  }
+
+  test("TABLE-arg TVF requiredOrdering is honored when the call site supplies PARTITION BY") {
+    // orderonly declares requiredOrdering (ts) with an unspecified distribution. On its own that is
+    // rejected, but a call-site PARTITION BY satisfies the "ordering needs a partition"
+    // requirement, so the merged plan must sort each group by ts (not over-reject).
+    catalog.createTableFunction(Identifier.of(Array("ns"), "collectorder"), UnboundCollectOrder)
+    sql("CREATE TABLE tvf.ns.cosrc (k INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.cosrc VALUES (1, 11), (1, 10), (2, 21), (1, 12), (2, 20)")
+    checkAnswer(
+      sql("SELECT k, tss FROM tvf.ns.collectorder(TABLE(tvf.ns.cosrc) PARTITION BY k)"),
+      Row(1, "10,11,12") :: Row(2, "20,21") :: Nil)
+  }
+
+  test("TABLE-arg TVF mixing a scalar argument with the TABLE argument is rejected") {
+    // A table-argument function consumes only its TABLE argument; its evaluator has no channel for
+    // a scalar argument. A call that mixes a scalar with the TABLE must fail analysis (rather than
+    // silently drop the scalar or crash treating a leading scalar as the input struct).
+    catalog.createTableFunction(
+      Identifier.of(Array("ns"), "scalarplustable"), UnboundScalarPlusTable)
+    sql("CREATE TABLE tvf.ns.sptsrc (k INT, ts BIGINT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT * FROM tvf.ns.scalarplustable(5, TABLE(tvf.ns.sptsrc))").collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_TABLE_ARGUMENT_WITH_SCALAR_UNSUPPORTED")
+  }
 }
 
 /** gen(n) -> rows (0..n-1) with a single LONG column `id`, via a LocalScan. */
@@ -466,4 +675,312 @@ class TableFunctionOnlyCatalog extends TableFunctionCatalog {
   def createTableFunction(ident: Identifier, fn: UnboundTableFunction): Unit = {
     tableFunctions.put(ident, fn)
   }
+}
+
+/**
+ * collectgroups(TABLE t PARTITION BY k ORDER BY ts) -> one row per group: (k INT, tss STRING),
+ * where `tss` is the comma-joined `ts` values in received order. A `SupportsTableArgument` fixture
+ * used to exercise TABLE-argument lowering (Step 3) and per-group ordered execution (Step 4). It
+ * declares no required distribution/ordering of its own, so the call-site PARTITION BY / ORDER BY
+ * governs.
+ */
+object UnboundCollectGroups extends UnboundTableFunction {
+  override def name(): String = "collectgroups"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCollectGroups
+}
+
+object BoundCollectGroups extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "collectgroups"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("k", "int").add("tss", "string")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory =
+    CollectGroupsEvaluatorFactory
+}
+
+object CollectGroupsEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      val rows = partition.asScala.toSeq
+      if (rows.isEmpty) {
+        java.util.Collections.emptyIterator()
+      } else {
+        val k = rows.head.getInt(0)
+        val tss = rows.map(_.getLong(1)).mkString(",")
+        java.util.Collections.singletonList(
+          InternalRow(k, org.apache.spark.unsafe.types.UTF8String.fromString(tss))
+            .asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
+}
+
+/**
+ * collectall(TABLE t WITH SINGLE PARTITION ORDER BY ts) -> one row: (tss STRING), the comma-joined
+ * ts values in order across the whole (single-partition) input. A `SupportsTableArgument` fixture
+ * for the WITH SINGLE PARTITION path.
+ */
+object UnboundCollectAll extends UnboundTableFunction {
+  override def name(): String = "collectall"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCollectAll
+}
+
+object BoundCollectAll extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "collectall"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("tss", "string")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CollectAllEvaluatorFactory
+}
+
+object CollectAllEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      val rows = partition.asScala.toSeq
+      if (rows.isEmpty) {
+        java.util.Collections.emptyIterator()
+      } else {
+        val tss = rows.map(_.getLong(1)).mkString(",")
+        java.util.Collections.singletonList(
+          InternalRow(org.apache.spark.unsafe.types.UTF8String.fromString(tss))
+            .asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
+}
+
+/**
+ * countrows(TABLE t) -> per input group, one row (cnt LONG) = the group's row count. With no
+ * PARTITION BY, each Spark task-partition is one group, so summing the outputs equals the total
+ * input row count. A `SupportsTableArgument` fixture for the no-PARTITION-BY path.
+ */
+object UnboundCountRows extends UnboundTableFunction {
+  override def name(): String = "countrows"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCountRows
+}
+
+object BoundCountRows extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "countrows"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+object CountRowsEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      val n = partition.asScala.size.toLong
+      if (n == 0L) {
+        java.util.Collections.emptyIterator()
+      } else {
+        java.util.Collections.singletonList(
+          InternalRow(n).asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
+}
+
+/**
+ * groupbyrequired(TABLE t) -> one row per group: (k INT, tss STRING). Unlike collectgroups, this
+ * fixture declares its OWN required distribution (clustered by `k`) and ordering (by `ts` ASC)
+ * rather than relying on a call-site PARTITION BY / ORDER BY. It exercises applyRequiredMetadata's
+ * ClusteredDistribution -> PARTITION BY and requiredOrdering -> ORDER BY threading (and the
+ * V2ExpressionUtils conversions), plus the call-site-vs-required conflict validation.
+ */
+object UnboundGroupByRequired extends UnboundTableFunction {
+  override def name(): String = "groupbyrequired"
+  override def bind(inputType: StructType): BoundTableFunction = BoundGroupByRequired
+}
+
+object BoundGroupByRequired extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "groupbyrequired"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("k", "int").add("tss", "string")
+  override def requiredDistribution(): Distribution =
+    Distributions.clustered(Array[V2Expression](Expressions.column("k")))
+  override def requiredOrdering(): Array[V2SortOrder] =
+    Array(Expressions.sort(Expressions.column("ts"), SortDirection.ASCENDING))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CollectGroupsEvaluatorFactory
+}
+
+/**
+ * collectbin(TABLE t PARTITION BY k) -> one row per group: (cnt LONG) = the group's row count.
+ * The partition key `k` is BINARY, exercising value-based (byte-wise) group segmentation.
+ */
+object UnboundCollectBin extends UnboundTableFunction {
+  override def name(): String = "collectbin"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCollectBin
+}
+
+object BoundCollectBin extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "collectbin"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * charout(TABLE t PARTITION BY k) -> one row per group: (label CHAR(1)) = the constant "g". Its
+ * result schema declares a CHAR column so the test can assert it is replaced with STRING on output.
+ */
+object UnboundCharOut extends UnboundTableFunction {
+  override def name(): String = "charout"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCharOut
+}
+
+object BoundCharOut extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "charout"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("label", "char(1)")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CharOutEvaluatorFactory
+}
+
+object CharOutEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      if (!partition.hasNext) {
+        java.util.Collections.emptyIterator()
+      } else {
+        partition.asScala.size // drain
+        java.util.Collections.singletonList(
+          InternalRow(org.apache.spark.unsafe.types.UTF8String.fromString("g"))
+            .asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
+}
+
+/**
+ * nondet(TABLE t PARTITION BY k) -> a non-deterministic transform (isDeterministic()=false). Used
+ * to assert the generator propagates determinism; the evaluator body is irrelevant to the test.
+ */
+object UnboundNonDet extends UnboundTableFunction {
+  override def name(): String = "nondet"
+  override def bind(inputType: StructType): BoundTableFunction = BoundNonDet
+}
+
+object BoundNonDet extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "nondet"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = false
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * orderonly declares a requiredOrdering but leaves requiredDistribution unspecified -- an invalid
+ * combination Spark rejects at analysis (the ordering could never be enforced).
+ */
+object UnboundOrderOnly extends UnboundTableFunction {
+  override def name(): String = "orderonly"
+  override def bind(inputType: StructType): BoundTableFunction = BoundOrderOnly
+}
+
+object BoundOrderOnly extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "orderonly"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] =
+    Array(Expressions.sort(Expressions.column("ts"), SortDirection.ASCENDING))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * ordereddist declares an ORDERED distribution, which the TABLE-argument path does not support
+ * (only clustered / unspecified). Spark must reject it at analysis rather than silently drop it.
+ */
+object UnboundOrderedDist extends UnboundTableFunction {
+  override def name(): String = "ordereddist"
+  override def bind(inputType: StructType): BoundTableFunction = BoundOrderedDist
+}
+
+object BoundOrderedDist extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "ordereddist"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution =
+    Distributions.ordered(Array[V2SortOrder](
+      Expressions.sort(Expressions.column("k"), SortDirection.ASCENDING)))
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * collectorder declares requiredOrdering (ts ASC) with an UNSPECIFIED distribution, and emits
+ * (k, tss) per group. On its own the ordering-without-partition combination is rejected, but a
+ * call-site PARTITION BY satisfies it, so the merged plan sorts each group by ts.
+ */
+object UnboundCollectOrder extends UnboundTableFunction {
+  override def name(): String = "collectorder"
+  override def bind(inputType: StructType): BoundTableFunction = BoundCollectOrder
+}
+
+object BoundCollectOrder extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "collectorder"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("k", "int").add("tss", "string")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] =
+    Array(Expressions.sort(Expressions.column("ts"), SortDirection.ASCENDING))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CollectGroupsEvaluatorFactory
+}
+
+/**
+ * scalarplustable declares two parameters (a scalar `n` before the TABLE `input`), so a call like
+ * `scalarplustable(5, TABLE(t))` produces a leading scalar argument alongside the TABLE argument.
+ * A table-argument function cannot consume a scalar, so this must be rejected at analysis.
+ */
+object UnboundScalarPlusTable extends UnboundTableFunction {
+  override def name(): String = "scalarplustable"
+  override def bind(inputType: StructType): BoundTableFunction = BoundScalarPlusTable
+}
+
+object BoundScalarPlusTable extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "scalarplustable"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(
+      TableFunctionParameter.scalar("n", DataTypes.IntegerType).build(),
+      TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def requiredDistribution(): Distribution = Distributions.unspecified()
+  override def requiredOrdering(): Array[V2SortOrder] = Array.empty
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
 }

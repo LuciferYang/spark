@@ -46,6 +46,16 @@ public interface TableFunctionParameter {
   String BY_NAME_METADATA_KEY = "BY_NAME";
 
   /**
+   * A field metadata key that indicates whether an argument is a TABLE argument (a relation).
+   * <p>
+   * When set to {@code true} on a field of the {@code inputType} passed to
+   * {@link UnboundTableFunction#bind}, that field's data type is the relation's schema (a struct).
+   * This lets a polymorphic {@code bind} implementation locate its TABLE argument(s) and inspect
+   * the input schema, even when a scalar argument is itself struct-typed.
+   */
+  String TABLE_ARGUMENT_METADATA_KEY = "TABLE_ARGUMENT";
+
+  /**
    * Creates a builder for a scalar parameter.
    *
    * @param name the name of the parameter
