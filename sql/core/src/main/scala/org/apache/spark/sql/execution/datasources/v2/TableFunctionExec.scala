@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters._
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, BaseOrdering, BoundReference, GenericInternalRow, RowOrdering, SortOrder, UnsafeProjection}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, AttributeSet, BaseOrdering, BoundReference, GenericInternalRow, RowOrdering, SortOrder, UnsafeProjection}
 import org.apache.spark.sql.connector.catalog.functions.TableFunctionEvaluatorFactory
 import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -62,6 +62,13 @@ case class TableFunctionExec(
     child: SparkPlan) extends UnaryExecNode {
 
   override def output: Seq[Attribute] = generatorOutput
+
+  // This node PRODUCES its output rows (the evaluator emits them); they are not read from the
+  // child, whose only column is the struct input `c`. Declare them as produced so plan validation
+  // (missingInput) does not treat the output attributes as unresolved references when this node is
+  // the top of the plan (e.g. the outer projection selects exactly these columns and is elided).
+  // Mirrors GenerateExec.
+  override def producedAttributes: AttributeSet = AttributeSet(generatorOutput)
 
   override protected def withNewChildInternal(newChild: SparkPlan): TableFunctionExec =
     copy(child = newChild)

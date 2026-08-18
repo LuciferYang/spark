@@ -2475,6 +2475,18 @@ private[sql] object QueryCompilationErrors extends QueryErrorsBase with Compilat
       messageParameters = Map("functionName" -> toSQLId(functionName)))
   }
 
+  def tableValuedFunctionSelectedColumnNotFoundError(
+      functionName: String,
+      columnName: String,
+      availableColumns: Seq[String]): Throwable = {
+    new AnalysisException(
+      errorClass = "TABLE_VALUED_FUNCTION_SELECTED_COLUMN_NOT_FOUND",
+      messageParameters = Map(
+        "functionName" -> toSQLId(functionName),
+        "columnName" -> toSQLId(columnName),
+        "availableColumns" -> availableColumns.map(toSQLId).mkString(", ")))
+  }
+
   def tableValuedFunctionRequiresFoldableArgsError(functionName: String): Throwable = {
     new AnalysisException(
       errorClass = "TABLE_VALUED_FUNCTION_REQUIRES_FOLDABLE_ARGUMENTS",

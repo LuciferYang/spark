@@ -25,12 +25,12 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.{AnalysisException, Row}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException
-import org.apache.spark.sql.catalyst.expressions.TableFunctionGenerator
-import org.apache.spark.sql.catalyst.plans.logical.{Generate, RepartitionByExpression, Sort}
+import org.apache.spark.sql.catalyst.expressions.{Alias, CreateNamedStruct, NamedExpression, TableFunctionGenerator}
+import org.apache.spark.sql.catalyst.plans.logical.{Generate, Project, RepartitionByExpression, Sort}
 import org.apache.spark.sql.connector.catalog.{BasicInMemoryTableCatalog, Identifier, InMemoryCatalog, TableFunctionCatalog}
 import org.apache.spark.sql.connector.catalog.functions.{BoundTableFunction, SupportsScalarInvocation, SupportsTableArgument, TableFunctionEvaluator, TableFunctionEvaluatorFactory, TableFunctionParameter, UnboundTableFunction}
 import org.apache.spark.sql.connector.distributions.{Distribution, Distributions}
-import org.apache.spark.sql.connector.expressions.{Expression => V2Expression, Expressions, SortDirection, SortOrder => V2SortOrder}
+import org.apache.spark.sql.connector.expressions.{Expression => V2Expression, Expressions, NamedReference, SortDirection, SortOrder => V2SortOrder}
 import org.apache.spark.sql.connector.read._
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 import org.apache.spark.sql.internal.SQLConf
@@ -509,6 +509,107 @@ class TableFunctionCatalogSuite extends SharedSparkSession with BeforeAndAfter {
       sql("SELECT * FROM tvf.ns.scalarplustable(5, TABLE(tvf.ns.sptsrc))").collect())
     assert(e.getCondition == "TABLE_VALUED_FUNCTION_TABLE_ARGUMENT_WITH_SCALAR_UNSUPPORTED")
   }
+
+  test("TABLE-arg TVF select pushdown inserts a Project of exactly the declared columns") {
+    // selecttwo declares selectedInputColumns() = [b, a] over a (a, b, c) input. The analyzed
+    // TABLE-argument subtree must contain a Project computing exactly [b, a] (subset + reorder)
+    // feeding the struct input column, so the connector's evaluator sees only those two columns.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "selecttwo"), UnboundSelectTwo)
+    sql("CREATE TABLE tvf.ns.stsrc (a INT, b BIGINT, c STRING) USING foo")
+    val analyzed =
+      sql("SELECT * FROM tvf.ns.selecttwo(TABLE(tvf.ns.stsrc))").queryExecution.analyzed
+    // The struct input column `c` = CreateStruct over the selected columns, so the inserted
+    // Project's output names are exactly the selected columns in the declared order.
+    val structProjects = analyzed.collectWithSubqueries {
+      case p: Project => p
+    }.filter(_.projectList.exists {
+      case Alias(_: CreateNamedStruct, "c") => true
+      case _ => false
+    })
+    assert(structProjects.nonEmpty, s"expected the struct-input Project, plan:\n$analyzed")
+    val struct = structProjects.head.projectList.collectFirst {
+      case Alias(s: CreateNamedStruct, "c") => s
+    }.get
+    // CreateNamedStruct children alternate name-literal, value; the value names must be [b, a].
+    val selectedNames = struct.children.grouped(2).map {
+      case Seq(_, ref: NamedExpression) => ref.name
+      case other => fail(s"unexpected struct child shape: $other")
+    }.toSeq
+    assert(selectedNames == Seq("b", "a"),
+      s"expected struct over [b, a], got $selectedNames, plan:\n$analyzed")
+  }
+
+  test("TABLE-arg TVF select pushdown: evaluator receives only the selected columns, in order") {
+    // echocols echoes the field count and the concatenated string form of each received row, so a
+    // correct pushdown makes it see exactly [b, a] (two columns) rather than all three.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "echocols"), UnboundEchoCols)
+    sql("CREATE TABLE tvf.ns.ecsrc (a INT, b BIGINT, c STRING) USING foo")
+    sql("INSERT INTO tvf.ns.ecsrc VALUES (1, 10, 'x'), (2, 20, 'y')")
+    checkAnswer(
+      sql("SELECT ncols, rowstr FROM tvf.ns.echocols(TABLE(tvf.ns.ecsrc))"),
+      Row(2, "10|1") :: Row(2, "20|2") :: Nil)
+  }
+
+  test("TABLE-arg TVF select pushdown combines with a call-site PARTITION BY") {
+    // selectpart selects [ts, k] and the call site PARTITION BY k. The partition-key ordinal must
+    // track the selected layout (selected ++ partition_by marker), so each k lands in one group
+    // and the group's ts values are collected -- proving the ordinals survived the select Project.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "selectpart"), UnboundSelectPart)
+    sql("CREATE TABLE tvf.ns.spsrc (k INT, ts BIGINT, junk STRING) USING foo")
+    sql("INSERT INTO tvf.ns.spsrc VALUES " +
+      "(1, 11, 'a'), (2, 20, 'b'), (1, 10, 'c'), (2, 21, 'd'), (1, 12, 'e')")
+    checkAnswer(
+      sql("SELECT k, tss FROM tvf.ns.selectpart(TABLE(tvf.ns.spsrc) PARTITION BY k ORDER BY ts)"),
+      Row(1, "10,11,12") :: Row(2, "20,21") :: Nil)
+  }
+
+  test("TABLE-arg TVF selecting a non-existent input column is rejected") {
+    // selectmissing declares selectedInputColumns() = [nope]; the TABLE argument has no such
+    // column, so analysis must fail with a clean error rather than an internal resolution failure.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "selectmissing"), UnboundSelectMissing)
+    sql("CREATE TABLE tvf.ns.smsrc (a INT, b BIGINT) USING foo")
+    val e = intercept[AnalysisException](
+      sql("SELECT * FROM tvf.ns.selectmissing(TABLE(tvf.ns.smsrc))").collect())
+    assert(e.getCondition == "TABLE_VALUED_FUNCTION_SELECTED_COLUMN_NOT_FOUND")
+  }
+
+  test("TABLE-arg TVF with no selectedInputColumns passes every input column (default)") {
+    // echocols' sibling with an empty selection must still see all three columns -- the default
+    // (empty selectedInputColumns) is a no-op pushdown, preserving pre-PR3 behavior.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "echoall"), UnboundEchoAll)
+    sql("CREATE TABLE tvf.ns.easrc (a INT, b BIGINT, c STRING) USING foo")
+    sql("INSERT INTO tvf.ns.easrc VALUES (1, 10, 'x')")
+    checkAnswer(
+      sql("SELECT ncols, rowstr FROM tvf.ns.echoall(TABLE(tvf.ns.easrc))"),
+      Row(3, "1|10|x") :: Nil)
+  }
+
+  test("TABLE-arg TVF select pushdown matches column names case-insensitively") {
+    // selectcase declares selectedInputColumns() = [B, A] but the table columns are lower-case
+    // (a, b, c). Under the default case-insensitive analysis these must resolve to [b, a], the same
+    // as echocols -- mirroring how PARTITION BY / ORDER BY references resolve in this path.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "selectcase"), UnboundSelectCase)
+    sql("CREATE TABLE tvf.ns.scsrc (a INT, b BIGINT, c STRING) USING foo")
+    sql("INSERT INTO tvf.ns.scsrc VALUES (1, 10, 'x'), (2, 20, 'y')")
+    checkAnswer(
+      sql("SELECT ncols, rowstr FROM tvf.ns.selectcase(TABLE(tvf.ns.scsrc))"),
+      Row(2, "10|1") :: Row(2, "20|2") :: Nil)
+  }
+
+  test("TABLE-arg TVF select excluding the partition keys slices markers and groups by all keys") {
+    // selectmulti selects ONLY [ts], excluding the two PARTITION BY keys k1, k2. This pins two
+    // things the selectpart test cannot: (a) the appended partition_by markers are sliced off
+    // before the evaluator (ncols must be 1, not 3); (b) the partition ordinals track the selected
+    // layout across MULTIPLE keys (offset [1, 2], not [0, 1]) -- a missing offset would segment on
+    // ts and split every row into its own group.
+    catalog.createTableFunction(Identifier.of(Array("ns"), "selectmulti"), UnboundSelectMulti)
+    sql("CREATE TABLE tvf.ns.smtsrc (k1 INT, k2 INT, ts BIGINT) USING foo")
+    sql("INSERT INTO tvf.ns.smtsrc VALUES (1, 1, 10), (1, 1, 11), (1, 2, 20), (2, 1, 30)")
+    checkAnswer(
+      sql("SELECT ncols, tss FROM tvf.ns.selectmulti(" +
+        "TABLE(tvf.ns.smtsrc) PARTITION BY (k1, k2) ORDER BY ts)"),
+      Row(1, "10,11") :: Row(1, "20") :: Row(1, "30") :: Nil)
+  }
 }
 
 /** gen(n) -> rows (0..n-1) with a single LONG column `id`, via a LocalScan. */
@@ -983,4 +1084,234 @@ object BoundScalarPlusTable extends BoundTableFunction with SupportsTableArgumen
   override def requiredDistribution(): Distribution = Distributions.unspecified()
   override def requiredOrdering(): Array[V2SortOrder] = Array.empty
   override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * selecttwo(TABLE t) over input (a, b, c) declares selectedInputColumns() = [b, a] -- a subset and
+ * reorder. Used only for the plan-level assertion that the inserted struct-input Project selects
+ * exactly [b, a], so its evaluator is irrelevant.
+ */
+object UnboundSelectTwo extends UnboundTableFunction {
+  override def name(): String = "selecttwo"
+  override def bind(inputType: StructType): BoundTableFunction = BoundSelectTwo
+}
+
+object BoundSelectTwo extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "selecttwo"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("b"), Expressions.column("a"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * echocols(TABLE t) declares selectedInputColumns() = [b, a] over input (a INT, b BIGINT, c STRING)
+ * and emits one row per input row: (ncols INT, rowstr STRING), where ncols is the number of fields
+ * its evaluator received and rowstr is the pipe-joined field values. It proves the evaluator sees
+ * exactly the selected columns (2), in order [b, a] (BIGINT then INT).
+ */
+object UnboundEchoCols extends UnboundTableFunction {
+  override def name(): String = "echocols"
+  override def bind(inputType: StructType): BoundTableFunction = BoundEchoCols
+}
+
+object BoundEchoCols extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "echocols"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("ncols", "int").add("rowstr", "string")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("b"), Expressions.column("a"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = EchoColsEvaluatorFactory
+}
+
+/**
+ * Emits (ncols, rowstr) per input row for the selected [b BIGINT, a INT] layout: ncols = number of
+ * fields received (must be 2), rowstr = "<b>|<a>".
+ */
+object EchoColsEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      partition.asScala.map { row =>
+        val rowstr = s"${row.getLong(0)}|${row.getInt(1)}"
+        InternalRow(row.numFields, org.apache.spark.unsafe.types.UTF8String.fromString(rowstr))
+          .asInstanceOf[InternalRow]
+      }.asJava
+    }
+  }
+}
+
+/**
+ * echoall(TABLE t) is echocols with no selection (default = all columns). Over (a INT, b BIGINT,
+ * c STRING) its evaluator must see all three columns, in schema order.
+ */
+object UnboundEchoAll extends UnboundTableFunction {
+  override def name(): String = "echoall"
+  override def bind(inputType: StructType): BoundTableFunction = BoundEchoAll
+}
+
+object BoundEchoAll extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "echoall"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("ncols", "int").add("rowstr", "string")
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = EchoAllEvaluatorFactory
+}
+
+/**
+ * Emits (ncols, rowstr) per input row for the full (a INT, b BIGINT, c STRING) layout: ncols must
+ * be 3, rowstr = "<a>|<b>|<c>".
+ */
+object EchoAllEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      partition.asScala.map { row =>
+        val rowstr = s"${row.getInt(0)}|${row.getLong(1)}|${row.getUTF8String(2)}"
+        InternalRow(row.numFields, org.apache.spark.unsafe.types.UTF8String.fromString(rowstr))
+          .asInstanceOf[InternalRow]
+      }.asJava
+    }
+  }
+}
+
+/**
+ * selectpart(TABLE t PARTITION BY k) over (k INT, ts BIGINT, junk STRING) declares
+ * selectedInputColumns() = [ts, k]. It emits one row per group: (k INT, tss STRING), the group's
+ * ts values comma-joined in order. Because the selected layout is [ts, k] (+ the appended
+ * partition_by marker), correct output proves the PARTITION BY ordinal tracks the selected layout.
+ */
+object UnboundSelectPart extends UnboundTableFunction {
+  override def name(): String = "selectpart"
+  override def bind(inputType: StructType): BoundTableFunction = BoundSelectPart
+}
+
+object BoundSelectPart extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "selectpart"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("k", "int").add("tss", "string")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("ts"), Expressions.column("k"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = SelectPartEvaluatorFactory
+}
+
+/**
+ * Per group over the selected [ts, k] layout: emits (k, tss) where k is column 1 and tss is the
+ * comma-joined ts values (column 0) in received order.
+ */
+object SelectPartEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      val rows = partition.asScala.toSeq
+      if (rows.isEmpty) {
+        java.util.Collections.emptyIterator()
+      } else {
+        val k = rows.head.getInt(1)
+        val tss = rows.map(_.getLong(0)).mkString(",")
+        java.util.Collections.singletonList(
+          InternalRow(k, org.apache.spark.unsafe.types.UTF8String.fromString(tss))
+            .asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
+}
+
+/**
+ * selectmissing(TABLE t) declares selectedInputColumns() = [nope], a column absent from the input,
+ * so analysis must fail with a clean TABLE_VALUED_FUNCTION_SELECTED_COLUMN_NOT_FOUND error.
+ */
+object UnboundSelectMissing extends UnboundTableFunction {
+  override def name(): String = "selectmissing"
+  override def bind(inputType: StructType): BoundTableFunction = BoundSelectMissing
+}
+
+object BoundSelectMissing extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "selectmissing"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType = new StructType().add("cnt", "long")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("nope"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = CountRowsEvaluatorFactory
+}
+
+/**
+ * selectcase(TABLE t) is echocols with UPPER-cased selectedInputColumns() = [B, A] over lower-cased
+ * input (a, b, c). Under the default case-insensitive analysis these resolve to [b, a], so its
+ * evaluator (reused from echocols) must see exactly two columns in [b, a] order.
+ */
+object UnboundSelectCase extends UnboundTableFunction {
+  override def name(): String = "selectcase"
+  override def bind(inputType: StructType): BoundTableFunction = BoundSelectCase
+}
+
+object BoundSelectCase extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "selectcase"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("ncols", "int").add("rowstr", "string")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("B"), Expressions.column("A"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = EchoColsEvaluatorFactory
+}
+
+/**
+ * selectmulti(TABLE t PARTITION BY k1, k2) over (k1 INT, k2 INT, ts BIGINT) selects ONLY [ts],
+ * excluding both partition keys. It emits one row per group: (ncols INT, tss STRING) where ncols is
+ * the number of fields its evaluator received (must be 1 -- the two appended partition_by markers
+ * are sliced off) and tss is the group's ts values comma-joined. Correct output proves the marker
+ * slicing and the multi-key partition ordinals both track the selected layout.
+ */
+object UnboundSelectMulti extends UnboundTableFunction {
+  override def name(): String = "selectmulti"
+  override def bind(inputType: StructType): BoundTableFunction = BoundSelectMulti
+}
+
+object BoundSelectMulti extends BoundTableFunction with SupportsTableArgument {
+  override def name(): String = "selectmulti"
+  override def parameters(): Array[TableFunctionParameter] =
+    Array(TableFunctionParameter.scalar("input", DataTypes.StringType).build())
+  override def isDeterministic(): Boolean = true
+  override def resultSchema(): StructType =
+    new StructType().add("ncols", "int").add("tss", "string")
+  override def selectedInputColumns(): Array[NamedReference] =
+    Array(Expressions.column("ts"))
+  override def evaluatorFactory(): TableFunctionEvaluatorFactory = SelectMultiEvaluatorFactory
+}
+
+/**
+ * Per group over the selected [ts] layout: emits (ncols, tss) where ncols is the received field
+ * count (must be 1, markers sliced) and tss is the comma-joined ts values (column 0) in order.
+ */
+object SelectMultiEvaluatorFactory extends TableFunctionEvaluatorFactory {
+  override def create(): TableFunctionEvaluator = new TableFunctionEvaluator {
+    override def eval(
+        partition: java.util.Iterator[InternalRow]): java.util.Iterator[InternalRow] = {
+      val rows = partition.asScala.toSeq
+      if (rows.isEmpty) {
+        java.util.Collections.emptyIterator()
+      } else {
+        val ncols = rows.head.numFields
+        val tss = rows.map(_.getLong(0)).mkString(",")
+        java.util.Collections.singletonList(
+          InternalRow(ncols, org.apache.spark.unsafe.types.UTF8String.fromString(tss))
+            .asInstanceOf[InternalRow]).iterator()
+      }
+    }
+  }
 }

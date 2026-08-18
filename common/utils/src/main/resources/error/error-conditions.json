@@ -7597,6 +7597,12 @@
     ],
     "sqlState" : "42K08"
   },
+  "TABLE_VALUED_FUNCTION_SELECTED_COLUMN_NOT_FOUND" : {
+    "message" : [
+      "The table-valued function <functionName> requested input column <columnName>, but the TABLE argument has no such column. Available columns: <availableColumns>."
+    ],
+    "sqlState" : "42703"
+  },
   "TABLE_VALUED_FUNCTION_TABLE_ARGUMENT_WITH_SCALAR_UNSUPPORTED" : {
     "message" : [
       "The table-valued function <functionName> was called with both a TABLE argument and one or more scalar arguments.",

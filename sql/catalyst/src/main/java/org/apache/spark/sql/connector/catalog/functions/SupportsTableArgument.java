@@ -20,6 +20,7 @@ package org.apache.spark.sql.connector.catalog.functions;
 import org.apache.spark.annotation.Evolving;
 import org.apache.spark.sql.connector.distributions.Distribution;
 import org.apache.spark.sql.connector.distributions.Distributions;
+import org.apache.spark.sql.connector.expressions.NamedReference;
 import org.apache.spark.sql.connector.expressions.SortOrder;
 
 /**
@@ -77,4 +78,20 @@ public interface SupportsTableArgument extends BoundTableFunction {
    * once per task.
    */
   TableFunctionEvaluatorFactory evaluatorFactory();
+
+  /**
+   * Returns the subset of the TABLE argument's columns this function's evaluator consumes, in the
+   * order they should be presented to it.
+   * <p>
+   * Each reference must name a single top-level column of the TABLE argument's schema. Spark
+   * projects only the referenced columns (in the given order) into the input relation, so
+   * {@link TableFunctionEvaluator#eval(java.util.Iterator)} receives one field per reference and
+   * the connector can prune columns it does not read. The default is an empty array, meaning no
+   * pruning: the evaluator receives every column of the TABLE argument, in schema order.
+   *
+   * @return the selected input columns; an empty array means all columns (no pruning)
+   */
+  default NamedReference[] selectedInputColumns() {
+    return new NamedReference[0];
+  }
 }

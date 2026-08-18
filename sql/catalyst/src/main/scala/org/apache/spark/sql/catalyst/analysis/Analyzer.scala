@@ -2433,8 +2433,17 @@ class Analyzer(
             // V2 TABLE-argument generator, so its exec node can segment adjacent rows into groups.
             case g @ Generate(tvfGen: TableFunctionGenerator, _, _, _, _, _)
                 if f.partitionByExpressions.nonEmpty =>
+              val partitionColumnIndexes = if (f.selectedInputExpressions.isEmpty) {
+                f.partitioningExpressionIndexes
+              } else {
+                // When the function also selected input column(s), `evaluable` builds the input
+                // struct as `selected ++ partition_by markers`, so the PARTITION BY columns sit
+                // right after the selected columns (mirrors the PythonUDTF handling above).
+                (0 until f.extraProjectedPartitioningExpressions.length)
+                  .map(_ + f.selectedInputExpressions.length)
+              }
               g.copy(generator =
-                tvfGen.copy(partitionColumnIndexes = f.partitioningExpressionIndexes))
+                tvfGen.copy(partitionColumnIndexes = partitionColumnIndexes))
             case _ => tvf
           }
 

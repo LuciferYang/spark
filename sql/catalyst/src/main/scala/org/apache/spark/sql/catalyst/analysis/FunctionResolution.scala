@@ -434,11 +434,15 @@ class FunctionResolution(
         applyRequiredMetadata(fnName, tableFn, t)
       case other => other
     }
-    // The number of the TABLE argument's own columns: the analyzer's expansion may append internal
-    // partition_by_N marker columns after them (for group segmentation), so the exec node needs the
-    // original count to slice each row back to the connector's expected input schema.
+    // The number of the TABLE argument's own columns that reach the connector's evaluator: this is
+    // what the exec node slices each row back to, dropping any trailing partition_by_N markers the
+    // analyzer appends for group segmentation. When the function selects a subset of input columns
+    // (selectedInputExpressions), `evaluable` builds the input struct as `selected ++ markers`, so
+    // the count is the number of selected columns; otherwise it is the full input width.
     val inputColumnCount = withRequired.collectFirst {
-      case t: FunctionTableSubqueryArgumentExpression => t.plan.output.length
+      case t: FunctionTableSubqueryArgumentExpression =>
+        if (t.selectedInputExpressions.nonEmpty) t.selectedInputExpressions.length
+        else t.plan.output.length
     }.getOrElse {
       // resolveV2TableArgumentFunction is only entered when a TABLE argument is present, so the
       // TABLE argument must survive rearrangement; a miss means an internal invariant is broken.
@@ -508,6 +512,10 @@ class FunctionResolution(
     // call-site PARTITION BY / ORDER BY is preserved (mirrors applyToTableArgument).
     val newPartitionBy = if (partitionBy.nonEmpty) partitionBy else t.partitionByExpressions
     val newOrderBy = if (orderBy.nonEmpty) orderBy else t.orderByExpressions
+    // The function may also declare a subset/reordering of input columns its evaluator consumes.
+    // A TABLE-argument function is a catalog function, not SQL syntax, so there is no call-site
+    // `select` to merge with -- the function's declaration is authoritative (empty = all columns).
+    val selectedInputExpressions = resolveSelectedInputExpressions(fnName, tableFn, t)
     // An ordering can only be enforced when the input is partitioned: `evaluable` inserts a Sort
     // only under a PARTITION BY or WITH SINGLE PARTITION. Evaluate this against the MERGED state --
     // a call-site PARTITION BY / WITH SINGLE PARTITION satisfies the requirement just as a
@@ -520,11 +528,51 @@ class FunctionResolution(
           "(via the function's clustered distribution or the call site's PARTITION BY / WITH " +
           "SINGLE PARTITION clause)")
     }
-    if (newPartitionBy.eq(t.partitionByExpressions) && newOrderBy.eq(t.orderByExpressions)) {
+    if (newPartitionBy.eq(t.partitionByExpressions) && newOrderBy.eq(t.orderByExpressions) &&
+        selectedInputExpressions.eq(t.selectedInputExpressions)) {
       t
     } else {
-      t.copy(partitionByExpressions = newPartitionBy, orderByExpressions = newOrderBy)
+      t.copy(
+        partitionByExpressions = newPartitionBy,
+        orderByExpressions = newOrderBy,
+        selectedInputExpressions = selectedInputExpressions)
     }
+  }
+
+  /**
+   * Resolves the function-declared `selectedInputColumns` (a subset/reordering of the TABLE
+   * argument's columns the connector's evaluator consumes) against the TABLE argument's output,
+   * as `PythonUDTFSelectedExpression`s so they reuse the same `evaluable` projection the Python
+   * UDTF `select` mechanism uses. Returns `Seq.empty` when the function selects nothing (all input
+   * columns are passed through, the default). A named column absent from the input relation fails
+   * analysis with a clean error rather than an internal resolution failure.
+   */
+  private def resolveSelectedInputExpressions(
+      fnName: String,
+      tableFn: SupportsTableArgument,
+      t: FunctionTableSubqueryArgumentExpression): Seq[PythonUDTFSelectedExpression] = {
+    val selected = tableFn.selectedInputColumns()
+    if (selected.isEmpty) {
+      return Seq.empty
+    }
+    selected.map { ref =>
+      // Each reference must name a single top-level column of the TABLE argument's schema.
+      val name = ref.fieldNames() match {
+        case Array(single) => single
+        case parts =>
+          throw QueryCompilationErrors.tableValuedFunctionSelectedColumnNotFoundError(
+            fnName, parts.mkString("."), t.plan.output.map(_.name))
+      }
+      // Match by the analyzer's resolver (case-insensitive under the default caseSensitive=false),
+      // consistent with how the PARTITION BY / ORDER BY references in this same path are resolved
+      // (via V2ExpressionUtils -> plan.resolve). An exact-string match would reject a differently
+      // cased-but-equal column name the connector cannot control (the user picks it at CREATE
+      // TABLE). `find` also gives a deterministic first match if the input has duplicate names.
+      val attr = t.plan.output.find(a => conf.resolver(a.name, name)).getOrElse(
+        throw QueryCompilationErrors.tableValuedFunctionSelectedColumnNotFoundError(
+          fnName, name, t.plan.output.map(_.name)))
+      PythonUDTFSelectedExpression(attr, None)
+    }.toImmutableArraySeq
   }
 
   /**
