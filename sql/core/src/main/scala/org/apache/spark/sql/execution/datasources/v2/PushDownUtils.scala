@@ -22,7 +22,7 @@ import scala.collection.mutable
 import org.apache.spark.SparkException
 import org.apache.spark.internal.{Logging, LogKeys}
 import org.apache.spark.sql.AnalysisException
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, DynamicPruning, DynamicPruningExpression, Expression, ExpressionSet, GetStructField, NamedExpression, PythonUDF, SchemaPruning, SubqueryExpression, V2ExpressionUtils}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, DynamicPruning, DynamicPruningExpression, Expression, ExpressionSet, GetStructField, Literal, NamedExpression, PythonUDF, SchemaPruning, SubqueryExpression, V2ExpressionUtils}
 import org.apache.spark.sql.catalyst.plans.logical.SampleMethod
 import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
@@ -232,6 +232,14 @@ object PushDownUtils extends Logging {
    * @return one entry per original input partition: `Some(part)` for surviving partitions and
    *         `None` for partition keys whose splits were entirely pruned (SPJ alignment)
    */
+  /**
+   * A runtime filter that cannot remove anything. `PlanDynamicPruningFilters` substitutes
+   * `DynamicPruningExpression(TrueLiteral)` for a DPP filter it decided not to plan, and
+   * `BatchScanExec.doCanonicalize` drops exactly this value before comparing plans.
+   */
+  private[v2] def isNoOpRuntimeFilter(f: Expression): Boolean =
+    f == DynamicPruningExpression(Literal.TrueLiteral) || f == Literal.TrueLiteral
+
   def replanWithRuntimeFilters(
       scan: Scan,
       runtimeFilters: Seq[Expression],
@@ -244,8 +252,21 @@ object PushDownUtils extends Logging {
     // expressions. This preserves DynamicPruningExpression and scalar-subquery semantics
     // that V2-Predicate translation would drop.
     val (filtered, newPartitions) = scan match {
-      case fs: FileScan if runtimeFilters.nonEmpty =>
-        (true, fs.planInputPartitionsWithRuntimeFilters(runtimeFilters))
+      case fs: FileScan =>
+        // The gate is "has a filter that can prune", not `nonEmpty`:
+        // `PlanDynamicPruningFilters` leaves `DynamicPruningExpression(TrueLiteral)` behind when
+        // `reuseBroadcastOnly` is on and there is no reusable broadcast, and that value removes
+        // nothing while still counting as a filter. Routing it through
+        // `planInputPartitionsWithRuntimeFilters` costs a full `fileIndex.listFiles` plus
+        // `FilePartition` bucketing and cannot drop a single file, which is not cheap on a table
+        // with many partitions. `BatchScanExec.doCanonicalize` drops the same value, which is how
+        // we know it really reaches here.
+        val pruningFilters = runtimeFilters.filterNot(isNoOpRuntimeFilter)
+        if (pruningFilters.isEmpty) {
+          (false, Array.empty[InputPartition])
+        } else {
+          (true, fs.planInputPartitionsWithRuntimeFilters(pruningFilters))
+        }
       case _ =>
         val pushed = pushRuntimeFilters(scan, runtimeFilters, table, output)
         // call toBatch again to get filtered partitions

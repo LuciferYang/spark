@@ -89,9 +89,19 @@ object PartitionPruning extends Rule[LogicalPlan] with PredicateHelper with Join
         // SPARK-30628: FileScan doesn't implement SupportsRuntimeV2Filtering, so the case
         // above doesn't catch it. Partition columns are filterable at runtime via
         // FileScan.planInputPartitionsWithRuntimeFilters, so DPP is eligible on them.
-        val partitionFieldNames = scan.readPartitionSchema.fieldNames.toSet
+        //
+        // Name matching goes through the resolver, like the V1 branch above
+        // (`l.resolve(fs.partitionSchema, ...)`) and like FileScan itself everywhere else
+        // (`FileScanBuilder.readPartitionSchema` and `FileScan.planInputPartitions` both
+        // normalise by case sensitivity). The two sides do agree in case today, because the
+        // partition attributes in `r.output` are built from this same `readPartitionSchema`;
+        // the resolver is here so this branch is not the one place that breaks if that stops
+        // holding. Note `readPartitionSchema` is derived from the required schema, so a
+        // partition column the query never reads is absent and DPP is simply not offered on
+        // it -- a missed optimisation, not a wrong answer.
+        val resolver = conf.resolver
         val partitionColumns = AttributeSet(
-          r.output.filter(a => partitionFieldNames.contains(a.name)))
+          r.output.filter(a => scan.readPartitionSchema.exists(f => resolver(f.name, a.name))))
         if (resExp.references.subsetOf(partitionColumns)) {
           Some(r)
         } else {
