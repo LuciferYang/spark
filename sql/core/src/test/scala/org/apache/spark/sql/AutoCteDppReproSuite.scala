@@ -222,19 +222,11 @@ class AutoCteDppReproSuite extends QueryTest with TPCDSBase {
    * that is what a widened cache body actually changes. The TPC-DS tables this
    * suite creates are empty, so this test brings its own partitioned table.
    *
-   * `spark.sql.unionOutputPartitioning=false` works around a defect in this fork's
-   * `UnionExec`, not in auto-CTE. `supportCodegen` is gated on
-   * `outputPartitioning.isInstanceOf[UnknownPartitioning]` and `metrics` registers
-   * `numOutputRows` only when that gate passes, but `outputPartitioning` is derived from
-   * the children, and a cached child's partitioning changes when AQE materialises the
-   * cache: `InMemoryTableScanExec.outputPartitioning` reads `cachedPlan.outputPartitioning`,
-   * which the inner `AdaptiveSparkPlanExec` only reports concretely once the cache stage
-   * has run. AQE then rebuilds the union through `withNewChildren` without re-running
-   * `CollapseCodegenStages`, so the fused `WholeStageCodegenExec` ends up around an
-   * instance that now answers `supportCodegen = false`, and `doProduce` dies with
-   * `NoSuchElementException: key not found: numOutputRows`. Two cached scans directly
-   * under a `Union` is the shape that reaches it, which is why auto-CTE finds it and the
-   * baseline run does not. Remove the pin once `UnionExec` is fixed.
+   * This test used to pin `spark.sql.unionOutputPartitioning=false`, because two cached
+   * scans under a `Union` reached a `UnionExec` defect: its codegen decision was derived
+   * from the children's partitioning, which changes when AQE materialises the cache. That
+   * decision is now taken once and carried on the node, so the pin is gone -- see
+   * `UnionFusedMetricsSuite`.
    */
   test("a DynamicPruningExpression wrapping a real conjunct is not stripped") {
     withTable("auto_cte_dpe_fact") {
@@ -269,7 +261,6 @@ class AutoCteDppReproSuite extends QueryTest with TPCDSBase {
       var baseline: Seq[Row] = null
       withSQLConf(
           SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "false",
-          SQLConf.UNION_OUTPUT_PARTITIONING.key -> "false",
           SQLConf.AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE.key -> "false") {
         baseline = spark.sql(sqlText).collect().toSeq
       }
@@ -279,7 +270,6 @@ class AutoCteDppReproSuite extends QueryTest with TPCDSBase {
       var cached: Seq[Row] = null
       withSQLConf(
           SQLConf.AUTO_REUSED_CTE_ENABLED.key -> "true",
-          SQLConf.UNION_OUTPUT_PARTITIONING.key -> "false",
           SQLConf.AUTO_CTE_SKIP_WHEN_PRUNING_APPLICABLE.key -> "false",
           SQLConf.AUTO_CTE_CACHE_MIN_SIZE_BYTES.key -> "0") {
         val df = spark.sql(sqlText)

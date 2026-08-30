@@ -32,6 +32,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.plans.physical._
+import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.execution.joins.{ShuffledHashJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
@@ -907,7 +908,8 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
-  override def outputPartitioning: Partitioning = {
+  /** The SPARK-52921 pass-through partitioning, recomputed from the children on every call. */
+  private def rawPartitioning: Partitioning = {
     if (conf.getConf(SQLConf.UNION_OUTPUT_PARTITIONING)) {
       val partitionings = prepareOutputPartitioning()
       if (partitionings.forall(comparePartitioning(_, partitionings.head))) {
@@ -930,9 +932,50 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
     }
   }
 
-  // True when the codegen path applies: `outputPartitioning` is `UnknownPartitioning`,
-  // and `unionedInputRDD` matches the semantics of `sparkContext.union(...)` in `doExecute`.
-  private def isPlainUnion: Boolean = outputPartitioning.isInstanceOf[UnknownPartitioning]
+  /**
+   * True when this union behaves as a plain concatenation: `unionedInputRDD` matches the
+   * semantics of `sparkContext.union(...)`, whole-stage codegen fusion applies, and
+   * `numOutputRows` is registered.
+   *
+   * DECIDED ONCE and then carried on the node, rather than recomputed per caller. The inputs
+   * are not stable over a node's lifetime: `InMemoryTableScanExec.outputPartitioning` reads
+   * `cachedPlan.outputPartitioning`, and an inner `AdaptiveSparkPlanExec` answers
+   * `UnknownPartitioning` until its final plan exists, so a child can report Unknown while
+   * `CollapseCodegenStages` decides and a concrete partitioning by the time the stage runs.
+   * When both children answer Unknown, `comparePartitioning` rejects that pair and the union
+   * falls through to `super.outputPartitioning`, i.e. it looks plain and gets fused; the
+   * partitioning then becomes concrete and every consumer of this predicate flips with it.
+   *
+   * `insertInputAdapter` rebuilds the node through `withNewChildren` and puts the COPY inside
+   * the `WholeStageCodegenExec` it just created, so the copy re-derives the predicate later and
+   * can answer the opposite of the decision the shell was built from -- `metrics` comes back
+   * empty and `doProduce`'s `metricTerm` throws `key not found: numOutputRows`. A `TreeNodeTag`
+   * survives that rebuild (`TreeNode.withNewChildren` ends in `copyTagsFrom`, which copies into
+   * a tagless node), so the copy inherits the decision instead of making a new one.
+   *
+   * `outputPartitioning` reads this too, which is the half that keeps a fused union from lying:
+   * a node that committed to concatenation must not go on claiming a concrete partitioning, or
+   * a parent skips an exchange it needs. The cost is that a union over children whose
+   * partitioning only becomes known later keeps reporting Unknown -- SPARK-52921's
+   * exchange elimination is lost for that shape, which is the conservative direction.
+   */
+  private def isPlainUnion: Boolean =
+    getTagValue(UnionExec.PLAIN_UNION_DECISION).getOrElse {
+      val plain = rawPartitioning.isInstanceOf[UnknownPartitioning]
+      setTagValue(UnionExec.PLAIN_UNION_DECISION, plain)
+      plain
+    }
+
+  /**
+   * The partitioning this node reports AND executes by. Both `outputPartitioning` and
+   * `doExecute` read it, so the RDD shape can never contradict the claim: a latched-plain node
+   * reports Unknown and concatenates, and a latched-aware node whose children have since
+   * drifted apart reports Unknown -- `rawPartitioning` says so -- and concatenates as well.
+   */
+  private def effectivePartitioning: Partitioning =
+    if (isPlainUnion) UnknownPartitioning(0) else rawPartitioning
+
+  override def outputPartitioning: Partitioning = effectivePartitioning
 
   // Per-child projection from the child's output to the union's output. The wrapped
   // child is always the source `Attribute` (deterministic by construction); the Alias
@@ -1138,14 +1181,14 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
   override def usedInputs: AttributeSet = AttributeSet.empty
 
   protected override def doExecute(): RDD[InternalRow] = {
-    if (isPlainUnion) {
-      sparkContext.union(children.map(_.execute()))
-    } else {
-      // This union has a known partitioning, i.e., its children have the same partitioning
-      // in semantics so this union can choose not to change the partitioning by using a
-      // custom partitioning aware union RDD.
-      val nonEmptyRdds = children.map(_.execute()).filter(!_.partitions.isEmpty)
-      new SQLPartitioningAwareUnionRDD(sparkContext, nonEmptyRdds, outputPartitioning.numPartitions)
+    effectivePartitioning match {
+      case _: UnknownPartitioning => sparkContext.union(children.map(_.execute()))
+      case p =>
+        // This union has a known partitioning, i.e., its children have the same partitioning
+        // in semantics so this union can choose not to change the partitioning by using a
+        // custom partitioning aware union RDD.
+        val nonEmptyRdds = children.map(_.execute()).filter(!_.partitions.isEmpty)
+        new SQLPartitioningAwareUnionRDD(sparkContext, nonEmptyRdds, p.numPartitions)
     }
   }
 
@@ -1162,6 +1205,14 @@ case class UnionExec(children: Seq[SparkPlan]) extends SparkPlan with CodegenSup
 }
 
 object UnionExec {
+  /**
+   * The once-and-for-all "does this union behave as a plain concatenation" decision, carried on
+   * the node so that the copy `CollapseCodegenStages.insertInputAdapter` puts inside a
+   * `WholeStageCodegenExec` cannot re-derive it and answer differently. See
+   * `UnionExec.isPlainUnion`.
+   */
+  val PLAIN_UNION_DECISION = TreeNodeTag[Boolean]("plainUnionDecision")
+
   /**
    * Codegen operators that return more than one RDD from `inputRDDs()`.
    * `UnionExec`'s fusion assumes each direct child contributes one RDD.
