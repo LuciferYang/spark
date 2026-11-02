@@ -173,6 +173,11 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       // but are also routed into runtimeFilters so BatchScanExec can use them for
       // partition pruning via SupportsRuntimeV2Filtering.filter() or via FileScan's
       // planInputPartitionsWithRuntimeFilters (SPARK-30628 for V2 file sources).
+      // Only deterministic filters qualify. FileScan evaluates runtime filters once per
+      // partition value on the driver, where a non-deterministic expression either fails
+      // (it is never initialized) or keeps or drops whole partitions. A filter whose only
+      // non-determinism is inside the subquery plan is excluded too: the scan and the
+      // FilterExec above it would each run the subquery when subquery reuse is off.
       val effectiveRuntimeFilterAttrs = relation.scan match {
         case fs: FileScan =>
           // SPARK-30628: FileScan doesn't implement SupportsRuntimeV2Filtering, so
@@ -185,7 +190,8 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       }
       val scalarSubqueryFilters = if (effectiveRuntimeFilterAttrs.nonEmpty) {
         postScanFilters.filter { f =>
-          f.containsPattern(SCALAR_SUBQUERY) &&
+          f.deterministic &&
+            f.containsPattern(SCALAR_SUBQUERY) &&
             f.references.nonEmpty &&
             f.references.subsetOf(effectiveRuntimeFilterAttrs)
         }

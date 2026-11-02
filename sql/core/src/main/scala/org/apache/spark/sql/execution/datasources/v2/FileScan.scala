@@ -196,9 +196,10 @@ trait FileScan extends Scan
 
   /**
    * SPARK-30628: produce InputPartitions taking additional runtime filters into account.
-   * Called by `BatchScanExec.filteredPartitions` with DPP and scalar-subquery filters that
-   * must apply on top of the scan's compile-time `partitionFilters`. Returns the same
-   * partitions as `planInputPartitions()` when `extraFilters` is empty.
+   * Called by `PushDownUtils.replanWithRuntimeFilters` (from `BatchScanExec.filteredPartitions`)
+   * with DPP and scalar-subquery filters that must apply on top of the scan's compile-time
+   * `partitionFilters`. Returns the same partitions as `planInputPartitions()` when
+   * `extraFilters` is empty.
    */
   def planInputPartitionsWithRuntimeFilters(
       extraFilters: Seq[Expression]): Array[InputPartition] = {

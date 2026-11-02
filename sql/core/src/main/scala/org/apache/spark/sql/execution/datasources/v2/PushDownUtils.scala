@@ -211,6 +211,14 @@ object PushDownUtils extends Logging {
   }
 
   /**
+   * A runtime filter that cannot remove anything. `PlanDynamicPruningFilters` substitutes
+   * `DynamicPruningExpression(TrueLiteral)` for a DPP filter it decided not to plan, and
+   * `BatchScanExec.doCanonicalize` drops exactly this value before comparing plans.
+   */
+  private[v2] def isNoOpRuntimeFilter(f: Expression): Boolean =
+    f == DynamicPruningExpression(Literal.TrueLiteral) || f == Literal.TrueLiteral
+
+  /**
    * Pushes runtime filters into `scan` and re-plans its input partitions. For scans whose
    * `outputPartitioning` is a [[KeyedPartitioning]] (SPJ-active), validates that the data source
    * preserved the original partitioning and pads with `None` to preserve key alignment with the
@@ -232,14 +240,6 @@ object PushDownUtils extends Logging {
    * @return one entry per original input partition: `Some(part)` for surviving partitions and
    *         `None` for partition keys whose splits were entirely pruned (SPJ alignment)
    */
-  /**
-   * A runtime filter that cannot remove anything. `PlanDynamicPruningFilters` substitutes
-   * `DynamicPruningExpression(TrueLiteral)` for a DPP filter it decided not to plan, and
-   * `BatchScanExec.doCanonicalize` drops exactly this value before comparing plans.
-   */
-  private[v2] def isNoOpRuntimeFilter(f: Expression): Boolean =
-    f == DynamicPruningExpression(Literal.TrueLiteral) || f == Literal.TrueLiteral
-
   def replanWithRuntimeFilters(
       scan: Scan,
       runtimeFilters: Seq[Expression],

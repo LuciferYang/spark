@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{DynamicPruning, DynamicPruning
 import org.apache.spark.sql.catalyst.plans.logical.Filter
 import org.apache.spark.sql.execution.ExplainUtils.stripAQEPlan
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, FileScan}
+import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
 
@@ -208,6 +209,39 @@ class DataSourceV2FileSourceDPPSuite extends QueryTest with SharedSparkSession {
         assert(dynamicPruningInstances.isEmpty,
           "scalar subquery filters must not be wrapped in DynamicPruning at this commit, " +
             "got plan:\n" + optimized.treeString)
+      }
+    }
+  }
+
+  test("non-deterministic filter with a scalar subquery on a partition column still runs") {
+    // The OR conjunct contains a scalar subquery and references only the partition column,
+    // the shape routed into BatchScanExec.runtimeFilters. Partition pruning evaluates runtime
+    // filters once per partition value on the driver, which a non-deterministic expression
+    // cannot take: `rand` is never initialized there and fails the query, and a
+    // non-deterministic UDF is evaluated once per partition, keeping or dropping all of its
+    // rows. (`rand(0) >= 0` would not do: OptimizeRand folds it to true.)
+    withDppV2Conf {
+      withTempDir { dir =>
+        writeFactAndDim(dir)
+        withUserDefinedFunction("nd_coin" -> true) {
+          spark.udf.register("nd_coin", udf(() => math.random() < 0.5).asNondeterministic())
+          Seq("rand(0) < 0.5", "nd_coin()").foreach { nonDeterministic =>
+            val df = sql(
+              s"""SELECT f.id, f.part FROM fact f
+                 |WHERE f.part = (SELECT max(dim_id) FROM dim WHERE dim_val = 7)
+                 |   OR $nonDeterministic""".stripMargin)
+            val rows = df.collect()
+            // Every row of partition 7 passes the left side; the rest are sampled.
+            assert(rows.count(_.getInt(1) == 7) == 10)
+            val executedPlan = stripAQEPlan(df.queryExecution.executedPlan)
+            val factScan = executedPlan.collectFirst {
+              case b: BatchScanExec if b.scan.isInstanceOf[FileScan] => b
+            }.getOrElse(fail("no fact BatchScanExec found in:\n" + executedPlan.treeString))
+            assert(factScan.runtimeFilters.isEmpty,
+              s"`$nonDeterministic` reached the scan's runtime filters:\n" +
+                executedPlan.treeString)
+          }
+        }
       }
     }
   }
