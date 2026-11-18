@@ -389,6 +389,16 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
       // `isRepeatableRead` counts. A pushed limit, for example, lets the source pick other rows on
       // a second read.
       case scan: DataSourceV2ScanRelation if !scan.isRepeatableRead => None
+      // A PartialAggregate or FinalAggregate that groups by the target key produces a superset of
+      // distinct key values, so it's safe to traverse through it for bloom filter creation. We
+      // reset predicate/filter state since the aggregate may change the plan structure above the
+      // selective filter. A plain Aggregate is not traversed, as before partial aggregation
+      // optimization.
+      case agg @ (_: PartialAggregate | _: FinalAggregate)
+          if agg.output.exists(_.semanticEquals(targetKey)) =>
+        extract(agg.children.head, AttributeSet.empty,
+          hasHitFilter = false, hasHitSelectiveFilter = false,
+          currentPlan = currentPlan, targetKey = targetKey)
       case _: LeafNode if hasHitSelectiveFilter =>
         Some(FilterCreationSide(
           targetKey,
@@ -405,7 +415,7 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
     }
   }
 
-  private def isSimpleExpression(e: Expression): Boolean = {
+  private[optimizer] def isSimpleExpression(e: Expression): Boolean = {
     !e.containsAnyPattern(PYTHON_UDF, SCALA_UDF, INVOKE, JSON_TO_STRUCT, LIKE_FAMLIY,
       REGEXP_EXTRACT_FAMILY, REGEXP_REPLACE, EXTERNAL_UDF)
   }
