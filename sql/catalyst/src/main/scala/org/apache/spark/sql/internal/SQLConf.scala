@@ -1987,6 +1987,30 @@ object SQLConf {
       .booleanConf
       .createWithDefault(true)
 
+  val PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED =
+    buildConf("spark.sql.optimizer.partialAggregationOptimization.enabled")
+      .internal()
+      .doc("When true, the query optimizer will introduce partial aggregations to " +
+        "optimize query. This optimization applies to: " +
+        "1. Push down partial sum, count, avg, min, max, first and last through inner join " +
+        "2. Partial deduplicate the children of join if the aggregation itself is group only " +
+        "3. Partial deduplicate the right side of left semi/anti join.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(false)
+
+  val PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO =
+    buildConf("spark.sql.optimizer.partialAggregationOptimization.benefitRatio")
+      .internal()
+      .doc("The reduction ratio lower than this config will introduce partial aggregations " +
+        "before join.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .doubleConf
+      .checkValue(r => r >= 0 && r <= 1.0, "The benefit ratio must be positive number.")
+      .createWithDefault(0.3)
+
   val ESCAPED_STRING_LITERALS = buildConf("spark.sql.parser.escapedStringLiterals")
     .internal()
     .doc("When true, string literals (including regex patterns) remain escaped in our SQL " +
@@ -10259,6 +10283,12 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
     getConf(LEGACY_INFER_FAILABLE_FILTERS_FROM_CONSTRAINTS)
 
   def inferFiltersAcrossAsOfJoinEnabled: Boolean = getConf(INFER_FILTERS_ACROSS_AS_OF_JOIN_ENABLED)
+
+  def partialAggregationOptimizationEnabled: Boolean =
+    getConf(PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED)
+
+  def partialAggregationOptimizationBenefitRatio: Double =
+    getConf(PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO)
 
   def escapedStringLiterals: Boolean = getConf(ESCAPED_STRING_LITERALS)
 

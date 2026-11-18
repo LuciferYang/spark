@@ -128,6 +128,51 @@ object AggUtils {
     }
   }
 
+  def planPartialAggregateWithoutDistinct(
+    groupingExpressions: Seq[NamedExpression],
+    aggregateExpressions: Seq[AggregateExpression],
+    resultExpressions: Seq[NamedExpression],
+    child: SparkPlan): Seq[SparkPlan] = {
+    val completeAggregateExpressions = aggregateExpressions.map(_.copy(mode = Complete))
+    createAggregate(
+      requiredChildDistributionExpressions = None,
+      groupingExpressions = groupingExpressions.map(_.toAttribute),
+      aggregateExpressions = completeAggregateExpressions,
+      aggregateAttributes = completeAggregateExpressions.map(_.resultAttribute),
+      initialInputBufferOffset = groupingExpressions.length,
+      resultExpressions = resultExpressions,
+      child = child) :: Nil
+  }
+
+  def planFinalAggregateWithoutDistinct(
+    groupingExpressions: Seq[NamedExpression],
+    aggregateExpressions: Seq[AggregateExpression],
+    resultExpressions: Seq[NamedExpression],
+    child: SparkPlan): Seq[SparkPlan] = {
+    // PushPartialAggregationThroughJoin does not push a session window grouping.
+    assert(!groupingExpressions.exists(_.metadata.contains(SessionWindow.marker)))
+    val finalAggregateExpressions = aggregateExpressions.map(_.copy(mode = Complete))
+    val finalAggregateAttributes = finalAggregateExpressions.map(_.resultAttribute)
+
+    // One aggregate sees all rows of a group, so it groups on the normalized keys, as the
+    // Complete-mode aggregate of `planAggregateWithoutDistinct` does when partial aggregation is
+    // bypassed.
+    // Require clustering on the normalized values: a child partitioning never carries the Alias,
+    // so requiring the Alias always adds a shuffle.
+    val requiredDistribution = groupingExpressions.map {
+      case a: Alias => a.child
+      case e => e
+    }
+    createAggregate(
+      requiredChildDistributionExpressions = Some(requiredDistribution),
+      groupingExpressions = groupingExpressions,
+      aggregateExpressions = finalAggregateExpressions,
+      aggregateAttributes = finalAggregateAttributes,
+      initialInputBufferOffset = 0,
+      resultExpressions = resultExpressions,
+      child = child) :: Nil
+  }
+
   def planAggregateWithoutDistinct(
       groupingExpressions: Seq[NamedExpression],
       aggregateExpressions: Seq[AggregateExpression],

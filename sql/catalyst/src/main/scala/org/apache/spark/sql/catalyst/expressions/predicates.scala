@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.expressions.Cast._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.expressions.codegen.Block._
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Filter, GlobalLimit, Join, LeafNode, LocalLimit, LogicalPlan, Offset, Project, Sample, Sort, Union}
+import org.apache.spark.sql.catalyst.plans.logical.{AggregateBase, Filter, GlobalLimit, Join, LeafNode, LocalLimit, LogicalPlan, Offset, Project, Sample, Sort, Union}
 import org.apache.spark.sql.catalyst.trees.TreePattern._
 import org.apache.spark.sql.catalyst.util.{CollationFactory, TypeUtils}
 import org.apache.spark.sql.internal.SQLConf
@@ -144,7 +144,7 @@ trait PredicateHelper extends AliasHelper with Logging {
         val aliases = getAliasMap(p)
         findExpressionAndTrackAllLineagesDown(replaceAlias(exp, aliases), p.child, strict)
       // we can unwrap only if there are row projections, and no aggregation operation
-      case a: Aggregate =>
+      case a: AggregateBase =>
         val aliasMap = getAliasMap(a)
         findExpressionAndTrackAllLineagesDown(replaceAlias(exp, aliasMap), a.child, strict)
       case l: LeafNode if exp.references.subsetOf(l.outputSet) =>
@@ -239,10 +239,10 @@ trait PredicateHelper extends AliasHelper with Logging {
    * does. The columns are:
    *  - A deterministic column of a [[Project]] whose expression
    *    [[ExprUtils.canEvaluateUnconditionally]] rejects or reads such a column of its child.
-   *  - A result column of an [[Aggregate]] whose expression, with each aggregate function taken
-   *    as its value, is deterministic and rejected by it. Only an aggregation with grouping keys
-   *    under whole-stage codegen computes it lazily, so this is conservative for the others,
-   *    e.g. a global aggregation or an `ObjectHashAggregateExec`.
+   *  - A result column of an aggregation ([[AggregateBase]]) whose expression, with each
+   *    aggregate function taken as its value, is deterministic and rejected by it. Only an
+   *    aggregation with grouping keys under whole-stage codegen computes it lazily, so this is
+   *    conservative for the others, e.g. a global aggregation or an `ObjectHashAggregateExec`.
    *
    * These operators pass such columns of their children through:
    *  - [[Filter]] and [[Sample]].
@@ -273,7 +273,7 @@ trait PredicateHelper extends AliasHelper with Logging {
               a.child.references.exists(below.contains)) => a.toAttribute
         case a: Attribute if below.contains(a) => a
       })
-    case agg: Aggregate =>
+    case agg: AggregateBase =>
       AttributeSet(agg.aggregateExpressions.flatMap {
         case a: Alias =>
           val result = a.child.transform { case e: AggregateExpression => e.resultAttribute }

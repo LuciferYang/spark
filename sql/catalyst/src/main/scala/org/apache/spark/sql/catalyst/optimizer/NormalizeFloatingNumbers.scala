@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{Alias, And, ArrayTransform, Ca
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, ExtractSingleColumnNullAwareAntiJoin}
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Window}
+import org.apache.spark.sql.catalyst.plans.logical.{AggregateBase, LogicalPlan, PartialAggregate, Window}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern._
 import org.apache.spark.sql.types._
@@ -108,9 +108,14 @@ object NormalizeFloatingNumbers extends Rule[LogicalPlan] {
    * the grouping keys of every Aggregate (see `SparkStrategies.Aggregation`), except one whose
    * aggregate functions are all grouped-agg pandas UDFs, planned as `ArrowAggregatePythonExec` on
    * the raw keys. Rules that replace an Aggregate with a Project check [[readsNormalizedKeys]].
-   * The answer can still change during optimization, see [[mayChangeKeyForm]].
+   * The answer can still change during optimization, see [[mayChangeKeyForm]]. A
+   * `PartialAggregate` groups on the raw keys.
    */
-  private[sql] def outputsNormalizedKeys(aggregate: Aggregate): Boolean = {
+  private[sql] def outputsNormalizedKeys(aggregate: AggregateBase): Boolean = {
+    !aggregate.isInstanceOf[PartialAggregate] && outputsNormalizedKeysOf(aggregate)
+  }
+
+  private def outputsNormalizedKeysOf(aggregate: AggregateBase): Boolean = {
     val aggregateFunctions = aggregate.aggregateExpressions.flatMap(_.collect {
       case ae: AggregateExpression => ae.aggregateFunction
     })
@@ -124,7 +129,7 @@ object NormalizeFloatingNumbers extends Rule[LogicalPlan] {
    * outputs the raw keys, or all of them, so that it becomes group-only and outputs normalized
    * keys.
    */
-  private[sql] def mayChangeKeyForm(aggregate: Aggregate): Boolean = {
+  private[sql] def mayChangeKeyForm(aggregate: AggregateBase): Boolean = {
     aggregate.aggregateExpressions.exists(_.exists {
       case ae: AggregateExpression => ae.aggregateFunction.isInstanceOf[PythonUDAF]
       case _ => false
@@ -134,7 +139,7 @@ object NormalizeFloatingNumbers extends Rule[LogicalPlan] {
   /**
    * The float/double grouping expressions that `aggregate` outputs normalized, without aliases.
    */
-  private[sql] def normalizedKeys(aggregate: Aggregate): Seq[Expression] = {
+  private[sql] def normalizedKeys(aggregate: AggregateBase): Seq[Expression] = {
     if (outputsNormalizedKeys(aggregate)) {
       aggregate.groupingExpressions
         .map {
@@ -158,7 +163,7 @@ object NormalizeFloatingNumbers extends Rule[LogicalPlan] {
    * `PushPredicateThroughNonJoin.pushBelowAggregate`).
    */
   private[sql] def readsNormalizedKeys(
-      aggregate: Aggregate,
+      aggregate: AggregateBase,
       outputs: Seq[NamedExpression]): Boolean = {
     val keys = normalizedKeys(aggregate)
     !aggregate.isStreaming && keys.nonEmpty &&
