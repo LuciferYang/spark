@@ -2065,7 +2065,7 @@ object SQLConf {
     buildConf("spark.sql.optimizer.partialAggregationOptimization.benefitRatio")
       .internal()
       .doc("The reduction ratio lower than this config will introduce partial aggregations " +
-        "before join.")
+        "before join or below an Expand operator.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .doubleConf
