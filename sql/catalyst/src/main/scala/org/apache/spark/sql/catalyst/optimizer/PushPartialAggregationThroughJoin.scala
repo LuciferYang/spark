@@ -29,7 +29,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{AGGREGATE, EXTERNAL_UDF, JOIN}
 import org.apache.spark.sql.catalyst.util.UnsafeRowUtils
-import org.apache.spark.sql.types.{DataType, DecimalType, IntegralType, LongType, NumericType}
+import org.apache.spark.sql.types.{AnsiIntervalType, DataType, DecimalType, IntegralType, LongType, NumericType}
 import org.apache.spark.sql.types.DecimalType.LongDecimal
 
 /**
@@ -206,18 +206,18 @@ object PushPartialAggregationThroughJoin extends Rule[LogicalPlan]
   // Whether `sum` returns null on overflow, which it detects with an isEmpty flag in its buffer
   // (see `Sum.shouldTrackIsEmpty`). A pushed sum outputs its evaluated value instead, which is null
   // after an overflow, and the sum above it skips nulls.
-  private def tracksOverflow(sum: Sum): Boolean = sum.evalContext.evalMode match {
+  private[optimizer] def tracksOverflow(sum: Sum): Boolean = sum.evalContext.evalMode match {
     case EvalMode.ANSI => false
     case mode => sum.dataType match {
       case _: DecimalType => true
-      case _: IntegralType => mode == EvalMode.TRY
+      case _: IntegralType | _: AnsiIntervalType => mode == EvalMode.TRY
       case _ => false
     }
   }
 
   // Returns null when an input of `sum` is null although the values it was computed from are not,
   // which only an overflow causes.
-  private def nullOnOverflow(
+  private[optimizer] def nullOnOverflow(
       sum: AggregateExpression,
       input: Expression,
       inputNonEmpty: Expression): Expression = {
@@ -345,7 +345,7 @@ object PushPartialAggregationThroughJoin extends Rule[LogicalPlan]
 
   // A session window is merged by `MergingSessionsExec` before the aggregate that groups by it,
   // which the pushed rewrite does not plan.
-  private def isSessionWindow(e: Expression): Boolean = e match {
+  private[optimizer] def isSessionWindow(e: Expression): Boolean = e match {
     case a: Attribute => a.metadata.contains(SessionWindow.marker)
     case _ => false
   }
