@@ -21,6 +21,7 @@ import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.catalyst.util.UnsafeRowUtils
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.streaming.{ProjectAggregationBufferExec, StatefulStreamlineAggregateExec}
@@ -33,6 +34,14 @@ import org.apache.spark.util.collection.{Utils => CUtils}
  * Utility functions used by the query planner to convert our plan to new aggregation code path.
  */
 object AggUtils {
+
+  /**
+   * Marks the aggregate that `planPartialAggregateWithoutDistinct` plans for a `PartialAggregate`.
+   * The aggregate above it merges the groups of every partition, so it may pass input rows
+   * through, see `HashAggregateExec.adaptivePartialAggEnabled`. The value is the largest distinct
+   * count of a grouping key from the column statistics, 0 when there is none.
+   */
+  val PUSHED_PARTIAL_AGGREGATE = TreeNodeTag[Long]("pushedPartialAggregate")
 
   private def mayRemoveAggFilters(exprs: Seq[AggregateExpression]): Seq[AggregateExpression] = {
     exprs.map { ae =>
@@ -132,16 +141,19 @@ object AggUtils {
     groupingExpressions: Seq[NamedExpression],
     aggregateExpressions: Seq[AggregateExpression],
     resultExpressions: Seq[NamedExpression],
-    child: SparkPlan): Seq[SparkPlan] = {
+    child: SparkPlan,
+    maxKeyDistinctCount: Long = 0L): Seq[SparkPlan] = {
     val completeAggregateExpressions = aggregateExpressions.map(_.copy(mode = Complete))
-    createAggregate(
+    val aggregate = createAggregate(
       requiredChildDistributionExpressions = None,
       groupingExpressions = groupingExpressions.map(_.toAttribute),
       aggregateExpressions = completeAggregateExpressions,
       aggregateAttributes = completeAggregateExpressions.map(_.resultAttribute),
       initialInputBufferOffset = groupingExpressions.length,
       resultExpressions = resultExpressions,
-      child = child) :: Nil
+      child = child)
+    aggregate.setTagValue(PUSHED_PARTIAL_AGGREGATE, maxKeyDistinctCount)
+    aggregate :: Nil
   }
 
   def planFinalAggregateWithoutDistinct(

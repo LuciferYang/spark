@@ -99,6 +99,7 @@ class TungstenAggregationIterator(
     numTasksFallBacked: SQLMetric,
     numPassthroughRows: SQLMetric,
     adaptivePartialAggEnabled: Boolean,
+    adaptiveJudgesRecentRows: Boolean,
     adaptiveMinRows: Long,
     adaptiveMinCompaction: Double,
     adaptiveMinCompactionToSpill: Double)
@@ -193,15 +194,16 @@ class TungstenAggregationIterator(
   // `nextPassThroughOutput`). The aggregation is ineffective when `rows` processed rows do not
   // collapse into their `keys` keys by at least `threshold`, checked at two points:
   //   - periodically, every `minRows` processed rows, over the whole epoch against
-  //     `minCompaction`;
+  //     `minCompaction`, or over the rows since the previous check
+  //     (`adaptiveJudgesRecentRows`);
   //   - when the map is about to spill, over the recent rows (those since the periodic check
   //     before last) against the higher `minCompactionToSpill`. Keeping the aggregation then
   //     means aggregating the rest of the input through spills, which pays off only if that input
   //     keeps repeating keys; when keys repeat across the input, the ratio of the recent rows
   //     climbs above the epoch's as the map fills. Below the threshold, the map does not spill
   //     and the row that could not be inserted becomes the first pass-through row. Pass-through
-  //     cannot be undone within the task, so like the periodic check this waits until the current
-  //     epoch has processed `minRows` rows; a map that fills sooner spills as usual.
+  //     cannot be undone within the task, so this waits until the current epoch has processed
+  //     `minRows` rows; a map that fills sooner spills as usual.
   // A spill starts a new in-memory map epoch: the row counters restart so that epoch is judged on
   // its own rows, which lets an input whose cardinality only turns unfavorable later still be
   // passed through. Pass-through may therefore coexist with earlier spills. The output order
@@ -288,7 +290,14 @@ class TungstenAggregationIterator(
           // Periodic check: if the aggregation is not collapsing enough rows, bypass it for the
           // rest of the input.
           if (adaptivePartialAggEnabled && processedRows == nextCheckRow) {
-            if (ineffective(processedRows, hashMap.getNumKeys(), adaptiveMinCompaction)) {
+            // See `HashAggregateExec.adaptiveJudgesRecentRows`.
+            val checkIneffective = if (adaptiveJudgesRecentRows) {
+              processedRows > minRows &&
+                ineffective(minRows, hashMap.getNumKeys() - checkKeys, adaptiveMinCompaction)
+            } else {
+              ineffective(processedRows, hashMap.getNumKeys(), adaptiveMinCompaction)
+            }
+            if (checkIneffective) {
               passThrough = true
             } else {
               nextCheckRow += minRows

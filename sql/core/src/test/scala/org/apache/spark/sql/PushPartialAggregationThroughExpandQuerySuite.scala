@@ -19,7 +19,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.catalyst.plans.logical.{AggregateBase, Expand, LogicalPlan, PartialAggregate}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
-import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.aggregate.{AggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.streaming.runtime.{MemoryStream, StreamingQueryWrapper}
 import org.apache.spark.sql.functions.sum
 import org.apache.spark.sql.internal.SQLConf
@@ -339,16 +339,133 @@ class PushPartialAggregationThroughExpandQuerySuite
           val df = sql(query)
           checkAnswer(df, expected)
           assert(hasPreAggBelowExpand(df.queryExecution.optimizedPlan))
-          // The pre-aggregation is planned in Complete mode, which never passes rows through.
-          // The partial aggregate of the outer aggregate does.
+          // The pre-aggregation may pass rows through under
+          // `spark.sql.optimizer.partialAggregationOptimization.adaptive.enabled`, and so does
+          // the partial aggregate of the outer aggregate.
           val aggs = collect(df.queryExecution.executedPlan) { case a: HashAggregateExec => a }
           def passedThrough(a: HashAggregateExec): Option[Long] =
             a.metrics.get("numPassthroughRows").map(_.value)
           val (pre, outer) = aggs.partition(_.logicalLink.exists(_.isInstanceOf[PartialAggregate]))
-          assert(pre.size === 1 && passedThrough(pre.head).isEmpty)
+          assert(pre.size === 1 && passedThrough(pre.head).nonEmpty)
           assert(outer.flatMap(passedThrough).sum > 0)
         }
       }
     }
   }
+
+  test("a pre-aggregation that does not reduce its input passes rows through") {
+    // Every (a, b) is distinct, so the pre-aggregation keeps every row. The rows are read as one
+    // partition, which passes through after the second check, at row 200. The first 100 rows share
+    // one `k` and the rest are distinct: at row 200 the rows since the previous check are all new
+    // keys, although the whole epoch, 200 rows in 101 keys, still looks reduced, and would not
+    // look ineffective before row 2100.
+    withTempView("t") {
+      spark.range(0, 1000, 1, 1).selectExpr("CAST(id % 10 AS INT) a", "CAST(id AS INT) b",
+        "IF(id = 7, NULL, CAST(id % 7 AS INT)) v", "IF(id = 3, 9223372036854775807L, id) w",
+        "IF(id < 100, 0, id) k")
+        .createOrReplaceTempView("t")
+      // `w` overflows the sums of the groups that contain row 3.
+      val queries = Seq(
+        "SELECT a, b, sum(v), count(v), count(*), avg(v), min(v), max(v), try_sum(w) " +
+          "FROM t GROUP BY ROLLUP(a, b)",
+        "SELECT k, count(*) FROM t GROUP BY ROLLUP(k)")
+      val baseConf = Seq(
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "1.0",
+        SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS.key -> "100")
+      val expected = withSQLConf(baseConf :+
+          (SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "false"): _*) {
+        queries.map(q => q -> sql(q).collect().toSeq).toMap
+      }
+      for (query <- queries; adaptive <- Seq(true, false); codegen <- Seq(true, false)) {
+        withSQLConf(baseConf ++ Seq(
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ADAPTIVE_ENABLED.key -> adaptive.toString,
+            SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegen.toString): _*) {
+          val df = sql(query)
+          withClue(s"$query, adaptive $adaptive, codegen $codegen") {
+            checkAnswer(df, expected(query))
+            assert(preAggPassedThrough(df) === Seq(if (adaptive) Some(800L) else None))
+          }
+        }
+      }
+    }
+  }
+
+  test("the check window of a pre-aggregation holds the distinct count of its grouping key") {
+    // `k1` cycles through 300 values in row order and `k2` through 100, so every row of the first
+    // 300 is a new (k1, k2) and none after. A window of 100 rows sees only new keys at the second
+    // check and passes the rest through; a window of the distinct count of `k1` sees none. Every
+    // (k2, j) is distinct, and the largest distinct count among them is the 100 values of `k2`.
+    withTable("t") {
+      spark.range(0, 3000, 1, 1).selectExpr("CAST(id % 300 AS INT) k1",
+        "CAST(id % 100 AS INT) k2", "CAST(id DIV 100 AS INT) j",
+        "IF(id % 4 = 3, NULL, CAST(id % 3 AS INT)) c", "CAST(id AS INT) v").write.saveAsTable("t")
+      val cycling = "SELECT k1, k2, sum(v) FROM t GROUP BY ROLLUP(k1, k2)"
+      val distinct = "SELECT k2, j, sum(v) FROM t GROUP BY ROLLUP(k2, j)"
+      val withNull = "SELECT c, sum(v) FROM t GROUP BY ROLLUP(c)"
+      val queries = Seq(cycling, distinct, withNull)
+      val expected = withSQLConf(
+          SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "false") {
+        queries.map(q => q -> sql(q).collect().toSeq).toMap
+      }
+      // Runs `query` and returns its pre-aggregations.
+      def runAggs(query: String, confs: (String, String)*): Seq[HashAggregateExec] = {
+        withSQLConf(confs: _*) {
+          val df = sql(query)
+          checkAnswer(df, expected(query))
+          collect(df.queryExecution.executedPlan) {
+            case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) => a
+          }
+        }
+      }
+      // The tags, which hold the largest distinct count of a grouping key, and the
+      // passed-through rows of the pre-aggregations of `query`.
+      def run(query: String, confs: (String, String)*): Seq[(Option[Long], Option[Long])] =
+        runAggs(query, confs: _*).map { a =>
+          (a.getTagValue(AggUtils.PUSHED_PARTIAL_AGGREGATE),
+            a.metrics.get("numPassthroughRows").map(_.value))
+        }
+      def confs(codegen: Boolean, minRows: Int = 100): Seq[(String, String)] = Seq(
+        SQLConf.CBO_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "1.0",
+        SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS.key -> minRows.toString,
+        SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegen.toString)
+      // Without column statistics the window is `minRows`.
+      Seq(true, false).foreach { codegen =>
+        withClue(s"codegen $codegen") {
+          assert(run(cycling, confs(codegen): _*) === Seq((Some(0L), Some(2800L))))
+        }
+      }
+      sql("ANALYZE TABLE t COMPUTE STATISTICS FOR ALL COLUMNS")
+      Seq(true, false).foreach { codegen =>
+        withClue(s"codegen $codegen") {
+          val Seq((Some(k1Count), passed)) = run(cycling, confs(codegen): _*)
+          assert(k1Count >= 270 && k1Count <= 330 && passed === Some(0L))
+          // A map that fills before the window ends spills instead of passing through.
+          val spilled = runAggs(cycling, confs(codegen) :+
+            ("spark.sql.TungstenAggregate.testFallbackStartsAt" -> "1, 150"): _*)
+          assert(spilled.map(_.metrics("numTasksFallBacked").value) === Seq(1L))
+          assert(spilled.flatMap(_.metrics.get("numPassthroughRows")).map(_.value) === Seq(0L))
+          // Above `minRows`, the distinct count sets the window; below, `minRows` does.
+          val Seq((Some(k2Count), keyPassed)) = run(distinct, confs(codegen, minRows = 50): _*)
+          assert(k2Count >= 90 && k2Count <= 110 && keyPassed === Some(3000 - 2 * k2Count))
+          assert(run(distinct, confs(codegen, minRows = 200): _*) ===
+            Seq((Some(k2Count), Some(2600L))))
+          // `minRows = 0` turns the periodic check off whatever the window.
+          assert(run(distinct, confs(codegen, minRows = 0): _*) ===
+            Seq((Some(k2Count), Some(0L))))
+          // A null counts as one more value: `c` holds 0, 1, 2 and null.
+          assert(run(withNull, confs(codegen): _*).map(_._1) === Seq(Some(4L)))
+        }
+      }
+    }
+  }
+
+  // The rows the pre-aggregations passed through, None when they could not.
+  private def preAggPassedThrough(df: DataFrame): Seq[Option[Long]] =
+    collect(df.queryExecution.executedPlan) {
+      case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) =>
+        a.metrics.get("numPassthroughRows").map(_.value)
+    }
 }

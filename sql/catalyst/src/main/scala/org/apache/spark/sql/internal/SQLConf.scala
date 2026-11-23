@@ -2072,6 +2072,23 @@ object SQLConf {
       .checkValue(r => r >= 0 && r <= 1.0, "The benefit ratio must be positive number.")
       .createWithDefault(0.3)
 
+  val PARTIAL_AGGREGATION_OPTIMIZATION_ADAPTIVE_ENABLED =
+    buildConf("spark.sql.optimizer.partialAggregationOptimization.adaptive.enabled")
+      .internal()
+      .doc("When true, a partial aggregation pushed down by " +
+        s"${PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key} stops aggregating at runtime and " +
+        "passes its input rows through when it does not reduce them, with the thresholds of " +
+        "spark.sql.execution.aggregate.adaptivePartialAggregation.minRows, minCompaction and " +
+        "minCompactionToSpill. It checks every max(minRows, the largest distinct count of a " +
+        "grouping key in the column statistics) rows, judges the rows since the previous " +
+        "check, and skips the first check. It does not need " +
+        "spark.sql.execution.aggregate.adaptivePartialAggregation.enabled; while that is on, " +
+        "a pushed aggregation without aggregate functions follows its rule instead.")
+      .version("4.2.0")
+      .withBindingPolicy(ConfigBindingPolicy.SESSION)
+      .booleanConf
+      .createWithDefault(true)
+
   val ESCAPED_STRING_LITERALS = buildConf("spark.sql.parser.escapedStringLiterals")
     .internal()
     .doc("When true, string literals (including regex patterns) remain escaped in our SQL " +
@@ -10549,6 +10566,9 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
 
   def partialAggregationOptimizationBenefitRatio: Double =
     getConf(PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO)
+
+  def partialAggregationOptimizationAdaptiveEnabled: Boolean =
+    getConf(PARTIAL_AGGREGATION_OPTIMIZATION_ADAPTIVE_ENABLED)
 
   def escapedStringLiterals: Boolean = getConf(ESCAPED_STRING_LITERALS)
 

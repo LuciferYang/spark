@@ -108,6 +108,11 @@ case class HashAggregateExec(
     // Registered only when the feature applies, and only read from the pass-through path.
     val numPassthroughRows =
       if (adaptivePartialAggEnabled) longMetric("numPassthroughRows") else null
+    // Read on the driver: tags are not serialized with the plan, so these would not see the tag of
+    // a pushed partial aggregation on an executor.
+    val adaptiveEnabled = adaptivePartialAggEnabled
+    val judgesRecentRows = adaptiveJudgesRecentRows
+    val minRows = adaptiveMinRows
 
     child.execute().mapPartitionsWithIndex { (partIndex, iter) =>
 
@@ -137,8 +142,9 @@ case class HashAggregateExec(
             avgHashProbe,
             numTasksFallBacked,
             numPassthroughRows,
-            adaptivePartialAggEnabled,
-            adaptiveMinRows,
+            adaptiveEnabled,
+            judgesRecentRows,
+            minRows,
             adaptiveMinCompaction,
             adaptiveMinCompactionToSpill)
         if (!hasInput && groupingExpressions.isEmpty) {
@@ -198,22 +204,59 @@ case class HashAggregateExec(
    *     static sibling `spark.sql.execution.bypassPartialAggregation` likewise stays away from
    *     streaming and `session_window` groupings.
    */
-  private val adaptivePartialAggEnabled: Boolean = {
-    conf.adaptivePartialAggregationEnabled &&
-      groupingExpressions.nonEmpty &&
+  //
+  // The aggregate that `AggUtils.planPartialAggregateWithoutDistinct` plans for a pushed partial
+  // aggregation is in `Complete` mode, but the aggregate above it merges its output like a `Final`
+  // merges buffers, so a passed-through row, evaluated as a group of one row, gives the same
+  // result. It is eligible under its own conf, unless the checks above admit it: one without
+  // aggregate functions keeps the SPARK-58511 rule while that conf is on. The confs are read when
+  // the node is built, and only the tag, which the planner sets after construction, is read
+  // lazily; a `copy()` without the tag loses this rule.
+  private lazy val adaptivePartialAggEnabled: Boolean =
+    adaptivePartialAggByConf || adaptivePushedPartial
+
+  private val adaptivePartialAggShape: Boolean =
+    groupingExpressions.nonEmpty &&
       !isStreaming &&
       !groupingExpressions.exists(_.metadata.contains(SessionWindow.marker)) &&
-      aggregateExpressions.forall(a => a.mode == Partial || a.mode == PartialMerge) &&
-      (aggregateExpressions.exists(_.mode == Partial) || aggregateExpressions.isEmpty) &&
       requiredChildDistributionExpressions.isEmpty
-  }
+
+  private val adaptivePartialAggByConf: Boolean =
+    conf.adaptivePartialAggregationEnabled && adaptivePartialAggShape &&
+      aggregateExpressions.forall(a => a.mode == Partial || a.mode == PartialMerge) &&
+      (aggregateExpressions.exists(_.mode == Partial) || aggregateExpressions.isEmpty)
+
+  private val adaptivePushedPartialByConf: Boolean =
+    conf.partialAggregationOptimizationAdaptiveEnabled && adaptivePartialAggShape &&
+      aggregateExpressions.forall(_.mode == Complete) && !adaptivePartialAggByConf
+
+  private lazy val adaptivePushedPartial: Boolean =
+    adaptivePushedPartialByConf && getTagValue(AggUtils.PUSHED_PARTIAL_AGGREGATE).isDefined
+
+  // Whether the periodic check judges the rows since the previous check instead of the whole
+  // epoch, and skips the first check. A pushed partial aggregation runs over the input of a join
+  // or an Expand, which can arrive in an order where the first rows of a task are nearly all new
+  // keys although later rows keep repeating them; judging the whole epoch at the first check
+  // would pass through such an input. An input that keeps bringing new keys still passes through,
+  // a window later. The window holds at least as many rows as a grouping key has distinct values,
+  // so that by the second check the keys of that column have had a chance to repeat whatever the
+  // scale of the data; a task of fewer rows than two windows is never passed through by a periodic
+  // check. The spill check is not delayed past the first window, and judges the whole epoch until
+  // the second check.
+  private lazy val adaptiveJudgesRecentRows: Boolean = adaptivePushedPartial
 
   // The number of rows between two compaction-ratio evaluations, and the ratios below which the
   // partial aggregation is considered ineffective: at the periodic check, and when the map is
   // about to spill. Keeping the aggregation past that point means aggregating the rest of the
   // input through spills, so the spill check never demands less compaction than the periodic one.
   // Only read when the feature applies.
-  private val adaptiveMinRows: Long = conf.adaptivePartialAggregationMinRows
+  private val adaptiveConfMinRows: Long = conf.adaptivePartialAggregationMinRows
+  private lazy val adaptiveMinRows: Long =
+    if (adaptivePushedPartial && adaptiveConfMinRows > 0) {
+      math.max(adaptiveConfMinRows, getTagValue(AggUtils.PUSHED_PARTIAL_AGGREGATE).getOrElse(0L))
+    } else {
+      adaptiveConfMinRows
+    }
   private val adaptiveMinCompaction: Double = conf.adaptivePartialAggregationMinCompaction
   private val adaptiveMinCompactionToSpill: Double =
     math.max(adaptiveMinCompaction, conf.adaptivePartialAggregationMinCompactionToSpill)
@@ -888,7 +931,8 @@ case class HashAggregateExec(
     // The compaction ratio is measured at the operator level: processed rows against the keys
     // held by both maps, so two-level-map routing does not change the decision. It is evaluated at
     // two check points:
-    //   - periodically, every `minRows` rows, over the whole epoch against `minCompaction`;
+    //   - periodically, every `minRows` rows, over the whole epoch against `minCompaction`, or
+    //     over the rows since the previous check (see `adaptiveJudgesRecentRows`);
     //   - right before the map would spill, over the recent rows against the higher
     //     `minCompactionToSpill`, in which case the map does not spill and the rest of the input
     //     is passed through. Keeping the aggregation then means aggregating the rest of the input
@@ -896,11 +940,11 @@ case class HashAggregateExec(
     //     those since the periodic check before last, measure that: when keys repeat across the
     //     input, more of them find their key already in the map as it fills, so their ratio
     //     climbs above the epoch's; when each key's rows arrive together, the two ratios match.
-    // Pass-through cannot be undone within the task, so the spill check, like the periodic one,
-    // waits until the current epoch has processed `minRows` rows; a map that fills sooner spills
-    // as usual. `minRows = 0` disables the periodic check: the row count is only ever compared
-    // after being incremented past 0, so it never matches and only the spill check remains,
-    // without a row floor and over the whole epoch.
+    // Pass-through cannot be undone within the task, so the spill check waits until the current
+    // epoch has processed `minRows` rows; a map that fills sooner spills as usual. `minRows = 0`
+    // disables the periodic check: the row count is only ever compared after being incremented
+    // past 0, so it never matches and only the spill check remains, without a row floor and over
+    // the whole epoch.
     def adaptiveEpochKeys: String = if (isFastHashMapEnabled) {
       s"((long) $fastHashMapTerm.getNumKeys() - $adaptiveFastKeysAtSpillTerm + " +
         s"$hashMapTerm.getNumKeys())"
@@ -1056,8 +1100,14 @@ case class HashAggregateExec(
         } else {
           s"($unsafeRowBuffer != null)"
         }
-        val epochIneffective =
+        // See `adaptiveJudgesRecentRows`.
+        val epochIneffective = if (adaptiveJudgesRecentRows) {
+          s"($processedRowsTerm > ${adaptiveMinRows}L && " +
+            adaptiveIneffective(s"${adaptiveMinRows}L",
+              s"($adaptiveEpochKeys - $adaptiveCheckKeysTerm)", adaptiveMinCompaction) + ")"
+        } else {
           adaptiveIneffective(processedRowsTerm, adaptiveEpochKeys, adaptiveMinCompaction)
+        }
         // The grouping key was already projected in `findOrInsertRegularHashMap`
         // (`unsafeRowKeyCode.code`), so `unsafeRowKeyCode.value` holds this row's key. Only build
         // the single-row partial buffer here: reset the reusable buffer to the initial aggregation

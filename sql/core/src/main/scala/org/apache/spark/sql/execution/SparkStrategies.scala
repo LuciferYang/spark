@@ -730,11 +730,19 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         PhysicalAggregation.unapply(Aggregate(groupingExps, aggregateExps, child)) match {
           case Some((groupingExpressions, aggExpressions, resultExpressions, _))
             if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+            val keyStats = child.stats.attributeStats
+            val maxKeyDistinctCount = groupingExps.collect {
+              case a: Attribute => keyStats.get(a).flatMap { s =>
+                val nulls = if (s.nullCount.exists(_ > 0)) 1 else 0
+                s.distinctCount.map(_ + nulls)
+              }
+            }.flatten.maxOption.map(_.min(Long.MaxValue).toLong).getOrElse(0L)
             AggUtils.planPartialAggregateWithoutDistinct(
               normalizeGroupingExpressions(groupingExpressions),
               aggExpressions.map(_.asInstanceOf[AggregateExpression]),
               resultExpressions,
-              planLater(child))
+              planLater(child),
+              maxKeyDistinctCount)
 
           case _ => Nil
         }

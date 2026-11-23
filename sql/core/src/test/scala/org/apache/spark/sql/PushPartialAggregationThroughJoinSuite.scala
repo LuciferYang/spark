@@ -18,9 +18,12 @@
 package org.apache.spark.sql
 
 import org.apache.spark.{SparkArithmeticException, SparkThrowable}
+import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
+import org.apache.spark.sql.catalyst.optimizer.BuildRight
 import org.apache.spark.sql.catalyst.plans.logical.{FinalAggregate, LogicalPlan, PartialAggregate}
+import org.apache.spark.sql.execution.{InputAdapter, SparkPlan, WholeStageCodegenExec}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
-import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.aggregate.{AggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins.BroadcastHashJoinExec
 import org.apache.spark.sql.execution.streaming.runtime.{MemoryStream, StreamingQueryWrapper}
@@ -520,15 +523,186 @@ class PushPartialAggregationThroughJoinSuite extends QueryTest
           val (pushed, others) =
             aggs.partition(_.logicalLink.exists(_.isInstanceOf[PartialAggregate]))
           assert(pushed.nonEmpty)
+          assert(pushed.forall(a => passedThrough(a).nonEmpty))
+          assert(pushed.forall(_.aggregateExpressions.nonEmpty === (query == aggregates)))
           if (query == aggregates) {
-            // Pushed aggregates with functions are planned in Complete mode, which never passes
-            // rows through. The Partial aggregate above the join does.
-            assert(pushed.forall(a => a.aggregateExpressions.nonEmpty && passedThrough(a).isEmpty))
+            // The Partial aggregate above the join passes rows through. The pushed aggregates
+            // follow `spark.sql.optimizer.partialAggregationOptimization.adaptive.enabled`, which
+            // skips the first check, so these few rows are not passed through; the next test
+            // passes them.
             assert(others.flatMap(passedThrough).sum > 0)
           } else {
-            assert(pushed.forall { a =>
-              a.aggregateExpressions.isEmpty && passedThrough(a).exists(_ > 0)
-            })
+            // A pushed aggregate without aggregate functions follows SPARK-58511.
+            assert(pushed.flatMap(passedThrough).sum > 0)
+          }
+        }
+      }
+    }
+  }
+
+  // Two tables of 1000 rows in one file each, read as one partition in row order. `a` repeats
+  // every 500 rows, so rows 500 to 699 bring the keys of the first 200 rows again. `w` overflows at
+  // key 50, from rows 50 and 550; rows 650 and 651 hold a null `v` and a null `w`. `z` is
+  // determined by `y`. Without statistics, the check window of the pushed aggregates is `minRows`.
+  private def withNonReducingTables(f: => Unit): Unit = {
+    withTable("pagg_t1", "pagg_t2") {
+      spark.range(0, 1000, 1, 1).selectExpr(
+        "CAST(id % 500 AS INT) a",
+        "IF(id % 1000 IN (7, 650), NULL, CAST(id % 7 AS INT)) v",
+        "IF(id % 1000 = 651, NULL, IF(id % 500 = 50, 9223372036854775807L, id)) w")
+        .write.saveAsTable("pagg_t1")
+      spark.range(0, 1000, 1, 1).selectExpr("CAST(id AS INT) x", "CAST(id % 5 AS INT) y",
+        "CAST(id % 5 AS INT) * 2 z").write.saveAsTable("pagg_t2")
+      f
+    }
+  }
+
+  private def pushedPassedThrough(df: DataFrame): Seq[Option[Long]] =
+    collect(df.queryExecution.executedPlan) {
+      case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) =>
+        a.metrics.get("numPassthroughRows").map(_.value)
+    }
+
+  test("a pushed aggregate that does not reduce its input passes rows through") {
+    // The pushed aggregates keep nearly every row, and pass through after the second check, at
+    // row 200. A key of the first 200 rows is then split between the map and a passed-through row.
+    withNonReducingTables {
+      val query = "SELECT y, sum(v), count(v), count(*), avg(v), min(v), max(v), try_sum(w), " +
+        "first(z), last(z) FROM pagg_t1 JOIN pagg_t2 ON a = x GROUP BY y"
+      val semiQuery = "SELECT a FROM pagg_t1 LEFT SEMI JOIN pagg_t2 ON a = x"
+      val baseConf = Seq(
+        SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1",
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "1.0",
+        SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS.key -> "100")
+      val expected = withSQLConf(baseConf :+
+          (SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "false"): _*) {
+        sql(query).collect().toSeq
+      }
+      for (adaptive <- Seq(true, false); upstream <- Seq(true, false);
+          codegen <- Seq(true, false)) {
+        withSQLConf(baseConf ++ Seq(
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ADAPTIVE_ENABLED.key -> adaptive.toString,
+            SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_ENABLED.key -> upstream.toString,
+            SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegen.toString): _*) {
+          val df = sql(query)
+          withClue(s"adaptive $adaptive, SPARK-58511 $upstream, codegen $codegen") {
+            checkAnswer(df, expected)
+            // 1000 rows on each side, of which the first 200 are aggregated.
+            assert(pushedPassedThrough(df) === Seq.fill(2)(if (adaptive) Some(800L) else None))
+            // A copy loses the tag that makes the pushed aggregate eligible.
+            val pushed = collect(df.queryExecution.executedPlan) {
+              case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) =>
+                a
+            }
+            assert(!pushed.head.copy().metrics.contains("numPassthroughRows"))
+            // The deduplicated right side of a semi join has no aggregate functions, so SPARK-58511
+            // admits it too and its rule applies: it judges the whole epoch at row 100.
+            val semi = sql(semiQuery)
+            checkAnswer(semi, spark.range(0, 1000).selectExpr("CAST(id % 500 AS INT)"))
+            assert(pushedPassedThrough(semi) ===
+              Seq(if (upstream) Some(900L) else if (adaptive) Some(800L) else None))
+          }
+        }
+      }
+      // With column statistics the window of pagg's rule is the distinct count of `x`, all 1000
+      // rows, so the second check never comes; SPARK-58511's rule keeps its window of `minRows`.
+      sql("ANALYZE TABLE pagg_t2 COMPUTE STATISTICS FOR ALL COLUMNS")
+      for (upstream <- Seq(true, false); codegen <- Seq(true, false)) {
+        withSQLConf(baseConf ++ Seq(
+            SQLConf.CBO_ENABLED.key -> "true",
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+            SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_ENABLED.key -> upstream.toString,
+            SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegen.toString): _*) {
+          withClue(s"analyzed, SPARK-58511 $upstream, codegen $codegen") {
+            val semi = sql(semiQuery)
+            checkAnswer(semi, spark.range(0, 1000).selectExpr("CAST(id % 500 AS INT)"))
+            val dedup = collect(semi.queryExecution.executedPlan) {
+              case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) =>
+                a
+            }
+            assert(dedup.size === 1)
+            assert(dedup.head.getTagValue(AggUtils.PUSHED_PARTIAL_AGGREGATE).exists(_ >= 900))
+            assert(dedup.head.metrics.get("numPassthroughRows").map(_.value) ===
+              Some(if (upstream) 900L else 0L))
+          }
+        }
+      }
+    }
+  }
+
+  test("a pushed aggregate on the streamed side of a broadcast join passes rows through") {
+    // The pushed aggregate on `pagg_t1` runs in the codegen stage of the join and of the partial
+    // aggregate above it, which passes rows through as well under SPARK-58511. A join that could be
+    // broadcast is pushed through only when its estimate expands its larger side, so each `x`
+    // matches 20 rows of `pagg_t2`, and the tables are analyzed.
+    withTable("pagg_t1", "pagg_t2") {
+      // Two files of 2000 rows. Every (a, g) of a file is distinct, so the pushed aggregate on
+      // `pagg_t1` keeps every row, and passes through after its second check.
+      spark.range(0, 4000, 1, 2).selectExpr("CAST(id % 500 AS INT) a", "CAST(id % 7 AS INT) g",
+        "IF(id % 2000 IN (7, 1650), NULL, CAST(id % 3 AS INT)) v", "id w")
+        .write.saveAsTable("pagg_t1")
+      spark.range(0, 2000, 1, 1).selectExpr("CAST(id % 100 AS INT) x", "CAST(id % 5 AS INT) y",
+        "CAST(id % 5 AS INT) * 2 z").write.saveAsTable("pagg_t2")
+      Seq("pagg_t1", "pagg_t2").foreach { t =>
+        sql(s"ANALYZE TABLE $t COMPUTE STATISTICS FOR ALL COLUMNS")
+      }
+      val query = "SELECT /*+ BROADCAST(pagg_t2) */ y, g, sum(v), count(v), count(*), avg(v), " +
+        "try_sum(w), first(z) FROM pagg_t1 JOIN pagg_t2 ON a = x GROUP BY y, g"
+      val baseConf = Seq(
+        SQLConf.CBO_ENABLED.key -> "true",
+        SQLConf.FILES_OPEN_COST_IN_BYTES.key -> (1L << 30).toString,
+        SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO.key -> "1.0",
+        SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS.key -> "100",
+        SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_MIN_COMPACTION.key -> "1000000")
+      val expected = withSQLConf(baseConf :+
+          (SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "false"): _*) {
+        sql(query).collect().toSeq
+      }
+      for (upstream <- Seq(true, false); codegen <- Seq(true, false)) {
+        withSQLConf(baseConf ++ Seq(
+            SQLConf.PARTIAL_AGGREGATION_OPTIMIZATION_ENABLED.key -> "true",
+            SQLConf.ADAPTIVE_PARTIAL_AGGREGATION_ENABLED.key -> upstream.toString,
+            SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> codegen.toString): _*) {
+          val df = sql(query)
+          withClue(s"SPARK-58511 $upstream, codegen $codegen") {
+            checkAnswer(df, expected)
+            val plan = df.queryExecution.executedPlan
+            val join = collect(plan) { case j: BroadcastHashJoinExec => j }
+            assert(join.size === 1)
+            assert(join.head.buildSide === BuildRight)
+            val streamed = join.head.left.collectFirst { case a: HashAggregateExec => a }
+            assert(streamed.exists(_.logicalLink.exists(_.isInstanceOf[PartialAggregate])))
+            // The check window holds the distinct count of `a`, about 500 rows, and the rows after
+            // the second check of each partition are passed through.
+            val window = streamed.get.getTagValue(AggUtils.PUSHED_PARTIAL_AGGREGATE).get.max(100L)
+            assert(window >= 450 && window <= 550)
+            assert(streamed.get.metrics.get("numPassthroughRows").map(_.value) ===
+              Some(2 * (2000 - 2 * window)))
+            // `x` repeats every 100 rows, so the pushed aggregate on `pagg_t2` keeps reducing.
+            val build = collect(plan) {
+              case a: HashAggregateExec if a.logicalLink.exists(_.isInstanceOf[PartialAggregate]) &&
+                  !(a eq streamed.get) => a
+            }
+            assert(build.map(_.metrics.get("numPassthroughRows").map(_.value)) === Seq(Some(0L)))
+            val partial = collect(plan) {
+              case a: HashAggregateExec if a.aggregateExpressions.exists(_.mode == Partial) => a
+            }
+            assert(partial.size === 1)
+            // 400 rows of each partition have an `a` below 100 and match one pushed group of
+            // `pagg_t2`; the first 100 of them are aggregated.
+            assert(partial.head.metrics.get("numPassthroughRows").map(_.value) ===
+              (if (upstream) Some(600L) else None))
+            if (codegen) {
+              def inStage(p: SparkPlan): Seq[SparkPlan] = p +: (p match {
+                case _: InputAdapter => Nil
+                case _ => p.children.flatMap(inStage)
+              })
+              val stage = collect(plan) {
+                case w: WholeStageCodegenExec if inStage(w.child).exists(_ eq partial.head) => w
+              }
+              assert(stage.size === 1 && inStage(stage.head.child).exists(_ eq streamed.get))
+            }
           }
         }
       }
