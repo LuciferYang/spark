@@ -94,14 +94,14 @@ WholeStageCodegen (14)
         Exchange [c_last_name,c_first_name,s_store_name] #1
           WholeStageCodegen (13)
             HashAggregate [c_last_name,c_first_name,s_store_name,netpaid] [sum,isEmpty,sum,isEmpty]
-              HashAggregate [c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size,sum] [sum(UnscaledValue(ss_net_paid)),netpaid,sum]
+              HashAggregate [c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size,sum] [sum((UnscaledValue(ss_net_paid) * cntL)),netpaid,sum]
                 InputAdapter
                   Exchange [c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size] #2
                     WholeStageCodegen (12)
-                      HashAggregate [c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size,ss_net_paid] [sum,sum]
-                        Project [ss_net_paid,s_store_name,s_state,i_current_price,i_size,i_color,i_units,i_manager_id,c_first_name,c_last_name,ca_state]
-                          BroadcastHashJoin [ss_store_sk,c_birth_country,s_store_sk,ca_country]
-                            Project [ss_store_sk,ss_net_paid,i_current_price,i_size,i_color,i_units,i_manager_id,c_first_name,c_last_name,c_birth_country]
+                      HashAggregate [c_last_name,c_first_name,s_store_name,ca_state,s_state,i_color,i_current_price,i_manager_id,i_units,i_size,ss_net_paid,cnt] [sum,sum]
+                        Project [ss_net_paid,i_current_price,i_size,i_color,i_units,i_manager_id,c_first_name,c_last_name,s_store_name,ca_state,s_state,cnt]
+                          BroadcastHashJoin [ss_store_sk,c_birth_country,s_store_sk,_pullout_upper_ca_country]
+                            Project [c_birth_country,ss_store_sk,ss_net_paid,i_current_price,i_size,i_color,i_units,i_manager_id,c_first_name,c_last_name]
                               SortMergeJoin [ss_ticket_number,ss_item_sk,sr_ticket_number,sr_item_sk]
                                 InputAdapter
                                   WholeStageCodegen (7)
@@ -165,17 +165,18 @@ WholeStageCodegen (14)
                             InputAdapter
                               BroadcastExchange #9
                                 WholeStageCodegen (11)
-                                  Project [s_store_sk,s_store_name,s_state,ca_state,ca_country]
-                                    BroadcastHashJoin [s_zip,ca_zip]
-                                      InputAdapter
-                                        BroadcastExchange #10
-                                          WholeStageCodegen (10)
-                                            Project [s_store_sk,s_store_name,s_state,s_zip]
-                                              Filter [s_market_id,s_store_sk,s_zip]
-                                                ColumnarToRow
-                                                  InputAdapter
-                                                    Scan parquet spark_catalog.default.store [s_store_sk,s_store_name,s_market_id,s_state,s_zip]
-                                      Filter [ca_country,ca_zip]
-                                        ColumnarToRow
-                                          InputAdapter
-                                            Scan parquet spark_catalog.default.customer_address [ca_state,ca_zip,ca_country]
+                                  HashAggregate [s_store_sk,_pullout_upper_ca_country,s_store_name,ca_state,s_state] [count(1),cnt,count]
+                                    Project [s_store_sk,s_store_name,s_state,ca_state,ca_country]
+                                      BroadcastHashJoin [s_zip,ca_zip]
+                                        InputAdapter
+                                          BroadcastExchange #10
+                                            WholeStageCodegen (10)
+                                              Project [s_store_sk,s_store_name,s_state,s_zip]
+                                                Filter [s_market_id,s_store_sk,s_zip]
+                                                  ColumnarToRow
+                                                    InputAdapter
+                                                      Scan parquet spark_catalog.default.store [s_store_sk,s_store_name,s_market_id,s_state,s_zip]
+                                        Filter [ca_country,ca_zip]
+                                          ColumnarToRow
+                                            InputAdapter
+                                              Scan parquet spark_catalog.default.customer_address [ca_state,ca_zip,ca_country]

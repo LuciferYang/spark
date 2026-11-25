@@ -2055,11 +2055,14 @@ object SQLConf {
         "optimize query. This optimization applies to: " +
         "1. Push down partial sum, count, avg, min, max, first and last through inner join " +
         "2. Partial deduplicate the children of join if the aggregation itself is group only " +
-        "3. Partial deduplicate the right side of left semi/anti join.")
+        "3. Partial deduplicate the right side of left semi/anti join. " +
+        "4. Pre-aggregate below the Expand of a ROLLUP, CUBE or GROUPING SETS. " +
+        "With a benefit ratio below 1.0, a rewrite needs the row count and column " +
+        "statistics that spark.sql.cbo.enabled estimates.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val PARTIAL_AGGREGATION_OPTIMIZATION_BENEFIT_RATIO =
     buildConf("spark.sql.optimizer.partialAggregationOptimization.benefitRatio")
