@@ -267,7 +267,7 @@ private[spark] class LocalSchedulerBackend(
       stopped = true
       if (localEndpoint != null) {
         Utils.tryLogNonFatalError {
-          localEndpoint.ask(StopExecutor)
+          localEndpoint.ask[Boolean](StopExecutor)
         }
       }
       Utils.tryLogNonFatalError {

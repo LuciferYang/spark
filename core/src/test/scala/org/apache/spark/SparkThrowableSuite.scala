@@ -324,7 +324,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val e = new SparkArithmeticException(
       errorClass = "DIVIDE_BY_ZERO",
       messageParameters = Map("config" -> "CONFIG"),
-      context = Array(new TestQueryContext),
+      context = Array[QueryContext](new TestQueryContext),
       summary = "Query summary")
 
     assert(SparkThrowableHelper.getMessage(e, PRETTY) ===
@@ -403,7 +403,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val e4 = new SparkArithmeticException(
       errorClass = "DIVIDE_BY_ZERO",
       messageParameters = Map("config" -> "CONFIG"),
-      context = Array(new TestQueryContext2),
+      context = Array[QueryContext](new TestQueryContext2),
       summary = "Query summary")
 
     assert(SparkThrowableHelper.getMessage(e4, PRETTY) ===
@@ -901,7 +901,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val exception = new SparkArithmeticException(
       errorClass = "DIVIDE_BY_ZERO",
       messageParameters = Map("config" -> "CONFIG"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
 
     assert(exception.getSqlState == "22012",
@@ -947,7 +947,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val numberFormatException = new SparkNumberFormatException(
       errorClass = "CANNOT_PARSE_DECIMAL",
       messageParameters = Map.empty[String, String],
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
     assert(numberFormatException.getSqlState == "22018",
       "Should use error class reader SQL state when custom not provided")
@@ -998,7 +998,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val exception = new SparkArithmeticException(
       errorClass = "DIVIDE_BY_ZERO",
       messageParameters = Map("config" -> "CONFIG"),
-      context = Array(new TestQueryContext),
+      context = Array[QueryContext](new TestQueryContext),
       summary = "")
 
     val error = intercept[TestFailedException] {
@@ -1031,7 +1031,7 @@ class SparkThrowableSuite extends SparkFunSuite {
     val exception = new SparkArithmeticException(
       errorClass = "DIVIDE_BY_ZERO",
       messageParameters = Map("config" -> "CONFIG"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
 
     checkError(

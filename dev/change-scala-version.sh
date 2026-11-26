@@ -19,7 +19,7 @@
 
 set -e
 
-VALID_VERSIONS=( 2.13 )
+VALID_VERSIONS=( 2.13 3 )
 
 usage() {
   echo "Usage: $(basename $0) [-h|--help] <version>
@@ -44,11 +44,13 @@ check_scala_version() {
 
 check_scala_version "$TO_VERSION"
 
-if [ $TO_VERSION = "2.13" ]; then
-  FROM_VERSION="2.12"
-else
+if [ $TO_VERSION = "3" ]; then
   FROM_VERSION="2.13"
+else
+  FROM_VERSION="3"
 fi
+# Escape the dots so that the version matches literally in sed patterns.
+FROM_VERSION_RE=${FROM_VERSION//./\\.}
 
 sed_i() {
   sed -e "$1" "$2" > "$2.tmp" && mv "$2.tmp" "$2"
@@ -57,7 +59,7 @@ sed_i() {
 BASEDIR=$(dirname $0)/..
 for f in $(find "$BASEDIR" -name 'pom.xml' -not -path '*target*'); do
   echo $f
-  sed_i 's/\(artifactId.*\)_'$FROM_VERSION'/\1_'$TO_VERSION'/g' $f
+  sed_i 's/\(<artifactId>[^<]*\)_'$FROM_VERSION_RE'<\/artifactId>/\1_'$TO_VERSION'<\/artifactId>/g' $f
   sed_i 's/^\([[:space:]]*<!-- #if scala-'$TO_VERSION' -->\)<!--/\1/' $f
   sed_i 's/^\([[:space:]]*\)-->\(<!-- #endif scala-'$TO_VERSION' -->\)/\1\2/' $f
   sed_i 's/^\([[:space:]]*<!-- #if scala-'$FROM_VERSION' -->\)$/\1<!--/' $f
@@ -77,20 +79,20 @@ sed_i '1,/<scala\.version>[0-9]*\.[0-9]*\.[0-9]*</s/<scala\.version>[0-9]*\.[0-9
 
 # Also update <scala.binary.version> in parent POM
 # Match any scala binary version to ensure idempotency
-sed_i '1,/<scala\.binary\.version>[0-9]*\.[0-9]*</s/<scala\.binary\.version>[0-9]*\.[0-9]*</<scala.binary.version>'$TO_VERSION'</' \
+sed_i '1,/<scala\.binary\.version>[0-9][0-9.]*</s/<scala\.binary\.version>[0-9][0-9.]*</<scala.binary.version>'$TO_VERSION'</' \
   "$BASEDIR/pom.xml"
 
 # Update source of scaladocs
 echo "$BASEDIR/docs/_plugins/build_api_docs.rb"
-if [ $TO_VERSION = "2.13" ]; then
+if [ $TO_VERSION = "3" ]; then
   sed_i '/\-Pscala-'$TO_VERSION'/!s:build/sbt:build/sbt \-Pscala\-'$TO_VERSION':' "$BASEDIR/docs/_plugins/build_api_docs.rb"
 else
   sed_i 's:build/sbt \-Pscala\-'$FROM_VERSION':build/sbt:' "$BASEDIR/docs/_plugins/build_api_docs.rb"
 fi
-sed_i 's/scala\-'$FROM_VERSION'/scala\-'$TO_VERSION'/' "$BASEDIR/docs/_plugins/build_api_docs.rb"
+sed_i 's/scala\-'$FROM_VERSION_RE'\//scala\-'$TO_VERSION'\//' "$BASEDIR/docs/_plugins/build_api_docs.rb"
 
 echo "$BASEDIR/dev/mima"
-if [ $TO_VERSION = "2.13" ]; then
+if [ $TO_VERSION = "3" ]; then
   sed_i '/\-Pscala-'$TO_VERSION'/!s:build/sbt:build/sbt \-Pscala\-'$TO_VERSION':' "$BASEDIR/dev/mima"
   sed_i '/\-Pscala-'$TO_VERSION'/!s;SPARK_PROFILES=\${1:\-";SPARK_PROFILES=\${1:\-"\-Pscala\-'$TO_VERSION' ;' \
     "$BASEDIR/dev/mima"

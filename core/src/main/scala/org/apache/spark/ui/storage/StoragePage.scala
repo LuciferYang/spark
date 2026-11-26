@@ -213,7 +213,7 @@ private[ui] class StoragePage(parent: SparkUITab, store: AppStatusStore) extends
           <td rowspan={replication.toString}>
             {replication.toString}
           </td>
-        }
+        } else Seq.empty
       }
       <td>{block.hostPort}</td>
       <td>{storageLevel}</td>

@@ -155,7 +155,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
     when(in.read(any())).thenReturn(1)
     when(in.read(any(), any(), any())).thenReturn(1)
     when(mockManagedBuffer.createInputStream()).thenReturn(in)
-    when(mockManagedBuffer.size()).thenReturn(size)
+    when(mockManagedBuffer.size()).thenReturn(size.toLong)
     mockManagedBuffer
   }
 
@@ -1242,7 +1242,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
         }
       })
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       taskContext = Some(taskContext),
@@ -1289,7 +1289,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
         }
       })
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       taskContext = Some(taskContext),
@@ -1404,7 +1404,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
       blockManager, Map(SHUFFLE_MERGER_IDENTIFIER -> localDirs),
       failReadingLocalChunksMeta = true)
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       blockManager = Some(blockManager), streamWrapperLimitSize = Some(100),
@@ -1423,7 +1423,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
     doThrow(new RuntimeException("Forced error")).when(blockManager)
       .getLocalMergedBlockData(ShuffleMergedBlockId(0, 0, 2), localDirs)
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       blockManager = Some(blockManager),
@@ -1457,7 +1457,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
     doReturn(Seq(createMockManagedBuffer(2))).when(blockManager)
       .getLocalMergedBlockData(ShuffleMergedBlockId(0, 0, 3), localDirs)
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       blockManager = Some(blockManager),
@@ -1597,7 +1597,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
       })).when(blockManager).getLocalMergedBlockData(
       ShuffleMergedBlockId(0, 0, 2), localDirs)
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       blockManager = Some(blockManager),
@@ -1622,7 +1622,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
     when(corruptStream.read(any(), any(), any())).thenThrow(new IOException("corrupt"))
     doReturn(corruptStream).when(corruptBuffer).createInputStream()
     val taskContext = TaskContext.empty()
-    val shuffleMetrics = taskContext.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics = taskContext.taskMetrics().createTempShuffleReadMetrics()
     val iterator = createShuffleBlockIteratorWithDefaults(
       blocksByAddress,
       blockManager = Some(blockManager),
@@ -2114,7 +2114,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
         SHUFFLE_PUSH_MAP_ID)))
 
     val taskContext1 = TaskContext.empty()
-    val shuffleMetrics1 = taskContext1.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics1 = taskContext1.taskMetrics().createTempShuffleReadMetrics()
     val iterator1 = createShuffleBlockIteratorWithDefaults(blocksByAddress1,
       blockManager = Some(blockManager),
       shuffleMetrics = Some(shuffleMetrics1))
@@ -2145,7 +2145,7 @@ class ShuffleBlockFetcherIteratorSuite extends SparkFunSuite {
         SHUFFLE_PUSH_MAP_ID)))
 
     val taskContext2 = TaskContext.empty()
-    val shuffleMetrics2 = taskContext2.taskMetrics.createTempShuffleReadMetrics()
+    val shuffleMetrics2 = taskContext2.taskMetrics().createTempShuffleReadMetrics()
     val iterator2 = createShuffleBlockIteratorWithDefaults(blocksByAddress2,
       blockManager = Some(blockManager),
       shuffleMetrics = Some(shuffleMetrics2))

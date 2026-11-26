@@ -998,7 +998,7 @@ private[spark] class ExecutorAllocationManager(
       }
     }
 
-    def removeStageFromResourceProfileIfUnused(stageAttempt: StageAttempt): Unit = {
+    private def removeStageFromResourceProfileIfUnused(stageAttempt: StageAttempt): Unit = {
       if (!stageAttemptToNumRunningTask.contains(stageAttempt) &&
           !stageAttemptToNumTasks.contains(stageAttempt) &&
           !stageAttemptToPendingSpeculativeTasks.contains(stageAttempt) &&

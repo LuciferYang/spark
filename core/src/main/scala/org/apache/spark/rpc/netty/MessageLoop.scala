@@ -80,14 +80,14 @@ private sealed abstract class MessageLoop(dispatcher: Dispatcher) extends Loggin
       }
     } catch {
       case _: InterruptedException => // exit
-        case t: Throwable =>
-          try {
-            // Re-submit a receive task so that message delivery will still work if
-            // UncaughtExceptionHandler decides to not kill JVM.
-            threadpool.execute(receiveLoopRunnable)
-          } finally {
-            throw t
-          }
+      case t: Throwable =>
+        try {
+          // Re-submit a receive task so that message delivery will still work if
+          // UncaughtExceptionHandler decides to not kill JVM.
+          threadpool.execute(receiveLoopRunnable)
+        } finally {
+          throw t
+        }
     }
   }
 }

@@ -257,10 +257,10 @@ private[ui] class StagePagedTable(
           cachedRddInfos.map { i =>
             <a href={s"$basePathUri/storage/rdd/?id=${i.id}"}>{i.name}</a>
           }
-        }}
+        } else Seq.empty}
         <pre>{s.details}</pre>
       </div>
-    }
+    } else Seq.empty
 
     val stageDesc = descriptionOption.map(UIUtils.makeDescription(_, basePathUri))
     <div>{stageDesc.getOrElse("")} {killLink} {nameLink} {details}</div>

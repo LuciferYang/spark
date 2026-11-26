@@ -144,7 +144,8 @@ class ReadOnlyMasterWebUISuite extends SparkFunSuite {
     assert(conn.getResponseCode === SC_OK)
     val result = Source.fromInputStream(conn.getInputStream).mkString
     assert(result.contains("Environment Variables"))
-    assert(result.contains("<tr><td>SPARK_SCALA_VERSION</td><td>2.1"))
+    assert(result.contains(
+      s"<tr><td>SPARK_SCALA_VERSION</td><td>${sys.env("SPARK_SCALA_VERSION")}"))
   }
 
   test("SPARK-50022: Fix 'MasterPage' to hide App UI links when UI is disabled") {

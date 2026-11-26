@@ -33,7 +33,7 @@ import javax.net.ssl._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
-import scala.reflect.{classTag, ClassTag}
+import scala.reflect.ClassTag
 import scala.sys.process.Process
 import scala.util.Try
 
@@ -165,15 +165,17 @@ private[spark] object TestUtils extends SparkTestUtils {
    * exceptions in the tree. If a type parameter `E` is supplied, this will additionally confirm
    * that the exception is a subtype of the exception provided in the type parameter.
    */
-  def assertExceptionMsg[E <: Throwable : ClassTag](
+  def assertExceptionMsg[E <: Throwable](
       exception: Throwable,
       msg: String,
-      ignoreCase: Boolean = false): Unit = {
+      ignoreCase: Boolean = false)(implicit tag: ClassTag[E] = null): Unit = {
 
-    val (typeMsg, typeCheck) = if (classTag[E] == classTag[Nothing]) {
+    // When `E` is not given, it is inferred as `Nothing`. Scala 3 has no `ClassTag[Nothing]`,
+    // so `tag` falls back to the default `null` there.
+    val (typeMsg, typeCheck) = if (tag == null || tag == ClassTag.Nothing) {
       ("", (_: Throwable) => true)
     } else {
-      val clazz = classTag[E].runtimeClass
+      val clazz = tag.runtimeClass
       (s"of type ${clazz.getName} ", (e: Throwable) => clazz.isAssignableFrom(e.getClass))
     }
 

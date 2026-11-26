@@ -1444,7 +1444,9 @@ class UtilsSuite extends SparkFunSuite with ResetSystemProperties {
       .get
     assert(extWithConf.conf eq conf)
 
-    class NestedExtension { }
+    // Refers to the suite, so that both Scala 2 and Scala 3 give its constructor an outer
+    // instance parameter.
+    class NestedExtension { def suite: UtilsSuite = UtilsSuite.this }
 
     val invalid = Seq(classOf[NestedExtension].getName())
     intercept[SparkException] {

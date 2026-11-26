@@ -90,8 +90,10 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
   /**
    * Return a new RDD by applying a function to all elements of this RDD.
    */
-  def map[R](f: JFunction[T, R]): JavaRDD[R] =
-    new JavaRDD(rdd.map(f)(fakeClassTag))(fakeClassTag)
+  def map[R](f: JFunction[T, R]): JavaRDD[R] = {
+    implicit val ctagR: ClassTag[R] = fakeClassTag
+    new JavaRDD(rdd.map(f))
+  }
 
   /**
    * Return a new RDD by applying a function to each partition of this RDD, while tracking the index
@@ -99,9 +101,11 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    */
   def mapPartitionsWithIndex[R](
       f: JFunction2[jl.Integer, JIterator[T], JIterator[R]],
-      preservesPartitioning: Boolean = false): JavaRDD[R] =
+      preservesPartitioning: Boolean = false): JavaRDD[R] = {
+    implicit val ctagR: ClassTag[R] = fakeClassTag
     new JavaRDD(rdd.mapPartitionsWithIndex((a, b) => f.call(a, b.asJava).asScala,
-        preservesPartitioning)(fakeClassTag))(fakeClassTag)
+        preservesPartitioning))
+  }
 
   /**
    * Return a new RDD by applying a function to all elements of this RDD.
@@ -114,8 +118,7 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    * Return a new RDD by applying a function to all elements of this RDD.
    */
   def mapToPair[K2, V2](f: PairFunction[T, K2, V2]): JavaPairRDD[K2, V2] = {
-    def cm: ClassTag[(K2, V2)] = implicitly[ClassTag[(K2, V2)]]
-    new JavaPairRDD(rdd.map[(K2, V2)](f)(cm))(fakeClassTag[K2], fakeClassTag[V2])
+    new JavaPairRDD(rdd.map[(K2, V2)](f))(fakeClassTag[K2], fakeClassTag[V2])
   }
 
   /**
@@ -124,7 +127,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    */
   def flatMap[U](f: FlatMapFunction[T, U]): JavaRDD[U] = {
     def fn: (T) => Iterator[U] = (x: T) => f.call(x).asScala
-    JavaRDD.fromRDD(rdd.flatMap(fn)(fakeClassTag[U]))(fakeClassTag[U])
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    JavaRDD.fromRDD(rdd.flatMap(fn))
   }
 
   /**
@@ -142,8 +146,9 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    */
   def flatMapToPair[K2, V2](f: PairFlatMapFunction[T, K2, V2]): JavaPairRDD[K2, V2] = {
     def fn: (T) => Iterator[(K2, V2)] = (x: T) => f.call(x).asScala
-    def cm: ClassTag[(K2, V2)] = implicitly[ClassTag[(K2, V2)]]
-    JavaPairRDD.fromRDD(rdd.flatMap(fn)(cm))(fakeClassTag[K2], fakeClassTag[V2])
+    implicit val ctagK2: ClassTag[K2] = fakeClassTag
+    implicit val ctagV2: ClassTag[V2] = fakeClassTag
+    JavaPairRDD.fromRDD(rdd.flatMap(fn))
   }
 
   /**
@@ -153,7 +158,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     def fn: (Iterator[T]) => Iterator[U] = {
       (x: Iterator[T]) => f.call(x.asJava).asScala
     }
-    JavaRDD.fromRDD(rdd.mapPartitions(fn)(fakeClassTag[U]))(fakeClassTag[U])
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    JavaRDD.fromRDD(rdd.mapPartitions(fn))
   }
 
   /**
@@ -164,8 +170,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     def fn: (Iterator[T]) => Iterator[U] = {
       (x: Iterator[T]) => f.call(x.asJava).asScala
     }
-    JavaRDD.fromRDD(
-      rdd.mapPartitions(fn, preservesPartitioning)(fakeClassTag[U]))(fakeClassTag[U])
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    JavaRDD.fromRDD(rdd.mapPartitions(fn, preservesPartitioning))
   }
 
   /**
@@ -186,7 +192,9 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     def fn: (Iterator[T]) => Iterator[(K2, V2)] = {
       (x: Iterator[T]) => f.call(x.asJava).asScala
     }
-    JavaPairRDD.fromRDD(rdd.mapPartitions(fn))(fakeClassTag[K2], fakeClassTag[V2])
+    implicit val ctagK2: ClassTag[K2] = fakeClassTag
+    implicit val ctagV2: ClassTag[V2] = fakeClassTag
+    JavaPairRDD.fromRDD(rdd.mapPartitions(fn))
   }
 
   /**
@@ -209,8 +217,9 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     def fn: (Iterator[T]) => Iterator[(K2, V2)] = {
       (x: Iterator[T]) => f.call(x.asJava).asScala
     }
-    JavaPairRDD.fromRDD(
-      rdd.mapPartitions(fn, preservesPartitioning))(fakeClassTag[K2], fakeClassTag[V2])
+    implicit val ctagK2: ClassTag[K2] = fakeClassTag
+    implicit val ctagV2: ClassTag[V2] = fakeClassTag
+    JavaPairRDD.fromRDD(rdd.mapPartitions(fn, preservesPartitioning))
   }
 
   /**
@@ -230,8 +239,10 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    * Return the Cartesian product of this RDD and another one, that is, the RDD of all pairs of
    * elements (a, b) where a is in `this` and b is in `other`.
    */
-  def cartesian[U](other: JavaRDDLike[U, _]): JavaPairRDD[T, U] =
-    JavaPairRDD.fromRDD(rdd.cartesian(other.rdd)(other.classTag))(classTag, other.classTag)
+  def cartesian[U](other: JavaRDDLike[U, _]): JavaPairRDD[T, U] = {
+    implicit val ctagU: ClassTag[U] = other.classTag
+    JavaPairRDD.fromRDD(rdd.cartesian(other.rdd))
+  }
 
   /**
    * Return an RDD of grouped elements. Each group consists of a key and a sequence of elements
@@ -241,7 +252,7 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     // The type parameter is U instead of K in order to work around a compiler bug; see SPARK-4459
     implicit val ctagK: ClassTag[U] = fakeClassTag
     implicit val ctagV: ClassTag[JList[T]] = fakeClassTag
-    JavaPairRDD.fromRDD(groupByResultToJava(rdd.groupBy(f)(fakeClassTag)))
+    JavaPairRDD.fromRDD(groupByResultToJava(rdd.groupBy(f)))
   }
 
   /**
@@ -252,7 +263,7 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     // The type parameter is U instead of K in order to work around a compiler bug; see SPARK-4459
     implicit val ctagK: ClassTag[U] = fakeClassTag
     implicit val ctagV: ClassTag[JList[T]] = fakeClassTag
-    JavaPairRDD.fromRDD(groupByResultToJava(rdd.groupBy(f, numPartitions)(fakeClassTag[U])))
+    JavaPairRDD.fromRDD(groupByResultToJava(rdd.groupBy(f, numPartitions)))
   }
 
   /**
@@ -305,7 +316,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    * a map on the other).
    */
   def zip[U](other: JavaRDDLike[U, _]): JavaPairRDD[T, U] = {
-    JavaPairRDD.fromRDD(rdd.zip(other.rdd)(other.classTag))(classTag, other.classTag)
+    implicit val ctagU: ClassTag[U] = other.classTag
+    JavaPairRDD.fromRDD(rdd.zip(other.rdd))
   }
 
   /**
@@ -320,8 +332,9 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
     def fn: (Iterator[T], Iterator[U]) => Iterator[V] = {
       (x: Iterator[T], y: Iterator[U]) => f.call(x.asJava, y.asJava).asScala
     }
-    JavaRDD.fromRDD(
-      rdd.zipPartitions(other.rdd)(fn)(other.classTag, fakeClassTag[V]))(fakeClassTag[V])
+    implicit val ctagU: ClassTag[U] = other.classTag
+    implicit val ctagV: ClassTag[V] = fakeClassTag
+    JavaRDD.fromRDD(rdd.zipPartitions(other.rdd)(fn))
   }
 
   /**
@@ -424,8 +437,10 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
    * allocation.
    */
   def aggregate[U](zeroValue: U)(seqOp: JFunction2[U, T, U],
-    combOp: JFunction2[U, U, U]): U =
-    rdd.aggregate(zeroValue)(seqOp, combOp)(fakeClassTag[U])
+    combOp: JFunction2[U, U, U]): U = {
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    rdd.aggregate(zeroValue)(seqOp, combOp)
+  }
 
   /**
    * Aggregates the elements of this RDD in a multi-level tree pattern.
@@ -438,7 +453,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
       seqOp: JFunction2[U, T, U],
       combOp: JFunction2[U, U, U],
       depth: Int): U = {
-    rdd.treeAggregate(zeroValue)(seqOp, combOp, depth)(fakeClassTag[U])
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    rdd.treeAggregate(zeroValue)(seqOp, combOp, depth)
   }
 
   /**
@@ -461,7 +477,8 @@ trait JavaRDDLike[T, This <: JavaRDDLike[T, This]] extends Serializable {
       combOp: JFunction2[U, U, U],
       depth: Int,
       finalAggregateOnExecutor: Boolean): U = {
-    rdd.treeAggregate(zeroValue, seqOp, combOp, depth, finalAggregateOnExecutor)(fakeClassTag[U])
+    implicit val ctagU: ClassTag[U] = fakeClassTag
+    rdd.treeAggregate(zeroValue, seqOp, combOp, depth, finalAggregateOnExecutor)
   }
 
   /**

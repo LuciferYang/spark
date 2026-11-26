@@ -30,7 +30,7 @@ import org.apache.spark.tags.{ChromeUITest, ExtendedLevelDBTest, WebBrowserTest}
 abstract class ChromeUIHistoryServerSuite
   extends RealBrowserUIHistoryServerSuite("webdriver.chrome.driver") {
 
-  override var webDriver: WebDriver = _
+  var webDriver: WebDriver = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()

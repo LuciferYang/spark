@@ -31,6 +31,7 @@ import org.apache.spark.memory.MemoryTestingUtils
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleChecksumTestHelper}
 import org.apache.spark.shuffle.api.ShuffleExecutorComponents
+import org.apache.spark.shuffle.checksum.RowBasedChecksum
 import org.apache.spark.shuffle.sort.io.LocalDiskShuffleExecutorComponents
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.util.Utils
@@ -193,7 +194,7 @@ class SortShuffleWriterSuite
         when(dependency.serializer).thenReturn(serializer)
         when(dependency.aggregator).thenReturn(aggregator)
         when(dependency.keyOrdering).thenReturn(order)
-        when(dependency.rowBasedChecksums).thenReturn(Array.empty)
+        when(dependency.rowBasedChecksums).thenReturn(Array.empty[RowBasedChecksum])
         new BaseShuffleHandle[Int, Int, Int](shuffleId, dependency)
       }
 
@@ -217,8 +218,7 @@ class SortShuffleWriterSuite
         new LocalDiskShuffleExecutorComponents(
           conf, shuffleBlockResolver._blockManager, shuffleBlockResolver))
       writer.write(records.iterator)
-      val sorterMethod = PrivateMethod[ExternalSorter[_, _, _]](Symbol("sorter"))
-      val sorter = writer.invokePrivate(sorterMethod())
+      val sorter = getPrivateField[ExternalSorter[_, _, _]](writer, "sorter")
       val expectSpillSize = if (doSpill) records.size else 0
       assert(sorter.numSpills === expectSpillSize)
       writer.stop(success = true)

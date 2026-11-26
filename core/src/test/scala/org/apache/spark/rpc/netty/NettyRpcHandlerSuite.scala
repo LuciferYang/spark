@@ -20,6 +20,8 @@ package org.apache.spark.rpc.netty
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
+import scala.reflect.ClassTag
+
 import io.netty.channel.Channel
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
@@ -33,8 +35,13 @@ class NettyRpcHandlerSuite extends SparkFunSuite {
 
   val env = mock(classOf[NettyRpcEnv])
   val sm = mock(classOf[StreamManager])
-  when(env.deserialize(any(classOf[TransportClient]), any(classOf[ByteBuffer]))(any()))
-    .thenReturn(new RequestMessage(RpcAddress("localhost", 12345), null, null))
+  when {
+    // Scala 3 takes no explicit argument for a context bound, so the ClassTag matcher is an
+    // implicit `def`: it is created when passed, after the matchers before it, as Mockito needs
+    // matchers created in parameter order.
+    implicit def anyClassTag: ClassTag[Any] = any()
+    env.deserialize[Any](any(classOf[TransportClient]), any(classOf[ByteBuffer]))
+  }.thenReturn(new RequestMessage(RpcAddress("localhost", 12345), null, null))
 
   test("receive") {
     val dispatcher = mock(classOf[Dispatcher])

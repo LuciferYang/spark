@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit
 
 import scala.annotation.tailrec
 
-import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, Tag}
 import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
 import org.scalatest.time._ // scalastyle:ignore
@@ -32,19 +31,25 @@ import org.scalatest.time._ // scalastyle:ignore
  */
 abstract class SparkFunSuite
   extends AnyFunSuite // scalastyle:ignore funsuite
-  with SparkTestSuite {
+  with SparkTestSuite
+  with ScalaVersionSpecificTestImplicits {
 
-  override protected def test(testName: String, testTags: Tag*)(testBody: => Any)
-    (implicit pos: Position): Unit = {
-    if (excluded.contains(testName)) {
-      ignore(s"$testName (excluded)")(testBody)
-    } else {
-      val timeout = sys.props.getOrElse("spark.test.timeout", "20").toLong
-      super.test(testName, testTags: _*)(
-        failAfter(Span(timeout, Minutes))(testBody)
-      )
+  /**
+   * Whether the test named `testName` is reported as ignored instead of being run. By default,
+   * the tests that `excluded` lists.
+   */
+  protected def shouldIgnoreTest(testName: String): Boolean = excluded.contains(testName)
+
+  // Ignores the tests that `shouldIgnoreTest` selects. This cannot happen when the tests are
+  // registered: ScalaTest for Scala 3 makes `test` final, so it cannot be overridden.
+  override def tags: Map[String, Set[String]] = {
+    testNames.filter(shouldIgnoreTest).foldLeft(super.tags) { (tags, testName) =>
+      tags.updated(testName, tags.getOrElse(testName, Set.empty) + SparkFunSuite.IgnoreTagName)
     }
   }
+
+  override protected def testTimeLimit: Option[Span] =
+    Some(Span(sys.props.getOrElse("spark.test.timeout", "20").toLong, Minutes))
 
   /**
    * Note: this method doesn't support `BeforeAndAfter`. You must use `BeforeAndAfterEach` to
@@ -137,4 +142,9 @@ abstract class SparkFunSuite
     // Unreachable: the loop either returns a value or rethrows the OOM.
     throw new IllegalStateException("retryOnOOM exited its retry loop unexpectedly")
   }
+}
+
+private object SparkFunSuite {
+  // The tag ScalaTest puts on a test registered with `ignore`.
+  val IgnoreTagName: String = classOf[org.scalatest.Ignore].getName
 }

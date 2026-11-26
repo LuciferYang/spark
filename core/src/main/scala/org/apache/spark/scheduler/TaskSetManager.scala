@@ -1245,7 +1245,7 @@ private[spark] class TaskSetManager(
         lazy val isShuffleMapOutputAvailable = reason match {
           case ExecutorDecommission(_, _) =>
             val mapId = if (conf.get(config.SHUFFLE_USE_OLD_FETCH_PROTOCOL)) {
-              info.partitionId
+              info.partitionId.toLong
             } else {
               tid
             }

@@ -79,7 +79,7 @@ private[spark] object SerializationDebugger extends Logging {
       val clazz = classOf[ObjectOutputStream]
       val lookup = MethodHandles.privateLookupIn(clazz, MethodHandles.lookup())
       val vh = lookup.findStaticVarHandle(clazz, "extendedDebugInfo", java.lang.Boolean.TYPE)
-      !vh.get().asInstanceOf[Boolean]
+      !(vh.get(): AnyRef).asInstanceOf[Boolean]
     }
 
   private class SerializationDebugger {

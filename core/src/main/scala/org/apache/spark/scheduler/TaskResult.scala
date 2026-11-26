@@ -105,7 +105,8 @@ private[spark] class DirectTaskResult[T](
       // This should not run when holding a lock because it may cost dozens of seconds for a large
       // value
       val ser = if (resultSer == null) SparkEnv.get.serializer.newInstance() else resultSer
-      valueObject = SerializerHelper.deserializeFromChunkedBuffer(ser, valueByteBuffer)
+      valueObject =
+        SerializerHelper.deserializeFromChunkedBuffer[Any](ser, valueByteBuffer).asInstanceOf[T]
       valueObjectDeserialized = true
       valueObject
     }

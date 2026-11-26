@@ -178,7 +178,7 @@ object JdbcRDD {
       upperBound: Long,
       numPartitions: Int,
       mapRow: JFunction[ResultSet, T]): JavaRDD[T] = {
-
+    implicit val ctag: ClassTag[T] = fakeClassTag
     val jdbcRDD = new JdbcRDD[T](
       sc.sc,
       () => connectionFactory.getConnection,
@@ -186,9 +186,9 @@ object JdbcRDD {
       lowerBound,
       upperBound,
       numPartitions,
-      (resultSet: ResultSet) => mapRow.call(resultSet))(fakeClassTag)
+      (resultSet: ResultSet) => mapRow.call(resultSet))
 
-    new JavaRDD[T](jdbcRDD)(fakeClassTag)
+    new JavaRDD[T](jdbcRDD)
   }
 
   /**

@@ -108,7 +108,7 @@ private[spark] object RUtils {
   }
 
   def isEncryptionEnabled(sc: JavaSparkContext): Boolean = {
-    sc.conf.get(IO_ENCRYPTION_ENABLED)
+    sc.sc.conf.get(IO_ENCRYPTION_ENABLED)
   }
 
   def getJobTags(sc: JavaSparkContext): Array[String] = {

@@ -127,7 +127,7 @@ private[ui] class WorkerPage(parent: WorkerWebUI) extends WebUIPage("") {
                   id="aggregated-runningDrivers">
                 {runningDriverTable}
               </div>
-            }
+            } else Seq.empty
           }
           {
             if (finishedExecutors.nonEmpty) {
@@ -145,7 +145,7 @@ private[ui] class WorkerPage(parent: WorkerWebUI) extends WebUIPage("") {
                   id="aggregated-finishedExecutors">
                 {finishedExecutorTable}
               </div>
-            }
+            } else Seq.empty
           }
           {
             if (finishedDrivers.nonEmpty) {
@@ -162,7 +162,7 @@ private[ui] class WorkerPage(parent: WorkerWebUI) extends WebUIPage("") {
                   id="aggregated-finishedDrivers">
                 {finishedDriverTable}
               </div>
-            }
+            } else Seq.empty
           }
         </div>
       </div>;

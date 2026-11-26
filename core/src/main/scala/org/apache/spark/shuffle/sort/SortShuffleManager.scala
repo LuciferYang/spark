@@ -82,7 +82,7 @@ private[spark] class SortShuffleManager(conf: SparkConf)
 
   private lazy val shuffleExecutorComponents = loadShuffleExecutorComponents(conf)
 
-  override val shuffleBlockResolver =
+  override val shuffleBlockResolver: IndexShuffleBlockResolver =
     new IndexShuffleBlockResolver(conf, taskIdMapsForShuffle = taskIdMapsForShuffle)
 
   /**

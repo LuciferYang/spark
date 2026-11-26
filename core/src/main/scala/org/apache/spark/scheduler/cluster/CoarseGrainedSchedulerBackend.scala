@@ -123,7 +123,7 @@ class CoarseGrainedSchedulerBackend(protected val scheduler: TaskSchedulerImpl, 
   // triggeredByExecutor).
   protected val unknownExecutorsPendingDecommission =
     CacheBuilder.newBuilder()
-      .maximumSize(conf.get(SCHEDULER_MAX_RETAINED_UNKNOWN_EXECUTORS))
+      .maximumSize(conf.get(SCHEDULER_MAX_RETAINED_UNKNOWN_EXECUTORS).toLong)
       .build[String, (ExecutorDecommissionInfo, Boolean, Boolean)]()
 
   // A map of ResourceProfile id to map of hostname with its possible task number running on it

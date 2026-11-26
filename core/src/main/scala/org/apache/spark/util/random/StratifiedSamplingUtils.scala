@@ -104,7 +104,7 @@ private[spark] object StratifiedSamplingUtils extends Logging {
           acceptResult.waitListBound = (lmbd2 - lmbd1) / n
         }
         val acceptBound = acceptResult.acceptBound
-        val copiesAccepted = if (acceptBound == 0.0) 0L else rng.nextPoisson(acceptBound)
+        val copiesAccepted = if (acceptBound == 0.0) 0L else rng.nextPoisson(acceptBound).toLong
         if (copiesAccepted > 0) {
           acceptResult.numAccepted += copiesAccepted
         }
@@ -251,7 +251,7 @@ private[spark] object StratifiedSamplingUtils extends Logging {
           val acceptBound = finalResult(key).acceptBound
           // Must use the same invoke pattern on the rng as in getSeqOp for with replacement
           // in order to generate the same sequence of random numbers when creating the sample
-          val copiesAccepted = if (acceptBound == 0) 0L else rng.nextPoisson(acceptBound)
+          val copiesAccepted = if (acceptBound == 0) 0L else rng.nextPoisson(acceptBound).toLong
           val copiesWaitlisted = rng.nextPoisson(finalResult(key).waitListBound)
           val copiesInSample = copiesAccepted +
             (0 until copiesWaitlisted).count(i => rng.nextUniform() < thresholdByKey(key))
@@ -279,7 +279,7 @@ private[spark] object StratifiedSamplingUtils extends Logging {
   }
 
   /** A random data generator that generates both uniform values and Poisson values. */
-  private class RandomDataGenerator {
+  private[random] class RandomDataGenerator {
     val uniform = new XORShiftRandom()
     // commons-math3 doesn't have a method to generate Poisson from an arbitrary mean;
     // maintain a cache of Poisson(m) distributions for various m

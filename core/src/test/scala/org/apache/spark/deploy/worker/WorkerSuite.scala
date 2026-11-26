@@ -415,17 +415,11 @@ class WorkerSuite extends SparkFunSuite with Matchers with BeforeAndAfter with P
     val masterRef = mock(classOf[RpcEndpointRef])
     when(masterRef.address).thenReturn(masterAddress)
 
-    def getHeartbeatTask(worker: Worker): Option[JScheduledFuture[_]] = {
-      val _heartbeatTask =
-        PrivateMethod[Option[JScheduledFuture[_]]](Symbol("heartbeatTask"))
-      worker.invokePrivate(_heartbeatTask())
-    }
+    def getHeartbeatTask(worker: Worker): Option[JScheduledFuture[_]] =
+      getPrivateField[Option[JScheduledFuture[_]]](worker, "heartbeatTask")
 
-    def getWorkDirCleanupTask(worker: Worker): Option[JScheduledFuture[_]] = {
-      val _workDirCleanupTask =
-        PrivateMethod[Option[JScheduledFuture[_]]](Symbol("workDirCleanupTask"))
-      worker.invokePrivate(_workDirCleanupTask())
-    }
+    def getWorkDirCleanupTask(worker: Worker): Option[JScheduledFuture[_]] =
+      getPrivateField[Option[JScheduledFuture[_]]](worker, "workDirCleanupTask")
 
     // Tasks should not be scheduled yet before registration
     assert(getHeartbeatTask(worker).isEmpty && getWorkDirCleanupTask(worker).isEmpty)

@@ -27,7 +27,10 @@ import org.apache.spark.*;
 import org.apache.spark.network.shuffle.checksum.ShuffleChecksumHelper;
 import org.apache.spark.shuffle.ShuffleChecksumTestHelper;
 import org.mockito.stubbing.Answer;
-import scala.*;
+import scala.Option;
+import scala.Product2;
+import scala.Tuple2;
+import scala.Tuple2$;
 import scala.collection.Iterator;
 
 import com.google.common.collect.HashMultiset;
@@ -262,7 +265,9 @@ public class UnsafeShuffleWriterSuite implements ShuffleChecksumTestHelper {
 
   @Test
   public void writeFailurePropagates() throws Exception {
-    class BadRecords extends scala.collection.AbstractIterator<Product2<Object, Object>> {
+    // A Java iterator: javac cannot extend scala.collection.AbstractIterator of the Scala 3
+    // standard library, whose generic signatures it reports as conflicting.
+    class BadRecords implements java.util.Iterator<Product2<Object, Object>> {
       @Override public boolean hasNext() {
         throw new PandaException();
       }

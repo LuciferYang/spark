@@ -1485,7 +1485,7 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with PrivateMethodTe
       } finally {
         TaskContext.unset()
       }
-      context.taskMetrics.updatedBlockStatuses
+      context.taskMetrics().updatedBlockStatuses
     }
 
     // 1 updated block (i.e. list1)
@@ -1513,7 +1513,7 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with PrivateMethodTe
       } finally {
         TaskContext.unset()
       }
-      context.taskMetrics.updatedBlockStatuses
+      context.taskMetrics().updatedBlockStatuses
     }
 
     // 1 updated block (i.e. list1)
@@ -3229,8 +3229,8 @@ private object BlockManagerSuite {
     }
 
     val getLocalAndReleaseLock: (BlockId) => Option[BlockResult] = wrapGet(store.getLocalValues)
-    val getAndReleaseLock: (BlockId) => Option[BlockResult] = wrapGet(store.get)
-    val getSingleAndReleaseLock: (BlockId) => Option[Any] = wrapGet(store.getSingle)
+    val getAndReleaseLock: (BlockId) => Option[BlockResult] = wrapGet(store.get[Any])
+    val getSingleAndReleaseLock: (BlockId) => Option[Any] = wrapGet(store.getSingle[Any])
     val getLocalBytesAndReleaseLock: (BlockId) => Option[ChunkedByteBuffer] = {
       val allocator = ByteBuffer.allocate _
       wrapGet { bid => store.getLocalBytes(bid).map(_.toChunkedByteBuffer(allocator)) }

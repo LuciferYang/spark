@@ -23,6 +23,8 @@ import java.util.Locale
 import scala.io.Source
 import scala.xml.Node
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import jakarta.servlet.http.{HttpServletRequest, HttpServletResponse}
 import org.eclipse.jetty.client.{HttpClient, StringRequestContent}
 import org.glassfish.jersey.internal.util.collection.MultivaluedStringMap
@@ -197,7 +199,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
         StorageLevels.MEMORY_ONLY.description)
 
       val dataDistributions0 =
-        (updatedRddJson \ "dataDistribution").extract[Seq[RDDDataDistribution]]
+        readDataDistributions(updatedRddJson \ "dataDistribution")
       dataDistributions0.length should be (1)
       val dist0 = dataDistributions0.head
 
@@ -216,7 +218,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
       updatedStorageJson1.children.length should be (1)
       val updatedRddJson1 = getJson(ui, "storage/rdd/0")
       val dataDistributions1 =
-        (updatedRddJson1 \ "dataDistribution").extract[Seq[RDDDataDistribution]]
+        readDataDistributions(updatedRddJson1 \ "dataDistribution")
       dataDistributions1.length should be (1)
       val dist1 = dataDistributions1.head
 
@@ -378,8 +380,8 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
 
       val jobJson = getJson(sc.ui.get, "jobs")
       for {
-        job @ JObject(_) <- jobJson
-        JInt(jobId) <- job \ "jobId"
+        job <- jobJson.filter(_.isInstanceOf[JObject])
+        jobId <- List(job \ "jobId").collect { case JInt(id) => id }
         jobGroup = job \ "jobGroup"
       } {
         jobId.toInt match {
@@ -428,10 +430,10 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
       val stageJson = getJson(sc.ui.get, "stages")
 
       for {
-        stage @ JObject(_) <- stageJson
-        JString(status) <- stage \ "status"
-        JInt(stageId) <- stage \ "stageId"
-        JInt(attemptId) <- stage \ "attemptId"
+        stage <- stageJson.filter(_.isInstanceOf[JObject])
+        status <- List(stage \ "status").collect { case JString(s) => s }
+        stageId <- List(stage \ "stageId").collect { case JInt(id) => id }
+        attemptId <- List(stage \ "attemptId").collect { case JInt(id) => id }
       } {
         val exp = if (attemptId.toInt == 0 && stageId.toInt == 1) {
           StageStatus.FAILED
@@ -825,7 +827,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
       val jobsJson = getJson(sc.ui.get, "jobs")
       jobsJson.children.size should be (expJobInfo.size)
       for {
-        (job @ JObject(_), idx) <- jobsJson.children.zipWithIndex
+        (job, idx) <- jobsJson.children.zipWithIndex if job.isInstanceOf[JObject]
         id = (job \ "jobId").extract[String]
         name = (job \ "name").extract[String]
       } {
@@ -870,7 +872,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
       val stagesJson = getJson(sc.ui.get, "stages")
       stagesJson.children.size should be (3)
       for {
-        (stage @ JObject(_), idx) <- stagesJson.children.zipWithIndex
+        (stage, idx) <- stagesJson.children.zipWithIndex if stage.isInstanceOf[JObject]
         id = (stage \ "stageId").extract[String]
         name = (stage \ "name").extract[String]
       } {
@@ -1121,6 +1123,16 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers {
 
   def parseDate(json: JValue): Long = {
     JacksonMessageWriter.makeISODateFormat.parse(json.extract[String]).getTime
+  }
+
+  /**
+   * Reads the given JSON array with Jackson. json4s cannot extract the `Option[Long]` fields of
+   * `RDDDataDistribution` when Spark is compiled with Scala 3, whose classes have no Scala 2
+   * signature for it to read; Jackson uses the `@JsonDeserialize` annotations of the fields.
+   */
+  private def readDataDistributions(json: JValue): Seq[RDDDataDistribution] = {
+    val mapper = new ObjectMapper().registerModule(DefaultScalaModule)
+    mapper.readValue(JsonMethods.compact(json), classOf[Array[RDDDataDistribution]]).toSeq
   }
 
   def getJson(ui: SparkUI, path: String): JValue = {

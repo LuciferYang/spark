@@ -33,7 +33,7 @@ import org.apache.spark.util.{AccumulatorV2, DoubleAccumulator, LongAccumulator}
  */
 private[spark] class AccumulatorSource extends Source {
   private val registry = new MetricRegistry
-  protected def register[T](accumulators: Map[String, AccumulatorV2[_, T]]): Unit = {
+  protected[source] def register[T](accumulators: Map[String, AccumulatorV2[_, T]]): Unit = {
     accumulators.foreach {
       case (name, accumulator) =>
         val gauge = new Gauge[T] {

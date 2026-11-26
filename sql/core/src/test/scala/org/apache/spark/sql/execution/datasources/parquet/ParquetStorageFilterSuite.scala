@@ -2298,7 +2298,7 @@ class ParquetStorageFilterSuite extends QueryTest with SharedSparkSession
       cap: String = "64MB"): Unit = {
     val held = 1000000L
     val context = memoryTask(held + margin)
-    val other = new TestMemoryConsumer(context.taskMemoryManager)
+    val other = new TestMemoryConsumer(context.taskMemoryManager())
     other.use(held)
     val (read, _) = readInTask(path, context, batchSize = 4096, cap = cap)
     val name = s"$rows rows with a margin of $margin under a cap of $cap"
@@ -2338,7 +2338,7 @@ class ParquetStorageFilterSuite extends QueryTest with SharedSparkSession
         assert(held == expected,
           s"$name: each batch must hold its row group's reservation until the next row group " +
             s"loads; got $held")
-        assert(context.taskMemoryManager.getMemoryConsumptionForThisTask == 0,
+        assert(context.taskMemoryManager().getMemoryConsumptionForThisTask == 0,
           s"$name: not released")
       }
       // On heap, each row group asks first for its first survivor's 49 bytes, with nothing held
@@ -2356,13 +2356,13 @@ class ParquetStorageFilterSuite extends QueryTest with SharedSparkSession
         asTask(context) {
           drain(formatReader(checkedSchema(), Nil, Seq(keyAtLeast(10L)))(file)) { it =>
             it.next()
-            context.taskMemoryManager.getMemoryConsumptionForThisTask
+            context.taskMemoryManager().getMemoryConsumptionForThisTask
           }
         }
       }
       assert(heldAtFirst == 130L,
         s"the first batch must hold the first row group; got $heldAtFirst")
-      assert(context.taskMemoryManager.getMemoryConsumptionForThisTask == 0,
+      assert(context.taskMemoryManager().getMemoryConsumptionForThisTask == 0,
         "a reader closed early must release what it holds")
     }
   }
@@ -2383,7 +2383,7 @@ class ParquetStorageFilterSuite extends QueryTest with SharedSparkSession
       val expected = (0 until 98).map(b => held(b - b % 29))
       assert(reserved == expected, s"expected the reservation to step down at batches 29, 58 " +
         s"and 87; got ${reserved.distinct}")
-      assert(context.taskMemoryManager.getMemoryConsumptionForThisTask == 0, "not released")
+      assert(context.taskMemoryManager().getMemoryConsumptionForThisTask == 0, "not released")
       // A growing buffer asks a few times. First for the first survivor, then for as much again as
       // it holds up to 802,816 bytes, and then 1 MiB at a time.
       assert(asked == Seq(49L) ++ (0 to 14).map(49L << _) ++ Seq.fill(2)(1L << 20),
@@ -2500,7 +2500,7 @@ class ParquetStorageFilterSuite extends QueryTest with SharedSparkSession
       // Reads beside another consumer whose spill throws `error`, and returns what the read throws.
       def readBesideFailing(error: Throwable): Throwable = {
         val context = memoryTask(1000L)
-        val failing = new TestMemoryConsumer(context.taskMemoryManager) {
+        val failing = new TestMemoryConsumer(context.taskMemoryManager()) {
           override def spill(size: Long, trigger: MemoryConsumer): Long = throw error
         }
         failing.use(1000L)

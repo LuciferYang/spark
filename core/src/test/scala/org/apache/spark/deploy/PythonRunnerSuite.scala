@@ -97,6 +97,8 @@ class PythonRunnerSuite extends SparkFunSuite {
       .filterNot(_.isSynthetic)
       .map(_.getName)
       .filterNot(_.contains("$"))
+      // Scala 3 adds a `writeReplace` method to every object for serialization.
+      .filterNot(_ == "writeReplace")
       .toSet
 
     // Compare

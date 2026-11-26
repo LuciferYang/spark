@@ -345,7 +345,8 @@ object ArraySizeLimitBomb {
 /** An RDD whose serialization, and so its stage task binary, fails like [[ArraySizeLimitBomb]]. */
 class ArraySizeLimitBombRDD(sc: SparkContext, message: String = ArraySizeLimitBomb.message)
   extends RDD[Int](sc, Nil) {
-  private val bomb = new ArraySizeLimitBomb(message)
+  // Not `private`: Scala 3 drops a private field that no code reads.
+  private[spark] val bomb = new ArraySizeLimitBomb(message)
 
   override def compute(split: Partition, context: TaskContext): Iterator[Int] = Iterator(1)
 

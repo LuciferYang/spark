@@ -400,7 +400,7 @@ class JdbcWriteExceptionSuite extends SparkFunSuite {
       verify(stmt).close()
       verify(conn).commit()
       verify(conn, never()).rollback()
-      assert(context.taskMetrics.outputMetrics.recordsWritten == 1)
+      assert(context.taskMetrics().outputMetrics.recordsWritten == 1)
     }
   }
 }

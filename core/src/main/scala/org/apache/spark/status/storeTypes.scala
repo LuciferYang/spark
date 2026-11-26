@@ -85,8 +85,10 @@ private[spark] class StageDataWrapper(
     @JsonDeserialize(contentAs = classOf[JLong])
     val locality: Map[String, Long]) {
 
+  // A `def` rather than a `val`: Scala 3 drops a private `val` that no code reads, and with it
+  // the field that KVStore finds the index annotation on.
   @JsonIgnore @KVIndex
-  private[this] val id: Array[Int] = Array(info.stageId, info.attemptId)
+  private def id: Array[Int] = Array(info.stageId, info.attemptId)
 
   @JsonIgnore @KVIndex("stageId")
   private def stageId: Int = info.stageId
@@ -467,8 +469,9 @@ private[spark] class SpeculationStageSummaryWrapper(
   @JsonIgnore @KVIndex("stage")
   private def stage: Array[Int] = Array(stageId, stageAttemptId)
 
+  // A `def` rather than a `val`, for the reason given in `StageDataWrapper`.
   @KVIndex
-  private[this] val id: Array[Int] = Array(stageId, stageAttemptId)
+  private def id: Array[Int] = Array(stageId, stageAttemptId)
 }
 
 private[spark] class StreamBlockData(

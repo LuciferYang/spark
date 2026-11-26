@@ -19,7 +19,6 @@ package org.apache.spark.deploy.security
 
 import java.io.Closeable
 
-import scala.reflect.runtime.universe
 import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
@@ -42,9 +41,8 @@ private[security] class HBaseDelegationTokenProvider
       sparkConf: SparkConf,
       creds: Credentials): Option[Long] = {
     try {
-      val mirror = universe.runtimeMirror(Utils.getContextOrSparkClassLoader)
-      val obtainToken = mirror.classLoader.
-        loadClass("org.apache.hadoop.hbase.security.token.TokenUtil")
+      val obtainToken = Utils.getContextOrSparkClassLoader
+        .loadClass("org.apache.hadoop.hbase.security.token.TokenUtil")
         .getMethod("obtainToken", classOf[Configuration])
 
       logDebug("Attempting to fetch HBase security token.")
@@ -80,15 +78,15 @@ private[security] class HBaseDelegationTokenProvider
       creds: Credentials): Unit = {
     var hbaseConnection : Closeable = null
     try {
-      val mirror = universe.runtimeMirror(Utils.getContextOrSparkClassLoader)
-      val connectionFactoryClass = mirror.classLoader
+      val classLoader = Utils.getContextOrSparkClassLoader
+      val connectionFactoryClass = classLoader
         .loadClass("org.apache.hadoop.hbase.client.ConnectionFactory")
         .getMethod("createConnection", classOf[Configuration])
       hbaseConnection = connectionFactoryClass.invoke(null, hbaseConf(hadoopConf))
         .asInstanceOf[Closeable]
-      val connectionParamTypeClassRef = mirror.classLoader
+      val connectionParamTypeClassRef = classLoader
         .loadClass("org.apache.hadoop.hbase.client.Connection")
-      val obtainTokenMethod = mirror.classLoader
+      val obtainTokenMethod = classLoader
         .loadClass("org.apache.hadoop.hbase.security.token.TokenUtil")
         .getMethod("obtainToken", connectionParamTypeClassRef)
       logDebug("Attempting to fetch HBase security token.")
@@ -114,10 +112,9 @@ private[security] class HBaseDelegationTokenProvider
 
   private def hbaseConf(conf: Configuration): Configuration = {
     try {
-      val mirror = universe.runtimeMirror(Utils.getContextOrSparkClassLoader)
-      val confCreate = mirror.classLoader.
-        loadClass("org.apache.hadoop.hbase.HBaseConfiguration").
-        getMethod("create", classOf[Configuration])
+      val confCreate = Utils.getContextOrSparkClassLoader
+        .loadClass("org.apache.hadoop.hbase.HBaseConfiguration")
+        .getMethod("create", classOf[Configuration])
       confCreate.invoke(null, conf).asInstanceOf[Configuration]
     } catch {
       case NonFatal(e) =>

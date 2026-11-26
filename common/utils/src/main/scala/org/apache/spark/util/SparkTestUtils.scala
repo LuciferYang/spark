@@ -173,8 +173,6 @@ private[spark] trait SparkTestUtils {
       classpathUrls: Seq[URL] = Seq.empty,
       excludeClassPrefixes: Seq[String] = Seq.empty): URL = {
     val classDir = Files.createTempDirectory("spark-test-scala-classes").toFile
-    val compilerClass = SparkClassUtils.classForName[AnyRef]("scala.tools.nsc.Main")
-    val processMethod = compilerClass.getMethod("process", classOf[Array[String]])
 
     // When the classpath is supplied via a "pathing JAR" (a single JAR whose manifest
     // Class-Path attribute points to the real dependencies), `scala.tools.nsc.Main` does
@@ -187,7 +185,7 @@ private[spark] trait SparkTestUtils {
     val args = Array("-classpath", cpStr, "-d", classDir.getAbsolutePath) ++
       sourceFiles.map(_.getAbsolutePath)
 
-    val success = processMethod.invoke(null, args).asInstanceOf[Boolean]
+    val success = runScalaCompiler(args)
     assert(success, s"Scala compilation failed for: ${sourceFiles.map(_.getName).mkString(", ")}")
 
     try {
@@ -213,6 +211,30 @@ private[spark] trait SparkTestUtils {
     }
 
     jarFile.toURI.toURL
+  }
+
+  /**
+   * Run the Scala compiler that matches the Scala version Spark was built with: the Scala 3
+   * compiler (`dotty.tools.dotc.Main`) when it is on the classpath, `scala.tools.nsc.Main`
+   * otherwise. Returns whether the compilation succeeded.
+   */
+  private def runScalaCompiler(args: Array[String]): Boolean = {
+    val dottyMain = try {
+      Some(SparkClassUtils.classForName[AnyRef]("dotty.tools.dotc.Main$"))
+    } catch {
+      case _: ClassNotFoundException => None
+    }
+    dottyMain match {
+      case Some(mainClass) =>
+        val main = mainClass.getField("MODULE$").get(null)
+        // `process` returns a `dotty.tools.dotc.reporting.Reporter`.
+        val reporter = mainClass.getMethod("process", classOf[Array[String]]).invoke(main, args)
+        !reporter.getClass.getMethod("hasErrors").invoke(reporter).asInstanceOf[Boolean]
+      case None =>
+        val mainClass = SparkClassUtils.classForName[AnyRef]("scala.tools.nsc.Main")
+        mainClass.getMethod("process", classOf[Array[String]]).invoke(null, args)
+          .asInstanceOf[Boolean]
+    }
   }
 
   /**

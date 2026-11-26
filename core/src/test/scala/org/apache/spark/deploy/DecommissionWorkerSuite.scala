@@ -83,7 +83,7 @@ class DecommissionWorkerSuite
   }
 
   // Unlike TestUtils.withListener, it also waits for the job to be done
-  def withListener(sc: SparkContext, listener: RootStageAwareListener)
+  private def withListener(sc: SparkContext, listener: RootStageAwareListener)
                   (body: SparkListener => Unit): Unit = {
     sc.addSparkListener(listener)
     try {

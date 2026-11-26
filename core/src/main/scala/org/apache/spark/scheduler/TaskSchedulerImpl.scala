@@ -155,7 +155,7 @@ private[spark] class TaskSchedulerImpl(
   // still return correct value even after executor is lost
   val executorsRemovedByDecom =
     CacheBuilder.newBuilder()
-      .maximumSize(conf.get(SCHEDULER_MAX_RETAINED_REMOVED_EXECUTORS))
+      .maximumSize(conf.get(SCHEDULER_MAX_RETAINED_REMOVED_EXECUTORS).toLong)
       .build[String, ExecutorDecommissionState]()
 
   def runningTasksByExecutors: Map[String, Int] = synchronized {
@@ -589,7 +589,7 @@ private[spark] class TaskSchedulerImpl(
       }
     }
     val hosts = offers.map(_.host).distinct
-    for ((host, Some(rack)) <- hosts.zip(getRacksForHosts(hosts))) {
+    for ((host, rackOpt) <- hosts.zip(getRacksForHosts(hosts)); rack <- rackOpt) {
       hostsByRack.getOrElseUpdate(rack, new HashSet[String]()) += host
     }
 
@@ -654,8 +654,8 @@ private[spark] class TaskSchedulerImpl(
         var noDelaySchedulingRejects = true
         var globalMinLocality: Option[TaskLocality] = None
         for (currentMaxLocality <- taskSet.myLocalityLevels) {
-          var launchedTaskAtCurrentMaxLocality = false
-          do {
+          var launchedTaskAtCurrentMaxLocality = true
+          while (launchedTaskAtCurrentMaxLocality) {
             val (noDelayScheduleReject, minLocality) = resourceOfferSingleTaskSet(
               taskSet, currentMaxLocality, shuffledOffers, availableCpus,
               availableResources, tasks)
@@ -663,7 +663,7 @@ private[spark] class TaskSchedulerImpl(
             launchedAnyTask |= launchedTaskAtCurrentMaxLocality
             noDelaySchedulingRejects &= noDelayScheduleReject
             globalMinLocality = minTaskLocality(globalMinLocality, minLocality)
-          } while (launchedTaskAtCurrentMaxLocality)
+          }
         }
 
         if (!legacyLocalityWaitReset) {

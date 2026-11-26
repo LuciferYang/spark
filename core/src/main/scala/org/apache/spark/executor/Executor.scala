@@ -390,7 +390,7 @@ private[spark] class Executor(
   val defaultSessionState: IsolatedSessionState = newSessionState(JobArtifactState("default", None))
 
   val isolatedSessionCache: Cache[String, IsolatedSessionState] = CacheBuilder.newBuilder()
-    .maximumSize(conf.get(EXECUTOR_ISOLATED_SESSION_CACHE_SIZE))
+    .maximumSize(conf.get(EXECUTOR_ISOLATED_SESSION_CACHE_SIZE).toLong)
     .expireAfterAccess(30, TimeUnit.MINUTES)
     .removalListener(new RemovalListener[String, IsolatedSessionState]() {
       override def onRemoval(
@@ -1030,7 +1030,7 @@ private[spark] class Executor(
             ser.serialize(new IndirectTaskResult[Any](TaskResultBlockId(taskId), resultSize))
           } else if (resultSize > maxDirectResultSize) {
             val blockId = TaskResultBlockId(taskId)
-            env.blockManager.putBytes(
+            env.blockManager.putBytes[Any](
               blockId,
               serializedDirectResult,
               StorageLevel.MEMORY_AND_DISK_SER)

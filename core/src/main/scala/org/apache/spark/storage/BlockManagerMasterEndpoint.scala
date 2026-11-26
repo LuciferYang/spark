@@ -63,7 +63,7 @@ class BlockManagerMasterEndpoint(
   private val executorIdToLocalDirs =
     CacheBuilder
       .newBuilder()
-      .maximumSize(conf.get(config.STORAGE_LOCAL_DISK_BY_EXECUTORS_CACHE_SIZE))
+      .maximumSize(conf.get(config.STORAGE_LOCAL_DISK_BY_EXECUTORS_CACHE_SIZE).toLong)
       .build[String, Array[String]]()
 
   // Mapping from external shuffle service block manager id to the block statuses.
@@ -625,7 +625,7 @@ class BlockManagerMasterEndpoint(
   private def removeBlockFromWorkers(blockId: BlockId): Unit = {
     val locations = blockLocations.get(blockId)
     if (locations != null) {
-      locations.foreach { blockManagerId: BlockManagerId =>
+      locations.foreach { (blockManagerId: BlockManagerId) =>
         val blockManager = blockManagerInfo.get(blockManagerId)
         blockManager.foreach { bm =>
           // Remove the block from the BlockManager.

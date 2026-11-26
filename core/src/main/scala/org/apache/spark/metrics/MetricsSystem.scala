@@ -88,8 +88,8 @@ private[spark] class MetricsSystem private (
    */
   def getServletHandlers: Array[ServletContextHandler] = {
     require(running, "Can only call getServletHandlers on a running MetricsSystem")
-    metricsServlet.map(_.getHandlers(conf)).getOrElse(Array()) ++
-      prometheusServlet.map(_.getHandlers(conf)).getOrElse(Array())
+    metricsServlet.map(_.getHandlers(conf)).getOrElse(Array.empty[ServletContextHandler]) ++
+      prometheusServlet.map(_.getHandlers(conf)).getOrElse(Array.empty[ServletContextHandler])
   }
 
   metricsConfig.initialize()

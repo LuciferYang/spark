@@ -1007,6 +1007,7 @@ class TaskContextSuite extends SparkFunSuite with BeforeAndAfter with LocalSpark
         // queued like a completion listener, and this thread runs it next, after this one.
         val thread = new Thread(() => {
           context.addTaskPreCompletionListener(loggingListener(invocations, "P"))
+          ()
         })
         thread.setDaemon(true)
         thread.start()

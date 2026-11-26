@@ -283,10 +283,10 @@ object SizeEstimator extends Logging {
       length: Int): Long = {
     var size = 0L
     for (i <- 0 until ARRAY_SAMPLE_SIZE) {
-      var index = 0
-      do {
+      var index = rand.nextInt(length)
+      while (drawn.contains(index)) {
         index = rand.nextInt(length)
-      } while (drawn.contains(index))
+      }
       drawn.add(index)
       val obj = ScalaRunTime.array_apply(array, index).asInstanceOf[AnyRef]
       if (obj != null) {

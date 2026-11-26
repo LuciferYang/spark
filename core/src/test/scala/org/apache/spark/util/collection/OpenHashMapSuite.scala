@@ -218,8 +218,9 @@ class OpenHashMapSuite extends SparkFunSuite with Matchers {
     assert(map1("a") === 0)
     assert(map1("b") === 0)
     // If the data type is not in @specialized annotation, and
-    // the `key` is not be contained, the `map(key)` will return null
-    assert(map1("c") === null)
+    // the `key` is not be contained, the `map(key)` will return null.
+    // Read it as `Any`: Scala 3 unboxes a null `Short` result to 0.
+    assert(map1.asInstanceOf[OpenHashMap[String, Any]]("c") === null)
 
     val map2 = new OpenHashMap[String, Float]
     map2("a") = null.asInstanceOf[Float]
@@ -229,7 +230,7 @@ class OpenHashMapSuite extends SparkFunSuite with Matchers {
     // null.asInstance[Float] will return 0.0
     assert(map2("a") === 0.0)
     assert(map2("b") === 0.0)
-    assert(map2("c") === null)
+    assert(map2.asInstanceOf[OpenHashMap[String, Any]]("c") === null)
   }
 
   test("get") {

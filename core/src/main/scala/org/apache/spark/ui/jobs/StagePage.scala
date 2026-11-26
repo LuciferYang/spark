@@ -167,27 +167,27 @@ private[ui] class StagePage(parent: StagesTab, store: AppStatusStore) extends We
               <strong>Input Size / Records: </strong>
               {s"${Utils.bytesToString(stageData.inputBytes)} / ${stageData.inputRecords}"}
             </li>
-          }}
+          } else Seq.empty}
           {if (hasOutput(stageData)) {
             <li>
               <strong>Output Size / Records: </strong>
               {s"${Utils.bytesToString(stageData.outputBytes)} / ${stageData.outputRecords}"}
             </li>
-          }}
+          } else Seq.empty}
           {if (hasShuffleRead(stageData)) {
             <li>
               <strong>Shuffle Read Size / Records: </strong>
               {s"${Utils.bytesToString(stageData.shuffleReadBytes)} / " +
                s"${stageData.shuffleReadRecords}"}
             </li>
-          }}
+          } else Seq.empty}
           {if (hasShuffleWrite(stageData)) {
             <li>
               <strong>Shuffle Write Size / Records: </strong>
                {s"${Utils.bytesToString(stageData.shuffleWriteBytes)} / " +
                s"${stageData.shuffleWriteRecords}"}
             </li>
-          }}
+          } else Seq.empty}
           {if (hasBytesSpilled(stageData)) {
             <li>
               <strong>Spill (Memory): </strong>
@@ -197,7 +197,7 @@ private[ui] class StagePage(parent: StagesTab, store: AppStatusStore) extends We
               <strong>Spill (Disk): </strong>
               {Utils.bytesToString(stageData.diskBytesSpilled)}
             </li>
-          }}
+          } else Seq.empty}
           {if (!stageJobIds.isEmpty) {
             <li>
               <strong>Associated Job Ids: </strong>
@@ -207,7 +207,7 @@ private[ui] class StagePage(parent: StagesTab, store: AppStatusStore) extends We
                 <a href={jobURL}>{jobId.toString}</a><span>&nbsp;</span>
               }}
             </li>
-          }}
+          } else Seq.empty}
         </ul>
       </div>
 

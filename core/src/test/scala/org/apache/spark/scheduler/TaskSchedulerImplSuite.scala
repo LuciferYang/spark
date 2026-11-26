@@ -26,7 +26,6 @@ import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.concurrent.duration._
 import scala.language.implicitConversions
-import scala.language.reflectiveCalls
 
 import org.mockito.ArgumentMatchers.{any, anyInt, anyString, eq => meq}
 import org.mockito.Mockito.{atLeast, atMost, never, spy, times, verify, when}
@@ -2172,7 +2171,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
     val taskScheduler = setupScheduler()
 
     val latch = new CountDownLatch(2)
-    val resultGetter = new TaskResultGetter(sc.env, taskScheduler) {
+    class ExposedTaskResultGetter extends TaskResultGetter(sc.env, taskScheduler) {
       override protected val getTaskResultExecutor: ExecutorService =
         new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable],
           ThreadUtils.namedThreadFactory("task-result-getter")) {
@@ -2187,6 +2186,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
         }
       def taskResultExecutor() : ExecutorService = getTaskResultExecutor
     }
+    val resultGetter = new ExposedTaskResultGetter
     taskScheduler.taskResultGetter = resultGetter
 
     val workerOffers = IndexedSeq(new WorkerOffer("executor0", "host0", 1),
@@ -2211,7 +2211,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
     val directResult = new DirectTaskResult[Int](ser.serialize(1), Seq(), Array.empty[Long])
     val resultBytes = ser.serialize(directResult)
 
-    val busyTask = new Runnable {
+    class BusyTask extends Runnable {
       val lock : Object = new Object
       val running: AtomicBoolean = new AtomicBoolean(false)
       override def run(): Unit = {
@@ -2226,6 +2226,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext
         }
       }
     }
+    val busyTask = new BusyTask
     // make getTaskResultExecutor busy
     resultGetter.taskResultExecutor().submit(busyTask)
 

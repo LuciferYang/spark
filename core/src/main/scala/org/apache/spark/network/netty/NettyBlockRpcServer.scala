@@ -188,8 +188,7 @@ class NettyBlockRpcServer(
   private def deserializeMetadata(metadata: Array[Byte]): BlockReplicationMetadata = {
     serializer
       .newInstance()
-      .deserialize(ByteBuffer.wrap(metadata))
-      .asInstanceOf[BlockReplicationMetadata]
+      .deserialize[BlockReplicationMetadata](ByteBuffer.wrap(metadata))
   }
 
   override def getStreamManager(): StreamManager = streamManager

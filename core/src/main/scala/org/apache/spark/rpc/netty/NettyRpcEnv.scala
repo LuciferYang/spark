@@ -666,7 +666,7 @@ private[netty] object RequestMessage {
         senderAddress,
         ref,
         // The remaining bytes in `bytes` are the message content.
-        nettyEnv.deserialize(client, bytes))
+        nettyEnv.deserialize[Any](client, bytes))
     } finally {
       in.close()
     }

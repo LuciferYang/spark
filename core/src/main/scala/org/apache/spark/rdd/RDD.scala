@@ -1974,6 +1974,10 @@ abstract class RDD[T: ClassTag](
 
   private[spark] def elementClassTag: ClassTag[T] = classTag[T]
 
+  // The `(x, null)` pairs built by `distinct`, `intersection`, `subtract` and `countByValue` need
+  // a ClassTag for Null, which Scala 3 does not synthesize.
+  private implicit def nullClassTag: ClassTag[Null] = ClassTag.Null
+
   private[spark] var checkpointData: Option[RDDCheckpointData[T]] = None
 
   // Whether to checkpoint all ancestor RDDs that are marked for checkpointing. By default,
@@ -2010,9 +2014,7 @@ abstract class RDD[T: ClassTag](
    * Private API for changing an RDD's ClassTag.
    * Used for internal Java-Scala API compatibility.
    */
-  private[spark] def retag(implicit classTag: ClassTag[T]): RDD[T] = {
-    this.mapPartitions(identity, preservesPartitioning = true)(classTag)
-  }
+  private[spark] def retag(implicit classTag: ClassTag[T]): RDD[T] = RDD.retag(this, classTag)
 
   // Avoid handling doCheckpoint multiple times to prevent excessive recursion
   @transient private var doCheckpointCalled = false
@@ -2230,6 +2232,12 @@ abstract class RDD[T: ClassTag](
  * key-value-pair RDDs, and enabling extra functionalities such as `PairRDDFunctions.reduceByKey`.
  */
 object RDD {
+
+  // Kept out of the class so that `classTag` is the only implicit ClassTag[T] in scope.
+  private def retag[T](rdd: RDD[T], classTag: ClassTag[T]): RDD[T] = {
+    implicit val ctag: ClassTag[T] = classTag
+    rdd.mapPartitions(identity, preservesPartitioning = true)
+  }
 
   private[spark] val CHECKPOINT_ALL_MARKED_ANCESTORS =
     "spark.checkpoint.checkpointAllMarkedAncestors"

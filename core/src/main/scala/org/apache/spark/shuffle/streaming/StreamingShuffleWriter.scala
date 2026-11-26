@@ -61,7 +61,7 @@ class StreamingShuffleWriter[K, V](
   private val SEND_BUFFER_SIZE: Integer = 32 << 10 // 32 KB
   private val RECV_BUFFER_SIZE: Integer = 512
   // The target network buffer size
-  private val BUFFER_SIZE: Integer = conf.get(STREAMING_SHUFFLE_NETWORK_BUFFER_SIZE)
+  private val BUFFER_SIZE: Integer = conf.get(STREAMING_SHUFFLE_NETWORK_BUFFER_SIZE).intValue
   // The interval at which we flush pending messages.
   private val MAX_BUFFERING_TIME_MS = conf.get(STREAMING_SHUFFLE_NETWORK_BUFFER_MAX_WAIT_TIME_MS)
   private val CONNECTION_TIMEOUT_MS = conf.get(STREAMING_SHUFFLE_WRITER_CONNECTION_TIMEOUT_MS)
@@ -457,12 +457,12 @@ class StreamingShuffleWriter[K, V](
    */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
     val isWriteFinished = new CountDownLatch(1)
-    val flushThread = new Thread(() =>
+    val flushTask: Runnable = () =>
       Try {
         while (!isWriteFinished.await(MAX_BUFFERING_TIME_MS, TimeUnit.MILLISECONDS))
           shards.foreach(_.send())
       }.recover { case e => errorNotifier.markError(unwrapCompletionException(e)) }
-      , "time-based-flush-for-shuffle-writer-" +
+    val flushThread = new Thread(flushTask, "time-based-flush-for-shuffle-writer-" +
         s"${streamingShuffleHandle.shuffleId}-${shuffleWriterId}")
     try {
       // Reserve the budget with the task memory manager for accounting/visibility. In-flight

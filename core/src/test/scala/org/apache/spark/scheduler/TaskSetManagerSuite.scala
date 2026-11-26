@@ -1182,8 +1182,8 @@ class TaskSetManagerSuite
     assert(manager.resourceOffer("execA", "host3", NO_PREF)._1.get.index === 2)
   }
 
-  test("SPARK-4939: node-local tasks should be scheduled right after process-local tasks finished")
-  {
+  test("SPARK-4939: node-local tasks should be scheduled right after process-local tasks " +
+      "finished") {
     sc = new SparkContext("local", "test")
     sched = new FakeTaskScheduler(sc, ("execA", "host1"), ("execB", "host2"))
     val taskSet = FakeTask.createTaskSet(4,
@@ -2433,11 +2433,9 @@ class TaskSetManagerSuite
     val stageId = taskSet.stageId
     val stageAttemptId = taskSet.stageAttemptId
     sched.submitTasks(taskSet)
-    val taskSetManagers =
-      PrivateMethod[mutable.HashMap[Int, mutable.HashMap[Int, TaskSetManager]]](
-        Symbol("taskSetsByStageIdAndAttempt"))
     // get the TaskSetManager
-    val manager = sched.invokePrivate(taskSetManagers()).get(stageId).get(stageAttemptId)
+    val manager = getPrivateField[mutable.HashMap[Int, mutable.HashMap[Int, TaskSetManager]]](
+      sched, "taskSetsByStageIdAndAttempt").get(stageId).get(stageAttemptId)
 
     val (task0, task1) = eventually(timeout(10.seconds), interval(100.milliseconds)) {
       (manager.taskInfos(0), manager.taskInfos(1))
@@ -2450,10 +2448,10 @@ class TaskSetManagerSuite
     assert(manager.taskInfos(taskId0).running)
     assert(manager.taskInfos(taskId1).running)
 
-    val numFailures = PrivateMethod[Array[Int]](Symbol("numFailures"))
+    def numFailures: Array[Int] = getPrivateField[Array[Int]](manager, "numFailures")
     // no task failures yet
-    assert(manager.invokePrivate(numFailures())(index0) === 0)
-    assert(manager.invokePrivate(numFailures())(index1) === 0)
+    assert(numFailures(index0) === 0)
+    assert(numFailures(index1) === 0)
 
     sched.asInstanceOf[TaskSchedulerImpl]
       .statusUpdate(taskId1, TaskState.RUNNING, ByteBuffer.allocate(0))
@@ -2470,8 +2468,8 @@ class TaskSetManagerSuite
     eventually(timeout(10.seconds), interval(100.milliseconds)) {
       // executorsPendingToRemove should eventually be empty after reset()
       assert(backend.executorsPendingToRemove.isEmpty)
-      assert(manager.invokePrivate(numFailures())(index0) === 0)
-      assert(manager.invokePrivate(numFailures())(index1) === 1)
+      assert(numFailures(index0) === 0)
+      assert(numFailures(index1) === 1)
     }
   }
 
@@ -2588,13 +2586,13 @@ class TaskSetManagerSuite
       // complete the 3 tasks and leave 2 task in running
       val task3Metrics: TaskMetrics =
         ser.deserialize(ByteBuffer.wrap(ser.serialize(taskMetricsByTask(3)).array()))
-      sched.executorHeartbeatReceived("exec1", Array((3, task3Metrics.internalAccums)),
+      sched.executorHeartbeatReceived("exec1", Array((3L, task3Metrics.internalAccums)),
         blockManagerId, mutable.Map.empty[(Int, Int), ExecutorMetrics])
 
       updateAndGetTaskMetrics(taskMetricsByTask(4), efficientMultiplier = 5)
       val task4Metrics: TaskMetrics =
         ser.deserialize(ByteBuffer.wrap(ser.serialize(taskMetricsByTask(4)).array()))
-      sched.executorHeartbeatReceived("exec1", Array((4, task4Metrics.internalAccums)),
+      sched.executorHeartbeatReceived("exec1", Array((4L, task4Metrics.internalAccums)),
         blockManagerId, mutable.Map.empty[(Int, Int), ExecutorMetrics])
       for (id <- Set(0, 1, 2)) {
         val resultBytes = ser.serialize(createTaskResult(id, taskMetricsByTask(id).internalAccums))
@@ -2654,7 +2652,7 @@ class TaskSetManagerSuite
       // complete the 3 tasks and leave 1 task in running
       val taskMetrics: TaskMetrics =
         ser.deserialize(ByteBuffer.wrap(ser.serialize(taskMetricsByTask(3)).array()))
-      sched.executorHeartbeatReceived("exec1", Array((3, taskMetrics.internalAccums)),
+      sched.executorHeartbeatReceived("exec1", Array((3L, taskMetrics.internalAccums)),
         blockManagerId, mutable.Map.empty[(Int, Int), ExecutorMetrics])
       for (id <- Set(0, 1, 2)) {
         val resultBytes = ser.serialize(createTaskResult(id, taskMetricsByTask(id).internalAccums))
@@ -2707,7 +2705,7 @@ class TaskSetManagerSuite
       // complete the 3 tasks and leave 1 task in running
       val taskMetrics: TaskMetrics =
         ser.deserialize(ByteBuffer.wrap(ser.serialize(taskMetricsByTask(3)).array()))
-      sched.executorHeartbeatReceived("exec1", Array((3, taskMetrics.internalAccums)),
+      sched.executorHeartbeatReceived("exec1", Array((3L, taskMetrics.internalAccums)),
         blockManagerId, mutable.Map.empty[(Int, Int), ExecutorMetrics])
       for (id <- Set(0, 1, 2)) {
         val resultBytes = ser.serialize(createTaskResult(id, taskMetricsByTask(id).internalAccums))
@@ -3075,8 +3073,8 @@ class TaskSetManagerSuite
       Array.empty, "java.lang.RuntimeException: test failure", None)
     assert(exceptionFailure.countTowardsTaskFailures === true)
     manager.handleFailedTask(taskOption.get.taskId, TaskState.FAILED, exceptionFailure)
-    val numFailures = PrivateMethod[Array[Int]](Symbol("numFailures"))
-    assert(manager.invokePrivate(numFailures())(0) === 1,
+    def numFailures: Array[Int] = getPrivateField[Array[Int]](manager, "numFailures")
+    assert(numFailures(0) === 1,
       "ExceptionFailure must count towards task failures (contrast)")
   }
 

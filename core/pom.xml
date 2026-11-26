@@ -49,11 +49,21 @@
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-parallel-collections_${scala.binary.version}</artifactId>
     </dependency>
+    <!-- #if scala-2.13 -->
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-compiler</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- #endif scala-2.13 -->
+    <!-- #if scala-3 --><!--
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala3-compiler_${scala.binary.version}</artifactId>
+      <version>${scala.version}</version>
+      <scope>test</scope>
+    </dependency>
+    --><!-- #endif scala-3 -->
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
@@ -68,7 +78,7 @@
     </dependency>
     <dependency>
       <groupId>com.twitter</groupId>
-      <artifactId>chill_${scala.binary.version}</artifactId>
+      <artifactId>chill_${chill.scala.binary.version}</artifactId>
     </dependency>
     <dependency>
       <groupId>com.twitter</groupId>
@@ -283,10 +293,12 @@
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
     </dependency>
+    <!-- #if scala-2.13 -->
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-reflect</artifactId>
     </dependency>
+    <!-- #endif scala-2.13 -->
     <dependency>
       <groupId>org.json4s</groupId>
       <artifactId>json4s-jackson_${scala.binary.version}</artifactId>
@@ -576,6 +588,36 @@
                 guava,protobuf-java,jetty-io,jetty-ee10-servlet,jetty-ee10-servlets,jetty-http,jetty-ee10-plus,jetty-util,jetty-server,jetty-security,jetty-ee10-proxy,jetty-client,jetty-session,jetty-compression-server,jetty-compression-common,jetty-compression-gzip
               </includeArtifactIds>
               <silent>true</silent>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-scala-version-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/main/scala-${scala.binary.version}</source>
+              </sources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>add-scala-version-test-sources</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/test/scala-${scala.binary.version}</source>
+              </sources>
             </configuration>
           </execution>
         </executions>

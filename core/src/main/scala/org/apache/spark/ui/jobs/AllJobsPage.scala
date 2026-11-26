@@ -386,7 +386,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
                 </form>
                 {parent.lastHoldRequestStatus.getOrElse("")}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowActiveJobs) {
@@ -394,7 +394,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
                 <a href="#active"><strong>Active Jobs:</strong></a>
                 {activeJobs.size}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowCompletedJobs) {
@@ -402,7 +402,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
                 <a href="#completed"><strong>Completed Jobs:</strong></a>
                 {completedJobNumStr}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowFailedJobs) {
@@ -410,7 +410,7 @@ private[ui] class AllJobsPage(parent: JobsTab, store: AppStatusStore) extends We
                 <a href="#failed"><strong>Failed Jobs:</strong></a>
                 {failedJobs.size}
               </li>
-            }
+            } else Seq.empty
           }
         </ul>
       </div>
@@ -652,8 +652,8 @@ private[ui] class JobPagedTable(
       <td>{jobTableRow.formattedDuration}</td>
       <td class="stage-progress-cell">
         {job.numCompletedStages}/{job.stageIds.size - job.numSkippedStages}
-        {if (job.numFailedStages > 0) s"(${job.numFailedStages} failed)"}
-        {if (job.numSkippedStages > 0) s"(${job.numSkippedStages} skipped)"}
+        {if (job.numFailedStages > 0) s"(${job.numFailedStages} failed)" else ""}
+        {if (job.numSkippedStages > 0) s"(${job.numSkippedStages} skipped)" else ""}
       </td>
       <td class="progress-cell">
         {UIUtils.makeProgressBar(started = job.numActiveTasks,

@@ -57,10 +57,6 @@ class HeartbeatReceiverSuite
   private var heartbeatReceiverClock: ManualClock = null
 
   // Helper private method accessors for HeartbeatReceiver
-  private val _executorLastSeen =
-    PrivateMethod[collection.Map[String, Long]](Symbol("executorLastSeen"))
-  private val _executorTimeoutMs = PrivateMethod[Long](Symbol("executorTimeoutMs"))
-  private val _killExecutorThread = PrivateMethod[ExecutorService](Symbol("killExecutorThread"))
   var conf: SparkConf = _
 
   /**
@@ -143,7 +139,7 @@ class HeartbeatReceiverSuite
   }
 
   test("expire dead hosts") {
-    val executorTimeout = heartbeatReceiver.invokePrivate(_executorTimeoutMs())
+    val executorTimeout = getPrivateField[Long](heartbeatReceiver, "executorTimeoutMs")
     heartbeatReceiverRef.askSync[Boolean](TaskSchedulerIsSet)
     addExecutorAndVerify(executorId1)
     addExecutorAndVerify(executorId2)
@@ -199,10 +195,10 @@ class HeartbeatReceiverSuite
     // Since the kill request is sent to the cluster manager asynchronously, we need to block
     // on the kill thread to ensure that the cluster manager actually received our requests.
     // Here we use a timeout of O(seconds), but in practice this whole test takes O(10ms).
-    val executorTimeout = heartbeatReceiver.invokePrivate(_executorTimeoutMs())
+    val executorTimeout = getPrivateField[Long](heartbeatReceiver, "executorTimeoutMs")
     heartbeatReceiverClock.advance(executorTimeout * 2)
     heartbeatReceiverRef.askSync[Boolean](ExpireDeadHosts)
-    val killThread = heartbeatReceiver.invokePrivate(_killExecutorThread())
+    val killThread = getPrivateField[ExecutorService](heartbeatReceiver, "killExecutorThread")
     killThread.shutdown() // needed for awaitTermination
     killThread.awaitTermination(10L, TimeUnit.SECONDS)
 
@@ -304,7 +300,7 @@ class HeartbeatReceiverSuite
   private def getTrackedExecutors: collection.Map[String, Long] = {
     // We may receive undesired SparkListenerExecutorAdded from LocalSchedulerBackend,
     // so exclude it from the map. See SPARK-10800.
-    heartbeatReceiver.invokePrivate(_executorLastSeen()).
+    getPrivateField[collection.Map[String, Long]](heartbeatReceiver, "executorLastSeen").
       filter { case (k, _) => !SparkContext.isDriver(k) }
   }
 }

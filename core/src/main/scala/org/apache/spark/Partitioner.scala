@@ -315,7 +315,7 @@ class RangePartitioner[K : Ordering : ClassTag, V](
 
         val ser = sfactory.newInstance()
         Utils.deserializeViaNestedStream(in, ser) { ds =>
-          implicit val classTag = ds.readObject[ClassTag[Array[K]]]()
+          implicit val classTag: ClassTag[Array[K]] = ds.readObject[ClassTag[Array[K]]]()
           rangeBounds = ds.readObject[Array[K]]()
         }
     }

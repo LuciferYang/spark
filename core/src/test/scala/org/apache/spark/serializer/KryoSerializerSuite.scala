@@ -178,6 +178,14 @@ class KryoSerializerSuite extends SparkFunSuite with SharedSparkContext {
       mutable.HashMap(1 -> "one", 2 -> "two", 3 -> "three")))
   }
 
+  test("Scala Enumeration values") {
+    val ser = new KryoSerializer(new SparkConf(false)).newInstance()
+    Seq(KryoTest.Color.Red, KryoTest.Color.Green).foreach { value =>
+      // Deserialization resolves the value through its enumeration, so it returns the same object.
+      assert(ser.deserialize[KryoTest.Color.Value](ser.serialize(value)) eq value)
+    }
+  }
+
   test("SPARK-42071: Register scala.math.Ordering$Reverse") {
     val conf = new SparkConf(false)
     conf.set(KRYO_REGISTRATION_REQUIRED, true)
@@ -443,9 +451,10 @@ class KryoSerializerSuite extends SparkFunSuite with SharedSparkContext {
     import java.util._
     val ser = new KryoSerializer(new SparkConf).newInstance().asInstanceOf[KryoSerializerInstance]
 
+    // Not `private`: Scala 3 drops a private field that no code reads, such as `mapTwo`.
     class MapHolder {
-      private val mapOne = new HashMap[Int, String]
-      private val mapTwo = this.mapOne
+      val mapOne = new HashMap[Int, String]
+      val mapTwo = this.mapOne
     }
 
     val serializedMapHolder = ser.serialize(new MapHolder)
@@ -643,6 +652,10 @@ class ClassLoaderTestingObject
 object KryoTest {
 
   case class CaseClass(i: Int, s: String) {}
+
+  object Color extends Enumeration {
+    val Red, Green = Value
+  }
 
   class ClassWithNoArgConstructor {
     var x: Int = 0

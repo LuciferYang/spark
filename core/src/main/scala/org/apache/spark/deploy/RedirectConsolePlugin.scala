@@ -126,12 +126,12 @@ private[spark] class LineBuffer(lineMaxBytes: Long) extends ByteArrayOutputStrea
     if (LF_LENGTH == 1) return LF_BYTES(0) == buf(count - 1)
 
     var i = 0
-    do {
+    while (i < LF_LENGTH) {
       if (LF_BYTES(i) != buf(count - LF_LENGTH + i)) {
         return false
       }
       i = i + 1
-    } while (i < LF_LENGTH)
+    }
     true
   }
 }

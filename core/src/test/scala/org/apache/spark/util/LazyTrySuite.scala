@@ -16,6 +16,7 @@
  */
 package org.apache.spark.util
 
+import org.apache.spark.ScalaVersionSpecificTestUtils.isScala3
 import org.apache.spark.SparkFunSuite
 
 class LazyTrySuite extends SparkFunSuite{
@@ -139,10 +140,11 @@ class LazyTrySuite extends SparkFunSuite{
     val container = new LazyValContainer()
     // Nothing is lazy initialized yet
     assert(container.aSet == 0)
-    // This will deadlock, because b will take monitor on LazyValContainer, and then thread t
-    // will wait on that monitor, not able to initialize a.
-    // b will therefore see aSet == 0.
-    assert(container.b == 0)
+    // In Scala 2 this will deadlock, because b will take monitor on LazyValContainer, and then
+    // thread t will wait on that monitor, not able to initialize a.
+    // b will therefore see aSet == 0. Scala 3 does not lock the container, so t initializes a
+    // before b reads aSet.
+    assert(container.b == (if (isScala3) 1 else 0))
     // However, after b finishes initializing, the monitor will be released, and then thread t
     // will finish initializing a, and set aSet to 1.
     container.t.join()

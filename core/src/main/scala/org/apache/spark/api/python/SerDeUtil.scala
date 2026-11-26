@@ -21,6 +21,7 @@ import java.util.{ArrayList => JArrayList}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Try
 
@@ -68,11 +69,14 @@ private[spark] object SerDeUtil extends Logging {
    * It is only used by pyspark.sql.
    */
   def toJavaArray(jrdd: JavaRDD[Any]): JavaRDD[Array[_]] = {
-    jrdd.rdd.map {
+    // Scala 3 cannot synthesize a ClassTag for `Array[_]`. Scala 2 infers one for Object, the
+    // erasure of `Array[_]`.
+    implicit val arrayTag: ClassTag[Array[_]] = ClassTag(classOf[AnyRef])
+    jrdd.rdd.map[Array[_]] {
       case objs: JArrayList[_] =>
         objs.toArray
       case obj if obj.getClass.isArray =>
-        obj.asInstanceOf[Array[_]].toArray
+        obj.asInstanceOf[Array[_]].toArray[Any]
     }.toJavaRDD()
   }
 

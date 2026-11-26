@@ -437,10 +437,10 @@ class StandaloneDynamicAllocationSuite
     assert(executors.size === 2)
 
     // simulate running a task on the executor
-    val getMap = PrivateMethod[mutable.HashMap[String, mutable.HashSet[Long]]](
-      Symbol("executorIdToRunningTaskIds"))
     val taskScheduler = sc.taskScheduler.asInstanceOf[TaskSchedulerImpl]
-    val executorIdToRunningTaskIds = taskScheduler invokePrivate getMap()
+    val executorIdToRunningTaskIds =
+      getPrivateField[mutable.HashMap[String, mutable.HashSet[Long]]](
+        taskScheduler, "executorIdToRunningTaskIds")
     executorIdToRunningTaskIds(executors.head) = mutable.HashSet(1L)
     // kill the busy executor without force; this should fail
     assert(killExecutor(sc, executors.head, force = false).isEmpty)

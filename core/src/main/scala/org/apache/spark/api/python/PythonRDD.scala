@@ -60,10 +60,10 @@ private[spark] class PythonRDD(
 
   private[this] val jobArtifactUUID = JobArtifactSet.getCurrentJobArtifactState.map(_.uuid)
 
-  override def getPartitions: Array[Partition] = firstParent.partitions
+  override def getPartitions: Array[Partition] = firstParent[Any].partitions
 
   override val partitioner: Option[Partitioner] = {
-    if (preservePartitioning) firstParent.partitioner else None
+    if (preservePartitioning) firstParent[Any].partitioner else None
   }
 
   val asJavaRDD: JavaRDD[Array[Byte]] = JavaRDD.fromRDD(this)

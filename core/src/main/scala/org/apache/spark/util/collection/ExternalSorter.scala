@@ -567,8 +567,8 @@ private[spark] class ExternalSorter[K, V, C](
       if (finished || deserializeStream == null) {
         return null
       }
-      val k = deserializeStream.readKey().asInstanceOf[K]
-      val c = deserializeStream.readValue().asInstanceOf[C]
+      val k = deserializeStream.readKey[Any]().asInstanceOf[K]
+      val c = deserializeStream.readValue[Any]().asInstanceOf[C]
       lastPartitionId = partitionId
       // Start reading the next batch if we're done with this one
       indexInBatch += 1

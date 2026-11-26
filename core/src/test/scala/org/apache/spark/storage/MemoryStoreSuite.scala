@@ -461,7 +461,7 @@ class MemoryStoreSuite
       val tc = TaskContext.empty()
       val memManager = new UnifiedMemoryManager(conf, memStoreSize, memStoreSize.toInt / 2, 1)
       val blockInfoManager = new BlockInfoManager
-      blockInfoManager.registerTask(tc.taskAttemptId)
+      blockInfoManager.registerTask(tc.taskAttemptId())
       var droppedSoFar = 0
       var memoryStore: MemoryStore = null
       val blockEvictionHandler = new BlockEvictionHandler {

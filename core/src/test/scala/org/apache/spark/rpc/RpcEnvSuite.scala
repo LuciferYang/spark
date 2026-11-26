@@ -1001,5 +1001,6 @@ case class Register(ref: RpcEndpointRef)
 class UnserializableClass
 
 class UnserializableException extends Exception {
-  private val unserializableField = new UnserializableClass
+  // Not `private`: Scala 3 drops a private field that no code reads.
+  private[spark] val unserializableField = new UnserializableClass
 }

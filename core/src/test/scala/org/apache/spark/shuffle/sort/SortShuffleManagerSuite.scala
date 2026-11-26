@@ -41,6 +41,10 @@ class SortShuffleManagerSuite extends SparkFunSuite with Matchers {
     }
   }
 
+  // A real ordering: Mockito's inline mock maker cannot instrument the Scala 3 `Ordering` trait.
+  // The serialized-shuffle check never calls the ordering.
+  private val anyOrdering = Ordering.Int.asInstanceOf[Ordering[Any]]
+
   private def shuffleDep(
       partitioner: Partitioner,
       serializer: Serializer,
@@ -82,7 +86,7 @@ class SortShuffleManagerSuite extends SparkFunSuite with Matchers {
     assert(canUseSerializedShuffle(shuffleDep(
       partitioner = new HashPartitioner(2),
       serializer = kryo,
-      keyOrdering = Some(mock(classOf[Ordering[Any]])),
+      keyOrdering = Some(anyOrdering),
       aggregator = None,
       mapSideCombine = false
     )))
@@ -125,7 +129,7 @@ class SortShuffleManagerSuite extends SparkFunSuite with Matchers {
     assert(!canUseSerializedShuffle(shuffleDep(
       partitioner = new HashPartitioner(2),
       serializer = kryo,
-      keyOrdering = Some(mock(classOf[Ordering[Any]])),
+      keyOrdering = Some(anyOrdering),
       aggregator = Some(mock(classOf[Aggregator[Any, Any, Any]])),
       mapSideCombine = true
     )))

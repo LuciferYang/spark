@@ -1020,7 +1020,7 @@ final class ShuffleBlockFetcherIterator(
           // a SuccessFetchResult or a FailureFetchResult.
           result = null
 
-          case PushMergedLocalMetaFetchResult(
+        case PushMergedLocalMetaFetchResult(
             shuffleId, shuffleMergeId, reduceId, bitmaps, localDirs) =>
             // Fetch push-merged-local shuffle block data as multiple shuffle chunks
             val shuffleBlockId = ShuffleMergedBlockId(shuffleId, shuffleMergeId, reduceId)

@@ -490,7 +490,8 @@ class StandaloneRestSubmitSuite extends SparkFunSuite {
     request.environmentVariables = Map("AWS_ENDPOINT_URL" -> "{{SPARK_SCALA_VERSION}}")
     val servlet = new StandaloneSubmitRequestServlet(null, null, null)
     val desc = servlet.buildDriverDescription(request, "spark://master:7077", 6066)
-    assert(desc.command.environment.get("AWS_ENDPOINT_URL") === Some("2.13"))
+    assert(desc.command.environment.get("AWS_ENDPOINT_URL") ===
+      Some(sys.env("SPARK_SCALA_VERSION")))
   }
 
   test("SPARK-59404: server-side filter drops 'SPARK_LOCAL_(IP|HOSTNAME)' from the request") {
@@ -519,7 +520,8 @@ class StandaloneRestSubmitSuite extends SparkFunSuite {
     request.environmentVariables = Map.empty[String, String]
     val servlet = new StandaloneSubmitRequestServlet(null, null, null)
     val desc = servlet.buildDriverDescription(request, "spark://master:7077", 6066)
-    assert(desc.command.javaOpts.exists(_.contains("-Dspark.hadoop.fs.s3a.endpoint=2.13")))
+    val endpoint = sys.env("SPARK_SCALA_VERSION")
+    assert(desc.command.javaOpts.exists(_.contains(s"-Dspark.hadoop.fs.s3a.endpoint=$endpoint")))
   }
 
   test("SPARK-45197: Make StandaloneRestServer add JavaModuleOptions to drivers") {

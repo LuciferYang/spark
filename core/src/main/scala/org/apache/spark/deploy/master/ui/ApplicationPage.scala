@@ -105,7 +105,7 @@ private[ui] class ApplicationPage(parent: MasterWebUI) extends WebUIPage("app") 
                     <a href={s"${parent.master.historyServerUrl.get}/history/${app.id}"}>
                       Application History UI</a>
                 </strong></li>
-              }
+              } else Seq.empty
             }
           </ul>
         </div>
@@ -141,7 +141,7 @@ private[ui] class ApplicationPage(parent: MasterWebUI) extends WebUIPage("app") 
                   id="aggregated-removedExecutors">
                 {removedExecutorsTable}
               </div>
-            }
+            } else Seq.empty
           }
         </div>
       </div>;

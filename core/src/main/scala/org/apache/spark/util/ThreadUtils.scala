@@ -381,7 +381,7 @@ private[spark] object ThreadUtils {
     try {
       atMost match {
         case Duration.Inf => future.get()
-        case _ => future.get(atMost._1, atMost._2)
+        case _ => future.get(atMost.length, atMost.unit)
       }
     } catch {
       case e: SparkFatalException =>

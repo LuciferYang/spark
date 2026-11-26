@@ -34,26 +34,26 @@ if not defined SPARK_ENV_LOADED (
 rem Setting SPARK_SCALA_VERSION if not already set.
 
 set SCALA_VERSION_1=2.13
-set SCALA_VERSION_2=2.12
+set SCALA_VERSION_2=3
 
 set ASSEMBLY_DIR1="%SPARK_HOME%\assembly\target\scala-%SCALA_VERSION_1%"
 set ASSEMBLY_DIR2="%SPARK_HOME%\assembly\target\scala-%SCALA_VERSION_2%"
 set ENV_VARIABLE_DOC=https://spark.apache.org/docs/latest/configuration.html#environment-variables
-set SPARK_SCALA_VERSION=2.13
-rem if not defined SPARK_SCALA_VERSION (
-rem   if exist %ASSEMBLY_DIR2% if exist %ASSEMBLY_DIR1% (
-rem     echo Presence of build for multiple Scala versions detected ^(%ASSEMBLY_DIR1% and %ASSEMBLY_DIR2%^).
-rem     echo Remove one of them or, set SPARK_SCALA_VERSION=%SCALA_VERSION_1% in spark-env.cmd.
-rem     echo Visit %ENV_VARIABLE_DOC% for more details about setting environment variables in spark-env.cmd.
-rem     echo Either clean one of them or, set SPARK_SCALA_VERSION in spark-env.cmd.
-rem     exit 1
-rem   )
-rem   if exist %ASSEMBLY_DIR1% (
-rem     set SPARK_SCALA_VERSION=%SCALA_VERSION_1%
-rem   ) else (
-rem     set SPARK_SCALA_VERSION=%SCALA_VERSION_2%
-rem   )
-rem )
+
+if not defined SPARK_SCALA_VERSION (
+  if exist %ASSEMBLY_DIR2% if exist %ASSEMBLY_DIR1% (
+    echo Presence of build for multiple Scala versions detected ^(%ASSEMBLY_DIR1% and %ASSEMBLY_DIR2%^).
+    echo Remove one of them or, set SPARK_SCALA_VERSION=%SCALA_VERSION_1% in spark-env.cmd.
+    echo Visit %ENV_VARIABLE_DOC% for more details about setting environment variables in spark-env.cmd.
+    echo Either clean one of them or, set SPARK_SCALA_VERSION in spark-env.cmd.
+    exit 1
+  )
+  if exist %ASSEMBLY_DIR2% (
+    set SPARK_SCALA_VERSION=%SCALA_VERSION_2%
+  ) else (
+    set SPARK_SCALA_VERSION=%SCALA_VERSION_1%
+  )
+)
 exit /b 0
 
 :LoadSparkEnv

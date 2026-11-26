@@ -63,9 +63,11 @@ private[spark] object ClosureCleaner extends Logging {
         // others do not ({ _: Int => return; true }, fully specialized). When the bridge
         // exists, the SerializedLambda's impl method is the bridge, which only delegates: the
         // `new NonLocalReturnControl` instruction is emitted in the underlying unadapted
-        // method, so also match with the suffix stripped.
+        // method, so also match with the bridge marker removed. Scala 2 names the bridge
+        // `$anonfun$f$1$adapted`, Scala 3 names it `f$$anonfun$adapted$1`.
         // See https://github.com/scala/scala-dev/issues/109.
-        found.contains(target) || found.contains(target.stripSuffix("$adapted"))
+        found.contains(target) || found.contains(target.stripSuffix("$adapted")) ||
+          found.contains(target.replace("$$anonfun$adapted$", "$$anonfun$"))
     }
   }
 
@@ -792,7 +794,12 @@ private[spark] object IndylambdaScalaClosures extends Logging {
   }
 
   def isIndylambdaScalaClosure(lambdaProxy: SerializedLambda): Boolean = {
-    lambdaProxy.getImplMethodKind == MethodHandleInfo.REF_invokeStatic &&
+    // Scala 2 implements every lambda body with a static method. Scala 3 uses a private
+    // instance method of the enclosing class when the body refers to `this`, which then is the
+    // first captured argument, as it is for Scala 2.
+    val implMethodKind = lambdaProxy.getImplMethodKind
+    (implMethodKind == MethodHandleInfo.REF_invokeStatic ||
+      implMethodKind == MethodHandleInfo.REF_invokeSpecial) &&
       lambdaProxy.getImplMethodName.contains("$anonfun$")
   }
 

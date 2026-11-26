@@ -255,7 +255,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
                  </div>
                </div>
              </div>
-           }
+           } else Seq.empty
           }
         </div>
 
@@ -299,7 +299,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
                   </div>
                 </div>
               </div>
-            }
+            } else Seq.empty
           }
         </div>;
 
@@ -328,7 +328,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
       </td>
       {if (showResourceColumn) {
         <td>{formatWorkerResourcesDetails(worker)}</td>
-      }}
+      } else Seq.empty}
     </tr>
   }
 
@@ -343,7 +343,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
                 data-kill-message={s"Are you sure you want to kill application ${app.id} ?"}
                 class="btn btn-sm btn-outline-danger kill-link">Kill</button>
       </form>
-    }
+    } else Seq.empty
     // Offered only for an application whose driver reported it as holdable and which did not
     // disable the controls itself through spark.ui.holdEnabled. Rendered before the kill link:
     // floated controls stack right to left, so this keeps the two adjacent and leaves the kill
@@ -363,7 +363,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
         <button type="submit" data-confirm-message={message}
                 class="btn btn-sm btn-outline-secondary confirm-link">{label}</button>
       </form>
-    }
+    } else Seq.empty
     <tr>
       <td>
         <a href={"app/?appId=" + app.id}>{app.id}</a>
@@ -414,7 +414,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
                 data-kill-message={s"Are you sure you want to kill driver ${driver.id} ?"}
                 class="btn btn-sm btn-outline-danger kill-link">Kill</button>
       </form>
-    }
+    } else Seq.empty
     <tr>
       <td>{driver.id} {killLink}</td>
       <td>{UIUtils.formatDate(driver.submitDate)}</td>
@@ -440,7 +440,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
         <td sorttable_customkey={(-driver.startTime).toString}>
           {UIUtils.formatDuration(System.currentTimeMillis() - driver.startTime)}
         </td>
-      }}
+      } else Seq.empty}
     </tr>
   }
 }

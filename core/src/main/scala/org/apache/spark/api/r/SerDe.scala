@@ -190,7 +190,7 @@ private[spark] object SerDe {
       case 'r' => readBytesArr(dis)
       case 'a' =>
         val len = readInt(dis)
-        (0 until len).map(_ => readArray(dis, jvmObjectTracker)).toArray
+        (0 until len).map(_ => readArray(dis, jvmObjectTracker)).toArray[Any]
       case 'l' =>
         val len = readInt(dis)
         (0 until len).map(_ => readList(dis, jvmObjectTracker)).toArray

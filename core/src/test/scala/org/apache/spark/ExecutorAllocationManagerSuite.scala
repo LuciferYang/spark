@@ -2100,7 +2100,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
    | Helper methods for accessing private methods and fields |
    * ------------------------------------------------------- */
 
-  private val _addTime = PrivateMethod[Long](Symbol("addTime"))
   private val _schedule = PrivateMethod[Unit](Symbol("schedule"))
   private val _doUpdateRequest = PrivateMethod[Unit](Symbol("doUpdateRequest"))
   private val _updateAndSyncNumExecutorsTarget =
@@ -2109,10 +2108,6 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
   private val _removeExecutors = PrivateMethod[Seq[String]](Symbol("removeExecutors"))
   private val _onSchedulerBacklogged = PrivateMethod[Unit](Symbol("onSchedulerBacklogged"))
   private val _onSchedulerQueueEmpty = PrivateMethod[Unit](Symbol("onSchedulerQueueEmpty"))
-  private val _localityAwareTasksPerResourceProfileId =
-    PrivateMethod[mutable.HashMap[Int, Int]](Symbol("numLocalityAwareTasksPerResourceProfileId"))
-  private val _rpIdToHostToLocalTaskCount =
-    PrivateMethod[Map[Int, Map[String, Int]]](Symbol("rpIdToHostToLocalTaskCount"))
 
   private val defaultProfile = ResourceProfile.getOrCreateDefaultProfile(new SparkConf)
 
@@ -2159,7 +2154,7 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
   }
 
   private def addTime(manager: ExecutorAllocationManager): Long = {
-    manager invokePrivate _addTime()
+    SparkTestSuite.getPrivateField[Long](manager, "addTime")
   }
 
   private def doUpdateRequest(
@@ -2205,7 +2200,8 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
   }
 
   private def localityAwareTasksForDefaultProfile(manager: ExecutorAllocationManager): Int = {
-    val localMap = manager invokePrivate _localityAwareTasksPerResourceProfileId()
+    val localMap = SparkTestSuite.getPrivateField[mutable.HashMap[Int, Int]](
+      manager, "numLocalityAwareTasksPerResourceProfileId")
     localMap(defaultProfile.id)
   }
 
@@ -2216,7 +2212,8 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
 
   private def hostToLocalTaskCount(
       manager: ExecutorAllocationManager): Map[String, Int] = {
-    val rpIdToHostLocal = manager invokePrivate _rpIdToHostToLocalTaskCount()
+    val rpIdToHostLocal = SparkTestSuite.getPrivateField[Map[Int, Map[String, Int]]](
+      manager, "rpIdToHostToLocalTaskCount")
     rpIdToHostLocal(defaultProfile.id)
   }
 

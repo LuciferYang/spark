@@ -91,14 +91,16 @@ private[spark] class AppStatusListener(
   /** The last time when flushing `LiveEntity`s. This is to avoid flushing too frequently. */
   private var lastFlushTimeNs = System.nanoTime()
 
-  kvstore.addTrigger(classOf[ExecutorSummaryWrapper], conf.get(MAX_RETAINED_DEAD_EXECUTORS))
-    { count => cleanupExecutors(count) }
+  kvstore.addTrigger(
+      classOf[ExecutorSummaryWrapper], conf.get(MAX_RETAINED_DEAD_EXECUTORS).toLong) { count =>
+    cleanupExecutors(count)
+  }
 
-  kvstore.addTrigger(classOf[JobDataWrapper], conf.get(MAX_RETAINED_JOBS)) { count =>
+  kvstore.addTrigger(classOf[JobDataWrapper], conf.get(MAX_RETAINED_JOBS).toLong) { count =>
     cleanupJobs(count)
   }
 
-  kvstore.addTrigger(classOf[StageDataWrapper], conf.get(MAX_RETAINED_STAGES)) { count =>
+  kvstore.addTrigger(classOf[StageDataWrapper], conf.get(MAX_RETAINED_STAGES).toLong) { count =>
     cleanupStages(count)
   }
 
@@ -1294,7 +1296,7 @@ private[spark] class AppStatusListener(
   }
 
   private def cleanupJobs(count: Long): Unit = {
-    val countToDelete = calculateNumberToRemove(count, conf.get(MAX_RETAINED_JOBS))
+    val countToDelete = calculateNumberToRemove(count, conf.get(MAX_RETAINED_JOBS).toLong)
     if (countToDelete <= 0L) {
       return
     }
@@ -1385,7 +1387,7 @@ private[spark] class AppStatusListener(
   }
 
   private def cleanupStages(count: Long): Unit = {
-    val countToDelete = calculateNumberToRemove(count, conf.get(MAX_RETAINED_STAGES))
+    val countToDelete = calculateNumberToRemove(count, conf.get(MAX_RETAINED_STAGES).toLong)
     if (countToDelete <= 0L) {
       return
     }

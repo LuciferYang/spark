@@ -231,7 +231,7 @@ private[spark] trait PagedTable[T] {
               </span>
             </a>
           </li>
-          }}
+          } else Seq.empty}
           {if (page > 1) {
           <li class="page-item">
           <a href={Unparsed(pageLink(page - 1))} class="page-link" aria-label="Previous">
@@ -240,7 +240,7 @@ private[spark] trait PagedTable[T] {
             </span>
           </a>
           </li>
-          }}
+          } else Seq.empty}
           {pageTags}
           {if (page < totalPages) {
           <li class="page-item">
@@ -248,7 +248,7 @@ private[spark] trait PagedTable[T] {
               <span aria-hidden="true">&gt;</span>
             </a>
           </li>
-          }}
+          } else Seq.empty}
           {if (currentGroup < lastGroup) {
           <li class="page-item">
             <a href={Unparsed(pageLink(startPage + groupSize))} class="page-link"
@@ -258,7 +258,7 @@ private[spark] trait PagedTable[T] {
               </span>
             </a>
           </li>
-        }}
+        } else Seq.empty}
         </ul>
       </div>
       <div>

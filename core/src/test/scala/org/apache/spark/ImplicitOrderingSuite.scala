@@ -17,7 +17,10 @@
 
 package org.apache.spark
 
+import scala.reflect.ClassTag
+
 import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 
 class ImplicitOrderingSuite extends SparkFunSuite with LocalSparkContext {
   // Tests that PairRDDFunctions grabs an implicit Ordering in various cases where it should.
@@ -39,6 +42,9 @@ class ImplicitOrderingSuite extends SparkFunSuite with LocalSparkContext {
 }
 
 private object ImplicitOrderingSuite {
+  // Scala 3 does not materialize a ClassTag for Null, which `(null, x)` pairs below need.
+  private implicit val nullClassTag: ClassTag[Null] = ClassTag.Null
+
   class NonOrderedClass {}
 
   class ComparableClass extends Comparable[ComparableClass] {

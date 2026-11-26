@@ -118,6 +118,7 @@ class CloseShieldOutputStreamSuite extends SparkFunSuite with LocalSparkContext 
         } catch {
           case t: Throwable => error = t
         }
+        ()
       })
       taskThread.start()
       assert(inWrite.await(1, TimeUnit.MINUTES), s"task thread failed before the write: $error")

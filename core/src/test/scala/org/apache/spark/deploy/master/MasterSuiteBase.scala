@@ -130,7 +130,7 @@ class MockExecutorLaunchFailWorker(master: Master, conf: SparkConf = new SparkCo
       assert(master.idToApp.contains(appId))
       appIdsToLaunchExecutor += appId
       failedCnt += 1
-      master.self.askSync(ExecutorStateChanged(appId, execId,
+      master.self.askSync[Boolean](ExecutorStateChanged(appId, execId,
         ExecutorState.FAILED, None, None))
 
     case otherMsg => super.receive(otherMsg)
@@ -198,7 +198,7 @@ trait MasterSuiteBase extends SparkFunSuite
     master.workers += worker2
     master.workers += worker3
     val drivers = getDrivers(master)
-    val waitingDrivers = master.invokePrivate(_waitingDrivers())
+    val waitingDrivers = getWaitingDrivers(master)
 
     master.invokePrivate(_schedule())
     assert(drivers.size === 0 && waitingDrivers.size === 0)
@@ -443,9 +443,6 @@ trait MasterSuiteBase extends SparkFunSuite
     PrivateMethod[Array[Int]](Symbol("scheduleExecutorsOnWorkers"))
   private val _startExecutorsOnWorkers =
     PrivateMethod[Unit](Symbol("startExecutorsOnWorkers"))
-  private val _drivers = PrivateMethod[HashSet[DriverInfo]](Symbol("drivers"))
-  protected val _waitingDrivers =
-    PrivateMethod[mutable.ArrayBuffer[DriverInfo]](Symbol("waitingDrivers"))
   protected val _newDriverId = PrivateMethod[String](Symbol("newDriverId"))
   protected val _newApplicationId = PrivateMethod[String](Symbol("newApplicationId"))
   protected val _maybeUpdateAppName =
@@ -566,8 +563,11 @@ trait MasterSuiteBase extends SparkFunSuite
     assert(decomWorkersCountAgain === numWorkersExpectedToDecom)
   }
 
+  protected def getWaitingDrivers(master: Master): mutable.ArrayBuffer[DriverInfo] =
+    getPrivateField[mutable.ArrayBuffer[DriverInfo]](master, "waitingDrivers")
+
   protected def getDrivers(master: Master): HashSet[DriverInfo] = {
-    master.invokePrivate(_drivers())
+    getPrivateField[HashSet[DriverInfo]](master, "drivers")
   }
 
   protected def getState(master: Master): RecoveryState.Value = {

@@ -680,7 +680,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
 
   test("top with custom ordering") {
     val words = Vector("a", "b", "c", "d")
-    implicit val ord = implicitly[Ordering[String]].reverse
+    implicit val ord: Ordering[String] = Ordering.String.reverse
     val rdd = sc.makeRDD(words, 2)
     val topK = rdd.top(2)
     assert(topK.length === 2)
@@ -709,7 +709,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
 
   test("takeOrdered with custom ordering") {
     val nums = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    implicit val ord = implicitly[Ordering[Int]].reverse
+    implicit val ord: Ordering[Int] = Ordering.Int.reverse
     val rdd = sc.makeRDD(nums.toImmutableArraySeq, 2)
     val sortedTopK = rdd.takeOrdered(5)
     assert(sortedTopK.length === 5)
@@ -810,7 +810,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
 
   test("runJob on an invalid partition") {
     intercept[IllegalArgumentException] {
-      sc.runJob(sc.parallelize(1 to 10, 2), {iter: Iterator[Int] => iter.size}, Seq(0, 1, 2))
+      sc.runJob(sc.parallelize(1 to 10, 2), {(iter: Iterator[Int]) => iter.size}, Seq(0, 1, 2))
     }
   }
 
@@ -1351,8 +1351,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
     val totalElements = 100
     val numToTake = 50
     val rdd = sc.parallelize(0 to totalElements, totalElements)
-    import scala.language.reflectiveCalls
-    val jobCountListener = new SparkListener {
+    class JobCountListener extends SparkListener {
       private val count: AtomicInteger = new AtomicInteger(0)
       def getCount: Int = count.get
       def reset(): Unit = count.set(0)
@@ -1360,6 +1359,7 @@ class RDDSuite extends SparkFunSuite with SharedSparkContext with Eventually {
         count.incrementAndGet()
       }
     }
+    val jobCountListener = new JobCountListener
     sc.addSparkListener(jobCountListener)
     // with default RDD_LIMIT_INITIAL_NUM_PARTITIONS = 1, expecting multiple jobs
     rdd.take(numToTake)

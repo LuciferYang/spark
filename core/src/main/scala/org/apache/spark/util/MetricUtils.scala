@@ -84,7 +84,7 @@ private[spark] object MetricUtils extends Logging {
       } else {
         logDebug(s"unexpected metrics type: $metricsType")
         val numberFormat = NumberFormat.getIntegerInstance(Locale.US)
-        v: Long => s"[unknown] ${numberFormat.format(v)}"
+        (v: Long) => s"[unknown] ${numberFormat.format(v)}"
       }
 
       val validValues = values.filter(_ >= 0)

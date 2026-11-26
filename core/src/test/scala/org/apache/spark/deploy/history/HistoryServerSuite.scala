@@ -28,6 +28,7 @@ import scala.jdk.CollectionConverters._
 import jakarta.servlet._
 import jakarta.servlet.http.{HttpServletRequest, HttpServletRequestWrapper, HttpServletResponse}
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.json4s.{jvalue2extractable, jvalue2monadic}
 import org.json4s.JsonAST._
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods._

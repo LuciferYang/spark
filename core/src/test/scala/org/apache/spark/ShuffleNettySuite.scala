@@ -17,9 +17,6 @@
 
 package org.apache.spark
 
-import org.scalactic.source.Position
-import org.scalatest.Tag
-
 import org.apache.spark.network.util.IOMode
 import org.apache.spark.util.Utils
 
@@ -34,14 +31,8 @@ abstract class ShuffleNettySuite extends ShuffleSuite {
     conf.set("spark.shuffle.io.mode", ioMode.toString)
   }
 
-  override protected def test(testName: String, testTags: Tag*)(testBody: => Any)(
-    implicit pos: Position): Unit = {
-    if (!shouldRunTests) {
-      ignore(s"$testName [disabled on ${Utils.osName} with $ioMode]")(testBody)
-    } else {
-      super.test(testName, testTags: _*) {testBody}
-    }
-  }
+  override protected def shouldIgnoreTest(testName: String): Boolean =
+    !shouldRunTests || super.shouldIgnoreTest(testName)
 }
 
 class ShuffleNettyNioSuite extends ShuffleNettySuite

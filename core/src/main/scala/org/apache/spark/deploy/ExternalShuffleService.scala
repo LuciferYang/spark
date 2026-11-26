@@ -66,7 +66,8 @@ class ExternalShuffleService(sparkConf: SparkConf, securityManager: SecurityMana
   private val shuffleServiceSource = new ExternalShuffleServiceSource
 
   protected def findRegisteredExecutorsDBFile(dbName: String): File = {
-    val localDirs = sparkConf.getOption("spark.local.dir").map(_.split(",")).getOrElse(Array())
+    val localDirs =
+      sparkConf.getOption("spark.local.dir").map(_.split(",")).getOrElse(Array.empty[String])
     if (localDirs.length >= 1) {
       new File(localDirs.find(new File(_, dbName).exists()).getOrElse(localDirs(0)), dbName)
     } else {

@@ -177,6 +177,7 @@ class DirectWorkerDispatcherSuite
         } finally {
           doneGate.countDown()
         }
+        ()
       }).start()
     }
     startGate.countDown()
@@ -306,6 +307,7 @@ class DirectWorkerDispatcherSuite
         } catch {
           case t: Throwable => errors.add(t)
         }
+        ()
       })
       t.start()
       t
@@ -318,6 +320,7 @@ class DirectWorkerDispatcherSuite
       } catch {
         case t: Throwable => errors.add(t)
       }
+      ()
     })
     dispatcherThread.start()
 
@@ -452,6 +455,7 @@ class DirectWorkerDispatcherSuite
         try session.close(emptyCancel) catch {
           case t: Throwable => errors.add(t)
         }
+        ()
       }, "session-release-racer")
       releaseThread.start()
 
@@ -462,6 +466,7 @@ class DirectWorkerDispatcherSuite
         try racing.close() catch {
           case t: Throwable => errors.add(t)
         }
+        ()
       }, "dispatcher-close-racer")
       closeThread.start()
       awaitThreadWaiting(closeThread, "dispatcher close thread")
@@ -946,6 +951,7 @@ class DirectWorkerDispatcherSuite
         } finally {
           doneGate.countDown()
         }
+        ()
       }).start()
     }
     startGate.countDown()

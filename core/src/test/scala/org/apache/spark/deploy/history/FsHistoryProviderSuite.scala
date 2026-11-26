@@ -1433,7 +1433,7 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
     var isReadable = false
     val mockedFs = spy[FileSystem](provider.fs)
     doThrow(new AccessControlException("Cannot read accessDenied file")).when(mockedFs).open(
-      argThat((path: Path) => path.getName.toLowerCase(Locale.ROOT) == "accessdenied" &&
+      argThat[Path]((path: Path) => path.getName.toLowerCase(Locale.ROOT) == "accessdenied" &&
         !isReadable))
     val mockedProvider = spy[FsHistoryProvider](provider)
     when(mockedProvider.fs).thenReturn(mockedFs)
@@ -1470,7 +1470,7 @@ abstract class FsHistoryProviderSuite extends SparkFunSuite with Matchers with P
     when(mockedProvider.fs).thenReturn(mockedFs)
     when(mockedFs.open(path)).thenReturn(in)
     when(in.getWrappedStream).thenReturn(dfsIn)
-    when(dfsIn.getFileLength).thenReturn(200)
+    when(dfsIn.getFileLength).thenReturn(200L)
 
     // FileStatus.getLen is more than logInfo fileSize
     var fileStatus = new FileStatus(200, false, 0, 0, 0, path)

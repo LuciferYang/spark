@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import org.apache.logging.log4j._
@@ -82,8 +83,7 @@ class ExecutorSuite extends SparkFunSuite
       resources: immutable.Map[String, ResourceInformation]
         = immutable.Map.empty[String, ResourceInformation])(f: Executor => Unit): Unit = {
     var executor: Executor = null
-    val getCustomHostname = PrivateMethod[Option[String]](Symbol("customHostname"))
-    val defaultCustomHostNameValue = Utils.invokePrivate(getCustomHostname())
+    val defaultCustomHostNameValue = getPrivateField[Option[String]](Utils, "customHostname")
     try {
       executor = new Executor(executorId, executorHostname, env, userClassPath, isLocal,
         uncaughtExceptionHandler, resources)
@@ -95,8 +95,7 @@ class ExecutorSuite extends SparkFunSuite
       }
       // SPARK-51633: Reset the custom hostname to its default value in finally block
       // to avoid contaminating other tests
-      val setCustomHostname = PrivateMethod[Unit](Symbol("customHostname_$eq"))
-      Utils.invokePrivate(setCustomHostname(defaultCustomHostNameValue))
+      setPrivateField(Utils, "customHostname", defaultCustomHostNameValue)
     }
   }
 
@@ -320,8 +319,13 @@ class ExecutorSuite extends SparkFunSuite
       withMockHeartbeatReceiverRef(executor) { mockReceiverRef =>
         // Save all heartbeats sent into an ArrayBuffer for verification
         val heartbeats = ArrayBuffer[Heartbeat]()
-        when(mockReceiverRef.askSync(any[Heartbeat], any[RpcTimeout])(any))
-          .thenAnswer((invocation: InvocationOnMock) => {
+        when {
+          // Scala 3 takes no explicit argument for a context bound, so the ClassTag matcher is an
+          // implicit `def`: it is created when passed, after the matchers before it, as Mockito
+          // needs matchers created in parameter order.
+          implicit def anyClassTag: ClassTag[HeartbeatResponse] = any()
+          mockReceiverRef.askSync[HeartbeatResponse](any[Heartbeat], any[RpcTimeout])
+        }.thenAnswer((invocation: InvocationOnMock) => {
             val args = invocation.getArguments()
             heartbeats += args(0).asInstanceOf[Heartbeat]
             HeartbeatResponse(false)
@@ -354,9 +358,9 @@ class ExecutorSuite extends SparkFunSuite
       val mockTaskRunner = mock[executor.TaskRunner]
       val mockTask = mock[Task[Any]]
       when(mockTask.metrics).thenReturn(metrics)
-      when(mockTaskRunner.taskId).thenReturn(6)
+      when(mockTaskRunner.taskId).thenReturn(6L)
       when(mockTaskRunner.task).thenReturn(mockTask)
-      when(mockTaskRunner.startGCTime).thenReturn(1)
+      when(mockTaskRunner.startGCTime).thenReturn(1L)
       tasksMap.put(6, mockTaskRunner)
 
       executor.invokePrivate(reportHeartbeat())
@@ -458,7 +462,10 @@ class ExecutorSuite extends SparkFunSuite
 
     withExecutor("id", "localhost", mockEnv) { executor =>
       withMockHeartbeatReceiverRef(executor) { mockReceiverRef =>
-        when(mockReceiverRef.askSync(any[Heartbeat], any[RpcTimeout])(any)).thenAnswer {
+        when {
+          implicit def anyClassTag: ClassTag[HeartbeatResponse] = any()
+          mockReceiverRef.askSync[HeartbeatResponse](any[Heartbeat], any[RpcTimeout])
+        }.thenAnswer {
           (_: InvocationOnMock) => HeartbeatResponse(reregisterBlockManager = true)
         }
         val reportHeartbeat = PrivateMethod[Unit](Symbol("reportHeartBeat"))

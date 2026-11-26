@@ -509,8 +509,8 @@ private[spark] class MemoryStore(
           case DeserializedMemoryEntry(values, _, _, _) => Left(values)
           case SerializedMemoryEntry(buffer, _, _) => Right(buffer)
         }
-        val newEffectiveStorageLevel =
-          blockEvictionHandler.dropFromMemory(blockId, () => data)(entry.classTag)
+        implicit val ct: ClassTag[T] = entry.classTag
+        val newEffectiveStorageLevel = blockEvictionHandler.dropFromMemory(blockId, () => data)
         if (newEffectiveStorageLevel.isValid) {
           // The block is still present in at least one store, so release the lock
           // but don't delete the block info
@@ -701,7 +701,10 @@ private class DeserializedValuesHolder[T](
     classTag: ClassTag[T],
     memoryMode: MemoryMode) extends ValuesHolder[T] {
   // Underlying vector for unrolling the block
-  var vector = new SizeTrackingVector[T]()(classTag)
+  var vector = {
+    implicit val ct: ClassTag[T] = classTag
+    new SizeTrackingVector[T]()
+  }
   var arrayValues: Array[T] = null
 
   override def storeValue(value: T): Unit = {
@@ -752,7 +755,8 @@ private class SerializedValuesHolder[T](
   }
 
   override def storeValue(value: T): Unit = {
-    serializationStream.writeObject(value)(classTag)
+    implicit val ct: ClassTag[T] = classTag
+    serializationStream.writeObject(value)
   }
 
   override def estimatedSize(): Long = {
@@ -930,8 +934,9 @@ private[storage] class PartiallySerializedBlock[T](
     unrolledBuffer.toInputStream(dispose = true).transferTo(os)
     memoryStore.releaseUnrollMemoryForThisTask(memoryMode, unrollMemory)
     redirectableOutputStream.setOutputStream(os)
+    implicit val ct: ClassTag[T] = classTag
     while (rest.hasNext) {
-      serializationStream.writeObject(rest.next())(classTag)
+      serializationStream.writeObject(rest.next())
     }
     serializationStream.close()
   }

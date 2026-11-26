@@ -96,6 +96,9 @@ object BuildCommons {
 
   val javaVersion = settingKey[String]("source and target JVM version for javac and scalac")
 
+  // Whether this build compiles with Scala 3, i.e. with the `scala-3` profile of pom.xml.
+  val isScala3 = Def.setting(scalaBinaryVersion.value == "3")
+
   // Google Protobuf version used for generating the protobuf.
   // SPARK-41247: needs to be consistent with `protobuf.version` in `pom.xml`.
   val protoVersion = "4.33.5"
@@ -176,7 +179,16 @@ object SparkBuild extends PomBuild {
   lazy val sparkGenjavadocSettings: Seq[sbt.Def.Setting[_]] = GenJavadocPlugin.projectSettings ++ Seq(
     scalacOptions ++= Seq(
       "-P:genjavadoc:strictVisibility=true" // hide package private types
-    )
+    ),
+    // genjavadoc is a Scala 2 compiler plugin and has no Scala 3 build.
+    libraryDependencies := {
+      val deps = libraryDependencies.value
+      if (isScala3.value) deps.filterNot(_.name == "genjavadoc-plugin") else deps
+    },
+    scalacOptions := {
+      val opts = scalacOptions.value
+      if (isScala3.value) opts.filterNot(_.startsWith("-P:genjavadoc")) else opts
+    }
   )
 
   lazy val scalaStyleRules = Project("scalaStyleRules", file("scalastyle"))
@@ -265,7 +277,17 @@ object SparkBuild extends PomBuild {
 
   lazy val compilerWarningSettings: Seq[sbt.Def.Setting[_]] = Seq(
     (Compile / scalacOptions) ++= {
-      Seq(
+      if (isScala3.value) {
+        // The rules below are written for Scala 2.13 warning messages. Scala 3 reports
+        // warnings without failing the build until its own rules are in place.
+        // `-no-indent` keeps braces significant and indentation not, as in Scala 2, so that
+        // shared sources parse the same way under both versions.
+        // `-Ximport-suggestion-timeout 0` turns off the import hints Scala 3 adds to an error:
+        // computing them scans every class on the classpath, and the compiler crashes on
+        // shaded classes in hadoop-client-api whose relocated outer classes are absent.
+        Seq("-deprecation", "-feature", "-unchecked", "-no-indent",
+          "-Ximport-suggestion-timeout", "0")
+      } else Seq(
         // replace -Xfatal-warnings with fine-grained configuration, since 2.13.2
         // verbose warning on deprecation, error on all others
         // see `scalac -Wconf:help` for details
@@ -300,6 +322,15 @@ object SparkBuild extends PomBuild {
                             sparkGenjavadocSettings ++
                             compilerWarningSettings ++
                             enableScalaStyle ++ Seq(
+    // sbt puts Scala 3 output under `target/scala-<full version>`. Use the binary version for
+    // both Scala versions, the layout Maven and the launcher scripts expect.
+    crossTarget := target.value / s"scala-${scalaBinaryVersion.value}",
+    // sbt-pom-reader strips the `_2.13` suffix from Maven artifact IDs, and sbt adds it back, but
+    // it keeps a `_3` suffix, which sbt would then add a second time (`spark-core_3_3`).
+    moduleName := {
+      val name = moduleName.value
+      if (isScala3.value) name.stripSuffix("_3") else name
+    },
     (Compile / exportJars) := true,
     (Test / exportJars) := false,
     javaHome := sys.env.get("JAVA_HOME")

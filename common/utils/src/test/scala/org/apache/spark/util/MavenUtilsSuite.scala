@@ -652,6 +652,7 @@ class MavenUtilsSuite
         } finally {
           callerInterrupted.set(Thread.currentThread().isInterrupted)
         }
+        ()
       }, "ivy-interrupted-caller")
 
       SparkErrorUtils.tryWithSafeFinally {

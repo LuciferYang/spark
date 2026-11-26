@@ -321,7 +321,7 @@ class TestClassWithNesting(val y: Int) extends Serializable {
  */
 private object TestUserClosuresActuallyCleaned {
   def testMap(rdd: RDD[Int]): Unit = { rdd.map { _ => return; 0 }.count() }
-  def testFlatMap(rdd: RDD[Int]): Unit = { rdd.flatMap { _ => return; Seq() }.count() }
+  def testFlatMap(rdd: RDD[Int]): Unit = { rdd.flatMap { _ => return; Seq.empty[Int] }.count() }
   def testFilter(rdd: RDD[Int]): Unit = { rdd.filter { _ => return; true }.count() }
   def testSortBy(rdd: RDD[Int]): Unit = { rdd.sortBy { _ => return; 1 }.count() }
   def testKeyBy(rdd: RDD[Int]): Unit = { rdd.keyBy { _ => return; 1 }.count() }
@@ -381,7 +381,7 @@ private object TestUserClosuresActuallyCleaned {
   }
   def testRunJob2(sc: SparkContext): Unit = {
     val rdd = sc.parallelize(1 to 10, 10)
-    sc.runJob(rdd, { _: Iterator[Int] => return; 1 } )
+    sc.runJob(rdd, { (_: Iterator[Int]) => return; 1 } )
   }
   def testRunApproximateJob(sc: SparkContext): Unit = {
     val rdd = sc.parallelize(1 to 10, 10)

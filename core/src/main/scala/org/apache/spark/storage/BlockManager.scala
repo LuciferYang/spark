@@ -513,7 +513,7 @@ private[spark] class BlockManager(
 
     private def saveSerializedValuesToMemoryStore(bytes: ChunkedByteBuffer): Boolean = {
       val memoryMode = level.memoryMode
-      memoryStore.putBytes(blockId, blockSize, memoryMode, () => {
+      memoryStore.putBytes[Any](blockId, blockSize, memoryMode, () => {
         if (memoryMode == MemoryMode.OFF_HEAP && bytes.chunks.exists(!_.isDirect)) {
           bytes.copy(Platform.allocateDirectBuffer)
         } else {
@@ -930,8 +930,9 @@ private[spark] class BlockManager(
       classTag: ClassTag[_],
       checksum: Option[Long] = None,
       verifySealedChecksum: Boolean = false): Boolean = {
-    putBytes(blockId, new ChunkedByteBuffer(data.nioByteBuffer()), level,
-      sourceChecksum = checksum, sourceVerifySealedChecksum = verifySealedChecksum)(classTag)
+    implicit val ct: ClassTag[Any] = classTag.asInstanceOf[ClassTag[Any]]
+    putBytes[Any](blockId, new ChunkedByteBuffer(data.nioByteBuffer()), level,
+      sourceChecksum = checksum, sourceVerifySealedChecksum = verifySealedChecksum)
   }
 
   override def putBlockDataAsStream(
@@ -1614,6 +1615,7 @@ private[spark] class BlockManager(
       makeIterator: () => Iterator[T],
       isCacheVisible: Boolean,
       verifySealedChecksum: Boolean = false): Either[BlockResult, Iterator[T]] = {
+    implicit val ct: ClassTag[T] = classTag
     // Track whether the data is computed or not, force to do the computation later if need to.
     // The reason we push the force computing later is that once the executor is decommissioned we
     // will have a better chance to replicate the cache block because of the `checkShouldStore`
@@ -1626,7 +1628,7 @@ private[spark] class BlockManager(
     if (isCacheVisible) {
       // Attempt to read the block from local or remote storage. If it's present, then we don't need
       // to go through the local-get-or-put path.
-      get[T](blockId)(classTag) match {
+      get[T](blockId) match {
         case Some(block) =>
           return Left(block)
         case _ =>
@@ -1869,6 +1871,7 @@ private[spark] class BlockManager(
       tellMaster: Boolean = true,
       keepReadLock: Boolean = false,
       verifySealedChecksum: Boolean = false): Option[PartiallyUnrolledIterator[T]] = {
+    implicit val ct: ClassTag[T] = classTag
     doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) { info =>
       val startTimeNs = System.nanoTime()
       var iteratorFromFailedMemoryStorePut: Option[PartiallyUnrolledIterator[T]] = None
@@ -1893,7 +1896,7 @@ private[spark] class BlockManager(
                 diskStore.put(blockId) { channel =>
                   val out = serializerManager.wrapForChecksum(
                     checksumOpt, Channels.newOutputStream(channel))
-                  serializerManager.dataSerializeStream(blockId, out, iter)(classTag)
+                  serializerManager.dataSerializeStream(blockId, out, iter)
                 }
                 recordChecksum(info, checksumOpt)
                 size = diskStore.getSize(blockId)
@@ -1931,7 +1934,7 @@ private[spark] class BlockManager(
         diskStore.put(blockId) { channel =>
           val out = serializerManager.wrapForChecksum(
             checksumOpt, Channels.newOutputStream(channel))
-          serializerManager.dataSerializeStream(blockId, out, iterator())(classTag)
+          serializerManager.dataSerializeStream(blockId, out, iterator())
         }
         recordChecksum(info, checksumOpt)
         size = diskStore.getSize(blockId)
@@ -1993,13 +1996,12 @@ private[spark] class BlockManager(
             case MemoryMode.ON_HEAP => ByteBuffer.allocate _
             case MemoryMode.OFF_HEAP => Platform.allocateDirectBuffer _
           }
-          val putSucceeded = memoryStore.putBytes(blockId, diskData.size, level.memoryMode, () => {
-            // https://issues.apache.org/jira/browse/SPARK-6076
-            // If the file size is bigger than the free memory, OOM will happen. So if we
-            // cannot put it into MemoryStore, copyForMemory should not be created. That's why
-            // this action is put into a `() => ChunkedByteBuffer` and created lazily.
-            diskData.toChunkedByteBuffer(allocator)
-          })
+          // https://issues.apache.org/jira/browse/SPARK-6076
+          // If the file size is bigger than the free memory, OOM will happen. So if we
+          // cannot put it into MemoryStore, copyForMemory should not be created. That's why
+          // this action is put into a `() => ChunkedByteBuffer` and created lazily.
+          val putSucceeded = memoryStore.putBytes[Any](blockId, diskData.size, level.memoryMode,
+            () => diskData.toChunkedByteBuffer(allocator))
           if (putSucceeded) {
             diskData.dispose()
             Some(memoryStore.getBytes(blockId).get)
@@ -2273,10 +2275,9 @@ private[spark] class BlockManager(
           diskStore.put(blockId) { channel =>
             val out = serializerManager.wrapForChecksum(
               checksumOpt, Channels.newOutputStream(channel))
-            serializerManager.dataSerializeStream(
-              blockId,
-              out,
-              elements.iterator)(info.classTag.asInstanceOf[ClassTag[T]])
+            // Serialize with the block's own ClassTag rather than the implicit one for `T`.
+            implicit val blockClassTag: ClassTag[Any] = info.classTag.asInstanceOf[ClassTag[Any]]
+            serializerManager.dataSerializeStream[Any](blockId, out, elements.iterator)
           }
           recordChecksum(info, checksumOpt)
         case Right(bytes) =>
@@ -2318,7 +2319,7 @@ private[spark] class BlockManager(
     blocksToRemove.size
   }
 
-  def decommissionBlockManager(): Unit = storageEndpoint.ask(DecommissionBlockManager)
+  def decommissionBlockManager(): Unit = storageEndpoint.ask[Unit](DecommissionBlockManager)
 
   private[spark] def decommissionSelf(): Unit = synchronized {
     decommissioner match {

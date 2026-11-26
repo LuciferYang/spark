@@ -38,9 +38,9 @@ class InternalAccumulatorSuite extends SparkFunSuite with LocalSparkContext {
 
   test("internal accumulators in TaskContext") {
     val taskContext = TaskContext.empty()
-    val accumUpdates = taskContext.taskMetrics.accumulators()
+    val accumUpdates = taskContext.taskMetrics().accumulators()
     assert(accumUpdates.nonEmpty)
-    val testAccum = taskContext.taskMetrics.testAccum.get
+    val testAccum = taskContext.taskMetrics().testAccum.get
     assert(accumUpdates.exists(_.id == testAccum.id))
   }
 

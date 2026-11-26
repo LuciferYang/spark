@@ -35,6 +35,7 @@ import org.scalatest.Assertions
 import org.apache.spark._
 import org.apache.spark.Partitioner
 import org.apache.spark.internal.config._
+import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.apache.spark.util.ArrayImplicits._
 
 class PairRDDFunctionsSuite extends SparkFunSuite with SharedSparkContext {
@@ -290,11 +291,11 @@ class PairRDDFunctionsSuite extends SparkFunSuite with SharedSparkContext {
 
   // See SPARK-9326
   test("cogroup with empty RDD") {
-    import scala.reflect.classTag
-    val intPairCT = classTag[(Int, Int)]
+    import scala.reflect.ClassTag
+    implicit val intPairCT: ClassTag[(Int, Int)] = ClassTag(classOf[(Int, Int)])
 
     val rdd1 = sc.parallelize(Seq((1, 1), (1, 2), (2, 1), (3, 1)))
-    val rdd2 = sc.emptyRDD[(Int, Int)](intPairCT)
+    val rdd2 = sc.emptyRDD[(Int, Int)]
 
     val joined = rdd1.cogroup(rdd2).collect()
     assert(joined.length > 0)
@@ -302,11 +303,11 @@ class PairRDDFunctionsSuite extends SparkFunSuite with SharedSparkContext {
 
   // See SPARK-9326
   test("cogroup with groupByed RDD having 0 partitions") {
-    import scala.reflect.classTag
-    val intCT = classTag[Int]
+    import scala.reflect.ClassTag
+    implicit val intCT: ClassTag[Int] = ClassTag.Int
 
     val rdd1 = sc.parallelize(Seq((1, 1), (1, 2), (2, 1), (3, 1)))
-    val rdd2 = sc.emptyRDD[Int](intCT).groupBy((x) => 5)
+    val rdd2 = sc.emptyRDD[Int].groupBy((x) => 5)
     val joined = rdd1.cogroup(rdd2).collect()
     assert(joined.length > 0)
   }

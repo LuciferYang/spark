@@ -94,9 +94,9 @@ class LocalCheckpointSuite extends SparkFunSuite with LocalSparkContext {
     assert(filteredRdd.getStorageLevel === StorageLevel.NONE)
     assert(filteredRdd.partitions.map(_.index) === expectedPartitionIndices)
     assert(filteredRdd.dependencies.size === 1)
-    assert(filteredRdd.dependencies.head.rdd === mappedRdd)
+    assert((filteredRdd.dependencies.head.rdd: RDD[_]) === mappedRdd)
     assert(mappedRdd.dependencies.size === 1)
-    assert(mappedRdd.dependencies.head.rdd === parallelRdd)
+    assert((mappedRdd.dependencies.head.rdd: RDD[_]) === parallelRdd)
     assert(parallelRdd.dependencies.size === 0)
 
     // Mark the RDD for local checkpointing
@@ -112,7 +112,7 @@ class LocalCheckpointSuite extends SparkFunSuite with LocalSparkContext {
     assert(filteredRdd.checkpointData.get.checkpointRDD.isDefined)
     val checkpointRdd = filteredRdd.checkpointData.flatMap(_.checkpointRDD).get
     assert(filteredRdd.dependencies.size === 1)
-    assert(filteredRdd.dependencies.head.rdd === checkpointRdd)
+    assert((filteredRdd.dependencies.head.rdd: RDD[_]) === checkpointRdd)
     assert(filteredRdd.partitions.map(_.index) === expectedPartitionIndices)
     assert(checkpointRdd.partitions.map(_.index) === expectedPartitionIndices)
 
@@ -264,7 +264,7 @@ class LocalCheckpointSuite extends SparkFunSuite with LocalSparkContext {
     assert(rdd.checkpointData.isDefined)
     assert(rdd.checkpointData.get.isCheckpointed)
     assert(rdd.checkpointData.get.checkpointRDD.isDefined)
-    assert(rdd.dependencies.head.rdd === rdd.checkpointData.get.checkpointRDD.get)
+    assert((rdd.dependencies.head.rdd: RDD[_]) === rdd.checkpointData.get.checkpointRDD.get)
     assert(rdd.collect() === result)
     assert(rdd.collect() === result)
   }
@@ -290,11 +290,11 @@ class LocalCheckpointSuite extends SparkFunSuite with LocalSparkContext {
     val rdd2Dependencies = rdd2.dependencies
     val rdd3Dependencies = rdd3.dependencies
     assert(rdd1Dependencies.size === 1)
-    assert(rdd1Dependencies.head.rdd === rdd)
+    assert((rdd1Dependencies.head.rdd: RDD[_]) === rdd)
     assert(rdd2Dependencies.size === 1)
-    assert(rdd2Dependencies.head.rdd === rdd1)
+    assert((rdd2Dependencies.head.rdd: RDD[_]) === rdd1)
     assert(rdd3Dependencies.size === 1)
-    assert(rdd3Dependencies.head.rdd === rdd2)
+    assert((rdd3Dependencies.head.rdd: RDD[_]) === rdd2)
 
     // Only the locally checkpointed RDD should have special storage level
     assert(rdd.getStorageLevel === targetStorageLevel)

@@ -181,7 +181,7 @@ private class DefaultPartitionCoalescer(val balanceSlack: Double = 0.10)
     prev.context.getPreferredLocs(prev, part.index).map(tl => tl.host)
   }
 
-  private class PartitionLocations(prev: RDD[_]) {
+  private[rdd] class PartitionLocations(prev: RDD[_]) {
 
     // contains all the partitions from the previous RDD that don't have preferred locations
     val partsWithoutLocs = ArrayBuffer[Partition]()

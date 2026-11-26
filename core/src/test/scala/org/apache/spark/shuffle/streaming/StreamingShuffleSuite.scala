@@ -22,7 +22,6 @@ import java.util.Properties
 import java.util.concurrent.{CountDownLatch, LinkedBlockingQueue, Semaphore, TimeoutException, TimeUnit}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.language.reflectiveCalls
 import scala.reflect.ClassTag
 
 import io.netty.buffer.{ByteBufOutputStream, PooledByteBufAllocator}
@@ -774,7 +773,7 @@ class StreamingShuffleSuite
         .set(STREAMING_SHUFFLE_READER_MAX_MEMORY, 1))) { sc =>
       val g = new ShuffleGroup[Int](sc, 1, 1)
 
-      val it = new Iterator[(Int, Int)] {
+      class BlockDetectingIterator extends Iterator[(Int, Int)] {
         var hasBlocked = false
         def hasNext: Boolean = !hasBlocked
 
@@ -790,6 +789,7 @@ class StreamingShuffleSuite
           hasBlocked
         }
       }
+      val it = new BlockDetectingIterator
 
       val writeFinished = g.write(0, it)
 

@@ -389,7 +389,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                   sqlExecutionId.get)
                 }>{sqlExecutionId.get}</a>}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (jobData.jobGroup.isDefined) {
@@ -397,7 +397,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                 <strong>Job Group:</strong>
                 {jobData.jobGroup.get}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowActiveStages) {
@@ -405,7 +405,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                 <a href="#active"><strong>Active Stages:</strong></a>
                 {activeStages.size}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowPendingStages) {
@@ -414,7 +414,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                   <strong>Pending Stages:</strong>
                 </a>{pendingOrSkippedStages.size}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowCompletedStages) {
@@ -422,7 +422,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                 <a href="#completed"><strong>Completed Stages:</strong></a>
                 {completedStages.size}
               </li>
-            }
+            } else Seq.empty
           }
           {
             if (shouldShowSkippedStages) {
@@ -430,7 +430,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
               <a href="#skipped"><strong>Skipped Stages:</strong></a>
               {pendingOrSkippedStages.size}
             </li>
-          }
+          } else Seq.empty
           }
           {
             if (shouldShowFailedStages) {
@@ -438,7 +438,7 @@ private[ui] class JobPage(parent: JobsTab, store: AppStatusStore) extends WebUIP
                 <a href="#failed"><strong>Failed Stages:</strong></a>
                 {failedStages.size}
               </li>
-            }
+            } else Seq.empty
           }
         </ul>
       </div>

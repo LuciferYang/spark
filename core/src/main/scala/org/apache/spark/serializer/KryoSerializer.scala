@@ -33,7 +33,7 @@ import com.esotericsoftware.kryo.io.{Input => KryoInput, Output => KryoOutput}
 import com.esotericsoftware.kryo.io.{UnsafeInput => KryoUnsafeInput, UnsafeOutput => KryoUnsafeOutput}
 import com.esotericsoftware.kryo.pool.{KryoCallback, KryoFactory, KryoPool}
 import com.esotericsoftware.kryo.serializers.{JavaSerializer => KryoJavaSerializer}
-import com.twitter.chill.{AllScalaRegistrar, EmptyScalaKryoInstantiator}
+import com.twitter.chill.EmptyScalaKryoInstantiator
 import org.apache.avro.generic.{GenericContainer, GenericData, GenericRecord}
 import org.roaringbitmap.RoaringBitmap
 
@@ -200,7 +200,7 @@ class KryoSerializer(conf: SparkConf)
 
     // Register Chill's classes; we do this after our ranges and the user's own classes to let
     // our code override the generic serializers in Chill for things like Seq
-    new AllScalaRegistrar().apply(kryo)
+    ScalaKryoRegistrar.register(kryo)
 
     // Register types missed by Chill.
     // scalastyle:off

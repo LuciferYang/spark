@@ -68,8 +68,10 @@ class AppendOnlyMapSuite extends SparkFunSuite {
     for (i <- 1 to 100) {
       assert(map(i) === i)
     }
-    assert(map(0) === null)
-    assert(map(101) === null)
+    // Read the missing values as `Any`: Scala 3 unboxes a null `Int` result to 0.
+    val untypedMap = map.asInstanceOf[AppendOnlyMap[Int, Any]]
+    assert(untypedMap(0) === null)
+    assert(untypedMap(101) === null)
     val set = new HashSet[(Int, Int)]
     for ((k, v) <- map) {   // Test the foreach method
       set += ((k, v))

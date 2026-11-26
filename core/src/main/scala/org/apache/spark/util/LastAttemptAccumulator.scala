@@ -846,7 +846,7 @@ trait LastAttemptAccumulator[IN, OUT, PARTIAL] extends Logging {
       return Some(copyAndReset().asInstanceOf[this.type].value)
     }
 
-    val acc = copyAndReset().asInstanceOf[this.type]
+    val acc: this.type = copyAndReset().asInstanceOf[this.type]
     rddIds.distinct.foreach(lastAttemptValueAggregateInternal(_, acc))
     Some(acc.value)
   } catch {

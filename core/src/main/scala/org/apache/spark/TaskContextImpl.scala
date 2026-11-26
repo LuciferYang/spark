@@ -38,6 +38,39 @@ import org.apache.spark.util._
 
 
 /**
+ * The fields of a [[TaskContextImpl]] that back the accessors of [[TaskContext]].
+ *
+ * Scala 3 does not let a `val` override a method with an empty parameter list, such as
+ * `TaskContext.stageId()`, and a constructor parameter cannot share its name with a method of
+ * the same class. Defining the accessors here lets `TaskContextImpl` keep its parameter names,
+ * which callers pass as named arguments.
+ */
+private[spark] abstract class TaskContextFields(
+    stageIdValue: Int,
+    stageAttemptNumberValue: Int,
+    partitionIdValue: Int,
+    taskAttemptIdValue: Long,
+    attemptNumberValue: Int,
+    numPartitionsValue: Int,
+    taskMemoryManagerValue: TaskMemoryManager,
+    taskMetricsValue: TaskMetrics,
+    cpuAmountValue: BigDecimal,
+    resourcesValue: Map[String, ResourceInformation])
+  extends TaskContext {
+
+  override def stageId(): Int = stageIdValue
+  override def stageAttemptNumber(): Int = stageAttemptNumberValue
+  override def partitionId(): Int = partitionIdValue
+  override def taskAttemptId(): Long = taskAttemptIdValue
+  override def attemptNumber(): Int = attemptNumberValue
+  override def numPartitions(): Int = numPartitionsValue
+  override def cpuAmount(): BigDecimal = cpuAmountValue
+  override def resources(): Map[String, ResourceInformation] = resourcesValue
+  override private[spark] def taskMemoryManager(): TaskMemoryManager = taskMemoryManagerValue
+  override def taskMetrics(): TaskMetrics = taskMetricsValue
+}
+
+/**
  * A [[TaskContext]] implementation.
  *
  * A small note on thread safety. The interrupted & fetchFailed fields are volatile, this makes
@@ -48,20 +81,21 @@ import org.apache.spark.util._
  * not thread safe.
  */
 private[spark] class TaskContextImpl(
-    override val stageId: Int,
-    override val stageAttemptNumber: Int,
-    override val partitionId: Int,
-    override val taskAttemptId: Long,
-    override val attemptNumber: Int,
-    override val numPartitions: Int,
-    override val taskMemoryManager: TaskMemoryManager,
+    stageId: Int,
+    stageAttemptNumber: Int,
+    partitionId: Int,
+    taskAttemptId: Long,
+    attemptNumber: Int,
+    numPartitions: Int,
+    taskMemoryManager: TaskMemoryManager,
     localProperties: Properties,
     @transient private val metricsSystem: MetricsSystem,
     // The default value is only used in tests.
-    override val taskMetrics: TaskMetrics = TaskMetrics.empty,
-    override val cpuAmount: BigDecimal = SparkEnv.get.conf.get(config.CPUS_PER_TASK),
-    override val resources: Map[String, ResourceInformation] = Map.empty)
-  extends TaskContext
+    taskMetrics: TaskMetrics = TaskMetrics.empty,
+    cpuAmount: BigDecimal = SparkEnv.get.conf.get(config.CPUS_PER_TASK),
+    resources: Map[String, ResourceInformation] = Map.empty)
+  extends TaskContextFields(stageId, stageAttemptNumber, partitionId, taskAttemptId,
+    attemptNumber, numPartitions, taskMemoryManager, taskMetrics, cpuAmount, resources)
   with Logging {
 
   import TaskContextImpl._

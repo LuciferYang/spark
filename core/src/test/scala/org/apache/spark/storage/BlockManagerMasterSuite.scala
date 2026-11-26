@@ -53,9 +53,13 @@ class BlockManagerMasterSuite extends SparkFunSuite {
     val future = promise.future
 
     // Mock the askSync to return the Future
-    when(
-      mockDriverEndpoint.askSync[Future[Seq[Int]]](any[RemoveRdd])(any[ClassTag[Future[Seq[Int]]]])
-    ).thenReturn(future)
+    when {
+      // Scala 3 takes no explicit argument for a context bound, so the ClassTag matcher is an
+      // implicit `def`: it is created when passed, after the matcher before it, as Mockito needs
+      // matchers created in parameter order.
+      implicit def anyClassTag: ClassTag[Future[Seq[Int]]] = any()
+      mockDriverEndpoint.askSync[Future[Seq[Int]]](any[RemoveRdd])
+    }.thenReturn(future)
 
     val bmm = new BlockManagerMaster(mockDriverEndpoint, mockHeartbeatEndpoint, conf, true)
 
@@ -79,9 +83,10 @@ class BlockManagerMasterSuite extends SparkFunSuite {
     val future = promise.future
 
     // Mock the askSync to return the Future
-    when(
-      mockDriverEndpoint.askSync[Future[Seq[Int]]](any[RemoveRdd])(any[ClassTag[Future[Seq[Int]]]])
-    ).thenReturn(future)
+    when {
+      implicit def anyClassTag: ClassTag[Future[Seq[Int]]] = any()
+      mockDriverEndpoint.askSync[Future[Seq[Int]]](any[RemoveRdd])
+    }.thenReturn(future)
 
     val bmm = new BlockManagerMaster(mockDriverEndpoint, mockHeartbeatEndpoint, conf, true)
 

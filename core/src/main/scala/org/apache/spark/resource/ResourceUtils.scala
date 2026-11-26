@@ -22,7 +22,7 @@ import java.util.Optional
 
 import scala.util.control.NonFatal
 
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{jvalue2extractable, DefaultFormats, Formats}
 import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.{SparkConf, SparkException}

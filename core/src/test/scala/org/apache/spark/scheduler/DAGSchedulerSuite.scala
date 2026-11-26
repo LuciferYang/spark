@@ -26,7 +26,6 @@ import scala.collection.immutable
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, Map}
 import scala.concurrent.Promise
 import scala.jdk.CollectionConverters._
-import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 import com.google.common.util.concurrent.Uninterruptibles
@@ -208,18 +207,18 @@ class DAGSchedulerSuite extends SparkFunSuite with TempLocalSparkContext with Ti
 
   val tasksMarkedAsCompleted = new ArrayBuffer[Task[_]]()
 
-  val taskScheduler = new TaskScheduler() {
+  class DAGSchedulerSuiteTaskScheduler extends TaskScheduler {
     val executorsPendingDecommission = new HashMap[String, ExecutorDecommissionState]
     override def schedulingMode: SchedulingMode = SchedulingMode.FIFO
     override def rootPool: Pool = new Pool("", schedulingMode, 0, 0)
-    override def start() = {}
-    override def stop(exitCode: Int) = {}
+    override def start(): Unit = {}
+    override def stop(exitCode: Int): Unit = {}
     override def executorHeartbeatReceived(
         execId: String,
         accumUpdates: Array[(Long, Seq[AccumulatorV2[_, _]])],
         blockManagerId: BlockManagerId,
         executorUpdates: Map[(Int, Int), ExecutorMetrics]): Boolean = true
-    override def submitTasks(taskSet: TaskSet) = {
+    override def submitTasks(taskSet: TaskSet): Unit = {
       // normally done by TaskSetManager
       taskSet.tasks.foreach(_.epoch = mapOutputTracker.getEpoch)
       taskSets += taskSet
@@ -239,8 +238,8 @@ class DAGSchedulerSuite extends SparkFunSuite with TempLocalSparkContext with Ti
         tasksMarkedAsCompleted += tasks.head
       }
     }
-    override def setDAGScheduler(dagScheduler: DAGScheduler) = {}
-    override def defaultParallelism() = 2
+    override def setDAGScheduler(dagScheduler: DAGScheduler): Unit = {}
+    override def defaultParallelism(): Int = 2
     override def executorLost(executorId: String, reason: ExecutorLossReason): Unit = {}
     override def workerRemoved(workerId: String, host: String, message: String): Unit = {}
     override def applicationAttemptId(): Option[String] = None
@@ -255,6 +254,7 @@ class DAGSchedulerSuite extends SparkFunSuite with TempLocalSparkContext with Ti
       executorsPendingDecommission.get(executorId)
     }
   }
+  val taskScheduler = new DAGSchedulerSuiteTaskScheduler
 
   /**
    * Listeners which records some information to verify in UTs. Getter-kind methods in this class
@@ -916,7 +916,7 @@ class DAGSchedulerSuite extends SparkFunSuite with TempLocalSparkContext with Ti
   test("avoid exponential blowup when getting preferred locs list") {
     // Build up a complex dependency graph with repeated zip operations, without preferred locations
     var rdd: RDD[_] = new MyRDD(sc, 1, Nil)
-    (1 to 30).foreach(_ => rdd = rdd.zip(rdd))
+    (1 to 30).foreach(_ => rdd = rdd.zip(rdd.asInstanceOf[RDD[Any]]))
     // getPreferredLocs runs quickly, indicating that exponential graph traversal is avoided.
     failAfter(10.seconds) {
       val preferredLocs = scheduler.getPreferredLocs(rdd, 0)
@@ -9835,7 +9835,7 @@ class DAGSchedulerSuite extends SparkFunSuite with TempLocalSparkContext with Ti
       clearInvocations(scheduler, mapOutputTracker)
       assertPipelinedUnsupported(
         submitAndCaptureFailure(result, Array(0, 1)), "reliable RDD checkpoint")
-      verify(scheduler, never()).createShuffleMapStage(any[ShuffleDependency[_, _, _]], any[Int])
+      verify(scheduler, never()).createShuffleMapStage[Any, Any, Any](any(), any[Int])
       assertDataStructuresEmpty()
     }
   }

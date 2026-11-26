@@ -31,6 +31,8 @@ import org.apache.logging.log4j.core.config.Property
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Failed, Outcome}
 import org.scalatest.TestSuite
 import org.scalatest.concurrent.TimeLimits
+import org.scalatest.exceptions.TestFailedDueToTimeoutException
+import org.scalatest.time.Span
 
 import org.apache.spark.deploy.LocalSparkCluster
 import org.apache.spark.internal.Logging
@@ -146,6 +148,9 @@ trait SparkTestSuite
   // useful when inheriting a test suite but do not want to run all tests in it
   protected def excluded: Seq[String] = Seq.empty
 
+  /** How long each test may run before it fails, or None for no limit. */
+  protected def testTimeLimit: Option[Span] = None
+
   protected def logForFailedTest(): Unit = {
     LocalSparkCluster.get.foreach { localCluster =>
       val workerLogfiles = localCluster.workerLogfiles()
@@ -172,7 +177,15 @@ trait SparkTestSuite
     val shortSuiteName = suiteName.replaceAll("org.apache.spark", "o.a.s")
     try {
       logInfo(s"\n\n===== TEST OUTPUT FOR $shortSuiteName: '$testName' =====\n")
-      val outcome = test()
+      val outcome = testTimeLimit match {
+        case Some(limit) =>
+          try {
+            failAfter(limit)(test())
+          } catch {
+            case e: TestFailedDueToTimeoutException => Failed(e)
+          }
+        case None => test()
+      }
       outcome match {
         case _: Failed =>
           logForFailedTest()
@@ -183,6 +196,21 @@ trait SparkTestSuite
       logInfo(s"\n\n===== FINISHED $shortSuiteName: '$testName' =====\n")
     }
   }
+
+  /**
+   * Returns the value of the private field `name` of `target`, which may be a Scala object.
+   *
+   * Use this instead of `PrivateMethodTester` for a private `val` or `var`: Scala 3 does not
+   * generate an accessor method for a private field that only its own class reads. A field that
+   * a companion or nested class reads has an expanded name such as `org$apache$spark$Foo$$name`,
+   * which this also matches.
+   */
+  protected def getPrivateField[T](target: AnyRef, name: String): T =
+    SparkTestSuite.getPrivateField[T](target, name)
+
+  /** Sets the private field `name` of `target`; see [[getPrivateField]]. */
+  protected def setPrivateField(target: AnyRef, name: String, value: Any): Unit =
+    SparkTestSuite.privateField(target, name).set(target, value)
 
   /**
    * Creates a temporary directory, which is then passed to `f` and will be deleted after `f`
@@ -409,3 +437,18 @@ trait SparkTestSuite
   }
 }
 
+private[spark] object SparkTestSuite {
+  /** See [[SparkTestSuite.getPrivateField]]. */
+  def getPrivateField[T](target: AnyRef, name: String): T =
+    privateField(target, name).get(target).asInstanceOf[T]
+
+  private[spark] def privateField(target: AnyRef, name: String): java.lang.reflect.Field = {
+    val field = Iterator.iterate[Class[_]](target.getClass)(_.getSuperclass)
+      .takeWhile(_ != null)
+      .flatMap(_.getDeclaredFields)
+      .find(f => f.getName == name || f.getName.endsWith("$$" + name))
+      .getOrElse(throw new NoSuchFieldException(s"$name in ${target.getClass.getName}"))
+    field.setAccessible(true)
+    field
+  }
+}

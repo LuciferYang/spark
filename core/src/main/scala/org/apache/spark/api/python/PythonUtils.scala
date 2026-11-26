@@ -54,7 +54,7 @@ private[spark] object PythonUtils extends Logging {
   }
 
   def generateRDDWithNull(sc: JavaSparkContext): JavaRDD[String] = {
-    sc.parallelize(List("a", null, "b"))
+    JavaRDD.fromRDD(sc.sc.parallelize(List("a", null, "b")))
   }
 
   /**
@@ -86,19 +86,19 @@ private[spark] object PythonUtils extends Logging {
   }
 
   def isEncryptionEnabled(sc: JavaSparkContext): Boolean = {
-    sc.conf.get(IO_ENCRYPTION_ENABLED)
+    sc.sc.conf.get(IO_ENCRYPTION_ENABLED)
   }
 
   def getBroadcastThreshold(sc: JavaSparkContext): Long = {
-    sc.conf.get(BROADCAST_FOR_UDF_COMPRESSION_THRESHOLD)
+    sc.sc.conf.get(BROADCAST_FOR_UDF_COMPRESSION_THRESHOLD)
   }
 
   def getPythonAuthSocketTimeout(sc: JavaSparkContext): Long = {
-    sc.conf.get(Python.PYTHON_AUTH_SOCKET_TIMEOUT)
+    sc.sc.conf.get(Python.PYTHON_AUTH_SOCKET_TIMEOUT)
   }
 
   def getSparkBufferSize(sc: JavaSparkContext): Int = {
-    sc.conf.get(BUFFER_SIZE)
+    sc.sc.conf.get(BUFFER_SIZE)
   }
 
   def logPythonInfo(pythonExec: String): Unit = {

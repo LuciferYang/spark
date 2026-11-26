@@ -124,9 +124,9 @@ private[spark] class BarrierCoordinator(
     private var timerTask: TimerTask = null
 
     // Init a TimerTask for a barrier() call.
-    private def initTimerTask(state: ContextBarrierState): Unit = {
+    private def initTimerTask(barrierState: ContextBarrierState): Unit = {
       timerTask = new TimerTask {
-        override def run(): Unit = state.synchronized {
+        override def run(): Unit = barrierState.synchronized {
           // Timeout current barrier() call, fail all the sync requests.
           requesters.foreach(_.sendFailure(new SparkException("The coordinator didn't get all " +
             s"barrier sync requests for barrier epoch $barrierEpoch from $barrierId within " +

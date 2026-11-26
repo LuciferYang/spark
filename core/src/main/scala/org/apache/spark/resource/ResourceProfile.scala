@@ -435,7 +435,7 @@ object ResourceProfile extends Logging {
     cores.foreach(ereqs.cores)
 
     val memory = if (isStandalone || isLocalCluster) {
-      SparkContext.executorMemoryInMb(conf)
+      SparkContext.executorMemoryInMb(conf).toLong
     } else {
       conf.get(EXECUTOR_MEMORY)
     }

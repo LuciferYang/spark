@@ -110,7 +110,7 @@ class MasterSuite extends MasterSuiteBase {
     master.state = RecoveryState.ALIVE
     master.workers += workerInfo
     val drivers = getDrivers(master)
-    val waitingDrivers = master.invokePrivate(_waitingDrivers())
+    val waitingDrivers = getWaitingDrivers(master)
 
     master.invokePrivate(_schedule())
     assert(drivers.size === 0 && waitingDrivers.size === 0)

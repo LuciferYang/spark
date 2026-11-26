@@ -29,7 +29,7 @@ import org.apache.spark.tags.{ChromeUITest, WebBrowserTest}
 @ChromeUITest
 class ChromeUISeleniumSuite extends RealBrowserUISeleniumSuite("webdriver.chrome.driver") {
 
-  override var webDriver: WebDriver with JavascriptExecutor = _
+  var webDriver: WebDriver with JavascriptExecutor = _
 
   override def beforeAll(): Unit = {
     super.beforeAll()

@@ -41,30 +41,32 @@ class MetricsSystemSuite extends SparkFunSuite with BeforeAndAfter with PrivateM
     securityMgr = new SecurityManager(conf)
   }
 
+  private def sources(metricsSystem: MetricsSystem): ArrayBuffer[Source] =
+    getPrivateField[ArrayBuffer[Source]](metricsSystem, "sources")
+
+  private def sinks(metricsSystem: MetricsSystem): ArrayBuffer[Sink] =
+    getPrivateField[ArrayBuffer[Sink]](metricsSystem, "sinks")
+
   test("MetricsSystem with default config") {
     val metricsSystem = MetricsSystem.createMetricsSystem("default", conf)
     metricsSystem.start()
-    val sources = PrivateMethod[ArrayBuffer[Source]](Symbol("sources"))
-    val sinks = PrivateMethod[ArrayBuffer[Sink]](Symbol("sinks"))
 
-    assert(metricsSystem.invokePrivate(sources()).length === StaticSources.allSources.length)
-    assert(metricsSystem.invokePrivate(sinks()).length === 0)
+    assert(sources(metricsSystem).length === StaticSources.allSources.length)
+    assert(sinks(metricsSystem).length === 0)
     assert(metricsSystem.getServletHandlers.nonEmpty)
   }
 
   test("MetricsSystem with sources add") {
     val metricsSystem = MetricsSystem.createMetricsSystem("test", conf)
     metricsSystem.start()
-    val sources = PrivateMethod[ArrayBuffer[Source]](Symbol("sources"))
-    val sinks = PrivateMethod[ArrayBuffer[Sink]](Symbol("sinks"))
 
-    assert(metricsSystem.invokePrivate(sources()).length === StaticSources.allSources.length)
-    assert(metricsSystem.invokePrivate(sinks()).length === 1)
+    assert(sources(metricsSystem).length === StaticSources.allSources.length)
+    assert(sinks(metricsSystem).length === 1)
     assert(metricsSystem.getServletHandlers.nonEmpty)
 
     val source = new MasterSource(null)
     metricsSystem.registerSource(source)
-    assert(metricsSystem.invokePrivate(sources()).length === StaticSources.allSources.length + 1)
+    assert(sources(metricsSystem).length === StaticSources.allSources.length + 1)
   }
 
   test("MetricsSystem with Driver instance") {
@@ -277,9 +279,8 @@ class MetricsSystemSuite extends SparkFunSuite with BeforeAndAfter with PrivateM
       "org.apache.spark.metrics.ThreeParameterConstructorSink")
     val metricsSystem = MetricsSystem.createMetricsSystem("legacy", conf)
     metricsSystem.start()
-    val sinks = PrivateMethod[ArrayBuffer[Sink]](Symbol("sinks"))
 
-    assert(metricsSystem.invokePrivate(sinks()).length === 1)
+    assert(sinks(metricsSystem).length === 1)
   }
 }
 

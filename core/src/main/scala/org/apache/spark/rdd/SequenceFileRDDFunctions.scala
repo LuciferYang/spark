@@ -16,7 +16,7 @@
  */
 package org.apache.spark.rdd
 
-import scala.reflect.ClassTag
+import scala.reflect.{classTag, ClassTag}
 
 import org.apache.hadoop.io.Writable
 import org.apache.hadoop.io.compress.CompressionCodec
@@ -49,14 +49,14 @@ class SequenceFileRDDFunctions[K: IsWritable: ClassTag, V: IsWritable: ClassTag]
   def saveAsSequenceFile(
       path: String,
       codec: Option[Class[_ <: CompressionCodec]] = None): Unit = self.withScope {
-    def anyToWritable[U: IsWritable](u: U): Writable = u
+    def anyToWritable[U: IsWritable](u: U): Writable = implicitly[IsWritable[U]].apply(u)
 
     // TODO We cannot force the return type of `anyToWritable` be same as keyWritableClass and
     // valueWritableClass at the compile time. To implement that, we need to add type parameters to
     // SequenceFileRDDFunctions. however, SequenceFileRDDFunctions is a public class so it will be a
     // breaking change.
-    val convertKey = self.keyClass != _keyWritableClass
-    val convertValue = self.valueClass != _valueWritableClass
+    val convertKey = classTag[K].runtimeClass != _keyWritableClass
+    val convertValue = classTag[V].runtimeClass != _valueWritableClass
 
     logInfo(log"Saving as sequence file of type " +
       log"(${MDC(LogKeys.KEY, _keyWritableClass.getSimpleName)}," +

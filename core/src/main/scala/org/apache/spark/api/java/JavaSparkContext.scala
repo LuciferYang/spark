@@ -34,7 +34,7 @@ import org.apache.spark._
 import org.apache.spark.api.java.JavaSparkContext.fakeClassTag
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.input.PortableDataStream
-import org.apache.spark.rdd.{EmptyRDD, HadoopRDD, NewHadoopRDD}
+import org.apache.spark.rdd.{EmptyRDD, HadoopRDD, NewHadoopRDD, RDD}
 import org.apache.spark.resource.ResourceInformation
 import org.apache.spark.util.ArrayImplicits._
 
@@ -349,7 +349,7 @@ class JavaSparkContext(val sc: SparkContext) extends Closeable {
    */
   def objectFile[T](path: String, minPartitions: Int): JavaRDD[T] = {
     implicit val ctag: ClassTag[T] = fakeClassTag
-    sc.objectFile(path, minPartitions)(ctag)
+    sc.objectFile[T](path, minPartitions)
   }
 
   /**
@@ -361,7 +361,7 @@ class JavaSparkContext(val sc: SparkContext) extends Closeable {
    */
   def objectFile[T](path: String): JavaRDD[T] = {
     implicit val ctag: ClassTag[T] = fakeClassTag
-    sc.objectFile(path)(ctag)
+    sc.objectFile[T](path)
   }
 
   /**
@@ -545,7 +545,10 @@ class JavaSparkContext(val sc: SparkContext) extends Closeable {
    * [[org.apache.spark.broadcast.Broadcast]] object for reading it in distributed functions.
    * The variable will be sent to each cluster only once.
    */
-  def broadcast[T](value: T): Broadcast[T] = sc.broadcast(value)(fakeClassTag)
+  def broadcast[T](value: T): Broadcast[T] = {
+    implicit val ctag: ClassTag[T] = fakeClassTag
+    sc.broadcast(value)
+  }
 
   /** Shut down the SparkContext. */
   def stop(): Unit = {
@@ -834,7 +837,7 @@ class JavaSparkContext(val sc: SparkContext) extends Closeable {
    * @note This does not necessarily mean the caching or computation was successful.
    */
   def getPersistentRDDs: JMap[java.lang.Integer, JavaRDD[_]] = {
-    sc.getPersistentRDDs.toMap.transform((_, s) => JavaRDD.fromRDD(s))
+    sc.getPersistentRDDs.toMap.transform((_, s) => JavaRDD.fromRDD(s.asInstanceOf[RDD[Any]]))
       .asJava.asInstanceOf[JMap[java.lang.Integer, JavaRDD[_]]]
   }
 
