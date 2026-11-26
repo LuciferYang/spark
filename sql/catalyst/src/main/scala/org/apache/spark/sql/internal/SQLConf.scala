@@ -8865,14 +8865,14 @@ object SQLConf {
       "reduce IO pruning (e.g. partition or file skipping) compared to the individual " +
       "filters. When both subplans filter both join children, the merged join can also " +
       "produce pairs that neither subplan needs, increasing join work or making a formerly " +
-      "broadcastable input too large to broadcast. Disabled by default; enable once the " +
-      "behaviour has been validated in your " +
-      "workload, particularly on heavily partitioned or file-pruned tables. " +
+      "broadcastable input too large to broadcast. Enabled by default in this fork, after " +
+      "TPC-DS sf100 showed no slowdown on partitioned or non-partitioned tables; disable " +
+      "it if a workload shows either effect. " +
       s"Has no effect when ${MERGE_SUBPLANS_FILTER_PROPAGATION_ENABLED.key} is false.")
     .version("4.2.0")
     .withBindingPolicy(ConfigBindingPolicy.SESSION)
     .booleanConf
-    .createWithDefault(false)
+    .createWithDefault(true)
 
   val MERGE_SUBPLANS_DSV2_SYMMETRIC_FILTER_PROPAGATION_ENABLED = buildConf(
     "spark.sql.optimizer.mergeSubplans.filterPropagation.dsv2SymmetricFilterPropagation.enabled")
@@ -8926,12 +8926,12 @@ object SQLConf {
         "common join to be merged into a single scan. A filter attribute is only propagated " +
         "through a join when it originates from the non-nullable (preserved) side: the left side " +
         "of LeftOuter/LeftSemi/LeftAnti, the right side of RightOuter, or either side of " +
-        "Inner/Cross. FullOuter joins are never eligible. " +
+        "Inner/Cross. FullOuter joins are never eligible. Enabled by default in this fork. " +
         s"Has no effect when ${MERGE_SUBPLANS_FILTER_PROPAGATION_ENABLED.key} is false.")
       .version("4.2.0")
       .withBindingPolicy(ConfigBindingPolicy.SESSION)
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val ERROR_MESSAGE_FORMAT = buildConf("spark.sql.error.messageFormat")
     .doc("When PRETTY, the error message consists of textual representation of error class, " +
