@@ -43,6 +43,7 @@ from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
+    TimestampNTZNanosType,
 )
 from pyspark.testing.sqlutils import ReusedSQLTestCase
 from pyspark.testing.utils import (
@@ -1871,6 +1872,58 @@ class UtilsTestsMixin:
         # This should fail
         with self.assertRaises(PySparkAssertionError):
             assertSchemaEqual(s1, s2)
+
+    def test_assert_schema_equal_with_timestamp_nanos_types(self):
+        """Test assertSchemaEqual with nanosecond timestamp types of different precision
+        (SPARK-57462): the precision must be compared even under ignoreNullable, like decimal."""
+        s1 = StructType([StructField("ts", TimestampNTZNanosType(9), True)])
+        # Same precision - should pass, including with the ignoreNullable default.
+        assertSchemaEqual(s1, StructType([StructField("ts", TimestampNTZNanosType(9), False)]))
+        # Different precision - should fail rather than be treated as equal.
+        with self.assertRaises(PySparkAssertionError):
+            assertSchemaEqual(s1, StructType([StructField("ts", TimestampNTZNanosType(7), True)]))
+
+
+class NonFiniteComparisonTests(unittest.TestCase):
+    def test_unequal_special_values(self):
+        nan, inf = float("nan"), float("inf")
+        for left, right in [
+            (nan, 1.0),
+            (nan, inf),
+            (nan, -inf),
+            (1.0, inf),
+            (1.0, -inf),
+            (inf, -inf),
+        ]:
+            for actual, expected in [(left, right), (right, left)]:
+                for ordered in [False, True]:
+                    for rtol, atol in [(1e-5, 1e-8), (0.0, 0.0)]:
+                        with self.subTest(actual=actual, expected=expected, ordered=ordered):
+                            with self.assertRaises(PySparkAssertionError) as error:
+                                assertDataFrameEqual(
+                                    [Row(value=actual)],
+                                    [Row(value=expected)],
+                                    checkRowOrder=ordered,
+                                    rtol=rtol,
+                                    atol=atol,
+                                )
+                            self.assertEqual(error.exception.getCondition(), "DIFFERENT_ROWS")
+
+    def test_equal_special_values_and_finite_tolerance(self):
+        for value in [float("nan"), float("inf"), float("-inf")]:
+            assertDataFrameEqual([Row(value=value)], [Row(value=value)])
+        assertDataFrameEqual([Row(value=1.001)], [Row(value=1.0)], rtol=0.01)
+        with self.assertRaises(PySparkAssertionError):
+            assertDataFrameEqual([Row(value=1.1)], [Row(value=1.0)], rtol=0.01)
+
+    def test_nested_special_values(self):
+        for wrap in [
+            lambda value: Row(nested=Row(value=value)),
+            lambda value: Row(items=[value]),
+            lambda value: Row(mapping={"key": value}),
+        ]:
+            with self.assertRaises(PySparkAssertionError):
+                assertDataFrameEqual([wrap(float("nan"))], [wrap(1.0)])
 
 
 class UtilsTests(UtilsTestsMixin, ReusedSQLTestCase):

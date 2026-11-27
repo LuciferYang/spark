@@ -32,7 +32,7 @@ import org.apache.spark.sql.catalyst.analysis.{
   RelationCache,
   RelationResolution,
   UnresolvedRelation,
-  V2TableReference}
+  V2Reference}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.streaming.StreamingRelationV2
 import org.apache.spark.sql.connector.catalog.{
@@ -60,6 +60,7 @@ import org.apache.spark.sql.execution.datasources.v2._
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.apache.spark.tags.DataSourceV2Test
 
 class LoadCountingInMemoryCatalog extends InMemoryCatalog {
   val singleArgLoads = new AtomicInteger(0)
@@ -71,10 +72,17 @@ class LoadCountingInMemoryCatalog extends InMemoryCatalog {
 }
 
 class StateAwareInMemoryCatalog extends LoadCountingInMemoryCatalog {
+  private val _tableStateOptionKeyCalls = new AtomicInteger(0)
+
+  def tableStateOptionKeyCalls: Int = _tableStateOptionKeyCalls.get()
+  def resetTableStateOptionKeyCalls(): Unit = _tableStateOptionKeyCalls.set(0)
+
   // Include Spark's internal marker so the write-context test detects if it leaks before state
   // option projection. Production catalogs should declare only raw user option keys.
-  override def tableStateOptionKeys(): util.Set[String] =
+  override def tableStateOptionKeys(): util.Set[String] = {
+    _tableStateOptionKeyCalls.incrementAndGet()
     util.Set.of("snapshot", UnresolvedRelation.REQUIRED_WRITE_PRIVILEGES)
+  }
 }
 
 class NullReturningInMemoryCatalog extends InMemoryCatalog {
@@ -142,8 +150,12 @@ class StateAwareV2InMemoryRelationCatalog extends V2InMemoryRelationCatalog {
   private val _loadTableCalls =
     mutable.ArrayBuffer.empty[(Identifier, TableContext, CaseInsensitiveStringMap)]
   private val _loadViewCalls = mutable.ArrayBuffer.empty[Identifier]
+  private val _tableStateOptionKeyCalls = new AtomicInteger(0)
 
-  override def tableStateOptionKeys(): util.Set[String] = util.Set.of("snapshot")
+  override def tableStateOptionKeys(): util.Set[String] = {
+    _tableStateOptionKeyCalls.incrementAndGet()
+    util.Set.of("snapshot")
+  }
 
   override def loadTable(
       ident: Identifier,
@@ -168,11 +180,13 @@ class StateAwareV2InMemoryRelationCatalog extends V2InMemoryRelationCatalog {
   def loadTableCalls: Seq[(Identifier, TableContext, CaseInsensitiveStringMap)] =
     _loadTableCalls.toSeq
   def loadViewCalls: Seq[Identifier] = _loadViewCalls.toSeq
+  def tableStateOptionKeyCalls: Int = _tableStateOptionKeyCalls.get()
 
   def resetDispatchCalls(): Unit = {
     resetLoadRelationCalls()
     _loadTableCalls.clear()
     _loadViewCalls.clear()
+    _tableStateOptionKeyCalls.set(0)
   }
 }
 
@@ -201,6 +215,7 @@ class DispatchTrackingRelationCatalog extends InMemoryRelationCatalog {
   }
 }
 
+@DataSourceV2Test
 class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
   import testImplicits._
 
@@ -333,7 +348,7 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
       checkAnswer(df, Seq(Row(1, "a"), Row(2, "b")))
 
       collected = df.queryExecution.executedPlan.collect {
-        case BatchScanExec(_, scan: InMemoryBaseTable#InMemoryBatchScan, _, _, _, _) =>
+        case BatchScanExec(_, scan: InMemoryBaseTable#InMemoryBatchScan, _, _, _, _, _, _) =>
           assert(scan.options.get("split-size") === "5")
       }
       assert (collected.size == 1)
@@ -368,7 +383,7 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
       checkAnswer(df, Seq(Row(1, "a"), Row(2, "b")))
 
       collected = df.queryExecution.executedPlan.collect {
-        case BatchScanExec(_, scan: InMemoryBaseTable#InMemoryBatchScan, _, _, _, _) =>
+        case BatchScanExec(_, scan: InMemoryBaseTable#InMemoryBatchScan, _, _, _, _, _, _) =>
           assert(scan.options.get("split-size") === "5")
       }
       assert (collected.size == 1)
@@ -1032,13 +1047,24 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
       sql(s"CREATE TABLE $t1 (id bigint, data string) USING parquet")
       relCatalog.resetDispatchCalls()
 
-      spark.read
+      val df = spark.read
         .option("snapshot", "s1")
         .option("split-size", "5")
         .table(t1)
-        .collect()
+      df.queryExecution.analyzed
 
-      assertOnlySnapshotTableOptions(relCatalog, "s1", expectedCalls = 2)
+      assertOnlySnapshotTableOptions(relCatalog, "s1", expectedCalls = 1)
+      assert(
+        relCatalog.tableStateOptionKeyCalls == 1,
+        s"expected one analysis projection, got: ${relCatalog.tableStateOptionKeyCalls}")
+
+      relCatalog.resetDispatchCalls()
+      df.collect()
+
+      assertOnlySnapshotTableOptions(relCatalog, "s1", expectedCalls = 1)
+      assert(
+        relCatalog.tableStateOptionKeyCalls == 1,
+        s"expected one refresh projection, got: ${relCatalog.tableStateOptionKeyCalls}")
       assert(relCatalog.loadRelationCalls.isEmpty)
     }
   }
@@ -1610,13 +1636,13 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
         .analyzed
         .collectFirst { case r: DataSourceV2Relation => r }
         .getOrElse(fail("expected a v2 relation"))
-      val readRef = V2TableReference.createForTransaction(original)
-      val otherReadRef = V2TableReference.createForTransaction(original.copy(
+      val readRef = V2Reference.createForTransaction(original)
+      val otherReadRef = V2Reference.createForTransaction(original.copy(
         options = new CaseInsensitiveStringMap(
           java.util.Map.of("snapshot", "s1", "split-size", "9"))))
-      val writeRef = V2TableReference.createForWriteTarget(original)
+      val writeRef = V2Reference.createForWriteTarget(original)
       var sharedRelationCacheLookups = 0
-      val sharedRelationCache: RelationCache = (_, _, _, _, _) => {
+      val sharedRelationCache: RelationCache = (_, _, _, _) => {
         sharedRelationCacheLookups += 1
         None
       }
@@ -1686,13 +1712,13 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
         .analyzed
         .collectFirst { case r: DataSourceV2Relation => r }
         .getOrElse(fail("expected a v2 relation"))
-      val initialRef = V2TableReference.createForTempView(cached, Seq("state_view"))
-      val otherOptionsRef = V2TableReference.createForTempView(
+      val initialRef = V2Reference.createForTempView(cached, Seq("state_view"))
+      val otherOptionsRef = V2Reference.createForTempView(
         cached.copy(options = new CaseInsensitiveStringMap(
           java.util.Map.of("snapshot", "s1", "split-size", "9"))),
         Seq("state_view"))
       var sharedRelationCacheLookups = 0
-      val sharedRelationCache: RelationCache = (_, _, _, _, _) => {
+      val sharedRelationCache: RelationCache = (_, _, _, _) => {
         sharedRelationCacheLookups += 1
         Some(cached)
       }
@@ -1703,12 +1729,28 @@ class DataSourceV2OptionSuite extends DatasourceV2SQLBase {
       stateCatalog.resetLoadTableCalls()
       stateCatalog.singleArgLoads.set(0)
       AnalysisContext.withNewAnalysisContext {
+        stateCatalog.resetTableStateOptionKeyCalls()
         val initialRelation =
           resolver.resolveReference(initialRef).asInstanceOf[DataSourceV2Relation]
+        assert(
+          stateCatalog.tableStateOptionKeyCalls == 1,
+          s"expected one initial projection, got: ${stateCatalog.tableStateOptionKeyCalls}")
+
+        stateCatalog.resetTableStateOptionKeyCalls()
         val cachedRelation =
           resolver.resolveReference(initialRef).asInstanceOf[DataSourceV2Relation]
+        assert(
+          stateCatalog.tableStateOptionKeyCalls == 0,
+          s"expected no projection on a relation-cache hit, got: " +
+            stateCatalog.tableStateOptionKeyCalls)
+
+        stateCatalog.resetTableStateOptionKeyCalls()
         val otherOptionsRelation =
           resolver.resolveReference(otherOptionsRef).asInstanceOf[DataSourceV2Relation]
+        assert(
+          stateCatalog.tableStateOptionKeyCalls == 1,
+          s"expected one table-cache lookup projection, got: " +
+            stateCatalog.tableStateOptionKeyCalls)
 
         assert(initialRelation.table eq cached.table)
         assert(cachedRelation.table eq cached.table)
