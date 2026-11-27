@@ -21,7 +21,6 @@ import scala.annotation.nowarn
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.LeftSingle
@@ -32,6 +31,10 @@ import org.apache.spark.sql.types.IntegerType
  * This suite is used to test [[LogicalPlan]]'s `transformUp/transformDown`.
  */
 class LogicalPlanSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   private var invocationCount = 0
   private val function: PartialFunction[LogicalPlan, LogicalPlan] = {
     case p: Project =>

@@ -67,7 +67,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
    * @since 2.1.0
    */
   def mapValues[W](func: MapFunction[V, W], encoder: Encoder[W]): KeyValueGroupedDataset[K, W] = {
-    mapValues(ToScalaUDF(func))(encoder)
+    implicit val wEncoder: Encoder[W] = encoder
+    mapValues(ToScalaUDF(func))
   }
 
   /**
@@ -119,7 +120,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
    * @since 1.6.0
    */
   def flatMapGroups[U](f: FlatMapGroupsFunction[K, V, U], encoder: Encoder[U]): Dataset[U] = {
-    flatMapGroups(ToScalaUDF(f))(encoder)
+    implicit val uEncoder: Encoder[U] = encoder
+    flatMapGroups(ToScalaUDF(f))
   }
 
   /**
@@ -178,7 +180,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       f: FlatMapGroupsFunction[K, V, U],
       encoder: Encoder[U]): Dataset[U] = {
     import org.apache.spark.util.ArrayImplicits._
-    flatMapSortedGroups(SortExprs.toImmutableArraySeq: _*)(ToScalaUDF(f))(encoder)
+    implicit val uEncoder: Encoder[U] = encoder
+    flatMapSortedGroups(SortExprs.toImmutableArraySeq: _*)(ToScalaUDF(f))
   }
 
   /**
@@ -222,7 +225,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
    * @since 1.6.0
    */
   def mapGroups[U](f: MapGroupsFunction[K, V, U], encoder: Encoder[U]): Dataset[U] = {
-    mapGroups(ToScalaUDF(f))(encoder)
+    implicit val uEncoder: Encoder[U] = encoder
+    mapGroups(ToScalaUDF(f))
   }
 
   /**
@@ -329,7 +333,9 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       func: MapGroupsWithStateFunction[K, V, S, U],
       stateEncoder: Encoder[S],
       outputEncoder: Encoder[U]): Dataset[U] = {
-    mapGroupsWithState[S, U](ToScalaUDF(func))(stateEncoder, outputEncoder)
+    implicit val sEncoder: Encoder[S] = stateEncoder
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    mapGroupsWithState[S, U](ToScalaUDF(func))
   }
 
   /**
@@ -362,7 +368,9 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       stateEncoder: Encoder[S],
       outputEncoder: Encoder[U],
       timeoutConf: GroupStateTimeout): Dataset[U] = {
-    mapGroupsWithState[S, U](timeoutConf)(ToScalaUDF(func))(stateEncoder, outputEncoder)
+    implicit val sEncoder: Encoder[S] = stateEncoder
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    mapGroupsWithState[S, U](timeoutConf)(ToScalaUDF(func))
   }
 
   /**
@@ -401,7 +409,9 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       timeoutConf: GroupStateTimeout,
       initialState: KeyValueGroupedDataset[K, S]): Dataset[U] = {
     val f = ToScalaUDF(func)
-    mapGroupsWithState[S, U](timeoutConf, initialState)(f)(stateEncoder, outputEncoder)
+    implicit val sEncoder: Encoder[S] = stateEncoder
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    mapGroupsWithState[S, U](timeoutConf, initialState)(f)
   }
 
   /**
@@ -499,7 +509,9 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       outputEncoder: Encoder[U],
       timeoutConf: GroupStateTimeout): Dataset[U] = {
     val f = ToScalaUDF(func)
-    flatMapGroupsWithState[S, U](outputMode, timeoutConf)(f)(stateEncoder, outputEncoder)
+    implicit val sEncoder: Encoder[S] = stateEncoder
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    flatMapGroupsWithState[S, U](outputMode, timeoutConf)(f)
   }
 
   /**
@@ -542,9 +554,9 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       outputEncoder: Encoder[U],
       timeoutConf: GroupStateTimeout,
       initialState: KeyValueGroupedDataset[K, S]): Dataset[U] = {
-    flatMapGroupsWithState[S, U](outputMode, timeoutConf, initialState)(ToScalaUDF(func))(
-      stateEncoder,
-      outputEncoder)
+    implicit val sEncoder: Encoder[S] = stateEncoder
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    flatMapGroupsWithState[S, U](outputMode, timeoutConf, initialState)(ToScalaUDF(func))
   }
 
   /**
@@ -626,7 +638,7 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       timeMode: TimeMode,
       outputMode: OutputMode,
       outputEncoder: Encoder[U]): Dataset[U] = {
-    transformWithState(statefulProcessor, timeMode, outputMode)(outputEncoder)
+    transformWithStateWith(statefulProcessor, timeMode, outputMode, outputEncoder)
   }
 
   /**
@@ -662,7 +674,7 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       eventTimeColumnName: String,
       outputMode: OutputMode,
       outputEncoder: Encoder[U]): Dataset[U] = {
-    transformWithState(statefulProcessor, eventTimeColumnName, outputMode)(outputEncoder)
+    transformWithStateWith(statefulProcessor, eventTimeColumnName, outputMode, outputEncoder)
   }
 
   /**
@@ -758,7 +770,11 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       initialState: KeyValueGroupedDataset[K, S],
       outputEncoder: Encoder[U],
       initialStateEncoder: Encoder[S]): Dataset[U] = {
-    transformWithState(statefulProcessor, timeMode, outputMode, initialState)(
+    transformWithStateWith(
+      statefulProcessor,
+      timeMode,
+      outputMode,
+      initialState,
       outputEncoder,
       initialStateEncoder)
   }
@@ -800,9 +816,57 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       eventTimeColumnName: String,
       outputEncoder: Encoder[U],
       initialStateEncoder: Encoder[S]): Dataset[U] = {
-    transformWithState(statefulProcessor, eventTimeColumnName, outputMode, initialState)(
+    transformWithStateWith(
+      statefulProcessor,
+      outputMode,
+      initialState,
+      eventTimeColumnName,
       outputEncoder,
       initialStateEncoder)
+  }
+
+  // The Java-specific `transformWithState` overloads above call these, so that the encoders they
+  // take are the only implicit encoders in scope. Their context bounds bring in others.
+  private def transformWithStateWith[U](
+      statefulProcessor: StatefulProcessor[K, V, U],
+      timeMode: TimeMode,
+      outputMode: OutputMode,
+      outputEncoder: Encoder[U]): Dataset[U] = {
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    transformWithState(statefulProcessor, timeMode, outputMode)
+  }
+
+  private def transformWithStateWith[U](
+      statefulProcessor: StatefulProcessor[K, V, U],
+      eventTimeColumnName: String,
+      outputMode: OutputMode,
+      outputEncoder: Encoder[U]): Dataset[U] = {
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    transformWithState(statefulProcessor, eventTimeColumnName, outputMode)
+  }
+
+  private def transformWithStateWith[U, S](
+      statefulProcessor: StatefulProcessorWithInitialState[K, V, U, S],
+      timeMode: TimeMode,
+      outputMode: OutputMode,
+      initialState: KeyValueGroupedDataset[K, S],
+      outputEncoder: Encoder[U],
+      initialStateEncoder: Encoder[S]): Dataset[U] = {
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    implicit val sEncoder: Encoder[S] = initialStateEncoder
+    transformWithState(statefulProcessor, timeMode, outputMode, initialState)
+  }
+
+  private def transformWithStateWith[U, S](
+      statefulProcessor: StatefulProcessorWithInitialState[K, V, U, S],
+      outputMode: OutputMode,
+      initialState: KeyValueGroupedDataset[K, S],
+      eventTimeColumnName: String,
+      outputEncoder: Encoder[U],
+      initialStateEncoder: Encoder[S]): Dataset[U] = {
+    implicit val uEncoder: Encoder[U] = outputEncoder
+    implicit val sEncoder: Encoder[S] = initialStateEncoder
+    transformWithState(statefulProcessor, eventTimeColumnName, outputMode, initialState)
   }
 
   /**
@@ -946,7 +1010,10 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
    *
    * @since 1.6.0
    */
-  def count(): Dataset[(K, Long)] = agg(cnt(lit(1)).as(PrimitiveLongEncoder))
+  def count(): Dataset[(K, Long)] = {
+    implicit val longEncoder: Encoder[Long] = PrimitiveLongEncoder
+    agg(cnt(lit(1)).as[Long])
+  }
 
   /**
    * (Scala-specific) Applies the given function to each cogrouped data. For each unique group,
@@ -973,7 +1040,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       other: KeyValueGroupedDataset[K, U],
       f: CoGroupFunction[K, V, U, R],
       encoder: Encoder[R]): Dataset[R] = {
-    cogroup(other)(ToScalaUDF(f))(encoder)
+    implicit val rEncoder: Encoder[R] = encoder
+    cogroup(other)(ToScalaUDF(f))
   }
 
   /**
@@ -1016,7 +1084,8 @@ abstract class KeyValueGroupedDataset[K, V] extends Serializable {
       f: CoGroupFunction[K, V, U, R],
       encoder: Encoder[R]): Dataset[R] = {
     import org.apache.spark.util.ArrayImplicits._
+    implicit val rEncoder: Encoder[R] = encoder
     cogroupSorted(other)(thisSortExprs.toImmutableArraySeq: _*)(
-      otherSortExprs.toImmutableArraySeq: _*)(ToScalaUDF(f))(encoder)
+      otherSortExprs.toImmutableArraySeq: _*)(ToScalaUDF(f))
   }
 }

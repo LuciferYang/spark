@@ -229,7 +229,15 @@ class BasicInMemoryTableCatalog extends TableCatalog {
       numRowsPerSplit, id, schemaAlignmentConfig)
   }
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
+  override def alterTable(ident: Identifier, changes: TableChange*): Table =
+    applyTableChanges(ident, changes)
+
+  /**
+   * Implements `alterTable`. Subclasses override this rather than `alterTable`: Scala 3 reports
+   * a missing `override` modifier on an override of `alterTable` in a subclass of this class,
+   * because the method it overrides implements a Java varargs method.
+   */
+  protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
     val table = loadTable(ident).asInstanceOf[InMemoryBaseTable]
     val properties = CatalogV2Util.applyPropertiesChanges(table.properties, changes)
     val schema = CatalogV2Util.applySchemaChanges(

@@ -17,11 +17,11 @@
 
 package org.apache.spark.sql.catalyst.plans
 
-import org.scalactic.source
-import org.scalatest.Suite
-import org.scalatest.Tag
+import scala.collection.mutable
 
-import org.apache.spark.SparkFunSuite
+import org.scalatest.{Outcome, Suite, Tag}
+
+import org.apache.spark.{SparkFunSuite, TestVariant}
 import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.CodegenObjectFactoryMode
@@ -36,24 +36,34 @@ trait PlanTest extends SparkFunSuite with PlanTestBase
 
 trait CodegenInterpretedPlanTest extends PlanTest {
 
-  override protected def test(
-      testName: String,
-      testTags: Tag*)(testFun: => Any)(implicit pos: source.Position): Unit = {
-    val codegenMode = CodegenObjectFactoryMode.CODEGEN_ONLY.toString
-    val interpretedMode = CodegenObjectFactoryMode.NO_CODEGEN.toString
+  // The tests that `testFallback` registers, which run once, in the codegen fallback mode.
+  private val fallbackTests = mutable.Set.empty[String]
 
-    super.test(testName + " (codegen path)", testTags: _*)(
-      withSQLConf(SQLConf.CODEGEN_FACTORY_MODE.key -> codegenMode) { testFun })(pos)
-    super.test(testName + " (interpreted path)", testTags: _*)(
-      withSQLConf(SQLConf.CODEGEN_FACTORY_MODE.key -> interpretedMode) { testFun })(pos)
+  // Runs each test in the codegen and the interpreted mode.
+  override protected def testVariants(testName: String): Seq[TestVariant] = {
+    if (fallbackTests.contains(testName)) {
+      Seq(withCodegenMode(testName, CodegenObjectFactoryMode.FALLBACK))
+    } else {
+      Seq(
+        withCodegenMode(testName + " (codegen path)", CodegenObjectFactoryMode.CODEGEN_ONLY),
+        withCodegenMode(testName + " (interpreted path)", CodegenObjectFactoryMode.NO_CODEGEN))
+    }
   }
 
-  protected def testFallback(
-      testName: String,
-      testTags: Tag*)(testFun: => Any)(implicit pos: source.Position): Unit = {
-    val codegenMode = CodegenObjectFactoryMode.FALLBACK.toString
-    super.test(testName + " (codegen fallback mode)", testTags: _*)(
-      withSQLConf(SQLConf.CODEGEN_FACTORY_MODE.key -> codegenMode) { testFun })(pos)
+  private def withCodegenMode(
+      name: String,
+      mode: CodegenObjectFactoryMode.Value): TestVariant = {
+    TestVariant(name, body => {
+      var outcome: Outcome = null
+      withSQLConf(SQLConf.CODEGEN_FACTORY_MODE.key -> mode.toString) { outcome = body }
+      outcome
+    })
+  }
+
+  protected def testFallback(testName: String, testTags: Tag*)(testFun: => Any): Unit = {
+    val name = testName + " (codegen fallback mode)"
+    fallbackTests += name
+    test(name, testTags: _*)(testFun)
   }
 }
 

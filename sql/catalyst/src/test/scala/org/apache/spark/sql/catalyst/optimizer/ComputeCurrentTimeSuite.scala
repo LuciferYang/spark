@@ -332,10 +332,10 @@ class ComputeCurrentTimeSuite extends PlanTest {
     val numUniqueZoneIds = ZoneId.SHORT_IDS.asScala.map { case (zoneId, _) =>
       ZoneId.of(zoneId, ZoneId.SHORT_IDS)
     }.toSet.size
-    checkLiterals({ _: String => CurrentTimestamp() }, 1)
-    checkLiterals({ zoneId: String => LocalTimestamp(Some(zoneId)) }, numUniqueZoneIds)
-    checkLiterals({ _: String => Now() }, 1)
-    checkLiterals({ zoneId: String => CurrentDate(Some(zoneId)) }, numUniqueZoneIds)
+    checkLiterals({ (_: String) => CurrentTimestamp() }, 1)
+    checkLiterals({ (zoneId: String) => LocalTimestamp(Some(zoneId)) }, numUniqueZoneIds)
+    checkLiterals({ (_: String) => Now() }, 1)
+    checkLiterals({ (zoneId: String) => CurrentDate(Some(zoneId)) }, numUniqueZoneIds)
   }
 
   test("applyForExpression rewrites current date/time leaves to literals") {

@@ -18,10 +18,12 @@
 package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.types.IntegerType
 
 class ExpressionSetSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   val aUpper = AttributeReference("A", IntegerType)(exprId = ExprId(1))
   val aLower = AttributeReference("a", IntegerType)(exprId = ExprId(1))

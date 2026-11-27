@@ -18,11 +18,11 @@
 package org.apache.spark.sql.catalyst.encoders
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.SparkRuntimeException
 import org.apache.spark.sql.{Encoder, Row}
 import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, InternalRow, JavaTypeInference, ScalaReflection, SerializerBuildHelper}
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, GetColumnByOrdinal, SimpleAnalyzer, UnresolvedAttribute, UnresolvedExtractValue}
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{OptionEncoder, TransformingEncoder}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder.{Deserializer, Serializer}
@@ -274,7 +274,8 @@ case class ExpressionEncoder[T](
   def resolveAndBind(
       attrs: Seq[Attribute] = DataTypeUtils.toAttributes(schema),
       analyzer: Analyzer = SimpleAnalyzer): ExpressionEncoder[T] = {
-    val dummyPlan = CatalystSerde.deserialize(LocalRelation(attrs))(this)
+    implicit val encoder: Encoder[T] = this
+    val dummyPlan = CatalystSerde.deserialize[T](LocalRelation(attrs))
     val analyzedPlan = analyzer.execute(dummyPlan)
     analyzer.checkAnalysis(analyzedPlan)
     val resolved = SimplifyCasts(analyzedPlan).asInstanceOf[DeserializeToObject].deserializer

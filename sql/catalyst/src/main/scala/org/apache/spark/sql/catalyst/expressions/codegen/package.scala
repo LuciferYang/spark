@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
-import scala.reflect.internal.util.AbstractFileClassLoader
-
 import org.apache.spark.sql.catalyst.rules
 import org.apache.spark.util.Utils
 
@@ -50,11 +48,13 @@ package object codegen {
 
     def apply(obj: Any): Unit = {
       val generatedClass = obj.getClass
-      val classLoader =
-        generatedClass
-          .getClassLoader
-          .asInstanceOf[AbstractFileClassLoader]
-      val generatedBytes = classLoader.classBytes(generatedClass.getName)
+      // The class loader is a `scala.reflect.internal.util.AbstractFileClassLoader`. It is called
+      // reflectively because scala-reflect is not a dependency of the Scala 3 build.
+      val classLoader = generatedClass.getClassLoader
+      val generatedBytes = classLoader.getClass
+        .getMethod("classBytes", classOf[String])
+        .invoke(classLoader, generatedClass.getName)
+        .asInstanceOf[Array[Byte]]
 
       val packageDir = new java.io.File(dumpDirectory, generatedClass.getPackage.getName)
       if (!packageDir.exists()) { packageDir.mkdir() }

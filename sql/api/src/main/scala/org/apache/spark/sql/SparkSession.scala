@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.concurrent.duration.NANOSECONDS
 import scala.jdk.CollectionConverters._
-import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 import org.apache.spark.{SparkConf, SparkContext, SparkException}
@@ -33,6 +32,7 @@ import org.apache.spark.annotation.{ClassicOnly, DeveloperApi, Experimental, Sta
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalog.Catalog
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.internal.{SessionState, SharedState}
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.streaming.{DataStreamReader, StreamingQueryManager}
@@ -217,7 +217,10 @@ abstract class SparkSession extends Serializable with Closeable {
    *
    * @since 4.2.0
    */
-  def emptyDataFrame(schema: StructType): DataFrame = emptyDataset(Encoders.row(schema))
+  def emptyDataFrame(schema: StructType): DataFrame = {
+    implicit val encoder: Encoder[Row] = Encoders.row(schema)
+    emptyDataset[Row]
+  }
 
   /**
    * Creates a `DataFrame` from a local Seq of Product.

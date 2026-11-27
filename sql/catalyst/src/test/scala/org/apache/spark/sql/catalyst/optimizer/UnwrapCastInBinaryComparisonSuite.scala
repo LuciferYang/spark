@@ -21,7 +21,6 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, ZoneId}
 
 import scala.collection.immutable.HashSet
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans.DslLogicalPlan
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.IntegralLiteralTestUtils._
@@ -35,6 +34,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
 class UnwrapCastInBinaryComparisonSuite extends PlanTest with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches: List[Batch] =

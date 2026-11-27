@@ -688,7 +688,8 @@ trait JoinSelectionHelper extends Logging {
    * use the size of bytes here as estimation.
    */
   private def muchSmaller(a: LogicalPlan, b: LogicalPlan, conf: SQLConf): Boolean = {
-    a.stats.sizeInBytes * conf.getConf(SQLConf.SHUFFLE_HASH_JOIN_FACTOR) <= b.stats.sizeInBytes
+    val factor = BigInt(conf.getConf(SQLConf.SHUFFLE_HASH_JOIN_FACTOR))
+    a.stats.sizeInBytes * factor <= b.stats.sizeInBytes
   }
 
   /**

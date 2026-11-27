@@ -17,9 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import scala.reflect.runtime.universe.TypeTag
-
 import org.apache.spark.api.java.function.FilterFunction
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder

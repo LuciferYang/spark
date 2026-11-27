@@ -246,7 +246,7 @@ case class With(child: Expression, defs: Seq[CommonExpressionDef])
   private lazy val canonicalizationIdMap: Map[Long, Long] = {
     // Start numbering after taking into account all nested With expression id maps.
     var currentId = child.map {
-      case w: With => w.canonicalizationIdMap.size
+      case w: With => w.canonicalizationIdMap.size.toLong
       case _ => 0L
     }.sum
     defs.map { d =>

@@ -19,7 +19,6 @@ package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.api.python.PythonEvalType
 import org.apache.spark.sql.catalyst.analysis.FormExternalLookupJoin
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Add, Cast, EvalMode, Expression,
   ExternalUserDefinedFunction, If, Literal, NumericEvalContext, PythonUDF, RaiseError, Rand,
@@ -36,6 +35,10 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.udf.worker.UDFWorkerSpecification
 
 class PushPredicateThroughExternalLookupJoinSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   private object Optimize extends RuleExecutor[LogicalPlan] {
     val batches = Batch("Push down predicates", FixedPoint(10), PushDownPredicates) :: Nil
   }

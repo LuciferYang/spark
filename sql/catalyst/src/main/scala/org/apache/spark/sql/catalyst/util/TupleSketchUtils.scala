@@ -105,7 +105,7 @@ trait SketchSize extends Expression {
   def lgNomEntries: Expression
 
   /** Returns the pretty name of the aggregation function for error messages. */
-  protected def prettyName: String
+  def prettyName: String
 
   /**
    * Validates that lgNomEntries parameter is a constant and within valid range (4-26).
@@ -158,7 +158,7 @@ trait SummaryAggregateMode extends Expression {
   def mode: Expression
 
   /** Returns the pretty name of the aggregation function for error messages. */
-  protected def prettyName: String
+  def prettyName: String
 
   /**
    * Validates and parses the mode parameter into a TupleSummaryMode. This lazy val ensures

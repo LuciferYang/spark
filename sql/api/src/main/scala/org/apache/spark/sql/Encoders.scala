@@ -20,9 +20,9 @@ package org.apache.spark.sql
 import java.lang.reflect.Modifier
 
 import scala.reflect.{classTag, ClassTag}
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.sql.catalyst.{JavaTypeInference, ScalaReflection}
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.encoders.{Codec, JavaSerializationCodec, KryoSerializationCodec, RowEncoder => SchemaInference}
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders._
 import org.apache.spark.sql.errors.ExecutionErrors
@@ -235,7 +235,10 @@ object Encoders {
    *
    * @since 1.6.0
    */
-  def kryo[T](clazz: Class[T]): Encoder[T] = kryo(ClassTag[T](clazz))
+  def kryo[T](clazz: Class[T]): Encoder[T] = {
+    implicit val tag: ClassTag[T] = ClassTag[T](clazz)
+    kryo[T]
+  }
 
   /**
    * (Scala-specific) Creates an encoder that serializes objects of type T using generic Java
@@ -261,8 +264,10 @@ object Encoders {
    *
    * @since 1.6.0
    */
-  def javaSerialization[T](clazz: Class[T]): Encoder[T] =
-    javaSerialization(ClassTag[T](clazz))
+  def javaSerialization[T](clazz: Class[T]): Encoder[T] = {
+    implicit val tag: ClassTag[T] = ClassTag[T](clazz)
+    javaSerialization[T]
+  }
 
   /** Throws an exception if T is not a public class. */
   private def validatePublicClass[T: ClassTag](): Unit = {
@@ -284,7 +289,11 @@ object Encoders {
   }
 
   private[sql] def tupleEncoder[T](encoders: Encoder[_]*): Encoder[T] = {
-    ProductEncoder.tuple(encoders.map(agnosticEncoderFor(_))).asInstanceOf[Encoder[T]]
+    val agnosticEncoders = encoders.map { e =>
+      implicit val encoder: Encoder[Any] = e.asInstanceOf[Encoder[Any]]
+      agnosticEncoderFor[Any]
+    }
+    ProductEncoder.tuple(agnosticEncoders).asInstanceOf[Encoder[T]]
   }
 
   /**

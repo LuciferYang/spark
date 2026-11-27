@@ -149,7 +149,7 @@ object EstimationUtils {
             attrStats(attr).avgLen.get
         }
       } else {
-        attr.dataType.defaultSize
+        attr.dataType.defaultSize.toLong
       }
     }.sum
   }

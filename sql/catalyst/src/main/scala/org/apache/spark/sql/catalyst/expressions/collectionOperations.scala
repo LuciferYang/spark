@@ -3702,9 +3702,10 @@ case class Sequence(
     case iType: IntegralType =>
       val physicalDataType = PhysicalDataType(iType)
       type T = physicalDataType.InternalType
-      val integral = PhysicalIntegralType.integral(iType)
-      val ct = physicalDataType.tag
-      new IntegralSequenceImpl[T](iType)(ct, integral.asInstanceOf[Integral[T]])
+      implicit val ct: ClassTag[T] = physicalDataType.tag
+      implicit val integral: Integral[T] =
+        PhysicalIntegralType.integral(iType).asInstanceOf[Integral[T]]
+      new IntegralSequenceImpl[T](iType)
 
     case TimestampType | TimestampNTZType |
         _: TimestampLTZNanosType | _: TimestampNTZNanosType =>
@@ -4652,13 +4653,15 @@ trait ArraySetLike {
 
   @transient protected lazy val (hsPostFix, hsTypeName) = {
     val ptName = CodeGenerator.primitiveTypeName(et)
-    et match {
+    val (postFix, typeName) = et match {
       // we cast byte/short to int when writing to the hash set.
       case ByteType | ShortType | IntegerType => ("$mcI$sp", "Int")
       case LongType => ("$mcJ$sp", ptName)
       case FloatType => ("$mcF$sp", ptName)
       case DoubleType => ("$mcD$sp", ptName)
     }
+    // Without the specialized variants, generated code uses the generic class and methods.
+    (if (SQLOpenHashSet.isSpecialized) postFix else "", typeName)
   }
 
   // we cast byte/short to int when writing to the hash set.

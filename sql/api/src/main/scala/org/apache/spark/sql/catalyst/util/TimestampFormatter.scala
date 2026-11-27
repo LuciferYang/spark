@@ -631,12 +631,12 @@ class FractionTimestampFormatter(zoneId: ZoneId)
       val buf = new Array[Char](totalLen)
       formatted.getChars(0, formatted.length, buf, 0)
       buf(formatted.length) = '.'
-      var i = totalLen
-      do {
-        i -= 1
+      var i = totalLen - 1
+      while (i >= fracOffset) {
         buf(i) = ('0' + (nanos % 10)).toChar
         nanos /= 10
-      } while (i > fracOffset)
+        i -= 1
+      }
       new String(buf)
     }
   }

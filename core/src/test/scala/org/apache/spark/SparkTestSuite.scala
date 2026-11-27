@@ -172,19 +172,21 @@ trait SparkTestSuite
    * {{org.scalatest.BeforeAndAfter}} trait instead.
    */
   final protected override def withFixture(test: NoArgTest): Outcome = {
-    val testName = test.text
+    val variant = test.configMap.get(TestVariant.ConfigKey).collect { case v: TestVariant => v }
+    val testName = variant.map(_.name).getOrElse(test.text)
     val suiteName = this.getClass.getName
     val shortSuiteName = suiteName.replaceAll("org.apache.spark", "o.a.s")
+    def runBody(): Outcome = variant.map(_.around(test())).getOrElse(test())
     try {
       logInfo(s"\n\n===== TEST OUTPUT FOR $shortSuiteName: '$testName' =====\n")
       val outcome = testTimeLimit match {
         case Some(limit) =>
           try {
-            failAfter(limit)(test())
+            failAfter(limit)(runBody())
           } catch {
             case e: TestFailedDueToTimeoutException => Failed(e)
           }
-        case None => test()
+        case None => runBody()
       }
       outcome match {
         case _: Failed =>

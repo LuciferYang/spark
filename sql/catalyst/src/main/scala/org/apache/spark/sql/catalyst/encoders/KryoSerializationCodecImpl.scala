@@ -29,5 +29,5 @@ class KryoSerializationCodecImpl extends Codec[Any, Array[Byte]] {
     serializer.serialize(in).array()
 
   override def decode(out: Array[Byte]): Any =
-    serializer.deserialize(ByteBuffer.wrap(out))
+    serializer.deserialize[Any](ByteBuffer.wrap(out))
 }

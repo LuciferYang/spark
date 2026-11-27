@@ -64,8 +64,8 @@ object RebaseDateTime {
    *   The rebased days.
    */
   private def rebaseDays(switches: Array[Int], diffs: Array[Int], days: Int): Int = {
-    var i = switches.length
-    do { i -= 1 } while (i > 0 && days < switches(i))
+    var i = switches.length - 1
+    while (i > 0 && days < switches(i)) i -= 1
     days + diffs(i)
   }
 
@@ -273,8 +273,8 @@ object RebaseDateTime {
    */
   private def rebaseMicros(rebaseInfo: RebaseInfo, micros: Long): Long = {
     val switches = rebaseInfo.switches
-    var i = switches.length
-    do { i -= 1 } while (i > 0 && micros < switches(i))
+    var i = switches.length - 1
+    while (i > 0 && micros < switches(i)) i -= 1
     micros + rebaseInfo.diffs(i)
   }
 

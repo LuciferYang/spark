@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.analysis
 import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, SessionCatalog}
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.Literal.{FalseLiteral, TrueLiteral}
 import org.apache.spark.sql.catalyst.expressions.aggregate._
@@ -30,6 +29,10 @@ import org.apache.spark.sql.types._
 
 
 class DecimalPrecisionSuite extends AnalysisTest with BeforeAndAfter {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   private val catalog = new SessionCatalog(new InMemoryCatalog, EmptyFunctionRegistry)
   private val analyzer = new Analyzer(catalog)
 

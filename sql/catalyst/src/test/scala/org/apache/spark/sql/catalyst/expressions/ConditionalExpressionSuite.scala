@@ -19,12 +19,14 @@ package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult.DataTypeMismatch
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.Literal.{FalseLiteral, TrueLiteral}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.types._
 
 class ConditionalExpressionSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("if") {
     val testcases = Seq[(java.lang.Boolean, Integer, Integer, Integer)](
@@ -67,7 +69,7 @@ class ConditionalExpressionSuite extends SparkFunSuite with ExpressionEvalHelper
     testIf(_.toString, StringType)
 
     DataTypeTestUtils.propertyCheckSupported.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(If, BooleanType, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(If.apply _, BooleanType, dt, dt)
     }
   }
 

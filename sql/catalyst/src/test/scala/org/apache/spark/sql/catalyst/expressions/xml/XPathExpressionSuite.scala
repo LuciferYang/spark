@@ -27,7 +27,6 @@ import org.apache.spark.sql.types.StringType
  * Test suite for various xpath functions.
  */
 class XPathExpressionSuite extends SparkFunSuite with ExpressionEvalHelper {
-
   /** A helper function that tests null and error behaviors for xpath expressions. */
   private def testNullAndErrorBehavior[T <: AnyRef](testExpr: (String, String, T) => Unit): Unit = {
     // null input should lead to null output
@@ -228,7 +227,8 @@ class XPathExpressionSuite extends SparkFunSuite with ExpressionEvalHelper {
       e.asInstanceOf[XPathExtract].replacement.asInstanceOf[Invoke]
         .targetObject.asInstanceOf[Literal].value.asInstanceOf[AnyRef]
 
-    Seq(XPathBoolean, XPathShort, XPathInt, XPathLong, XPathFloat, XPathDouble, XPathString)
+    Seq[(Expression, Expression) => Expression](
+      XPathBoolean, XPathShort, XPathInt, XPathLong, XPathFloat, XPathDouble, XPathString)
       .foreach { ctor =>
         val expr = ctor(Literal("<a><b>1</b></a>"), Literal("a/b"))
         assert(expr.stateful, s"${expr.prettyName}.stateful should be true")

@@ -2239,7 +2239,7 @@ object SchemaOfVariant {
   private class UuidType extends DataType {
     override def defaultSize: Int = 16
     override def typeName: String = "uuid"
-    private[spark] override def asNullable: UuidType = this
+    private[spark] override def asNullable: DataType = this
   }
   private case object UuidType extends UuidType
 

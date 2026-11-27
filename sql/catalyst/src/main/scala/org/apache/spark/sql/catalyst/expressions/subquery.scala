@@ -78,7 +78,8 @@ abstract class SubqueryExpression(
     outerAttrs: Seq[Expression],
     exprId: ExprId,
     joinCond: Seq[Expression],
-    hint: Option[HintInfo]) extends PlanExpression[LogicalPlan] {
+    // Not named `hint`: Scala 3 rejects a constructor parameter named like the abstract `hint`.
+    hintInfo: Option[HintInfo]) extends PlanExpression[LogicalPlan] {
 
   override lazy val resolved: Boolean = childrenResolved && plan.resolved
 

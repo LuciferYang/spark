@@ -32,9 +32,9 @@ import org.apache.spark.sql.internal.connector.ColumnImpl
  */
 class TypeChangeResetsColIdTableCatalog extends InMemoryTableCatalog {
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
+  override protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
     val oldColumns = loadTable(ident).columns()
-    val alteredTable = super.alterTable(ident, changes: _*).asInstanceOf[InMemoryTable]
+    val alteredTable = super.applyTableChanges(ident, changes).asInstanceOf[InMemoryTable]
 
     // The parent alterTable preserves column IDs across type changes.
     // Assign fresh IDs for columns whose type changed, so the column ID

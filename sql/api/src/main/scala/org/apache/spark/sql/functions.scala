@@ -20,12 +20,12 @@ package org.apache.spark.sql
 import java.util.Collections
 
 import scala.jdk.CollectionConverters._
-import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 import org.apache.spark.annotation.Stable
 import org.apache.spark.sql.api.java._
 import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.PrimitiveLongEncoder
 import org.apache.spark.sql.errors.CompilationErrors
 import org.apache.spark.sql.expressions.{Aggregator, SparkUserDefinedFunction, UserDefinedAggregator, UserDefinedFunction}
@@ -582,8 +582,10 @@ object functions {
    * @return
    *   Returns a column that evaluates to a long.
    */
-  def count(columnName: String): TypedColumn[Any, Long] =
-    count(Column(columnName)).as(PrimitiveLongEncoder)
+  def count(columnName: String): TypedColumn[Any, Long] = {
+    implicit val encoder: Encoder[Long] = PrimitiveLongEncoder
+    count(Column(columnName)).as[Long]
+  }
 
   /**
    * Aggregate function: returns the number of distinct items in a group.

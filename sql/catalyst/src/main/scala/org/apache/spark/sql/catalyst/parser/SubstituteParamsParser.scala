@@ -18,6 +18,7 @@ package org.apache.spark.sql.catalyst.parser
 
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, ParserRuleContext}
 
+import org.apache.spark.QueryContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.expressions.Literal
@@ -207,7 +208,7 @@ class SubstituteParamsParser extends Logging {
           throw new AnalysisException(
             errorClass = "UNBOUND_SQL_PARAMETER",
             messageParameters = Map("name" -> name),
-            context = Array(queryContext),
+            context = Array[QueryContext](queryContext),
             cause = None)
       }
     }
@@ -228,7 +229,7 @@ class SubstituteParamsParser extends Logging {
       throw new AnalysisException(
         errorClass = "UNBOUND_SQL_PARAMETER",
         messageParameters = Map("name" -> s"_${unboundLocation.start}"),
-        context = Array(queryContext),
+        context = Array[QueryContext](queryContext),
         cause = None)
     }
 

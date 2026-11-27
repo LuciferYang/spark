@@ -54,7 +54,7 @@ abstract class Collect[T <: Growable[Any] with Iterable[Any]] extends TypedImper
   // Subclasses can override bufferContainsNull to indicate if the result array contains nulls
   override def dataType: DataType = ArrayType(child.dataType, bufferContainsNull)
 
-  override def defaultResult: Option[Literal] = Option(Literal.create(Array(), dataType))
+  override def defaultResult: Option[Literal] = Option(Literal.create(Array.empty[Any], dataType))
 
   protected def convertToBufferElement(value: Any): Any
 
@@ -77,7 +77,7 @@ abstract class Collect[T <: Growable[Any] with Iterable[Any]] extends TypedImper
     buffer ++= other
   }
 
-  protected val bufferElementType: DataType
+  protected def bufferElementType: DataType
 
   protected lazy val projection = UnsafeProjection.create(
     Array[DataType](ArrayType(elementType = bufferElementType, containsNull = bufferContainsNull)))

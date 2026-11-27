@@ -21,7 +21,6 @@ import java.util.Locale
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.AnalysisException
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, MonotonicallyIncreasingID, NamedExpression}
@@ -37,6 +36,9 @@ import org.apache.spark.sql.types.{IntegerType, LongType, MetadataBuilder, Struc
 case class DummyCommand() extends LeafCommand
 
 class UnsupportedOperationsSuite extends SparkFunSuite with SQLHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   val attribute = AttributeReference("a", IntegerType, nullable = true)()
   val watermarkMetadata = new MetadataBuilder()
@@ -790,7 +792,7 @@ class UnsupportedOperationsSuite extends SparkFunSuite with SQLHelper {
     def func(k: Int, left: Iterator[Int], right: Iterator[Int]): Iterator[Int] = {
       Iterator.empty
     }
-    implicit val intEncoder = ExpressionEncoder[Int]()
+    implicit val intEncoder: ExpressionEncoder[Int] = ExpressionEncoder[Int]()
 
     left.cogroup[Int, Int, Int, Int](
       right,

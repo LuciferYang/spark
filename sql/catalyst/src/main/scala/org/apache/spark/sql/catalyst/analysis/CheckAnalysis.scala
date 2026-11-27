@@ -1337,7 +1337,7 @@ trait CheckAnalysis extends LookupCatalog with QueryErrorsBase with PlanToString
     if (!conf.getConf(SQLConf.USE_CURRENT_SQL_CONFIGS_FOR_CHECK_CONSTRAINT) &&
         !StoredExpressionText.readsAsInSession(catalogManager.v1SessionCatalog.parser, condition,
           StoredExpressionText.fixedConf(conf))) {
-      node.failAnalysis(
+      AnalysisErrorAt(node).failAnalysis(
         errorClass = "SESSION_DEPENDENT_CHECK_CONSTRAINT",
         messageParameters = Map("checkCondition" -> condition))
     }

@@ -47,7 +47,7 @@ private[sql] object DataTypeErrors extends DataTypeErrorsBase {
     new SparkArithmeticException(
       errorClass = "DECIMAL_PRECISION_EXCEEDS_MAX_PRECISION",
       messageParameters = Map("precision" -> precision, "maxPrecision" -> maxPrecision.toString),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -59,7 +59,7 @@ private[sql] object DataTypeErrors extends DataTypeErrorsBase {
     new SparkArithmeticException(
       errorClass = "NUMERIC_OUT_OF_SUPPORTED_RANGE",
       messageParameters = Map("value" -> str.toString),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -261,7 +261,7 @@ private[sql] object DataTypeErrors extends DataTypeErrorsBase {
         "sourceType" -> toSQLType(from),
         "targetType" -> toSQLType(to),
         "ansiConfig" -> toSQLConf("spark.sql.ansi.enabled")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 

@@ -35,10 +35,12 @@
     </properties>
 
     <dependencies>
+        <!-- #if scala-2.13 -->
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-reflect</artifactId>
         </dependency>
+        <!-- #endif scala-2.13 -->
         <dependency>
             <groupId>org.scala-lang.modules</groupId>
             <artifactId>scala-parser-combinators_${scala.binary.version}</artifactId>
@@ -104,6 +106,24 @@
                     <sourceDirectory>../api/src/main/antlr4</sourceDirectory>
                     <treatWarningsAsErrors>true</treatWarningsAsErrors>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-scala-version-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/scala-${scala.binary.version}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -254,7 +254,8 @@ private class InMemoryChangelogScanBuilder(
   override def build(): Scan = {
     val ordinals = projectedSchema.fields.map(field => schema.fieldIndex(field.name))
     def project(input: Seq[InternalRow]): Seq[InternalRow] = input.map { row =>
-      new GenericInternalRow(ordinals.map(ordinal => row.get(ordinal, schema(ordinal).dataType)))
+      new GenericInternalRow(
+        ordinals.map[Any](ordinal => row.get(ordinal, schema(ordinal).dataType)))
     }
     // Batch reads retain their captured snapshot. Streaming reads see appended rows, with
     // the same projection applied when planning every micro-batch, including after a restart.

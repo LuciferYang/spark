@@ -883,7 +883,7 @@ class CatalystTypeConvertersSuite extends SparkFunSuite with SQLHelper {
     val result = CatalystTypeConverters.convertToCatalyst(Map("key" -> geom))
     assert(result.isInstanceOf[ArrayBasedMapData])
     val mapData = result.asInstanceOf[ArrayBasedMapData]
-    val value = mapData.valueArray.get(0, GeometryType("ANY"))
+    val value = mapData.valueArray().get(0, GeometryType("ANY"))
     assert(value.isInstanceOf[BinaryView])
     assert(java.util.Arrays.equals(
       STUtils.stGeomAsBinary(value.asInstanceOf[BinaryView], NDR), pointWkb))
@@ -928,7 +928,7 @@ class CatalystTypeConvertersSuite extends SparkFunSuite with SQLHelper {
     val result = CatalystTypeConverters.convertToCatalyst(Map("key" -> geog))
     assert(result.isInstanceOf[ArrayBasedMapData])
     val mapData = result.asInstanceOf[ArrayBasedMapData]
-    val value = mapData.valueArray.get(0, GeographyType("ANY"))
+    val value = mapData.valueArray().get(0, GeographyType("ANY"))
     assert(value.isInstanceOf[BinaryView])
     assert(java.util.Arrays.equals(
       STUtils.stGeogAsBinary(value.asInstanceOf[BinaryView], NDR), pointWkb))

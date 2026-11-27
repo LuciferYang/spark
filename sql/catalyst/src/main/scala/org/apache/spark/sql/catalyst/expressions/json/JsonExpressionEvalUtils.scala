@@ -453,10 +453,10 @@ case class JsonTupleEvaluator(foldableFieldNames: Array[Option[String]]) {
 
             // SPARK-21804: json_tuple returns null values within repeated columns
             // except the first one; so that we need to check the remaining fields.
-            do {
+            while (idx >= 0) {
               row(idx) = jsonValue
               idx = fieldNames.indexOf(jsonField, idx + 1)
-            } while (idx >= 0)
+            }
           }
         }
       }

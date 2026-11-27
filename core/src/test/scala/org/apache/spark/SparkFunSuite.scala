@@ -22,7 +22,8 @@ import java.util.concurrent.TimeUnit
 
 import scala.annotation.tailrec
 
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, Tag}
+import org.scalatest.{Args, BeforeAndAfter, BeforeAndAfterEach, CompositeStatus, Filter, Status}
+import org.scalatest.Tag
 import org.scalatest.funsuite.AnyFunSuite // scalastyle:ignore funsuite
 import org.scalatest.time._ // scalastyle:ignore
 
@@ -46,6 +47,35 @@ abstract class SparkFunSuite
     testNames.filter(shouldIgnoreTest).foldLeft(super.tags) { (tags, testName) =>
       tags.updated(testName, tags.getOrElse(testName, Set.empty) + SparkFunSuite.IgnoreTagName)
     }
+  }
+
+  /**
+   * The runs of the test registered as `testName`: by default one run, under that name. Suites
+   * that run each test in several settings override this rather than `test`, which ScalaTest
+   * for Scala 3 makes final.
+   */
+  protected def testVariants(testName: String): Seq[TestVariant] = Seq(TestVariant(testName))
+
+  override protected def runTest(testName: String, args: Args): Status = {
+    val statuses = testVariants(testName).map { variant =>
+      val reporter = if (variant.name == testName) {
+        args.reporter
+      } else {
+        new TestRenamingReporter(args.reporter, testName, variant.name)
+      }
+      super.runTest(testName, args.copy(
+        reporter = reporter,
+        configMap = args.configMap + (TestVariant.ConfigKey -> variant)))
+    }
+    if (statuses.size == 1) statuses.head else new CompositeStatus(statuses.toSet)
+  }
+
+  override def expectedTestCount(filter: Filter): Int = {
+    val testCount = testNames.toSeq.map { testName =>
+      val (filtered, ignored) = filter(testName, tags, suiteId)
+      if (filtered || ignored) 0 else testVariants(testName).size
+    }.sum
+    testCount + nestedSuites.map(_.expectedTestCount(filter)).sum
   }
 
   override protected def testTimeLimit: Option[Span] =

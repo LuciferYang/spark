@@ -19,7 +19,6 @@ package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.api.python.PythonEvalType
 import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Alias, Collate, CreateArray, Expression, GetArrayItem, Literal, PythonUDF, Rand, ResolvedCollation, Substring, UpdateFields}
 import org.apache.spark.sql.catalyst.plans.PlanTest
@@ -29,6 +28,10 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, IntegerType, MetadataBuilder}
 
 class CollapseProjectSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches =
       Batch("Subqueries", FixedPoint(10), EliminateSubqueryAliases) ::

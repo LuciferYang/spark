@@ -18,7 +18,6 @@
 package org.apache.spark.sql.catalyst.analysis.resolver
 
 import scala.collection.immutable
-import scala.reflect.runtime.universe.typeOf
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.SQLConfHelper
@@ -51,10 +50,11 @@ class ResolutionValidatorSuite extends SparkFunSuite with SQLConfHelper {
   private val colTimestamp = AttributeReference(name = "colTimestamp", dataType = TimestampType)()
 
   test("All resolve* methods must have validate* counterparts") {
-    val actualMethodNames = typeOf[ResolutionValidator].decls
-      .collect {
-        case decl if decl.isMethod => decl.name.toString
-      }
+    // Java reflection rather than Scala reflection, which the Scala 3 build does not have. A
+    // name with `$` is a compiler-generated method, such as the body of a lambda.
+    val actualMethodNames = classOf[ResolutionValidator].getDeclaredMethods.toSeq
+      .map(_.getName)
+      .filterNot(_.contains("$"))
       .filter(name => {
         name.startsWith("validate")
       })
@@ -62,10 +62,9 @@ class ResolutionValidatorSuite extends SparkFunSuite with SQLConfHelper {
 
     val resolveMethodNamesToIgnoreSet = immutable.HashSet(resolveMethodNamesToIgnore: _*)
 
-    typeOf[Resolver].decls
-      .collect {
-        case decl if decl.isMethod => decl.name.toString
-      }
+    classOf[Resolver].getDeclaredMethods.toSeq
+      .map(_.getName)
+      .filterNot(_.contains("$"))
       .filter(name => {
         name.startsWith("resolve") && !resolveMethodNamesToIgnoreSet.contains(name)
       })

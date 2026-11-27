@@ -20,7 +20,6 @@ package org.apache.spark.sql
 import java.util.{List => JList, Map => JMap, Properties}
 
 import scala.collection.immutable
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.{DeveloperApi, Experimental, Stable, Unstable}
@@ -28,6 +27,7 @@ import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalog.Table
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.functions.{array_size, coalesce, col, lit, when}
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.streaming.{DataStreamReader, StreamingQueryManager}
@@ -659,10 +659,11 @@ abstract class SQLContext private[sql] (val sparkSession: SparkSession)
    * @since 1.3.0
    */
   def tableNames(databaseName: String): Array[String] = {
+    implicit val encoder: Encoder[String] = Encoders.STRING
     sparkSession.catalog
       .listTables(databaseName)
       .select(col("name"))
-      .as(Encoders.STRING)
+      .as[String]
       .collect()
   }
 

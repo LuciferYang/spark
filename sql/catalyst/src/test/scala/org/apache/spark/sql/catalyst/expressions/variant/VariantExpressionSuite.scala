@@ -20,11 +20,11 @@ package org.apache.spark.sql.catalyst.expressions.variant
 import java.time.{LocalDateTime, Period, ZoneId, ZoneOffset}
 
 import scala.collection.mutable
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.{SparkFunSuite, SparkRuntimeException}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.analysis.ResolveTimeZone
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util.DateTimeConstants._

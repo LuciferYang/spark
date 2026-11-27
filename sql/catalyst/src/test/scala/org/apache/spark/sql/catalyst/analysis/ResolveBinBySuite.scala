@@ -17,10 +17,9 @@
 
 package org.apache.spark.sql.catalyst.analysis
 
-import org.scalactic.source.Position
-import org.scalatest.Tag
+import org.scalatest.Outcome
 
-import org.apache.spark.SparkThrowable
+import org.apache.spark.{SparkThrowable, TestVariant}
 import org.apache.spark.sql.catalyst.QueryPlanningTracker
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast, Expression, Literal}
@@ -31,14 +30,13 @@ import org.apache.spark.sql.types._
 
 class ResolveBinBySuite extends AnalysisTest {
 
-  // Enable the operator for all tests here (the gate test opts out via `super.test`).
-  override protected def test(testName: String, testTags: Tag*)(testFun: => Any)
-                             (implicit pos: Position): Unit = {
-    super.test(testName, testTags: _*) {
-      withSQLConf(SQLConf.BIN_BY_ENABLED.key -> "true") {
-        testFun
-      }
-    }
+  // Enable the operator for all tests here (the gate test turns it off in its body).
+  override protected def testVariants(testName: String): Seq[TestVariant] = {
+    Seq(TestVariant(testName, body => {
+      var outcome: Outcome = null
+      withSQLConf(SQLConf.BIN_BY_ENABLED.key -> "true") { outcome = body }
+      outcome
+    }))
   }
 
   private val tsStart = $"ts_start".timestamp
@@ -403,8 +401,8 @@ class ResolveBinBySuite extends AnalysisTest {
       "produced BinBy attributes must have distinct exprIds across the two join sides")
   }
 
-  // `super.test` escapes the suite-wide flag-on wrapper; pin the flag off explicitly.
-  super.test("BIN BY is rejected when the operator is disabled") {
+  // The suite-wide wrapper turns the flag on; pin it off explicitly.
+  test("BIN BY is rejected when the operator is disabled") {
     withSQLConf(SQLConf.BIN_BY_ENABLED.key -> "false") {
       expectError(unresolved(), "UNSUPPORTED_FEATURE.BIN_BY")
     }

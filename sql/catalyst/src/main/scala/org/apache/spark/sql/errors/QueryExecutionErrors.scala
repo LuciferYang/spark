@@ -88,7 +88,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "sourceType" -> toSQLType(from),
         "targetType" -> toSQLType(to),
         "ansiConfig" -> toSQLConf("spark.sql.ansi.enabled")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -102,7 +102,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "sourceType" -> toSQLType(from),
         "targetType" -> toSQLType(to),
         "columnName" -> toSQLId(columnName)),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = ""
     )
   }
@@ -262,7 +262,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "bitPosition" -> s"$bitPosition",
         "bitmapNumBytes" -> s"$bitmapNumBytes",
         "bitmapNumBits" -> s"${bitmapNumBytes * 8}"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -281,7 +281,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "secAndMicros" -> s"$secAndMicros"
       ),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -292,7 +292,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "message" -> e.getMessage,
         "func" -> toSQLId(suggestedFunc)
       ),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -304,7 +304,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "format" -> toSQLValue(
           fmt.getOrElse("HH:mm:ss.SSSSSS"),
           StringType)),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "",
       cause = Some(e))
   }
@@ -313,7 +313,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
     new SparkDateTimeException(
       errorClass = "DATETIME_FIELD_OUT_OF_BOUNDS.WITHOUT_SUGGESTION",
       messageParameters = Map("rangeMessage" -> e.getMessage),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "",
       cause = Some(e))
   }
@@ -669,7 +669,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "symbol" -> symbol,
         "value2" -> toSQLValue(eval2, ShortType),
         "functionName" -> toSQLId(suggestedFunc)),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2636,7 +2636,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "numRows" -> numRows.toString(),
         "startIndex" -> startIndex.toString()),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2956,7 +2956,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" -> (s"add ${toSQLValue(amount, LongType)} $unit to " +
           s"${toSQLValue(DateTimeUtils.microsToInstant(micros), TimestampType)}")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2966,7 +2966,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" -> (s"find the next $dayOfWeek after " +
           s"${toSQLValue(DateTimeUtils.daysToLocalDate(days), DateType)}")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2976,7 +2976,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" -> (s"find the last day of the month of " +
           s"${toSQLValue(DateTimeUtils.daysToLocalDate(days), DateType)}")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2986,7 +2986,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" -> (s"truncate ${toSQLValue(DateTimeUtils.daysToLocalDate(days), DateType)} " +
           s"to $unit")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -2998,7 +2998,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "operation" -> (s"write the interval value $interval as Arrow IntervalMonthDayNano " +
           "nanoseconds (the microseconds component must be in +/-(Long.MaxValue / 1000), " +
           "roughly +/-292 years)")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3018,7 +3018,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
         "operation" -> (s"write the timestamp value $rendered as $sink " +
           "epoch-nanoseconds " +
           s"(supported range: $minInstant to 2262-04-11T23:47:16.854775807Z)")),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3032,7 +3032,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" ->
           s"add ${toSQLValue(interval, intervalType)} to ${toSQLValue(start, startType)}"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3042,7 +3042,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" ->
           s"create a TIMESTAMP_LTZ(9) from $nanos nanoseconds since the epoch"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3055,7 +3055,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
       messageParameters = Map(
         "operation" ->
           s"create a TIMESTAMP from ${toSQLValue(value, valueType)} $unit since the epoch"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3070,7 +3070,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
     new SparkArithmeticException(
       errorClass = "DATETIME_OVERFLOW",
       messageParameters = Map("operation" -> s"add $i to the time value $t"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 
@@ -3899,7 +3899,7 @@ private[sql] object QueryExecutionErrors extends QueryErrorsBase with ExecutionE
     new SparkArithmeticException(
       errorClass = "DATETIME_OVERFLOW",
       messageParameters = Map("operation" -> "compute BIN BY bucket boundaries"),
-      context = Array.empty,
+      context = Array.empty[QueryContext],
       summary = "")
   }
 

@@ -1867,7 +1867,8 @@ class DateTimeUtilsSuite extends SparkFunSuite with Matchers with SQLHelper {
     val min = 2
     val sec = 23
     val micros = 1234
-    val secAndMicros = Decimal(sec + (micros / MICROS_PER_SECOND.toFloat), 16, 6)
+    val secAndMicrosValue = (sec + (micros / MICROS_PER_SECOND.toFloat)).toDouble
+    val secAndMicros = Decimal(BigDecimal(secAndMicrosValue), 16, 6)
 
     // Valid case
     val nanoSecsTime = makeTime(hour, min, secAndMicros)

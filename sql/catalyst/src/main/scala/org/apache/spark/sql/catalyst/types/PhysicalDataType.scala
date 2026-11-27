@@ -31,7 +31,7 @@ import org.apache.spark.util.ArrayImplicits._
 sealed abstract class PhysicalDataType {
   private[sql] type InternalType
   private[sql] def ordering: Ordering[InternalType]
-  private[sql] val tag: ClassTag[InternalType]
+  private[sql] def tag: ClassTag[InternalType]
 }
 
 object PhysicalDataType {

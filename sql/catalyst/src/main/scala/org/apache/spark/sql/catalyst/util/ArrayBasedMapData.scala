@@ -27,15 +27,21 @@ import org.apache.spark.util.collection.Utils
  * Note that, user is responsible to guarantee that the key array does not have duplicated
  * elements, otherwise the behavior is undefined.
  */
-class ArrayBasedMapData(val keyArray: ArrayData, val valueArray: ArrayData) extends MapData {
-  require(keyArray.numElements() == valueArray.numElements())
+// The parameters are not `val`s named `keyArray` and `valueArray`: Scala 3 does not let a `val`
+// override a method with an empty parameter list.
+class ArrayBasedMapData(keys: ArrayData, values: ArrayData) extends MapData {
+  require(keys.numElements() == values.numElements())
 
-  override def numElements(): Int = keyArray.numElements()
+  override def keyArray(): ArrayData = keys
 
-  override def copy(): MapData = new ArrayBasedMapData(keyArray.copy(), valueArray.copy())
+  override def valueArray(): ArrayData = values
+
+  override def numElements(): Int = keys.numElements()
+
+  override def copy(): MapData = new ArrayBasedMapData(keys.copy(), values.copy())
 
   override def toString: String = {
-    s"keys: $keyArray, values: $valueArray"
+    s"keys: $keys, values: $values"
   }
 }
 
@@ -129,8 +135,8 @@ object ArrayBasedMapData {
   }
 
   def toScalaMap(map: ArrayBasedMapData): Map[Any, Any] = {
-    val keys = map.keyArray.asInstanceOf[GenericArrayData].array
-    val values = map.valueArray.asInstanceOf[GenericArrayData].array
+    val keys = map.keyArray().asInstanceOf[GenericArrayData].array
+    val values = map.valueArray().asInstanceOf[GenericArrayData].array
     Utils.toMap(keys, values)
   }
 

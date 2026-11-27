@@ -29,6 +29,7 @@ import org.codehaus.commons.compiler.CompileException
 import org.mockito.Mockito.{mock, when}
 
 import org.apache.spark.{JobArtifactSet, JobArtifactState, SparkConf, SparkEnv, SparkFunSuite}
+import org.apache.spark.ScalaVersionSpecificTestUtils.isScala3
 import org.apache.spark.executor.ExecutorClassLoader
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{BoundReference, GreaterThan, LessThan, Literal}
@@ -1037,12 +1038,18 @@ class CodeCompilerSuite extends SparkFunSuite with SQLHelper {
     // scalac stops emitting the helper as a public static on the anonymous class.
     val cls = CodeCompilerSuite.anonWithLambdaBody.getClass
     val statics = cls.getMethods.filter(m => Modifier.isStatic(m.getModifiers))
-    assert(statics.nonEmpty, s"fixture must carry a public static, got none on ${cls.getName}")
-    assert(statics.forall(_.isSynthetic),
-      s"fixture's statics must all be synthetic, got: ${statics.mkString(", ")}")
-    assert(statics.exists(_.getDeclaringClass eq cls),
-      s"at least one static must be declared by the anonymous class itself, got: " +
-        statics.map(_.getDeclaringClass.getName).mkString(", "))
+    // scalac 3 emits no helper on the anonymous class, so the fixture carries no public static.
+    // Pin that too, so the case above is revisited if it changes.
+    if (isScala3) {
+      assert(statics.isEmpty, s"expected no public static, got: ${statics.mkString(", ")}")
+    } else {
+      assert(statics.nonEmpty, s"fixture must carry a public static, got none on ${cls.getName}")
+      assert(statics.forall(_.isSynthetic),
+        s"fixture's statics must all be synthetic, got: ${statics.mkString(", ")}")
+      assert(statics.exists(_.getDeclaringClass eq cls),
+        s"at least one static must be declared by the anonymous class itself, got: " +
+          statics.map(_.getDeclaringClass.getName).mkString(", "))
+    }
   }
 
   test("referencesUnnarrowableClass: true when narrowing would lose access") {
@@ -1084,9 +1091,8 @@ class CodeCompilerSuite extends SparkFunSuite with SQLHelper {
 
   test("referencesUnnarrowableClass: true when the supertype itself cannot be named") {
     // Members line up here, but the nearest nameable supertype is a private nested class
-    // (scala.collection.mutable.HashSet$HashSetIterator), so javac could not write the
-    // narrowed cast at all.
-    val cls = scala.collection.mutable.HashSet("a").iterator.getClass
+    // (`UnnameableSupertypeFixture.Hidden`), so javac could not write the narrowed cast at all.
+    val cls = UnnameableSupertypeFixture.instance().getClass
     assert(cls.getCanonicalName == null, s"expected an unnameable class, got: ${cls.getName}")
     val name = cls.getName
     assert(JdkCodeCompiler.referencesUnnarrowableClass(s"$name v = ($name) references[0];"),
@@ -1231,12 +1237,14 @@ class CodeCompilerSuite extends SparkFunSuite with SQLHelper {
     val cls = CodeCompilerSuite.memberOfLocalClass.getClass
     assert(cls.getCanonicalName == null, s"expected no canonical name for ${cls.getName}")
     val outerFields = cls.getFields.filter(_.getName.contains("outer"))
-    assert(outerFields.nonEmpty && outerFields.forall(_.isSynthetic),
-      s"fixture must carry a synthetic public outer field, got: ${outerFields.mkString(", ")}")
     val extraMethods = cls.getMethods.filterNot(m =>
       classOf[java.util.ArrayList[_]].getMethods.exists(_.getName == m.getName))
-    assert(extraMethods.nonEmpty && extraMethods.forall(_.isSynthetic),
-      s"fixture's extra methods must all be synthetic, got: ${extraMethods.mkString(", ")}")
+    // scalac 3 drops the outer reference that the class does not use, so it adds no extras.
+    val expectExtras = !isScala3
+    assert(outerFields.nonEmpty == expectExtras && outerFields.forall(_.isSynthetic),
+      s"unexpected outer fields: ${outerFields.mkString(", ")}")
+    assert(extraMethods.nonEmpty == expectExtras && extraMethods.forall(_.isSynthetic),
+      s"unexpected extra methods: ${extraMethods.mkString(", ")}")
     val name = cls.getName
     assert(!JdkCodeCompiler.referencesUnnarrowableClass(s"$name v = ($name) references[0];"),
       "synthetic-only extras must not make a class unnarrowable")

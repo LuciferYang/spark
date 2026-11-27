@@ -42,7 +42,7 @@ object SchemaPruning extends SQLConfHelper {
     // in the resulting schema may differ from their ordering in the logical relation's
     // original schema
     val mergedSchema = requestedRootFields
-      .map { root: RootField => StructType(Array(root.field)) }
+      .map { (root: RootField) => StructType(Array(root.field)) }
       .reduceLeft(_ merge _)
     // Match by the exact name first. Fall back to the resolver only for a requested field that
     // no field of the schema has the exact name of, as the schema may have fields whose names

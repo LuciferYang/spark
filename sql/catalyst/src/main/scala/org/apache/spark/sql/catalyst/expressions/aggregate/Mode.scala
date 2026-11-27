@@ -382,7 +382,7 @@ case class PandasMode(
 
   override def eval(buffer: OpenHashMap[AnyRef, Long]): Any = {
     if (buffer.isEmpty) {
-      return new GenericArrayData(Array.empty)
+      return new GenericArrayData(Array.empty[Any])
     }
 
     // Fold collation-equal keys into one group before selecting the mode(s), so that under a

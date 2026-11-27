@@ -22,6 +22,7 @@ import scala.reflect._
 import org.apache.spark.annotation.Private
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.types.{DataType, DoubleType, FloatType}
+import org.apache.spark.util.SparkClassUtils
 import org.apache.spark.util.collection.OpenHashSet
 
 // A wrap of OpenHashSet that can handle null and special floating-point values according to SQL
@@ -62,6 +63,17 @@ class SQLOpenHashSet[@specialized(Long, Int, Double, Float) T: ClassTag](
 }
 
 object SQLOpenHashSet {
+  /**
+   * Whether the compiler generated the `@specialized` variants of this class, such as
+   * `SQLOpenHashSet$mcI$sp`, which generated code calls directly. Scala 3 does not specialize
+   * classes.
+   */
+  private[sql] lazy val isSpecialized: Boolean =
+    scala.util.Try {
+      SparkClassUtils.classForName[AnyRef](
+        classOf[SQLOpenHashSet[_]].getName + "$mcI$sp", initialize = false)
+    }.isSuccess
+
   def withNullCheckFunc(
       dataType: DataType,
       hashSet: SQLOpenHashSet[Any],

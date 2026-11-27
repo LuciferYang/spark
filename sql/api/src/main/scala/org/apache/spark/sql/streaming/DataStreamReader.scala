@@ -19,7 +19,7 @@ package org.apache.spark.sql.streaming
 import scala.jdk.CollectionConverters._
 
 import org.apache.spark.annotation.{Evolving, Experimental}
-import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, Encoders}
+import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, Encoder, Encoders}
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -352,7 +352,8 @@ abstract class DataStreamReader {
    */
   def textFile(path: String): Dataset[String] = {
     assertNoSpecifiedSchema("textFile")
-    text(path).select("value").as(Encoders.STRING)
+    implicit val encoder: Encoder[String] = Encoders.STRING
+    text(path).select("value").as[String]
   }
 
   protected def assertNoSpecifiedSchema(operation: String): Unit

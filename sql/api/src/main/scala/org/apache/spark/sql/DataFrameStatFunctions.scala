@@ -516,7 +516,8 @@ abstract class DataFrameStatFunctions {
   def countMinSketch(col: Column, eps: Double, confidence: Double, seed: Int): CountMinSketch =
     withOrigin {
       val cms = count_min_sketch(col, lit(eps), lit(confidence), lit(seed))
-      val bytes: Array[Byte] = df.select(cms).as(BinaryEncoder).head()
+      implicit val encoder: Encoder[Array[Byte]] = BinaryEncoder
+      val bytes: Array[Byte] = df.select(cms).as[Array[Byte]].head()
       CountMinSketch.readFrom(bytes)
     }
 
@@ -587,7 +588,8 @@ abstract class DataFrameStatFunctions {
    */
   def bloomFilter(col: Column, expectedNumItems: Long, numBits: Long): BloomFilter = withOrigin {
     val bf = Column.internalFn("bloom_filter_agg", col, lit(expectedNumItems), lit(numBits))
-    val bytes: Array[Byte] = df.select(bf).as(BinaryEncoder).head()
+    implicit val encoder: Encoder[Array[Byte]] = BinaryEncoder
+    val bytes: Array[Byte] = df.select(bf).as[Array[Byte]].head()
     BloomFilter.readFrom(bytes)
   }
 }

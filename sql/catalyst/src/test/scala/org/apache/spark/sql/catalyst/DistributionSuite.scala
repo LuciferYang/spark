@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst
 import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.serializer.JavaSerializer
 /* Implicit conversions */
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.{Ascending, AttributeReference, CollationAwareMurmur3Hash, Expression, Literal, Pmod, SortOrder, TransformExpression}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.physical._
@@ -29,6 +28,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, IntegerType}
 
 class DistributionSuite extends SparkFunSuite with SQLHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   /** A bound function with a stable canonical name, enough to build a `TransformExpression`. */
   private object TestYearsFunction extends ScalarFunction[Int] {

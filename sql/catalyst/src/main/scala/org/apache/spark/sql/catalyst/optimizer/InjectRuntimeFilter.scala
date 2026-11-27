@@ -204,9 +204,9 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
     val rowCount = filterCreationSide.rowCount
     PerPartitionSizing(
       capped(rowCount.getOrElse(
-        thresholds * conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_EXPECTED_NUM_ITEMS))),
+        thresholds * BigInt(conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_EXPECTED_NUM_ITEMS)))),
       Option.when(rowCount.isEmpty)(
-        capped(thresholds * conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_NUM_BITS))),
+        capped(thresholds * BigInt(conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_NUM_BITS)))),
       capped(thresholds))
   }
 
@@ -368,7 +368,7 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
           case Some((metadata, creationSize)) =>
             val rowCount = metadata.rowCount
             Option.when(
-              rowCount <= conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_MAX_NUM_ITEMS) &&
+              rowCount <= BigInt(conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_MAX_NUM_ITEMS)) &&
                 (hasHitSelectiveFilter || leaf.hasSelectivePredicate ||
                   applicationDistinctCount.exists(_ > rowCount))) {
               FilterCreationSide(
@@ -453,7 +453,7 @@ object InjectRuntimeFilter extends Rule[LogicalPlan] with PredicateHelper with J
     // rather than sum here.
     val maxScanSize = maxScanByteSize(filterApplicationSide)
     maxScanSize >=
-      conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_APPLICATION_SIDE_SCAN_SIZE_THRESHOLD)
+      BigInt(conf.getConf(SQLConf.RUNTIME_BLOOM_FILTER_APPLICATION_SIDE_SCAN_SIZE_THRESHOLD))
   }
 
   /**

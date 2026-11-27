@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{CreateStruct, Expression, GetStructField, If, Literal, OuterReference, ScalarSubquery}
 import org.apache.spark.sql.catalyst.expressions.aggregate.MinBy
@@ -26,6 +25,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{AsOfJoin, LocalRelation, Log
 import org.apache.spark.sql.internal.SQLConf
 
 class RewriteAsOfJoinSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val left = LocalRelation($"a".int, $"b".int, $"c".int)
   private val right = LocalRelation($"a".int, $"b".int, $"d".int)
@@ -103,7 +105,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = true, direction = AsOfJoinDirection("backward"))
+      tolerance = Some(Literal(1)), allowExactMatches = true,
+      direction = AsOfJoinDirection("backward"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 
@@ -132,7 +135,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance & allowExactMatches = false") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = false, direction = AsOfJoinDirection("backward"))
+      tolerance = Some(Literal(1)), allowExactMatches = false,
+      direction = AsOfJoinDirection("backward"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 
@@ -176,7 +180,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance & direction = forward") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = true, direction = AsOfJoinDirection("forward"))
+      tolerance = Some(Literal(1)), allowExactMatches = true,
+      direction = AsOfJoinDirection("forward"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 
@@ -191,7 +196,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance & allowExactMatches = false & direction = forward") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = false, direction = AsOfJoinDirection("forward"))
+      tolerance = Some(Literal(1)), allowExactMatches = false,
+      direction = AsOfJoinDirection("forward"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 
@@ -242,7 +248,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance & allowExactMatches = false & direction = nearest") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = false, direction = AsOfJoinDirection("nearest"))
+      tolerance = Some(Literal(1)), allowExactMatches = false,
+      direction = AsOfJoinDirection("nearest"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 
@@ -260,7 +267,8 @@ class RewriteAsOfJoinSuite extends PlanTest {
 
   test("tolerance & direction = nearest") {
     val query = AsOfJoin(left, right, left.output(0), right.output(0), None, Inner,
-      tolerance = Some(1), allowExactMatches = true, direction = AsOfJoinDirection("nearest"))
+      tolerance = Some(Literal(1)), allowExactMatches = true,
+      direction = AsOfJoinDirection("nearest"))
 
     val rewritten = RewriteAsOfJoin(query.analyze)
 

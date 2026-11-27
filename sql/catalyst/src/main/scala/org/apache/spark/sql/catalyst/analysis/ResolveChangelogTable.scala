@@ -20,6 +20,7 @@ package org.apache.spark.sql.catalyst.analysis
 import java.util.UUID
 
 import org.apache.spark.SparkRuntimeException
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
@@ -694,6 +695,7 @@ object ResolveChangelogTable extends Rule[LogicalPlan] {
 
     val processor = new CdcNetChangesStatefulProcessor(processorInputSchema, computeUpdates)
 
+    implicit val outputEncoder: ExpressionEncoder[Row] = rowEncoder
     val tws = new TransformWithState(
       keyDeserializer = UnresolvedDeserializer(keyEncoder.deserializer, groupingAttrs),
       valueDeserializer = UnresolvedDeserializer(rowEncoder.deserializer, withHelpers.output),
@@ -703,7 +705,7 @@ object ResolveChangelogTable extends Rule[LogicalPlan] {
       timeMode = EventTime,
       outputMode = OutputMode.Append(),
       keyEncoder = keyEncoder.asInstanceOf[ExpressionEncoder[Any]],
-      outputObjAttr = CatalystSerde.generateObjAttr(rowEncoder),
+      outputObjAttr = CatalystSerde.generateObjAttr[Row],
       child = withHelpers,
       hasInitialState = false,
       initialStateGroupingAttrs = groupingAttrs,
@@ -712,7 +714,7 @@ object ResolveChangelogTable extends Rule[LogicalPlan] {
       initialState = LocalRelation(keyEncoder.schema))
 
     // 4. Wrap with SerializeFromObject so the obj column becomes regular tabular output.
-    val serialized = CatalystSerde.serialize(tws)(rowEncoder)
+    val serialized = CatalystSerde.serialize[Row](tws)
 
     // 5. Strip the auto-injected EventTimeWatermark metadata from the user-visible
     //    `_commit_timestamp`. The metadata is preserved through the `transformWithState`

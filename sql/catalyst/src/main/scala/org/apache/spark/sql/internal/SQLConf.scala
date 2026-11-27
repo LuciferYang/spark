@@ -42,7 +42,6 @@ import org.apache.spark.internal.config.{ConfigBindingPolicy, _}
 import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.io.CompressionCodec
 import org.apache.spark.network.util.ByteUnit
-import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, HintErrorLogger, Resolver}
 import org.apache.spark.sql.catalyst.expressions.CodegenObjectFactoryMode
 import org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator
@@ -55,7 +54,7 @@ import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors
 import org.apache.spark.sql.types.{AtomicType, TimestampNTZType, TimestampType}
 import org.apache.spark.storage.{StorageLevel, StorageLevelMapper}
 import org.apache.spark.unsafe.array.ByteArrayMethods
-import org.apache.spark.util.{HadoopFSUtils, Utils, VersionUtils}
+import org.apache.spark.util.{HadoopFSUtils, SparkClassUtils, Utils, VersionUtils}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // This file defines the configuration options for Spark SQL.
@@ -11557,8 +11556,7 @@ class SQLConf extends Serializable with Logging with SqlApiConf {
       StaticSQLConf
       try {
         // Force to register SQL configurations from Hive module
-        val symbol = ScalaReflection.mirror.staticModule("org.apache.spark.sql.hive.HiveUtils")
-        ScalaReflection.mirror.reflectModule(symbol).instance
+        SparkClassUtils.getCompanionObject("org.apache.spark.sql.hive.HiveUtils")
       } catch {
         case NonFatal(e) =>
           logWarning("SQL configurations from Hive module is not loaded", e)

@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst.analysis
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, AttributeSet}
 import org.apache.spark.sql.catalyst.optimizer.SimpleTestOptimizer
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
@@ -25,6 +24,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{EventTimeWatermark, Filter, 
 import org.apache.spark.sql.types.{IntegerType, LongType, MetadataBuilder, TimestampType}
 
 class StreamingJoinHelperSuite extends AnalysisTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("state watermark extraction preserves arithmetic term multiplicity") {
     val leftTime = AttributeReference("leftTime", TimestampType)()

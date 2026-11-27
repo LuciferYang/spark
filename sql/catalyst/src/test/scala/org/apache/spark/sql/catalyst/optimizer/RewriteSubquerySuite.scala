@@ -18,7 +18,6 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.sql.catalyst.QueryPlanningTracker
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Alias, Cast, CheckInvariant, Coalesce, EqualTo, Exists, Expression, InSubquery, IsNull, ListQuery, Literal, Not, Or}
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, LeftSemi, PlanTest}
@@ -29,6 +28,9 @@ import org.apache.spark.sql.types.LongType
 
 
 class RewriteSubquerySuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches =

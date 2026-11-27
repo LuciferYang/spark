@@ -71,7 +71,7 @@ object NaturalAndUsingJoinResolution extends DataTypeErrorsBase with SQLConfHelp
     )
     val joinPairs = leftKeys.zip(rightKeys)
 
-    val newCondition = (condition ++ joinPairs.map(EqualTo.tupled)).reduceOption(And)
+    val newCondition = (condition ++ joinPairs.map((EqualTo.apply _).tupled)).reduceOption(And)
 
     // the output list looks like: join keys, columns from left, columns from right
     val (output, hiddenOutput) = computeOutputAndHiddenOutput(

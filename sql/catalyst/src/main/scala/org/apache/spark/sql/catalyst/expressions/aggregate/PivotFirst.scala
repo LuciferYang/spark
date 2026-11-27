@@ -93,7 +93,8 @@ case class PivotFirst(
     val slots = new Array[Int](pivotColumnValues.length)
     val values = mutable.ArrayBuffer.empty[Any]
     var index: Map[Any, Int] = if (usesTreeMap) {
-      TreeMap.empty[Any, Int](TypeUtils.getInterpretedOrdering(pivotColumn.dataType))
+      implicit val ordering: Ordering[Any] = TypeUtils.getInterpretedOrdering(pivotColumn.dataType)
+      TreeMap.empty[Any, Int]
     } else {
       HashMap.empty[Any, Int]
     }

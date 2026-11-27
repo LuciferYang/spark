@@ -1263,9 +1263,10 @@ object StaxXmlParser {
     } else {
       (x: String, y: String) => x.compareToIgnoreCase(y)
     }
-    val fieldToVariants = collection.mutable.TreeMap.empty[String, java.util.ArrayList[Variant]](
-      caseSensitivityOrdering
-    )
+    val fieldToVariants = {
+      implicit val ordering: Ordering[String] = caseSensitivityOrdering
+      collection.mutable.TreeMap.empty[String, java.util.ArrayList[Variant]]
+    }
 
     // Handle attributes first
     StaxXmlParserUtils.convertAttributesToValuesMap(attributes, options).foreach {

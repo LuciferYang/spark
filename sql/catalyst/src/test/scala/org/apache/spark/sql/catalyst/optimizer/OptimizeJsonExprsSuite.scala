@@ -306,7 +306,7 @@ class OptimizeJsonExprsSuite extends PlanTest with ExpressionEvalHelper {
   }
 
   test("SPARK-47670: do not fail optimization for unparseable get_json_object paths") {
-    val oversizedIndex = "$[" + "9" * 100 + "]"
+    val oversizedIndex = "$[" + "9".repeat(100) + "]"
     val query = testRelation2.select(
       GetJsonObject($"json", Literal(oversizedIndex)).as("value"))
 

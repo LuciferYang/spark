@@ -47,7 +47,7 @@ class HashExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(Md5(Literal.create(Array[Byte](1, 2, 3, 4, 5, 6), BinaryType)),
       "6ac1e56bc78f031059be7be854522c4c")
     checkEvaluation(Md5(Literal.create(null, BinaryType)), null)
-    checkConsistencyBetweenInterpretedAndCodegen(Md5, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(Md5.apply _, BinaryType)
   }
 
   test("sha1") {
@@ -58,7 +58,7 @@ class HashExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(Sha1(Literal.create(null, BinaryType)), null)
     checkEvaluation(Sha1(Literal("".getBytes(StandardCharsets.UTF_8))),
       "da39a3ee5e6b4b0d3255bfef95601890afd80709")
-    checkConsistencyBetweenInterpretedAndCodegen(Sha1, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(Sha1.apply _, BinaryType)
   }
 
   test("sha2") {
@@ -89,7 +89,7 @@ class HashExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(Crc32(Literal.create(Array[Byte](1, 2, 3, 4, 5, 6), BinaryType)),
       2180413220L)
     checkEvaluation(Crc32(Literal.create(null, BinaryType)), null)
-    checkConsistencyBetweenInterpretedAndCodegen(Crc32, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(Crc32.apply _, BinaryType)
   }
 
   test("xxh3_64 and xxh3_128") {
@@ -99,8 +99,8 @@ class HashExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
       "7d57dd84c60c86ca1f4e82ab91a12b5e")
     checkEvaluation(Xxh364(Literal.create(null, BinaryType)), null)
     checkEvaluation(Xxh3128(Literal.create(null, BinaryType)), null)
-    checkConsistencyBetweenInterpretedAndCodegen(Xxh364, BinaryType)
-    checkConsistencyBetweenInterpretedAndCodegen(Xxh3128, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(Xxh364.apply _, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(Xxh3128.apply _, BinaryType)
   }
 
   test("SPARK-61770: farm_fingerprint") {
@@ -136,7 +136,7 @@ class HashExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
       -7555523796863189993L)
     checkEvaluation(FarmFingerprint(Literal(Array[Byte](1, 2, 3, 4, 5, 6))), 8673355959317488908L)
     checkEvaluation(FarmFingerprint(Literal.create(null, BinaryType)), null)
-    checkConsistencyBetweenInterpretedAndCodegen(FarmFingerprint, BinaryType)
+    checkConsistencyBetweenInterpretedAndCodegen(FarmFingerprint.apply _, BinaryType)
   }
 
   def checkHiveHash(input: Any, dataType: DataType, expected: Long): Unit = {

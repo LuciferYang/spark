@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.analysis
 import org.apache.spark.{SPARK_DOC_ROOT, SparkException}
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Count, Max}
@@ -99,6 +98,10 @@ case class SupportsNonDeterministicExpressionTestOperator(
 }
 
 class AnalysisErrorSuite extends AnalysisTest with DataTypeErrorsBase {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   import TestRelations._
 
   def errorTest(

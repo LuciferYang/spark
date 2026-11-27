@@ -1907,7 +1907,7 @@ abstract class CastSuiteBase extends SparkFunSuite with ExpressionEvalHelper {
         "long overflow")
     }
 
-    Seq(Byte.MaxValue, Short.MaxValue, Int.MaxValue, Long.MaxValue, Long.MinValue + 1,
+    Seq[Long](Byte.MaxValue, Short.MaxValue, Int.MaxValue, Long.MaxValue, Long.MinValue + 1,
       Long.MinValue).foreach { duration =>
       val interval = Literal.create(
         Duration.of(duration, ChronoUnit.MICROS),
@@ -1953,7 +1953,7 @@ abstract class CastSuiteBase extends SparkFunSuite with ExpressionEvalHelper {
             "input" -> interval))
       }
 
-    Seq(Byte.MaxValue, Short.MaxValue, Int.MaxValue, Int.MinValue + 1, Int.MinValue)
+    Seq[Int](Byte.MaxValue, Short.MaxValue, Int.MaxValue, Int.MinValue + 1, Int.MinValue)
       .foreach { period =>
         val interval = Literal.create(Period.ofMonths(period), YearMonthIntervalType())
         checkEvaluation(cast(cast(interval, StringType), YearMonthIntervalType()), period)

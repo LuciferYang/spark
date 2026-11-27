@@ -146,9 +146,9 @@ class ExprUtilsSuite extends SparkFunSuite with SQLHelper {
     // They do not raise for any collation, also on empty, ignorable and invalid UTF-8 strings,
     // which ICU can not search for: a combining accent after a letter and alone, a zero-width
     // space, NUL, U+FFFD, a bad lead byte, a truncated sequence and one above U+10FFFF.
-    val ignorable = Seq(Seq('a', 0x0301), Seq(0x0301), Seq(0x200B), Seq(0x0000), Seq(0xFFFD))
+    val ignorable = Seq(Seq[Int]('a', 0x0301), Seq(0x0301), Seq(0x200B), Seq(0x0000), Seq(0xFFFD))
       .map(_.map(_.toChar).mkString)
-    val invalid = Seq(Array(0xFF, 'a'), Array('a', 0xE2), Array(0xF4, 0xBF, 0xBF, 0xBF))
+    val invalid = Seq(Array[Int](0xFF, 'a'), Array[Int]('a', 0xE2), Array(0xF4, 0xBF, 0xBF, 0xBF))
       .map(b => UTF8String.fromBytes(b.map(_.toByte)))
     val values = (Seq("", " ", "a", "abc") ++ ignorable).map(UTF8String.fromString) ++ invalid
     Seq("UTF8_BINARY", "UTF8_LCASE", "UNICODE", "UNICODE_CI", "UNICODE_AI", "UNICODE_CI_AI",

@@ -139,9 +139,10 @@ class ToNumberParser(
       char match {
         case ZERO_DIGIT =>
           val prevI = i
-          do {
+          i += 1
+          while (i < len && (numberFormat(i) == ZERO_DIGIT || numberFormat(i) == NINE_DIGIT)) {
             i += 1
-          } while (i < len && (numberFormat(i) == ZERO_DIGIT || numberFormat(i) == NINE_DIGIT))
+          }
           if (reachedDecimalPoint) {
             tokens.append(AtMostAsManyDigits(i - prevI))
           } else {
@@ -149,9 +150,10 @@ class ToNumberParser(
           }
         case NINE_DIGIT =>
           val prevI = i
-          do {
+          i += 1
+          while (i < len && (numberFormat(i) == ZERO_DIGIT || numberFormat(i) == NINE_DIGIT)) {
             i += 1
-          } while (i < len && (numberFormat(i) == ZERO_DIGIT || numberFormat(i) == NINE_DIGIT))
+          }
           tokens.append(AtMostAsManyDigits(i - prevI))
         case POINT_SIGN | POINT_LETTER =>
           tokens.append(DecimalPoint())

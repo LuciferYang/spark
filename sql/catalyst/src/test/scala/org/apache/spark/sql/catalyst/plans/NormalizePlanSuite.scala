@@ -23,13 +23,15 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable, CatalogTableType}
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{CTERelationDef, LocalRelation, LogicalPlan, UnionLoop, UnionLoopRef, View}
 import org.apache.spark.sql.types.{BooleanType, IntegerType, StringType, StructField, StructType}
 
 class NormalizePlanSuite extends SparkFunSuite with SQLConfHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("Normalize Project") {
     val baselineCol1 = $"col1".int

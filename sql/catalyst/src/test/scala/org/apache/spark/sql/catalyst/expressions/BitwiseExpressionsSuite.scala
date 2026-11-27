@@ -19,11 +19,13 @@ package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.SparkIllegalArgumentException
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.types._
 
 
 class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   import IntegralLiteralTestUtils._
 
@@ -49,7 +51,7 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(BitwiseNot(negativeLongLit), ~negativeLong)
 
     DataTypeTestUtils.integralType.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(BitwiseNot, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(BitwiseNot.apply _, dt)
     }
   }
 
@@ -76,7 +78,7 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(BitwiseAnd(positiveLongLit, negativeLongLit), positiveLong & negativeLong)
 
     DataTypeTestUtils.integralType.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(BitwiseAnd, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(BitwiseAnd.apply _, dt, dt)
     }
   }
 
@@ -103,7 +105,7 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(BitwiseOr(positiveLongLit, negativeLongLit), positiveLong | negativeLong)
 
     DataTypeTestUtils.integralType.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(BitwiseOr, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(BitwiseOr.apply _, dt, dt)
     }
   }
 
@@ -130,7 +132,7 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(BitwiseXor(positiveLongLit, negativeLongLit), positiveLong ^ negativeLong)
 
     DataTypeTestUtils.integralType.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(BitwiseXor, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(BitwiseXor.apply _, dt, dt)
     }
   }
 
@@ -231,7 +233,8 @@ class BitwiseExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
         "upper" -> "8",
         "invalidValue" -> "16"))
     DataTypeTestUtils.integralType.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegenAllowingException(BitwiseGet, dt, IntegerType)
+      checkConsistencyBetweenInterpretedAndCodegenAllowingException(
+        BitwiseGet.apply _, dt, IntegerType)
     }
   }
 }

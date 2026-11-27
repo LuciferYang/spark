@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst.planning
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.{Inner, PlanTest}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LocalRelation}
@@ -29,6 +28,9 @@ import org.apache.spark.sql.types.{DayTimeIntervalType, DoubleType, IntegerType}
  * on the join condition; the extractor does not return a residual separately.
  */
 class ExtractRangeJoinKeysSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val points = LocalRelation($"p".int)
   private val ranges = LocalRelation($"lo".int, $"hi".int)

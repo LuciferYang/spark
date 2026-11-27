@@ -18,7 +18,6 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.catalyst.plans._
@@ -28,6 +27,10 @@ import org.apache.spark.sql.types.IntegerType
 
 // Test class to verify correct functioning of OptimizeLimitZero rule in various scenarios
 class OptimizeLimitZeroSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches =
       Batch("OptimizeLimitZero", Once,

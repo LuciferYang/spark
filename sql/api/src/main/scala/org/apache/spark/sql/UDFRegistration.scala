@@ -16,9 +16,8 @@
  */
 package org.apache.spark.sql
 
-import scala.reflect.runtime.universe.TypeTag
-
 import org.apache.spark.sql.api.java._
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.util.SparkCharVarcharUtils
 import org.apache.spark.sql.expressions.{SparkUserDefinedFunction, UserDefinedAggregateFunction, UserDefinedFunction}
 import org.apache.spark.sql.internal.ToScalaUDF

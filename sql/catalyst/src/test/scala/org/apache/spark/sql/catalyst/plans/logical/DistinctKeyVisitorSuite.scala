@@ -18,9 +18,8 @@
 package org.apache.spark.sql.catalyst.plans.logical
 
 import scala.collection.mutable
-import scala.reflect.runtime.universe.TypeTag
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Cast, ExpressionSet, UnspecifiedFrame}
@@ -29,6 +28,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{CharType, IntegerType, StringType, VarcharType}
 
 class DistinctKeyVisitorSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val a = AttributeReference("a", IntegerType)()
   private val b = AttributeReference("b", IntegerType)()

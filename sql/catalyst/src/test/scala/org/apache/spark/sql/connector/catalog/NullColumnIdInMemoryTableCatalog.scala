@@ -39,7 +39,7 @@ class NullColumnIdInMemoryTableCatalog extends InMemoryTableCatalog {
   private def toNullColumnIdTable(table: InMemoryTable): NullColumnIdInMemoryTable = {
     val nullColIdTable = new NullColumnIdInMemoryTable(
       name = table.name,
-      columns = table.columns(),
+      initialColumns = table.columns(),
       partitioning = table.partitioning,
       properties = table.properties,
       constraints = table.constraints,
@@ -58,8 +58,8 @@ class NullColumnIdInMemoryTableCatalog extends InMemoryTableCatalog {
     nullColIdTable
   }
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
-    val table = super.alterTable(ident, changes: _*).asInstanceOf[InMemoryTable]
+  override protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
+    val table = super.applyTableChanges(ident, changes).asInstanceOf[InMemoryTable]
     val nullColIdTable = toNullColumnIdTable(table)
     tables.put(ident, nullColIdTable)
     nullColIdTable
@@ -73,14 +73,16 @@ class NullColumnIdInMemoryTableCatalog extends InMemoryTableCatalog {
  */
 class NullColumnIdInMemoryTable(
     name: String,
-    columns: Array[Column],
+    // Not named `columns`: Scala 3 does not let a constructor parameter share the name of the
+    // `columns()` method.
+    initialColumns: Array[Column],
     partitioning: Array[Transform],
     properties: java.util.Map[String, String],
     constraints: Array[Constraint] = Array.empty,
     override val id: String = java.util.UUID.randomUUID().toString)
   extends InMemoryTable(
     name = name,
-    columns = columns,
+    initialColumns = initialColumns,
     partitioning = partitioning,
     properties = properties,
     constraints = constraints,

@@ -16,7 +16,6 @@
  */
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{
   Add, Ascending, AttributeReference, CaseWhen, Cast, Coalesce, Divide, EvalMode, Exists,
@@ -34,6 +33,10 @@ import org.apache.spark.sql.types.{
 }
 
 class RewriteDistinctAggregatesSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   val nullInt = Literal(null, IntegerType)
   val nullString = Literal(null, StringType)
   val testRelation = LocalRelation($"a".string, $"b".string, $"c".string, $"d".string, $"e".int)
@@ -657,10 +660,10 @@ class RewriteDistinctAggregatesSuite extends PlanTest {
     // CaseWhen arm with an else is only reached for a non-null else. Rewriting
     // it would drop that value and collapse both counts onto one guarded group.
     val caseWhen1 = CaseWhen(
-      Seq((Symbol("b") > 1, Symbol("c"))),
+      Seq[(Expression, Expression)]((Symbol("b") > 1, Symbol("c"))),
       Some(Literal(0, IntegerType)))
     val caseWhen2 = CaseWhen(
-      Seq((Symbol("b") > 2, Symbol("c"))),
+      Seq[(Expression, Expression)]((Symbol("b") > 2, Symbol("c"))),
       Some(Literal(0, IntegerType)))
     val input = conditionalTestRelation
       .groupBy(Symbol("a"))(

@@ -18,8 +18,7 @@
 package org.apache.spark.sql.catalyst
 
 import org.apache.spark.{SparkException, SparkFunSuite, SparkUnsupportedOperationException}
-import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, AttributeReference, BindReferences, DirectShufflePartitionID, Expression, GetStructField, SortOrder, TransformExpression}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, AttributeReference, AttributeSeq, BindReferences, DirectShufflePartitionID, Expression, GetStructField, SortOrder, TransformExpression}
 import org.apache.spark.sql.catalyst.plans.SQLHelper
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, GenericArrayData}
@@ -28,6 +27,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, CharType, DataType, DateType, DayTimeIntervalType, DecimalType, DoubleType, IntegerType, LongType, MapType, ShortType, StringType, StructType, TimestampLTZNanosType, TimestampNTZNanosType, TimestampNTZType, TimestampType, TimeType, VarcharType, YearMonthIntervalType}
 
 class ShuffleSpecSuite extends SparkFunSuite with SQLHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val passThrough_a_10 = ShufflePartitionIdPassThrough(DirectShufflePartitionID($"a"), 10)
   private val passThrough_b_10 = ShufflePartitionIdPassThrough(DirectShufflePartitionID($"b"), 10)

@@ -805,7 +805,8 @@ case class InSet(child: Expression, hset: Set[Any])
     case _: NullType => hset
     case _ =>
       // for structs use interpreted ordering to be able to compare UnsafeRows with non-UnsafeRows
-      TreeSet.empty(TypeUtils.getInterpretedOrdering(child.dataType)) ++ (hset - null)
+      implicit val ordering: Ordering[Any] = TypeUtils.getInterpretedOrdering(child.dataType)
+      TreeSet.empty[Any] ++ (hset - null)
   }
 
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {

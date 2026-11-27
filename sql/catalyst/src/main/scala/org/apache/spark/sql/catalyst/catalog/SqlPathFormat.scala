@@ -54,7 +54,7 @@ private[sql] object SqlPathFormat {
             else Some(JObject(
               "catalog_name" -> JString(partStrs.head),
               "namespace" -> JArray(
-                partStrs.tail.map(JString).toList)))
+                partStrs.tail.map(JString(_)).toList)))
           case _ => None
         }
         if (converted.nonEmpty) Some(JArray(converted)) else None

@@ -44,7 +44,9 @@ trait RowLevelOperationWithOptions {
 
 class InMemoryRowLevelOperationTable private[catalog] (
     name: String,
-    columns: Array[Column],
+    // Not named `columns`: Scala 3 does not let a constructor parameter share the name of the
+    // `columns()` method.
+    initialColumns: Array[Column],
     partitioning: Array[Transform],
     properties: util.Map[String, String],
     constraints: Array[Constraint],
@@ -52,7 +54,7 @@ class InMemoryRowLevelOperationTable private[catalog] (
     schemaAlignmentConfig: SchemaAlignmentConfig)
   extends InMemoryTable(
     name,
-    columns,
+    initialColumns,
     partitioning,
     properties,
     constraints,
@@ -70,7 +72,7 @@ class InMemoryRowLevelOperationTable private[catalog] (
       schemaAlignmentConfig: SchemaAlignmentConfig = SchemaAlignmentConfig.DEFAULT) = {
     this(
       name = name,
-      columns = CatalogV2Util.structTypeToV2Columns(schema),
+      initialColumns = CatalogV2Util.structTypeToV2Columns(schema),
       partitioning = partitioning,
       properties = properties,
       constraints = constraints,

@@ -43,7 +43,7 @@ class MixedColumnIdTableCatalog extends InMemoryTableCatalog {
     val snapshot = MixedColumnIdTableCatalog.nullIdColumnNames.toSet
     val mixedTable = new MixedColumnIdInMemoryTable(
       name = table.name,
-      columns = table.columns(),
+      initialColumns = table.columns(),
       partitioning = table.partitioning,
       properties = table.properties,
       constraints = table.constraints,
@@ -63,8 +63,8 @@ class MixedColumnIdTableCatalog extends InMemoryTableCatalog {
     mixedTable
   }
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
-    val table = super.alterTable(ident, changes: _*).asInstanceOf[InMemoryTable]
+  override protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
+    val table = super.applyTableChanges(ident, changes).asInstanceOf[InMemoryTable]
     val mixedTable = toMixedIdTable(table)
     tables.put(ident, mixedTable)
     mixedTable
@@ -84,7 +84,9 @@ object MixedColumnIdTableCatalog {
  */
 class MixedColumnIdInMemoryTable(
     name: String,
-    columns: Array[Column],
+    // Not named `columns`: Scala 3 does not let a constructor parameter share the name of the
+    // `columns()` method.
+    initialColumns: Array[Column],
     partitioning: Array[Transform],
     properties: java.util.Map[String, String],
     constraints: Array[Constraint] = Array.empty,
@@ -92,7 +94,7 @@ class MixedColumnIdInMemoryTable(
     nullIdNames: Set[String] = Set.empty)
   extends InMemoryTable(
     name = name,
-    columns = columns,
+    initialColumns = initialColumns,
     partitioning = partitioning,
     properties = properties,
     constraints = constraints,

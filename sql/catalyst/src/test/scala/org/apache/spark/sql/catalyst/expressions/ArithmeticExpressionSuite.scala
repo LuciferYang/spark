@@ -25,7 +25,6 @@ import java.time.temporal.ChronoUnit
 import org.apache.spark.{SparkArithmeticException, SparkFunSuite}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin.withOrigin
 import org.apache.spark.sql.catalyst.trees.Origin
@@ -34,6 +33,9 @@ import org.apache.spark.sql.internal.{SqlApiConf, SQLConf}
 import org.apache.spark.sql.types._
 
 class ArithmeticExpressionSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   import IntegralLiteralTestUtils._
 
@@ -823,7 +825,7 @@ class ArithmeticExpressionSuite extends SparkFunSuite with ExpressionEvalHelper 
     }
 
     DataTypeTestUtils.ordered.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(Least, dt, 2)
+      checkConsistencyBetweenInterpretedAndCodegen(Least.apply _, dt, 2)
     }
 
     val least = Least(Seq(
@@ -884,7 +886,7 @@ class ArithmeticExpressionSuite extends SparkFunSuite with ExpressionEvalHelper 
     }
 
     DataTypeTestUtils.ordered.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(Greatest, dt, 2)
+      checkConsistencyBetweenInterpretedAndCodegen(Greatest.apply _, dt, 2)
     }
 
     val greatest = Greatest(Seq(
@@ -949,7 +951,7 @@ class ArithmeticExpressionSuite extends SparkFunSuite with ExpressionEvalHelper 
   }
 
   test("SPARK-61050: decimal Remainder, Pmod and IntegralDivide with a 40- or 76-digit quotient") {
-    val left = Literal(Decimal(BigDecimal("9" * 38)), DecimalType(38, 0))
+    val left = Literal(Decimal(BigDecimal("9".repeat(38))), DecimalType(38, 0))
     Seq(("0.07", 2, "0.02"), ("7E-38", 38, "2E-38")).foreach { case (divisor, scale, rem) =>
       val right = Literal(Decimal(BigDecimal(divisor), scale, scale), DecimalType(scale, scale))
       Seq(EvalMode.LEGACY, EvalMode.ANSI).foreach { mode =>

@@ -22,7 +22,6 @@ import java.util.{Set => JSet, TimeZone, UUID}
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.logging.log4j.Level
 import org.scalatest.matchers.must.Matchers
@@ -31,8 +30,8 @@ import org.apache.spark.SparkException
 import org.apache.spark.api.python.PythonEvalType
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{AliasIdentifier, QueryPlanningTracker, TableIdentifier}
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, SessionCatalog, VariableDefinition}
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
@@ -52,6 +51,10 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 class AnalysisSuite extends AnalysisTest with Matchers {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   import org.apache.spark.sql.catalyst.analysis.TestRelations._
 
   gridTest("insertion column projection preserves caller-owned aliases")(
@@ -298,7 +301,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
     val schema2 = new StructType().add("c", VarcharType(5))
     val schema3 = new StructType().add("c", ArrayType(CharType(5)))
     Seq(schema1, schema2, schema3).foreach { schema =>
-      val table = new InMemoryTable("t", schema, Array.empty, Map.empty[String, String].asJava)
+      val table = new InMemoryTable("t", schema, Array.empty[Transform],
+        Map.empty[String, String].asJava)
       checkError(
         exception = intercept[SparkException] {
           DataSourceV2Relation(
@@ -322,7 +326,8 @@ class AnalysisSuite extends AnalysisTest with Matchers {
       val schema2 = new StructType().add("c", VarcharType(5))
       val schema3 = new StructType().add("c", ArrayType(CharType(5)))
       Seq(schema1, schema2, schema3).foreach { schema =>
-        val table = new InMemoryTable("t", schema, Array.empty, Map.empty[String, String].asJava)
+        val table = new InMemoryTable("t", schema, Array.empty[Transform],
+          Map.empty[String, String].asJava)
         DataSourceV2Relation(
           table,
           DataTypeUtils.toAttributes(schema),
@@ -1624,7 +1629,7 @@ class AnalysisSuite extends AnalysisTest with Matchers {
       Option(ExpressionEncoder[String]().resolveAndBind()) :: Nil,
       udfDeterministic = false)
 
-    Seq(reflect, udf).foreach { e: Expression =>
+    Seq(reflect, udf).foreach { (e: Expression) =>
       val plan = Sort(Seq(e.asc), false, testRelation)
       val projected = Alias(e, "_nondeterministic")()
       val expect =
@@ -1933,7 +1938,7 @@ class AnalysisSuite extends AnalysisTest with Matchers {
       Iterator.empty
     }
 
-    implicit val intEncoder = ExpressionEncoder[Int]()
+    implicit val intEncoder: ExpressionEncoder[Int] = ExpressionEncoder[Int]()
 
     val left = testRelation2.select($"e").analyze
     val right = testRelation3.select($"e").analyze

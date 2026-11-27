@@ -18,9 +18,9 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.runtime.universe.TypeTag
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
@@ -33,6 +33,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
 class ObjectSerializerPruningSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches = Batch("Object serializer pruning", FixedPoint(100),
@@ -130,8 +133,10 @@ class ObjectSerializerPruningSuite extends PlanTest {
       val rowEncoder = ExpressionEncoder(new StructType()
         .add("i", new StructType().add("a", "int").add("b", "string"))
         .add("j", "int"))
-      val serializerObject = CatalystSerde.serialize(
-        CatalystSerde.deserialize(testRelation)(rowEncoder))(rowEncoder)
+      val serializerObject = {
+        implicit val encoder: ExpressionEncoder[Row] = rowEncoder
+        CatalystSerde.serialize[Row](CatalystSerde.deserialize[Row](testRelation))
+      }
       val query = serializerObject.select($"i.a")
       val optimized = Optimize.execute(query.analyze)
 

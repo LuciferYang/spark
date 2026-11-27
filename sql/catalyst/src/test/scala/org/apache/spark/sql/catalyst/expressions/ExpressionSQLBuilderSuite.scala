@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.expressions
 import java.time.LocalDateTime
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.util.DateTimeConstants.MICROS_PER_HOUR
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.internal.SQLConf
@@ -28,6 +27,10 @@ import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.unsafe.types.CalendarInterval
 
 class ExpressionSQLBuilderSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   import org.apache.spark.sql.catalyst.parser.CatalystSqlParser._
 
   protected def checkSQL(e: Expression, expectedSQL: String): Unit = {

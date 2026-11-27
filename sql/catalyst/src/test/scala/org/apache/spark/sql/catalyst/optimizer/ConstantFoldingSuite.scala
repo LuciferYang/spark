@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.optimizer
 import org.apache.spark.SparkArithmeticException
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.analysis.{EliminateSubqueryAliases, UnresolvedExtractValue}
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.objects.{Invoke, StaticInvoke}
@@ -32,6 +31,9 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.ByteArray
 
 class ConstantFoldingSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches =
@@ -517,7 +519,8 @@ class ConstantFoldingSuite extends PlanTest {
       Optimize.execute(testRelation.select(ScalarSubquery(emptyRelation).as("o")).analyze),
       testRelation.select(nullIntLit.as("o")).analyze)
 
-    Seq(EqualTo, LessThan, GreaterThan).foreach { comparison =>
+    val comparisons = Seq[(Expression, Expression) => Expression](EqualTo, LessThan, GreaterThan)
+    comparisons.foreach { comparison =>
       comparePlans(
         Optimize.execute(testRelation
           .select(comparison($"a", ScalarSubquery(emptyRelation)).as("o")).analyze),
@@ -534,7 +537,8 @@ class ConstantFoldingSuite extends PlanTest {
     val emptyRelation = LocalRelation($"a".int)
     val nullIntLit = Literal(null, IntegerType)
 
-    Seq(EqualTo, LessThan, GreaterThan).foreach { comparison =>
+    val comparisons = Seq[(Expression, Expression) => Expression](EqualTo, LessThan, GreaterThan)
+    comparisons.foreach { comparison =>
       comparePlans(
         Optimize.execute(testRelation
           .select(comparison($"a",

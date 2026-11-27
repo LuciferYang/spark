@@ -437,7 +437,7 @@ trait OffsetWindowFunction extends WindowFunction {
   /**
    * Default result value for the function when the `offset`th row does not exist.
    */
-  val default: Expression
+  def default: Expression
 
   /**
    * An optional specification that indicates the offset window function should skip null values in
@@ -757,7 +757,7 @@ case class NthValue(input: Expression, offset: Expression, ignoreNulls: Boolean)
     this(input, offset, WindowExpression.expressionToIngnoreNulls(ignoreNulls, "nth_value"))
   def this(child: Expression, offset: Expression) = this(child, offset, false)
 
-  override lazy val default = Literal.create(null, input.dataType)
+  override lazy val default: Literal = Literal.create(null, input.dataType)
 
   override def left: Expression = input
   override def right: Expression = offset
@@ -973,7 +973,7 @@ abstract class RankLike extends AggregateWindowFunction {
 
   /** Predicate that detects if the order attributes have changed. */
   protected val orderEquals = children.zip(orderAttrs)
-    .map(EqualNullSafe.tupled)
+    .map((EqualNullSafe.apply _).tupled)
     .reduceOption(And)
     .getOrElse(Literal(true))
 

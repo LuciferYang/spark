@@ -2238,7 +2238,7 @@ class AstBuilder extends DataTypeAstBuilder
       allowNamedGroupingExpressions: Boolean): LogicalPlan = withOrigin(ctx) {
     if (ctx.groupingExpressionsWithGroupingAnalytics.isEmpty) {
       val groupByExpressions: Seq[Expression] =
-        ctx.groupingExpressions.asScala.map { n: NamedExpressionContext =>
+        ctx.groupingExpressions.asScala.map { (n: NamedExpressionContext) =>
           if (!allowNamedGroupingExpressions && (n.name != null || n.identifierList != null)) {
             // If we do not allow grouping expressions to have aliases in this context, we throw a
             // syntax error here accordingly.
@@ -8501,7 +8501,7 @@ class AstBuilder extends DataTypeAstBuilder
       // it to generate clear error messages if the expression contains any aggregate functions
       // (this is not allowed in the EXTEND operator).
       val extendExpressions: Seq[NamedExpression] =
-        Option(ctx.extendList).map { n: NamedExpressionSeqContext =>
+        Option(ctx.extendList).map { (n: NamedExpressionSeqContext) =>
           visitNamedExpressionSeq(n).map {
             case (a: Alias, _) =>
               a.copy(
@@ -8623,7 +8623,7 @@ class AstBuilder extends DataTypeAstBuilder
     // Visit each aggregate expression, and add a [[PipeExpression]] on top of it to generate
     // clear error messages if the expression does not contain at least one aggregate function.
     val aggregateExpressions: Seq[NamedExpression] =
-      Option(ctx.namedExpressionSeq()).map { n: NamedExpressionSeqContext =>
+      Option(ctx.namedExpressionSeq()).map { (n: NamedExpressionSeqContext) =>
         visitNamedExpressionSeq(n).map {
           case (a: Alias, _) =>
             a.copy(child =
@@ -8639,7 +8639,7 @@ class AstBuilder extends DataTypeAstBuilder
               PipeExpression(e, isAggregate = true, PipeOperators.aggregateClause), aliasFunc)
         }
       }.getOrElse(Seq.empty)
-    Option(ctx.aggregationClause()).map { c: AggregationClauseContext =>
+    Option(ctx.aggregationClause()).map { (c: AggregationClauseContext) =>
       withAggregationClause(c, aggregateExpressions, left, allowNamedGroupingExpressions = true)
       match {
         case a: Aggregate =>

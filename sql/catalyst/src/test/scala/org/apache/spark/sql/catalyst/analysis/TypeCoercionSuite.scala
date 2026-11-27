@@ -22,7 +22,6 @@ import java.time.{Duration, LocalDateTime, LocalTime, Period}
 
 import org.apache.spark.internal.config.Tests.IS_TESTING
 import org.apache.spark.sql.catalyst.analysis.TypeCoercion._
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{ApproximatePercentile, Median,
@@ -692,7 +691,7 @@ abstract class TypeCoercionSuiteBase extends AnalysisTest {
     val dateLiteral = Literal(java.sql.Date.valueOf("2021-01-01"))
     val timestampNTZLiteral = Literal(LocalDateTime.parse("2021-01-01T00:00:00"))
     val timestampLiteral = Literal(Timestamp.valueOf("2021-01-01 00:00:00"))
-    Seq(
+    Seq[(Expression, Expression) => Expression](
       EqualTo,
       EqualNullSafe,
       GreaterThan,
@@ -722,6 +721,10 @@ abstract class TypeCoercionSuiteBase extends AnalysisTest {
 }
 
 class TypeCoercionSuite extends TypeCoercionSuiteBase {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   import TypeCoercionSuite._
 
   // scalastyle:off line.size.limit

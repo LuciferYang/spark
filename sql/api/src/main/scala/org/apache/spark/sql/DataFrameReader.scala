@@ -588,7 +588,8 @@ abstract class DataFrameReader {
   @scala.annotation.varargs
   def textFile(paths: String*): Dataset[String] = {
     assertNoSpecifiedSchema("textFile")
-    text(paths: _*).select("value").as(StringEncoder)
+    implicit val encoder: Encoder[String] = StringEncoder
+    text(paths: _*).select("value").as[String]
   }
 
   /**

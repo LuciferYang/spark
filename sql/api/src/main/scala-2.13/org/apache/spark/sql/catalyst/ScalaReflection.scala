@@ -245,6 +245,16 @@ object ScalaReflection extends ScalaReflection {
       .asInstanceOf[AgnosticEncoder[E]]
   }
 
+  /** Same as [[encoderFor]], for a [[TypeTag]] whose type is not known statically. */
+  private[sql] def encoderForTypeTag(tag: TypeTag[_]): AgnosticEncoder[_] =
+    encoderFor(tag.in(mirror).tpe)
+
+  /** Whether the type of `tag` is a [[Seq]] of [[Row]]. */
+  private[sql] def isSeqOfRow(tag: TypeTag[_]): Boolean = {
+    val tpe = tag.tpe
+    tpe <:< typeOf[Seq[_]] && tpe.typeArgs.nonEmpty && tpe.typeArgs.head =:= typeOf[Row]
+  }
+
   /**
    * Create an [[AgnosticEncoder]] for a [[Type]].
    */

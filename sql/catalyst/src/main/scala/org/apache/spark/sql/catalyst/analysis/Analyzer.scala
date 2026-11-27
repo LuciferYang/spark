@@ -2028,7 +2028,7 @@ class Analyzer(
       val BOTH, SOURCE, TARGET = Value
     }
 
-    def resolveAssignments(
+    private def resolveAssignments(
         assignments: Seq[Assignment],
         mergeInto: MergeIntoTable,
         resolvePolicy: MergeResolvePolicy.Value,

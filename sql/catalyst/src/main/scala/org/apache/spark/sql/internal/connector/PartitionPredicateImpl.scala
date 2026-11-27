@@ -20,7 +20,7 @@ package org.apache.spark.sql.internal.connector
 import org.apache.spark.SparkException
 import org.apache.spark.internal.{Logging, LogKeys}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, BindReferences, Expression => CatalystExpression, ExprId, Predicate => CatalystPredicate}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSeq, BindReferences, Expression => CatalystExpression, ExprId, Predicate => CatalystPredicate}
 import org.apache.spark.sql.connector.expressions.NamedReference
 import org.apache.spark.sql.connector.expressions.filter.PartitionPredicate
 import org.apache.spark.sql.types.NullType

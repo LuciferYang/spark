@@ -142,15 +142,22 @@ object MapPartitionsInR {
         toAttributes(schema),
         child)
     } else {
-      val deserialized = CatalystSerde.deserialize(child)(encoder)
-      CatalystSerde.serialize(MapPartitionsInR(
-        func,
-        packageNames,
-        broadcastVars,
-        encoder.schema,
-        schema,
-        CatalystSerde.generateObjAttr(ExpressionEncoder(schema)),
-        deserialized))(ExpressionEncoder(schema))
+      val deserialized = {
+        implicit val inputEncoder: Encoder[Row] = encoder
+        CatalystSerde.deserialize[Row](child)
+      }
+      // A separate block, so that the two implicit encoders are never both in scope.
+      locally {
+        implicit val outputEncoder: Encoder[Row] = ExpressionEncoder(schema)
+        CatalystSerde.serialize[Row](MapPartitionsInR(
+          func,
+          packageNames,
+          broadcastVars,
+          encoder.schema,
+          schema,
+          CatalystSerde.generateObjAttr[Row],
+          deserialized))
+      }
     }
   }
 }
@@ -693,7 +700,8 @@ object FlatMapGroupsInR {
         groupingAttributes,
         child)
     } else {
-      CatalystSerde.serialize(FlatMapGroupsInR(
+      implicit val outputEncoder: Encoder[Row] = ExpressionEncoder(schema)
+      CatalystSerde.serialize[Row](FlatMapGroupsInR(
         func,
         packageNames,
         broadcastVars,
@@ -703,8 +711,8 @@ object FlatMapGroupsInR {
         UnresolvedDeserializer(valueDeserializer, dataAttributes),
         groupingAttributes,
         dataAttributes,
-        CatalystSerde.generateObjAttr(ExpressionEncoder(schema)),
-        child))(ExpressionEncoder(schema))
+        CatalystSerde.generateObjAttr[Row],
+        child))
     }
   }
 }

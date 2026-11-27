@@ -477,8 +477,10 @@ class XmlInferSchema(private val options: XmlOptions, private val caseSensitive:
       (x: String, y: String) => x.compareToIgnoreCase(y)
     }
 
-    val nameToDataType =
-      collection.mutable.TreeMap.empty[String, DataType](caseSensitivityOrdering)
+    val nameToDataType = {
+      implicit val ordering: Ordering[String] = caseSensitivityOrdering
+      collection.mutable.TreeMap.empty[String, DataType]
+    }
 
     // When incremental inference is on, `schemaHintsOpt` carries the schema inferred for this
     // object from previous records. `fieldToHint` maps each field name to its already-inferred

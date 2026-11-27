@@ -382,10 +382,10 @@ object SQLFunction {
       functionsNames: Seq[String],
       variableNames: Seq[Seq[String]]): Map[String, String] = {
     val viewNamesJson =
-      JArray(viewNames.map(nameParts => JArray(nameParts.map(JString).toList)).toList)
-    val functionsNamesJson = JArray(functionsNames.map(JString).toList)
+      JArray(viewNames.map(nameParts => JArray(nameParts.map(JString(_)).toList)).toList)
+    val functionsNamesJson = JArray(functionsNames.map(JString(_)).toList)
     val variableNamesJson =
-      JArray(variableNames.map(nameParts => JArray(nameParts.map(JString).toList)).toList)
+      JArray(variableNames.map(nameParts => JArray(nameParts.map(JString(_)).toList)).toList)
 
     val props = new mutable.HashMap[String, String]
     props.put(FUNCTION_REFERRED_TEMP_VIEW_NAMES, compact(render(viewNamesJson)))

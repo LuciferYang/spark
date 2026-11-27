@@ -20,11 +20,11 @@ package org.apache.spark.sql.catalyst
 import java.sql.{Date, Timestamp}
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.{typeTag, TypeTag}
 
 import org.apache.spark.{SparkFunSuite, SparkUnsupportedOperationException}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.FooEnum.FooEnum
+import org.apache.spark.sql.catalyst.TypeTags.{typeTag, TypeTag}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedExtractValue
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders._
 import org.apache.spark.sql.catalyst.expressions.{CreateNamedStruct, Expression, If, SpecificInternalRow, UpCast}
@@ -176,7 +176,7 @@ object TestingValueClass {
                             wrappedStr: StrWrapper) // a string column
 }
 
-class ScalaReflectionSuite extends SparkFunSuite {
+class ScalaReflectionSuite extends SparkFunSuite with ScalaReflectionVersionSpecificTests {
   import org.apache.spark.sql.catalyst.ScalaReflection._
   import TestingValueClass._
 
@@ -190,12 +190,6 @@ class ScalaReflectionSuite extends SparkFunSuite {
   private def deserializerFor[T: TypeTag]: Expression = {
     val enc = ScalaReflection.encoderFor[T]
     DeserializerBuildHelper.createDeserializer(enc)
-  }
-
-  test("isSubtype") {
-    assert(isSubtype(localTypeOf[Option[Int]], localTypeOf[Option[_]]))
-    assert(isSubtype(localTypeOf[Option[Int]], localTypeOf[Option[Int]]))
-    assert(!isSubtype(localTypeOf[Option[_]], localTypeOf[Option[Int]]))
   }
 
   test("SQLUserDefinedType annotation on Scala structure") {

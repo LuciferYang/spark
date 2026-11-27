@@ -34,12 +34,12 @@ import java.util.{HexFormat, Objects}
 
 import scala.collection.{immutable, mutable}
 import scala.math.{BigDecimal, BigInt}
-import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 import org.json4s.JsonAST._
 
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, FunctionIdentifier, InternalRow, ScalaReflection}
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.analysis.{FunctionRegistry, UnresolvedFunction}
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.expressions.variant.VariantExpressionEvalUtils
@@ -238,7 +238,7 @@ object Literal {
     case st: StringType => Literal(UTF8String.fromString(""), st)
     case BinaryType => Literal("".getBytes(StandardCharsets.UTF_8))
     case CalendarIntervalType => Literal(new CalendarInterval(0, 0, 0))
-    case arr: ArrayType => create(Array(), arr)
+    case arr: ArrayType => create(Array.empty[Any], arr)
     case map: MapType => create(Map(), map)
     case struct: StructType =>
       create(new GenericInternalRow(
@@ -570,7 +570,7 @@ case class Literal (value: Any, dataType: DataType) extends LeafExpression {
       case binary: Array[Byte] => util.Arrays.hashCode(binary)
       // SPARK-40315: Literals of ArrayBasedMapData should have deterministic hashCode.
       case arrayBasedMapData: ArrayBasedMapData =>
-        arrayBasedMapData.keyArray.hashCode() * 37 + arrayBasedMapData.valueArray.hashCode()
+        arrayBasedMapData.keyArray().hashCode() * 37 + arrayBasedMapData.valueArray().hashCode()
       case other => other.hashCode()
     }
     31 * Objects.hashCode(dataType) + valueHashCode
@@ -583,7 +583,7 @@ case class Literal (value: Any, dataType: DataType) extends LeafExpression {
         case (null, null) => true
         case (a: Array[Byte], b: Array[Byte]) => util.Arrays.equals(a, b)
         case (a: ArrayBasedMapData, b: ArrayBasedMapData) =>
-          a.keyArray == b.keyArray && a.valueArray == b.valueArray
+          a.keyArray() == b.keyArray() && a.valueArray() == b.valueArray()
         case (a: Double, b: Double) if a.isNaN && b.isNaN => true
         case (a: Float, b: Float) if a.isNaN && b.isNaN => true
         case (a, b) => a != null && a == b
@@ -734,8 +734,8 @@ case class Literal (value: Any, dataType: DataType) extends LeafExpression {
         }
       s"NAMED_STRUCT(${structFields.mkString(", ")})"
     case (data: ArrayBasedMapData, mapType: MapType) =>
-      val keyData = data.keyArray.asInstanceOf[GenericArrayData]
-      val valueData = data.valueArray.asInstanceOf[GenericArrayData]
+      val keyData = data.keyArray().asInstanceOf[GenericArrayData]
+      val valueData = data.valueArray().asInstanceOf[GenericArrayData]
       val keysAndValues: Array[String] =
         keyData.array.zip(valueData.array).map { kv =>
           s"${Literal(kv._1, mapType.keyType).sql}, ${Literal(kv._2, mapType.valueType).sql}"

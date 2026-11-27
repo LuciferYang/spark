@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.expressions
 import java.util.TimeZone
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.plans.logical.Range
 import org.apache.spark.sql.internal.SQLConf
@@ -28,6 +27,9 @@ import org.apache.spark.sql.internal.SQLConf.MULTI_COMMUTATIVE_OP_OPT_THRESHOLD
 import org.apache.spark.sql.types.{BooleanType, Decimal, DecimalType, DoubleType, IntegerType, LongType, StringType, StructField, StructType, TimestampNTZType, TimestampType}
 
 class CanonicalizeSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("SPARK-24276: IN expression with different order are semantically equal") {
     val range = Range(1, 1, 1, 1)
@@ -199,7 +201,8 @@ class CanonicalizeSuite extends SparkFunSuite {
   }
 
   test("SPARK-40362: Commutative operator under BinaryComparison") {
-    Seq(EqualTo, EqualNullSafe, GreaterThan, LessThan, GreaterThanOrEqual, LessThanOrEqual)
+    Seq[(Expression, Expression) => Expression](
+      EqualTo, EqualNullSafe, GreaterThan, LessThan, GreaterThanOrEqual, LessThanOrEqual)
       .foreach { bc =>
         assert(bc(Multiply($"a", $"b"), Literal(10)).semanticEquals(
           bc(Multiply($"b", $"a"), Literal(10))))

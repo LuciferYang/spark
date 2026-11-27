@@ -22,7 +22,6 @@ import scala.jdk.CollectionConverters._
 import org.apache.spark.SparkException
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.QueryPlanningTracker
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Rand, ScalarSubquery}
 import org.apache.spark.sql.catalyst.optimizer.InlineCTE
@@ -42,6 +41,10 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 class FormExternalLookupJoinSuite extends AnalysisTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   // The stream side of a stream-static join.
   private val stream = LocalRelation(Seq($"streamTenant".int, $"streamId".int), isStreaming = true)
   // A lookup-only table has no batch scan, so it reaches the join as this placeholder.

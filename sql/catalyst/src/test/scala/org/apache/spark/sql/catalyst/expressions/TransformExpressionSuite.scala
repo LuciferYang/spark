@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.logging.log4j.Level
 
-import org.apache.spark.{SparkArithmeticException, SparkException, SparkFunSuite, SparkThrowable}
+import org.apache.spark.{QueryContext, SparkArithmeticException, SparkException, SparkFunSuite, SparkThrowable}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{AnsiTypeCoercion, TypeCoercion}
@@ -735,7 +735,7 @@ class TransformExpressionSuite extends SparkFunSuite with ExpressionEvalHelper {
       errorClass = "NUMERIC_VALUE_OUT_OF_RANGE.WITHOUT_SUGGESTION",
       messageParameters = Map("roundedValue" -> "1.5", "originalValue" -> "1.45",
         "precision" -> "1", "scale" -> "0"),
-      context = Array.empty, summary = "")
+      context = Array.empty[QueryContext], summary = "")
     val outOfRangeText = TransformExpression.failureText(outOfRange)
     assert(outOfRangeText.startsWith("The 1.5 rounded half up from 1.45 cannot be represented"),
       outOfRangeText)

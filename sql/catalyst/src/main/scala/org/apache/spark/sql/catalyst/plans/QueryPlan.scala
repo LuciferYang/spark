@@ -839,12 +839,14 @@ object QueryPlan extends PredicateHelper {
     e.transformUp {
       case s: PlanExpression[QueryPlan[_] @unchecked] =>
         // Normalize the outer references in the subquery plan.
-        val normalizedPlan = AnalysisHelper.allowInvokingTransformsInAnalyzer {
+        val normalizedPlan = AnalysisHelper.allowInvokingTransformsInAnalyzer[QueryPlan[_]] {
           s.plan.transformAllExpressionsWithPruning(_.containsPattern(OUTER_REFERENCE)) {
             case OuterReference(r) => OuterReference(QueryPlan.normalizeExpressions(r, input))
           }
         }
-        s.withNewPlan(normalizedPlan)
+        // The cast replaces the type that the pattern binds, which Scala 3 cannot match with
+        // the type of `normalizedPlan`.
+        s.asInstanceOf[PlanExpression[QueryPlan[_]]].withNewPlan(normalizedPlan)
 
       case ar: AttributeReference =>
         val ordinal = input.indexOf(ar.exprId)

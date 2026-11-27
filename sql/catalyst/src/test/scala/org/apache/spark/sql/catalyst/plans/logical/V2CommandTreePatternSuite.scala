@@ -21,7 +21,6 @@ import java.util
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.ProjectingInternalRow
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.catalyst.trees.TreePattern
 import org.apache.spark.sql.catalyst.util.{ReplaceDataProjections, WriteDeltaProjections}
@@ -35,6 +34,9 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
  * both the shared `COMMAND` bit and its own identity bit, so rules can prune on either.
  */
 class V2CommandTreePatternSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val target = LocalRelation($"a".int, $"b".int)
   private val source = LocalRelation($"c".int, $"d".int)

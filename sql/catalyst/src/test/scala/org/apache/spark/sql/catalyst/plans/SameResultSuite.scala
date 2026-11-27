@@ -18,7 +18,6 @@
 package org.apache.spark.sql.catalyst.plans
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.optimizer.EliminateResolvedHint
@@ -31,6 +30,10 @@ import org.apache.spark.sql.types.BooleanType
  * Tests for the sameResult function of [[LogicalPlan]].
  */
 class SameResultSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   val testRelation = LocalRelation($"a".int, $"b".int, $"c".int)
   val testRelation2 = LocalRelation($"a".int, $"b".int, $"c".int)
 

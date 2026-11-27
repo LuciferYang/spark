@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.statsEstimation
 import org.mockito.Mockito.mock
 
 import org.apache.spark.sql.catalyst.analysis.ResolvedNamespace
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Attribute, AttributeMap, AttributeReference, Cast, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, Inner, LeftSingle, PlanTest}
@@ -31,6 +30,10 @@ import org.apache.spark.sql.types.{BooleanType, ByteType, CharType, IntegerType,
 import org.apache.spark.util.ArrayImplicits._
 
 class BasicStatsEstimationSuite extends PlanTest with StatsEstimationTestBase {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   val attribute = attr("key")
   val colStat = ColumnStat(distinctCount = Some(10), min = Some(1), max = Some(10),
     nullCount = Some(0), avgLen = Some(4), maxLen = Some(4))

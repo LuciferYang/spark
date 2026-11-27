@@ -22,7 +22,6 @@ import java.sql.Timestamp
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.analysis.AnsiTypeCoercion._
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -31,6 +30,10 @@ import org.apache.spark.sql.internal.types.{AbstractArrayType, StringTypeWithCol
 import org.apache.spark.sql.types._
 
 class AnsiTypeCoercionSuite extends TypeCoercionSuiteBase {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
+
   import TypeCoercionSuite._
 
   test("combined type coercion invokes every rule in order") {
@@ -1114,7 +1117,7 @@ class AnsiTypeCoercionSuite extends TypeCoercionSuiteBase {
 
   test("SPARK-35937: GetDateFieldOperations") {
     val ts = Literal(Timestamp.valueOf("2021-01-01 01:30:00"))
-    Seq(
+    Seq[Expression => Expression](
       DayOfYear, Year, YearOfWeek, Quarter, Month, DayOfMonth, DayOfWeek, WeekDay, WeekOfYear
     ).foreach { operation =>
       ruleTest(

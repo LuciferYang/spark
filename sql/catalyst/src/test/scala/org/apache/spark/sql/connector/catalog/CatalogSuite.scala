@@ -1201,7 +1201,7 @@ class CatalogSuite extends SparkFunSuite {
     catalog.createNamespace(Array("ns1"), Map("property" -> "value").asJava)
 
     assert(catalog.listNamespaces === Array(Array("ns1")))
-    assert(catalog.listNamespaces(Array()) === Array(Array("ns1")))
+    assert(catalog.listNamespaces(Array.empty[String]) === Array(Array("ns1")))
     assert(catalog.listNamespaces(Array("ns1")) === Array())
   }
 
@@ -1225,7 +1225,7 @@ class CatalogSuite extends SparkFunSuite {
     catalog.createTable(ident2, tableInfo2)
 
     assert(catalog.listNamespaces === Array(Array("ns1")))
-    assert(catalog.listNamespaces(Array()) === Array(Array("ns1")))
+    assert(catalog.listNamespaces(Array.empty[String]) === Array(Array("ns1")))
     assert(catalog.listNamespaces(Array("ns1")) === Array(Array("ns1", "ns2")))
     assert(catalog.listNamespaces(Array("ns1", "ns2")) === Array())
   }
@@ -1240,7 +1240,7 @@ class CatalogSuite extends SparkFunSuite {
     catalog.createTable(ident2, columns, emptyTrans, emptyProps)
 
     assert(catalog.listNamespaces === Array(Array("ns1")))
-    assert(catalog.listNamespaces(Array()) === Array(Array("ns1")))
+    assert(catalog.listNamespaces(Array.empty[String]) === Array(Array("ns1")))
     assert(catalog.listNamespaces(Array("ns1")) === Array(Array("ns1", "ns2")))
     assert(catalog.listNamespaces(Array("ns1", "ns2")) === Array())
   }

@@ -2428,7 +2428,7 @@ case class RepartitionByExpression(
     if (numPartitions == 1) {
       SinglePartition
     } else {
-      super.partitioning
+      super[HasPartitionExpressions].partitioning
     }
   }
 

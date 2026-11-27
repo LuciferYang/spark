@@ -118,15 +118,15 @@ object StructFilters {
     }
     def translate(filter: sources.Filter): Option[Expression] = filter match {
       case sources.And(left, right) =>
-        zip(translate(left), translate(right)).map(And.tupled)
+        zip(translate(left), translate(right)).map((And.apply _).tupled)
       case sources.Or(left, right) =>
-        zip(translate(left), translate(right)).map(Or.tupled)
+        zip(translate(left), translate(right)).map((Or.apply _).tupled)
       case sources.Not(child) =>
         translate(child).map(Not)
       case sources.EqualTo(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(EqualTo.tupled)
+        zipAttributeAndValue(attribute, value).map((EqualTo.apply _).tupled)
       case sources.EqualNullSafe(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(EqualNullSafe.tupled)
+        zipAttributeAndValue(attribute, value).map((EqualNullSafe.apply _).tupled)
       case sources.IsNull(attribute) =>
         toRef(attribute).map(IsNull)
       case sources.IsNotNull(attribute) =>
@@ -139,19 +139,19 @@ object StructFilters {
           None
         }
       case sources.GreaterThan(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(GreaterThan.tupled)
+        zipAttributeAndValue(attribute, value).map((GreaterThan.apply _).tupled)
       case sources.GreaterThanOrEqual(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(GreaterThanOrEqual.tupled)
+        zipAttributeAndValue(attribute, value).map((GreaterThanOrEqual.apply _).tupled)
       case sources.LessThan(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(LessThan.tupled)
+        zipAttributeAndValue(attribute, value).map((LessThan.apply _).tupled)
       case sources.LessThanOrEqual(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(LessThanOrEqual.tupled)
+        zipAttributeAndValue(attribute, value).map((LessThanOrEqual.apply _).tupled)
       case sources.StringContains(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(Contains.tupled)
+        zipAttributeAndValue(attribute, value).map((Contains.apply _).tupled)
       case sources.StringStartsWith(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(StartsWith.tupled)
+        zipAttributeAndValue(attribute, value).map((StartsWith.apply _).tupled)
       case sources.StringEndsWith(attribute, value) =>
-        zipAttributeAndValue(attribute, value).map(EndsWith.tupled)
+        zipAttributeAndValue(attribute, value).map((EndsWith.apply _).tupled)
       case sources.AlwaysTrue() =>
         Some(Literal(true, BooleanType))
       case sources.AlwaysFalse() =>

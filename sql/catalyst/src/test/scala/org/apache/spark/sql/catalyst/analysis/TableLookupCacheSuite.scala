@@ -32,6 +32,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogStorageFor
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.connector.catalog.{CatalogManager, Identifier, InMemoryTable, InMemoryTableCatalog, Table}
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege
+import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -55,7 +56,7 @@ class TableLookupCacheSuite extends AnalysisTest with Matchers {
         new InMemoryTable(
           catalogTable.identifier.table,
           catalogTable.schema,
-          Array.empty,
+          Array.empty[Transform],
           Map.empty[String, String].asJava)
       }
       override def loadTable(

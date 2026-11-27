@@ -395,15 +395,18 @@ abstract class DeclarativeAggregate
   extends AggregateFunction
   with Serializable {
 
+  // The members below are `def`s so that implementations can define them as `lazy val`s, which
+  // Scala 3 does not allow for an abstract `val`.
+
   /**
    * Expressions for initializing empty aggregation buffers.
    */
-  val initialValues: Seq[Expression]
+  def initialValues: Seq[Expression]
 
   /**
    * Expressions for updating the mutable aggregation buffer based on an input row.
    */
-  val updateExpressions: Seq[Expression]
+  def updateExpressions: Seq[Expression]
 
   /**
    * A sequence of expressions for merging two aggregation buffers together. When defining these
@@ -411,13 +414,13 @@ abstract class DeclarativeAggregate
    * to the attributes corresponding to each of the buffers being merged (this magic is enabled
    * by the [[RichAttribute]] implicit class).
    */
-  val mergeExpressions: Seq[Expression]
+  def mergeExpressions: Seq[Expression]
 
   /**
    * An expression which returns the final value for this aggregate function. Its data type should
    * match this expression's [[dataType]].
    */
-  val evaluateExpression: Expression
+  def evaluateExpression: Expression
 
   /** An expression-based aggregate's bufferSchema is derived from bufferAttributes. */
   final override def aggBufferSchema: StructType = DataTypeUtils.fromAttributes(aggBufferAttributes)

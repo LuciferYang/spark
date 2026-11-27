@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{ArrayDistinct, ArrayExcept, ArrayIntersect, ArraysOverlap, ArrayUnion, CaseWhen, Cast, EvalMode, If, IsNull, KnownFloatingPointNormalized, Literal, RaiseError}
 import org.apache.spark.sql.catalyst.plans.{LeftAnti, PlanTest}
@@ -26,6 +25,9 @@ import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.types.DoubleType
 
 class NormalizeFloatingPointNumbersSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches = Batch("NormalizeFloatingPointNumbers", Once, NormalizeFloatingNumbers) :: Nil

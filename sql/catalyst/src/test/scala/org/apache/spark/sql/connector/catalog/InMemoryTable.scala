@@ -38,7 +38,9 @@ import org.apache.spark.util.ArrayImplicits._
  */
 class InMemoryTable(
     name: String,
-    columns: Array[Column],
+    // Not named `columns`: Scala 3 does not let a constructor parameter share the name of the
+    // `columns()` method.
+    initialColumns: Array[Column],
     override val partitioning: Array[Transform],
     override val properties: util.Map[String, String],
     override val constraints: Array[Constraint] = Array.empty,
@@ -50,8 +52,8 @@ class InMemoryTable(
     override val numRowsPerSplit: Int = Int.MaxValue,
     override val id: String = UUID.randomUUID().toString,
     override val schemaAlignmentConfig: SchemaAlignmentConfig = SchemaAlignmentConfig.DEFAULT)
-  extends InMemoryBaseTable(name, columns, partitioning, properties, constraints, distribution,
-    ordering, numPartitions, advisoryPartitionSize, isDistributionStrictlyRequired,
+  extends InMemoryBaseTable(name, initialColumns, partitioning, properties, constraints,
+    distribution, ordering, numPartitions, advisoryPartitionSize, isDistributionStrictlyRequired,
     numRowsPerSplit, schemaAlignmentConfig) with SupportsDelete {
 
   def this(

@@ -209,9 +209,9 @@ case class FromProtobuf(
     }
     val freshOptions = options.freshCopyIfContainsStatefulExpression()
     val optionsValue: Map[String, String] = freshOptions.eval() match {
-      case a: ArrayBasedMapData if a.keyArray.array.nonEmpty =>
-        val keys: Array[String] = a.keyArray.array.map(_.toString)
-        val values: Array[String] = a.valueArray.array.map(_.toString)
+      case a: ArrayBasedMapData if a.keyArray().array.nonEmpty =>
+        val keys: Array[String] = a.keyArray().array.map(_.toString)
+        val values: Array[String] = a.valueArray().array.map(_.toString)
         keys.zip(values).toMap
       case _ => Map.empty
     }
@@ -419,9 +419,9 @@ case class ToProtobuf(
     }
     val freshOptions = options.freshCopyIfContainsStatefulExpression()
     val optionsValue: Map[String, String] = freshOptions.eval() match {
-      case a: ArrayBasedMapData if a.keyArray.array.nonEmpty =>
-        val keys: Array[String] = a.keyArray.array.map(_.toString)
-        val values: Array[String] = a.valueArray.array.map(_.toString)
+      case a: ArrayBasedMapData if a.keyArray().array.nonEmpty =>
+        val keys: Array[String] = a.keyArray().array.map(_.toString)
+        val values: Array[String] = a.valueArray().array.map(_.toString)
         keys.zip(values).toMap
       case _ => Map.empty
     }

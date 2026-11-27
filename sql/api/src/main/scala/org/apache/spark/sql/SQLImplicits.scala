@@ -19,10 +19,10 @@ package org.apache.spark.sql
 import scala.collection.Map
 import scala.language.implicitConversions
 import scala.reflect.classTag
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoder
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders._
 

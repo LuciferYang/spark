@@ -36,7 +36,7 @@ class RowTest extends AnyFunSpec with Matchers {
     StructField("col1", StringType) ::
     StructField("col2", StringType) ::
     StructField("col3", IntegerType) :: Nil)
-  val values = Array("value1", "value2", 1)
+  val values = Array[Any]("value1", "value2", 1)
   val valuesWithoutCol3 = Array[Any](null, "value2", null)
 
   val sampleRow: Row = new GenericRowWithSchema(values, schema)

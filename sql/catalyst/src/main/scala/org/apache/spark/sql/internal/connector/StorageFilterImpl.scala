@@ -20,7 +20,7 @@ package org.apache.spark.sql.internal.connector
 import org.apache.spark.SparkException
 import org.apache.spark.internal.{Logging, LogKeys}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BasePredicate, BindReferences, Expression => CatalystExpression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSeq, BasePredicate, BindReferences, Expression => CatalystExpression}
 import org.apache.spark.sql.connector.expressions.{FieldReference, NamedReference}
 import org.apache.spark.sql.connector.read.{StorageFilter, StorageFilterNotAppliedException}
 

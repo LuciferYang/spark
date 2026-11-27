@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst.optimizer.joinReorder
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeMap, Divide, EvalMode, Expression, If, IsNull, Literal, NumericEvalContext, RaiseError}
 import org.apache.spark.sql.catalyst.optimizer._
@@ -30,6 +29,9 @@ import org.apache.spark.sql.internal.SQLConf.{CBO_ENABLED, JOIN_REORDER_ENABLED}
 
 
 class JoinReorderSuite extends JoinReorderPlanTestBase with StatsEstimationTestBase {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches =

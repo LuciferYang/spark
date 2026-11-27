@@ -20,7 +20,6 @@ package org.apache.spark.sql.catalyst.optimizer
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Average, MaxBy, MaxMinByK, MinBy, Sum}
@@ -30,6 +29,9 @@ import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.types.{Decimal, DecimalType, DoubleType, LongType}
 
 class DecimalAggregatesSuite extends PlanTest with ScalaCheckDrivenPropertyChecks {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches = Batch("Decimal Optimizations", FixedPoint(100),

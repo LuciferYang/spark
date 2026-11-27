@@ -27,6 +27,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
 
 class EliminateSortsBeforeRepartitionSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   val catalog = new SessionCatalog(new InMemoryCatalog, EmptyFunctionRegistry)
   val analyzer = new Analyzer(catalog)

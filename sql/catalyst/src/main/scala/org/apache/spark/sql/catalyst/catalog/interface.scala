@@ -38,7 +38,7 @@ import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{CurrentUserContext, FunctionIdentifier, InternalRow, SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.{MultiInstanceRelation, NormalizeableRelation, Resolver, SchemaBinding, SchemaCompensation, SchemaEvolution, SchemaTypeEvolution, SchemaUnsupported, UnresolvedLeafNode, ViewSchemaMode}
 import org.apache.spark.sql.catalyst.catalog.CatalogTable.VIEW_STORING_ANALYZED_PLAN
-import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeMap, AttributeReference, Cast, ExprId, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeMap, AttributeReference, AttributeSeq, Cast, ExprId, Literal}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.EstimationUtils
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
@@ -394,8 +394,8 @@ case class BucketSpec(
   def toJsonLinkedHashMap: mutable.LinkedHashMap[String, JValue] = {
     mutable.LinkedHashMap[String, JValue](
       "Num Buckets" -> JInt(numBuckets),
-      "Bucket Columns" -> JArray(bucketColumnNames.map(JString).toList),
-      "Sort Columns" -> JArray(sortColumnNames.map(JString).toList)
+      "Bucket Columns" -> JArray(bucketColumnNames.map(JString(_)).toList),
+      "Sort Columns" -> JArray(sortColumnNames.map(JString(_)).toList)
     )
   }
 }
@@ -651,7 +651,7 @@ case class CatalogTable(
         filteredTableProperties.toSeq.sortBy(_._1).map { case (k, v) => k -> JString(v) }: _*)
 
     val partitionColumns: JValue =
-      if (partitionColumnNames.nonEmpty) JArray(partitionColumnNames.map(JString).toList)
+      if (partitionColumnNames.nonEmpty) JArray(partitionColumnNames.map(JString(_)).toList)
       else JNull
 
     val lastAccess: JValue =
@@ -700,9 +700,9 @@ case class CatalogTable(
       }
       val viewQueryOutputColumns: JValue = Try {
         if (viewSchemaMode == SchemaEvolution) {
-          JArray(schema.map(_.name).map(JString).toList)
+          JArray(schema.map(_.name).map(JString(_)).toList)
         } else if (viewQueryColumnNames.nonEmpty) {
-          JArray(viewQueryColumnNames.map(JString).toList)
+          JArray(viewQueryColumnNames.map(JString(_)).toList)
         } else {
           JNull
         }

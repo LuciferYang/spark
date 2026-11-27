@@ -24,7 +24,6 @@ import org.apache.spark.{SPARK_DOC_ROOT, SparkFunSuite, SparkIllegalArgumentExce
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult.{DataTypeMismatch, InvalidFormat}
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.Cast._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, GenerateUnsafeProjection}
 import org.apache.spark.sql.catalyst.optimizer.ConstantFolding
@@ -39,6 +38,9 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
 class StringExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("concat") {
     def testConcat(inputs: String*): Unit = {
@@ -482,7 +484,7 @@ class StringExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
     checkEvaluation(
       new Mask(Literal(smile), Literal('Y'), Literal('y'), Literal('n'), Literal('*')), "*")
-    checkEvaluation(new Mask(Literal("ABC"), Literal(smile)), smile * 3)
+    checkEvaluation(new Mask(Literal("ABC"), Literal(smile)), smile.repeat(3))
     checkEvaluation(new Mask(Literal(s"A$boldA 1$boldZero")), "XX nn")
     // Supplementary upper-case, lower-case and digit characters are each classified and
     // replaced like their BMP counterparts.

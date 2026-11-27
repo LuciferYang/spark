@@ -36,7 +36,6 @@ import org.apache.spark.sql.types._
 
 
 class PredicateSuite extends SparkFunSuite with ExpressionEvalHelper {
-
   private def booleanLogicTest(
     name: String,
     op: (Expression, Expression) => Expression,
@@ -84,15 +83,15 @@ class PredicateSuite extends SparkFunSuite with ExpressionEvalHelper {
     notTrueTable.foreach { case (v, answer) =>
       checkEvaluation(Not(NonFoldableLiteral.create(v, BooleanType)), answer)
     }
-    checkConsistencyBetweenInterpretedAndCodegen(Not, BooleanType)
+    checkConsistencyBetweenInterpretedAndCodegen(Not.apply _, BooleanType)
   }
 
   test("AND, OR, EqualTo, EqualNullSafe consistency check") {
-    checkConsistencyBetweenInterpretedAndCodegen(And, BooleanType, BooleanType)
-    checkConsistencyBetweenInterpretedAndCodegen(Or, BooleanType, BooleanType)
+    checkConsistencyBetweenInterpretedAndCodegen(And.apply _, BooleanType, BooleanType)
+    checkConsistencyBetweenInterpretedAndCodegen(Or.apply _, BooleanType, BooleanType)
     DataTypeTestUtils.propertyCheckSupported.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(EqualTo, dt, dt)
-      checkConsistencyBetweenInterpretedAndCodegen(EqualNullSafe, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(EqualTo.apply _, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(EqualNullSafe.apply _, dt, dt)
     }
   }
 
@@ -396,10 +395,10 @@ class PredicateSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("BinaryComparison consistency check") {
     DataTypeTestUtils.ordered.foreach { dt =>
-      checkConsistencyBetweenInterpretedAndCodegen(LessThan, dt, dt)
-      checkConsistencyBetweenInterpretedAndCodegen(LessThanOrEqual, dt, dt)
-      checkConsistencyBetweenInterpretedAndCodegen(GreaterThan, dt, dt)
-      checkConsistencyBetweenInterpretedAndCodegen(GreaterThanOrEqual, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(LessThan.apply _, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(LessThanOrEqual.apply _, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(GreaterThan.apply _, dt, dt)
+      checkConsistencyBetweenInterpretedAndCodegen(GreaterThanOrEqual.apply _, dt, dt)
     }
   }
 

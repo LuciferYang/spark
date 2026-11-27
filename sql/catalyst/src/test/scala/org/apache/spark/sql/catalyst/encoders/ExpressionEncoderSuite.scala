@@ -25,11 +25,11 @@ import java.util.Arrays
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.{classTag, ClassTag}
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.{SPARK_DOC_ROOT, SparkArithmeticException, SparkRuntimeException, SparkUnsupportedOperationException}
 import org.apache.spark.sql.{Encoder, Encoders, Row}
-import org.apache.spark.sql.catalyst.{FooClassWithEnum, FooEnum, OptionalData, PrimitiveData, ScalaReflection, ScroogeLikeExample}
+import org.apache.spark.sql.catalyst.{FooClassWithEnum, FooEnum, OptionalData, PrimitiveData, ScalaReflection, ScalaReflectionTestUtils, ScroogeLikeExample}
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.analysis.AnalysisTest
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.AgnosticEncoders.{BinaryEncoder, EncoderField, IterableEncoder, MapEncoder, OptionEncoder, PrimitiveIntEncoder, ProductEncoder, TimestampEncoder, TransformingEncoder}
@@ -255,14 +255,14 @@ class ExpressionEncoderSuite extends CodegenInterpretedPlanTest with AnalysisTes
     UDTCaseClass(new java.net.URI("http://spark.apache.org/")), "udt with case class")
 
   // Kryo encoders
-  encodeDecodeTest("hello", "kryo string")(encoderFor(Encoders.kryo[String]))
-  encodeDecodeTest(new KryoSerializable(15), "kryo object")(
-    encoderFor(Encoders.kryo[KryoSerializable]))
+  encodeDecodeTestWith("hello", "kryo string")(Encoders.kryo[String])
+  encodeDecodeTestWith(new KryoSerializable(15), "kryo object")(
+    Encoders.kryo[KryoSerializable])
 
   // Java encoders
-  encodeDecodeTest("hello", "java string")(encoderFor(Encoders.javaSerialization[String]))
-  encodeDecodeTest(new JavaSerializable(15), "java object")(
-    encoderFor(Encoders.javaSerialization[JavaSerializable]))
+  encodeDecodeTestWith("hello", "java string")(Encoders.javaSerialization[String])
+  encodeDecodeTestWith(new JavaSerializable(15), "java object")(
+    Encoders.javaSerialization[JavaSerializable])
 
   // test product encoders
   private def productTest[T <: Product : ExpressionEncoder](
@@ -357,32 +357,32 @@ class ExpressionEncoderSuite extends CodegenInterpretedPlanTest with AnalysisTes
     Seq(Seq((1, 2)))))
 
   // test for ExpressionEncoder.tuple
-  encodeDecodeTest(
+  encodeDecodeTestWith(
     1 -> 10L,
     "tuple with 2 flat encoders")(
-    encoderFor(Encoders.tuple(Encoders.scalaInt, Encoders.scalaLong)))
+    Encoders.tuple(Encoders.scalaInt, Encoders.scalaLong))
 
-  encodeDecodeTest(
+  encodeDecodeTestWith(
     (PrimitiveData(1, 1, 1, 1, 1, 1, true), (3, 30L)),
     "tuple with 2 product encoders")(
-    encoderFor(Encoders.tuple(Encoders.product[PrimitiveData], Encoders.product[(Int, Long)])))
+    Encoders.tuple(Encoders.product[PrimitiveData], Encoders.product[(Int, Long)]))
 
-  encodeDecodeTest(
+  encodeDecodeTestWith(
     (PrimitiveData(1, 1, 1, 1, 1, 1, true), 3),
     "tuple with flat encoder and product encoder")(
-    encoderFor(Encoders.tuple(Encoders.product[PrimitiveData], Encoders.scalaInt)))
+    Encoders.tuple(Encoders.product[PrimitiveData], Encoders.scalaInt))
 
-  encodeDecodeTest(
+  encodeDecodeTestWith(
     (3, PrimitiveData(1, 1, 1, 1, 1, 1, true)),
     "tuple with product encoder and flat encoder")(
-    encoderFor(Encoders.tuple(Encoders.scalaInt, Encoders.product[PrimitiveData])))
+    Encoders.tuple(Encoders.scalaInt, Encoders.product[PrimitiveData]))
 
-  encodeDecodeTest(
+  encodeDecodeTestWith(
     (1, (10, 100L)),
     "nested tuple encoder") {
     val intEnc = Encoders.scalaInt
     val longEnc = Encoders.scalaLong
-    encoderFor(Encoders.tuple(intEnc, Encoders.tuple(intEnc, longEnc)))
+    Encoders.tuple(intEnc, Encoders.tuple(intEnc, longEnc))
   }
 
   // test for value classes
@@ -515,7 +515,11 @@ class ExpressionEncoderSuite extends CodegenInterpretedPlanTest with AnalysisTes
 
     // test for tupled encoders
     {
-      val encoder = encoderFor(Encoders.tuple(Encoders.scalaInt, Encoders.product[(String, Int)]))
+      val encoder = {
+        implicit val tupleEncoder: Encoder[(Int, (String, Int))] =
+          Encoders.tuple(Encoders.scalaInt, Encoders.product[(String, Int)])
+        encoderFor[(Int, (String, Int))]
+      }
       val schema = encoder.schema
       assert(schema(0).nullable === false)
       assert(schema(1).nullable)
@@ -913,6 +917,17 @@ class ExpressionEncoderSuite extends CodegenInterpretedPlanTest with AnalysisTes
     }
   }
 
+  // `encodeDecodeTest` with the encoder given explicitly, which the Scala 3 build can pass to a
+  // context bound only with `using`, a syntax that the style checkers cannot parse.
+  private def encodeDecodeTestWith[T](input: T, testName: String)(encoder: Encoder[T]): Unit = {
+    val expressionEncoder = {
+      implicit val e: Encoder[T] = encoder
+      encoderFor[T]
+    }
+    implicit val e: ExpressionEncoder[T] = expressionEncoder
+    encodeDecodeTest(input, testName)
+  }
+
   private def encodeDecodeTest[T : ExpressionEncoder](
       input: T,
       testName: String,
@@ -998,10 +1013,7 @@ class ExpressionEncoderSuite extends CodegenInterpretedPlanTest with AnalysisTes
    * @see org.apache.spark.sql.catalyst.ScalaReflection.cleanUpReflectionObjects
    */
   private def verifyNotLeakingReflectionObjects[T](func: => T): T = {
-    def undoLogSize: Int = {
-      scala.reflect.runtime.universe
-        .asInstanceOf[scala.reflect.runtime.JavaUniverse].undoLog.log.size
-    }
+    def undoLogSize: Int = ScalaReflectionTestUtils.undoLogSize
 
     val previousUndoLogSize = undoLogSize
     val r = func

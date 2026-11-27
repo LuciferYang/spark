@@ -25,7 +25,6 @@ import org.apache.spark.{SparkFunSuite, TaskContext}
 import org.apache.spark.metrics.source.CodegenMetrics
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.expressions.objects._
@@ -40,6 +39,9 @@ import org.apache.spark.util.{ThreadUtils, Utils}
  * Additional tests for code generation.
  */
 class CodeGenerationSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   test("multithreaded eval") {
     import scala.concurrent._

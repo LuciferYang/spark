@@ -18,7 +18,6 @@
 package org.apache.spark.sql.catalyst.planning
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast, Coalesce, CollationKey, EvalMode, Expression, IsNull, Literal, RaiseError}
 import org.apache.spark.sql.catalyst.plans.Inner
@@ -26,6 +25,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{Join, LocalRelation}
 import org.apache.spark.sql.types.{IntegerType, StringType}
 
 class ExtractEquiJoinKeysSuite extends SparkFunSuite {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   private val c = AttributeReference("c", StringType("UTF8_LCASE"))()
   private val t = AttributeReference("t", StringType("UTF8_LCASE"))()

@@ -17,10 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import scala.reflect.runtime.universe.TypeTag
-
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
@@ -31,6 +29,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DoubleType, MetadataBuilder, StringType, StructType, TimestampType}
 
 class ColumnPruningSuite extends PlanTest {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   object Optimize extends RuleExecutor[LogicalPlan] {
     val batches = Batch("Column pruning", FixedPoint(100),

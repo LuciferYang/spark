@@ -522,7 +522,7 @@ abstract class InMemoryBaseTable(
         // Physically remove dropped column values from the row so they do not
         // survive through ALTER chains (e.g. DROP COLUMN then ADD COLUMN same name).
         val retainedRowAfterDroppedColumns = if (areColumnsDropped) {
-          new GenericInternalRow(fieldsRetainedInOldSchema.map {
+          new GenericInternalRow(fieldsRetainedInOldSchema.map[Any] {
             case (retainedField, idx) => row.get(idx, retainedField.dataType)
           })
         } else {
@@ -1465,7 +1465,7 @@ private class BufferedRowsReader(
     val metadataRow = new GenericInternalRow(metadataColumnNames.map {
       case "index" => index
       case "_partition" => UTF8String.fromString(partition.keyString())
-    }.toArray)
+    }.toArray[Any])
     new JoinedRow(row, metadataRow)
   }
 
@@ -1709,9 +1709,11 @@ class InMemoryCustomDriverMetric extends CustomSumMetric {
   override def description(): String = "number of rows from driver"
 }
 
-class InMemoryCustomDriverTaskMetric(value: Long) extends CustomTaskMetric {
+// The parameter is not named `value`: Scala 3 does not let it share the name of the `value()`
+// method.
+class InMemoryCustomDriverTaskMetric(metricValue: Long) extends CustomTaskMetric {
   override def name(): String = "number_of_rows_from_driver"
-  override def value(): Long = value
+  override def value(): Long = metricValue
 }
 
 class RowsReadCustomMetric extends CustomSumMetric {

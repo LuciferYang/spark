@@ -175,16 +175,18 @@ object StaxXmlParserUtils {
       options: XmlOptions): String = {
     val xmlString = new StringBuilder()
     var indent = 0
-    do {
+    var hasMore = true
+    while (hasMore) {
       val (str, ind) = nextEventToString(parser, indent)
       indent = ind
       xmlString.append(str)
-    } while (parser.peek() match {
-      case _: EndElement =>
-        // until the unclosed end element for the whole parent is found
-        indent > 0
-      case _ => true
-    })
+      hasMore = parser.peek() match {
+        case _: EndElement =>
+          // until the unclosed end element for the whole parent is found
+          indent > 0
+        case _ => true
+      }
+    }
     skipNextEndElement(parser, startElementName, options)
     xmlString.toString()
   }
@@ -203,11 +205,13 @@ object StaxXmlParserUtils {
     )
     val xmlString = new StringBuilder()
     var indent = 0
-    do {
+    var hasMore = true
+    while (hasMore) {
       val (str, ind) = nextEventToString(parser, indent)
       indent = ind
       xmlString.append(str)
-    } while (indent > 0)
+      hasMore = indent > 0
+    }
     xmlString.toString()
   }
 

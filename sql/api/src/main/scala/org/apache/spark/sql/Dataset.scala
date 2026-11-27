@@ -19,12 +19,12 @@ package org.apache.spark.sql
 import java.util
 
 import scala.jdk.CollectionConverters._
-import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.spark.annotation.{ClassicOnly, DeveloperApi, Experimental, Stable, Unstable}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.api.java.function._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.internal.{ToScalaUDF, UDFAdaptors}
 import org.apache.spark.sql.streaming.DataStreamWriter
@@ -1621,7 +1621,8 @@ abstract class Dataset[T] extends Serializable {
   def groupByKey[K](
       func: MapFunction[T, K],
       encoder: Encoder[K]): KeyValueGroupedDataset[K, T] = {
-    groupByKey(ToScalaUDF(func))(encoder)
+    implicit val keyEncoder: Encoder[K] = encoder
+    groupByKey(ToScalaUDF(func))
   }
 
   /**
@@ -2968,8 +2969,10 @@ abstract class Dataset[T] extends Serializable {
    * @group typedrel
    * @since 1.6.0
    */
-  def mapPartitions[U](f: MapPartitionsFunction[T, U], encoder: Encoder[U]): Dataset[U] =
-    mapPartitions(ToScalaUDF(f))(encoder)
+  def mapPartitions[U](f: MapPartitionsFunction[T, U], encoder: Encoder[U]): Dataset[U] = {
+    implicit val uEncoder: Encoder[U] = encoder
+    mapPartitions(ToScalaUDF(f))
+  }
 
   /**
    * (Scala-specific) Returns a new Dataset by first applying a function to all elements of this
@@ -2989,7 +2992,8 @@ abstract class Dataset[T] extends Serializable {
    * @since 1.6.0
    */
   def flatMap[U](f: FlatMapFunction[T, U], encoder: Encoder[U]): Dataset[U] = {
-    mapPartitions(UDFAdaptors.flatMapToMapPartitions(f))(encoder)
+    implicit val uEncoder: Encoder[U] = encoder
+    mapPartitions(UDFAdaptors.flatMapToMapPartitions(f))
   }
 
   /**

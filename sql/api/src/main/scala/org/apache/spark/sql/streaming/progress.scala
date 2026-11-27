@@ -140,6 +140,12 @@ class StateOperatorProgress private[spark] (
   }
 
   private[sql] def jsonValue: JValue = {
+    val customMetricsJson: JValue = if (!customMetrics.isEmpty) {
+      val keys = customMetrics.keySet.asScala.toSeq.sorted
+      keys.map { k => k -> JInt(customMetrics.get(k).toLong): JObject }.reduce[JObject](_ ~ _)
+    } else {
+      JNothing
+    }
     ("operatorName" -> JString(operatorName)) ~
       ("numRowsTotal" -> JInt(numRowsTotal)) ~
       ("numRowsUpdated" -> JInt(numRowsUpdated)) ~
@@ -151,14 +157,7 @@ class StateOperatorProgress private[spark] (
       ("numRowsDroppedByWatermark" -> JInt(numRowsDroppedByWatermark)) ~
       ("numShufflePartitions" -> JInt(numShufflePartitions)) ~
       ("numStateStoreInstances" -> JInt(numStateStoreInstances)) ~
-      ("customMetrics" -> {
-        if (!customMetrics.isEmpty) {
-          val keys = customMetrics.keySet.asScala.toSeq.sorted
-          keys.map { k => k -> JInt(customMetrics.get(k).toLong): JObject }.reduce(_ ~ _)
-        } else {
-          JNothing
-        }
-      })
+      ("customMetrics" -> customMetricsJson)
   }
 
   override def toString: String = prettyJson
@@ -319,11 +318,11 @@ private class ObjectToStringDeserializer extends JsonDeserializer[String] {
 class SourceProgress protected[spark] (
     val description: String,
     // SPARK-54390: Use a custom deserializer to convert the JSON object to a string.
-    @JsonDeserialize(using = classOf[ObjectToStringDeserializer])
+    @JsonDeserialize(`using` = classOf[ObjectToStringDeserializer])
     val startOffset: String,
-    @JsonDeserialize(using = classOf[ObjectToStringDeserializer])
+    @JsonDeserialize(`using` = classOf[ObjectToStringDeserializer])
     val endOffset: String,
-    @JsonDeserialize(using = classOf[ObjectToStringDeserializer])
+    @JsonDeserialize(`using` = classOf[ObjectToStringDeserializer])
     val latestOffset: String,
     val numInputRows: Long,
     // The NaN is used in deserialization to indicate the value was not set.
@@ -449,7 +448,7 @@ private object SafeJsonSerializer {
   def safeMapToJValue[T](map: ju.Map[String, T], valueToJValue: (String, T) => JValue): JValue = {
     if (map == null || map.isEmpty) return JNothing
     val keys = map.asScala.keySet.toSeq.sorted
-    keys.map { k => k -> valueToJValue(k, map.get(k)): JObject }.reduce(_ ~ _)
+    keys.map { k => k -> valueToJValue(k, map.get(k)): JObject }.reduce[JObject](_ ~ _)
   }
 
   /** Convert BigDecimal to JValue while handling empty or infinite values */

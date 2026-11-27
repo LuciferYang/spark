@@ -76,7 +76,7 @@ class InMemoryRowLevelOperationTableCatalog
     table
   }
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
+  override protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
     val table = loadTable(ident).asInstanceOf[InMemoryRowLevelOperationTable]
     val properties = CatalogV2Util.applyPropertiesChanges(table.properties, changes)
     val schema = computeAlterTableSchema(table.schema, changes.toSeq)
@@ -123,7 +123,7 @@ class InMemoryRowLevelOperationTableCatalog
  */
 class PartialSchemaEvolutionCatalog extends InMemoryRowLevelOperationTableCatalog {
 
-  override def alterTable(ident: Identifier, changes: TableChange*): Table = {
+  override protected def applyTableChanges(ident: Identifier, changes: Seq[TableChange]): Table = {
     val table = loadTable(ident).asInstanceOf[InMemoryRowLevelOperationTable]
     // Only apply property changes; ignore all schema/column changes so that the table
     // schema remains unchanged. This simulates a catalog that accepts alterTable but

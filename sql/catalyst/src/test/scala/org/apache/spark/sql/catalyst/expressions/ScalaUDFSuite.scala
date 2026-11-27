@@ -19,10 +19,9 @@ package org.apache.spark.sql.catalyst.expressions
 
 import java.util.Locale
 
-import scala.reflect.runtime.universe.TypeTag
-
 import org.apache.spark.{SparkException, SparkFunSuite}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.TypeTags.TypeTag
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.expressions.variant.{ParseJson, VariantGet}

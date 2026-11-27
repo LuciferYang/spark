@@ -26,13 +26,15 @@ import com.google.common.math.LongMath
 import org.apache.spark.{SparkArithmeticException, SparkFunSuite}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCoercion.implicitCast
-import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateMutableProjection
 import org.apache.spark.sql.catalyst.optimizer.SimpleTestOptimizer
 import org.apache.spark.sql.catalyst.plans.logical.{OneRowRelation, Project}
 import org.apache.spark.sql.types._
 
 class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
+  // Imported in the class too: Scala 3 prefers the `===` inherited from ScalaTest to the
+  // DSL `===` imported only at the top of the file.
+  import org.apache.spark.sql.catalyst.dsl.expressions._
 
   import IntegralLiteralTestUtils._
 
@@ -209,13 +211,13 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("sin") {
     testUnary(Sin, math.sin)
-    checkConsistencyBetweenInterpretedAndCodegen(Sin, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Sin.apply _, DoubleType)
   }
 
   test("csc") {
     def f: (Double) => Double = (x: Double) => 1 / math.sin(x)
     testUnary(Csc, f)
-    checkConsistencyBetweenInterpretedAndCodegen(Csc, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Csc.apply _, DoubleType)
     val nullLit = Literal.create(null, NullType)
     val intNullLit = Literal.create(null, IntegerType)
     val intLit = Literal.create(1, IntegerType)
@@ -229,12 +231,12 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
   test("asin") {
     testUnary(Asin, math.asin, (-10 to 10).map(_ * 0.1))
     testUnary(Asin, math.asin, (11 to 20).map(_ * 0.1), expectNaN = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Asin, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Asin.apply _, DoubleType)
   }
 
   test("sinh") {
     testUnary(Sinh, math.sinh)
-    checkConsistencyBetweenInterpretedAndCodegen(Sinh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Sinh.apply _, DoubleType)
   }
 
   test("asinh") {
@@ -255,7 +257,7 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
       Math.copySign(w, x)
     }
     testUnary(Asinh, asinhRef)
-    checkConsistencyBetweenInterpretedAndCodegen(Asinh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Asinh.apply _, DoubleType)
 
     checkEvaluation(Asinh(Double.NegativeInfinity), Double.NegativeInfinity)
 
@@ -267,13 +269,13 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("cos") {
     testUnary(Cos, math.cos)
-    checkConsistencyBetweenInterpretedAndCodegen(Cos, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Cos.apply _, DoubleType)
   }
 
   test("sec") {
     def f: (Double) => Double = (x: Double) => 1 / math.cos(x)
     testUnary(Sec, f)
-    checkConsistencyBetweenInterpretedAndCodegen(Sec, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Sec.apply _, DoubleType)
     val nullLit = Literal.create(null, NullType)
     val intNullLit = Literal.create(null, IntegerType)
     val intLit = Literal.create(1, IntegerType)
@@ -287,12 +289,12 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
   test("acos") {
     testUnary(Acos, math.acos, (-10 to 10).map(_ * 0.1))
     testUnary(Acos, math.acos, (11 to 20).map(_ * 0.1), expectNaN = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Acos, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Acos.apply _, DoubleType)
   }
 
   test("cosh") {
     testUnary(Cosh, math.cosh)
-    checkConsistencyBetweenInterpretedAndCodegen(Cosh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Cosh.apply _, DoubleType)
   }
 
   test("acosh") {
@@ -314,7 +316,7 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     }
     testUnary(Acosh, acoshRef, (10 to 20).map(_ * 0.1))
     testUnary(Acosh, acoshRef, (-20 to 9).map(_ * 0.1), expectNaN = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Acosh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Acosh.apply _, DoubleType)
 
     val nullLit = Literal.create(null, NullType)
     val doubleNullLit = Literal.create(null, DoubleType)
@@ -324,13 +326,13 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("tan") {
     testUnary(Tan, math.tan)
-    checkConsistencyBetweenInterpretedAndCodegen(Tan, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Tan.apply _, DoubleType)
   }
 
   test("cot") {
     def f: (Double) => Double = (x: Double) => 1 / math.tan(x)
     testUnary(Cot, f)
-    checkConsistencyBetweenInterpretedAndCodegen(Cot, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Cot.apply _, DoubleType)
     val nullLit = Literal.create(null, NullType)
     val intNullLit = Literal.create(null, IntegerType)
     val intLit = Literal.create(1, IntegerType)
@@ -343,18 +345,18 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("atan") {
     testUnary(Atan, math.atan)
-    checkConsistencyBetweenInterpretedAndCodegen(Atan, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Atan.apply _, DoubleType)
   }
 
   test("tanh") {
     testUnary(Tanh, math.tanh)
-    checkConsistencyBetweenInterpretedAndCodegen(Tanh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Tanh.apply _, DoubleType)
   }
 
   test("atanh") {
     // SPARK-28519: more accurate express for 1/2 * ln((1 + x) / (1 - x))
     testUnary(Atanh, (x: Double) => 0.5 * (StrictMath.log1p(x) - StrictMath.log1p(-x)))
-    checkConsistencyBetweenInterpretedAndCodegen(Atanh, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Atanh.apply _, DoubleType)
 
     val nullLit = Literal.create(null, NullType)
     val doubleNullLit = Literal.create(null, DoubleType)
@@ -364,17 +366,17 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("toDegrees") {
     testUnary(ToDegrees, math.toDegrees)
-    checkConsistencyBetweenInterpretedAndCodegen(ToDegrees, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(ToDegrees.apply _, DoubleType)
   }
 
   test("toRadians") {
     testUnary(ToRadians, math.toRadians)
-    checkConsistencyBetweenInterpretedAndCodegen(ToRadians, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(ToRadians.apply _, DoubleType)
   }
 
   test("cbrt") {
     testUnary(Cbrt, math.cbrt)
-    checkConsistencyBetweenInterpretedAndCodegen(Cbrt, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Cbrt.apply _, DoubleType)
   }
 
   def checkDataTypeAndCast(expression: Expression): Expression = expression match {
@@ -490,7 +492,7 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("rint") {
     testUnary(Rint, math.rint)
-    checkConsistencyBetweenInterpretedAndCodegen(Rint, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Rint.apply _, DoubleType)
   }
 
   test("SPARK-61175: rint returns the canonical NaN") {
@@ -518,35 +520,35 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("exp") {
     testUnary(Exp, StrictMath.exp)
-    checkConsistencyBetweenInterpretedAndCodegen(Exp, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Exp.apply _, DoubleType)
   }
 
   test("expm1") {
     testUnary(Expm1, StrictMath.expm1)
-    checkConsistencyBetweenInterpretedAndCodegen(Expm1, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Expm1.apply _, DoubleType)
   }
 
   test("signum") {
     testUnary[Double, Double](Signum, math.signum)
-    checkConsistencyBetweenInterpretedAndCodegen(Signum, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Signum.apply _, DoubleType)
   }
 
   test("log") {
     testUnary(Log, StrictMath.log, (1 to 20).map(_ * 0.1))
     testUnary(Log, StrictMath.log, (-5 to 0).map(_ * 0.1), expectNull = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Log, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Log.apply _, DoubleType)
   }
 
   test("log10") {
     testUnary(Log10, StrictMath.log10, (1 to 20).map(_ * 0.1))
     testUnary(Log10, StrictMath.log10, (-5 to 0).map(_ * 0.1), expectNull = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Log10, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Log10.apply _, DoubleType)
   }
 
   test("log1p") {
     testUnary(Log1p, StrictMath.log1p, (0 to 20).map(_ * 0.1))
     testUnary(Log1p, StrictMath.log1p, (-10 to -1).map(_ * 1.0), expectNull = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Log1p, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Log1p.apply _, DoubleType)
   }
 
   test("bin") {
@@ -568,14 +570,14 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(Bin(positiveLongLit), java.lang.Long.toBinaryString(positiveLong))
     checkEvaluation(Bin(negativeLongLit), java.lang.Long.toBinaryString(negativeLong))
 
-    checkConsistencyBetweenInterpretedAndCodegen(Bin, LongType)
+    checkConsistencyBetweenInterpretedAndCodegen(Bin.apply _, LongType)
   }
 
   test("log2") {
     def f: (Double) => Double = (x: Double) => StrictMath.log(x) / StrictMath.log(2)
     testUnary(Log2, f, (1 to 20).map(_ * 0.1))
     testUnary(Log2, f, (-5 to 0).map(_ * 1.0), expectNull = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Log2, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Log2.apply _, DoubleType)
   }
 
   test("sqrt") {
@@ -585,13 +587,13 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(Sqrt(Literal.create(null, DoubleType)), null, create_row(null))
     checkNaN(Sqrt(Literal(-1.0)), EmptyRow)
     checkNaN(Sqrt(Literal(-1.5)), EmptyRow)
-    checkConsistencyBetweenInterpretedAndCodegen(Sqrt, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Sqrt.apply _, DoubleType)
   }
 
   test("pow") {
     testBinary(Pow, StrictMath.pow, (-5 to 5).map(v => (v * 1.0, v * 1.0)))
     testBinary(Pow, StrictMath.pow, Seq((-1.0, 0.9), (-2.2, 1.7), (-2.2, -1.7)), expectNaN = true)
-    checkConsistencyBetweenInterpretedAndCodegen(Pow, DoubleType, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Pow.apply _, DoubleType, DoubleType)
   }
 
   test("shift left") {
@@ -613,8 +615,8 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(ShiftLeft(negativeLongLit, positiveIntLit), negativeLong << positiveInt)
     checkEvaluation(ShiftLeft(negativeLongLit, negativeIntLit), negativeLong << negativeInt)
 
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftLeft, IntegerType, IntegerType)
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftLeft, LongType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(ShiftLeft.apply _, IntegerType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(ShiftLeft.apply _, LongType, IntegerType)
   }
 
   test("shift right") {
@@ -636,8 +638,8 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(ShiftRight(negativeLongLit, positiveIntLit), negativeLong >> positiveInt)
     checkEvaluation(ShiftRight(negativeLongLit, negativeIntLit), negativeLong >> negativeInt)
 
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftRight, IntegerType, IntegerType)
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftRight, LongType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(ShiftRight.apply _, IntegerType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(ShiftRight.apply _, LongType, IntegerType)
   }
 
   test("shift right unsigned") {
@@ -667,8 +669,10 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     checkEvaluation(ShiftRightUnsigned(negativeLongLit, negativeIntLit),
       negativeLong >>> negativeInt)
 
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftRightUnsigned, IntegerType, IntegerType)
-    checkConsistencyBetweenInterpretedAndCodegen(ShiftRightUnsigned, LongType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(
+
+      ShiftRightUnsigned.apply _, IntegerType, IntegerType)
+    checkConsistencyBetweenInterpretedAndCodegen(ShiftRightUnsigned.apply _, LongType, IntegerType)
   }
 
   test("hex") {
@@ -710,12 +714,12 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
   test("hypot") {
     testBinary(Hypot, math.hypot)
-    checkConsistencyBetweenInterpretedAndCodegen(Hypot, DoubleType, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Hypot.apply _, DoubleType, DoubleType)
   }
 
   test("atan2") {
     testBinary(Atan2, math.atan2)
-    checkConsistencyBetweenInterpretedAndCodegen(Atan2, DoubleType, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Atan2.apply _, DoubleType, DoubleType)
   }
 
   test("binary log") {
@@ -747,7 +751,7 @@ class MathExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
       Logarithm(Literal(1.0), Literal(-1.0)),
       null,
       create_row(null))
-    checkConsistencyBetweenInterpretedAndCodegen(Logarithm, DoubleType, DoubleType)
+    checkConsistencyBetweenInterpretedAndCodegen(Logarithm.apply _, DoubleType, DoubleType)
   }
 
   test("truncate") {

@@ -1378,7 +1378,8 @@ object CatalystToExternalMap {
  * @param inputData An expression that when evaluated returns a map object.
  * @param collClass The type of the resulting collection.
  */
-case class CatalystToExternalMap private(
+// `private[catalyst]` rather than `private`, for the reason given in `ExternalMapToCatalyst`.
+case class CatalystToExternalMap private[catalyst](
     keyLoopVar: LambdaVariable,
     keyLambdaFunction: Expression,
     valueLoopVar: LambdaVariable,
@@ -1562,7 +1563,9 @@ object ExternalMapToCatalyst {
  *                       format.
  * @param inputData An expression that when evaluated returns the input map object.
  */
-case class ExternalMapToCatalyst private(
+// The constructor is `private[catalyst]` rather than `private`: Scala 3 makes `copy` as private
+// as the constructor, and the optimizer copies this expression.
+case class ExternalMapToCatalyst private[catalyst](
     keyLoopVar: LambdaVariable,
     keyConverter: Expression,
     valueLoopVar: LambdaVariable,
@@ -1858,7 +1861,7 @@ case class DecodeUsingSerializer[T](child: Expression, tag: ClassTag[T], kryo: B
 
   override def nullSafeEval(input: Any): Any = {
     val inputBytes = java.nio.ByteBuffer.wrap(input.asInstanceOf[Array[Byte]])
-    serializerInstance.deserialize(inputBytes)
+    serializerInstance.deserialize[Any](inputBytes)
   }
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
