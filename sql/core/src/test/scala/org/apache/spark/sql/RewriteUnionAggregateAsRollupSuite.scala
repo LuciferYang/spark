@@ -20,6 +20,7 @@ package org.apache.spark.sql
 import org.apache.spark.sql.catalyst.plans.logical.Expand
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
+import org.apache.spark.sql.types.{DataType, Metadata}
 
 /**
  * End-to-end tests for [[RewriteUnionAggregateAsRollup]]. Unlike the
@@ -30,11 +31,10 @@ import org.apache.spark.sql.test.SharedSparkSession
  * intermediate Projects, or other plan shapes the rule's detection must
  * tolerate.
  *
- * Each test verifies two things:
- *   1. With the rule enabled, the optimized plan contains an Expand
- *      operator (proving the rule fired).
- *   2. Result rows are identical with the rule on vs off (semantic
- *      equivalence).
+ * A positive test checks that, with the rule enabled, the optimized plan contains
+ * an Expand (the rule fired) and that rows, and the optimized output's names, types
+ * and metadata, are identical with the rule on and off. A negative test checks that
+ * no Expand appears.
  */
 class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSession {
   import testImplicits._
@@ -52,26 +52,31 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     // Compare as sorted row sequences (multiset), NOT as Sets. UNION ALL has
     // multiset semantics, so a rewrite that changed the COUNT of an otherwise
     // identical row would be invisible to Set comparison.
+    // `df.schema` comes from the analyzed plan, which the rule never changes, so compare
+    // the optimized plan's output instead.
+    def optimizedOutput(df: DataFrame): Seq[(String, DataType, Metadata)] =
+      df.queryExecution.optimizedPlan.output.map(a => (a.name, a.dataType, a.metadata))
     val (withRuleSchema, withRule) = withSQLConf(
         SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "true") {
       assert(planContainsExpand(sqlText),
         s"Rule did not fire on:\n$sqlText")
       val df = spark.sql(sqlText)
-      (df.schema, df.collect().map(_.toString()).sorted.toSeq)
+      (optimizedOutput(df), df.collect().map(_.toString()).sorted.toSeq)
     }
     val (withoutRuleSchema, withoutRule) = withSQLConf(
         SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "false") {
       val df = spark.sql(sqlText)
-      (df.schema, df.collect().map(_.toString()).sorted.toSeq)
+      (optimizedOutput(df), df.collect().map(_.toString()).sorted.toSeq)
     }
-    // Schema as well as values. The remap pins every output to u.output's type by
-    // construction; if that pinning regressed and a widened decimal leaked through,
-    // small magnitudes would still print identically and the row comparison below
-    // would pass while the user-visible schema had changed.
+    // Output names, types and metadata as well as values. The remap pins every output
+    // to u.output's type and metadata; if that regressed and a widened decimal leaked
+    // through, small magnitudes would still print identically and the row comparison
+    // below would pass. Nullability is not compared: the rewritten Union's comes from
+    // its two children, the original's from all of them.
     assert(withRuleSchema == withoutRuleSchema,
-      s"Schema mismatch on:\n$sqlText\n" +
-      s"  withRule=${withRuleSchema.catalogString}\n" +
-      s"  withoutRule=${withoutRuleSchema.catalogString}")
+      s"Output mismatch on:\n$sqlText\n" +
+      s"  withRule=$withRuleSchema\n" +
+      s"  withoutRule=$withoutRuleSchema")
     assert(withRule == withoutRule,
       s"Result mismatch on:\n$sqlText\n" +
       s"  withRule=${withRule.size} rows, withoutRule=${withoutRule.size} rows\n" +
@@ -222,11 +227,10 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     // amt is Decimal(38,2) (max precision; sum stays Decimal(38,2), no widening).
     // Group (a,e) has 1000 rows of ~10^34, so their inner sum (~10^37) exceeds
     // the Decimal(38,2) range and overflows -> the original inner `tot` is NULL
-    // for (a,e), which propagates through the outer sum-of-sum (sum over NULL).
+    // for (a,e); the outer sum-of-sum skips it.
     // The rewrite must reproduce this NULL EXACTLY by folding OVER the inner
     // aggregate. (With the old over-source widening it would have recomputed a
-    // non-NULL value, diverging.) Only a few rows are needed -- the overflow is
-    // genuine, not replication-dependent.
+    // non-NULL value, diverging.)
     withTempView("big") {
       // amt carried as a STRING and CAST to Decimal(38,2) in SQL (a 34-digit
       // value does not fit the Decimal(38,18) the encoder would infer from a
@@ -254,7 +258,8 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
           |""".stripMargin
       // Non-ANSI so the genuine inner overflow yields NULL (not a thrown error),
       // letting checkRewriteAndEquivalence compare rule-on vs rule-off results.
-      // Both must produce the SAME NULL for the (a,e) group's rolled-up totals.
+      // Both must produce the same NULL for the (a,e) row; sum skips it, so the
+      // rolled-up totals for channel a and the grand total are 10.00 and 30.00.
       withSQLConf(SQLConf.ANSI_ENABLED.key -> "false") {
         checkRewriteAndEquivalence(sql)
       }
@@ -438,11 +443,14 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
   }
 
   test("function mismatch (SUM-of-MAX) is correctly rejected") {
+    // Killed by outerMatchesInner's class check. The inner max is over a BIGINT so it
+    // has the fold's type: with max over INT the union would add a coercion cast, and
+    // verifyDiscardedCastsAreRemapCasts would reject the shape without that check.
     withSalesTable {
       val sql =
         """
           |WITH s AS (
-          |  SELECT channel, region, max(amt) AS mx
+          |  SELECT channel, region, max(CAST(amt AS BIGINT)) AS mx
           |  FROM sales GROUP BY channel, region)
           |SELECT channel, region, mx FROM s
           |UNION ALL
@@ -456,7 +464,7 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     }
   }
 
-  test("AVG (non-idempotent) is correctly rejected") {
+  test("AVG (not a foldable aggregate) is correctly rejected") {
     withSalesTable {
       val sql =
         """
@@ -477,7 +485,10 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("non-prefix-shrinking GROUP BY hierarchy is correctly rejected") {
     withSalesTable {
-      // [region], [channel] -- not a strict prefix hierarchy
+      // Levels [channel, region], [region], []: [region] is not the size-1 ROLLUP
+      // prefix [channel], so isPrefixShrinkingHierarchy rejects it. The grand-total
+      // branch is there so nothing else does: without it buildRollupPlan finds no
+      // GROUP BY () branch and bails on its own.
       val sql =
         """
           |WITH s AS (
@@ -488,8 +499,8 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
           |SELECT NULL AS channel, region, sum(tot) AS tot
           |FROM s GROUP BY region
           |UNION ALL
-          |SELECT channel, NULL AS region, sum(tot) AS tot
-          |FROM s GROUP BY channel
+          |SELECT NULL AS channel, NULL AS region, sum(tot) AS tot
+          |FROM s
           |""".stripMargin
       checkNotRewritten(sql)
     }
@@ -549,23 +560,29 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate AVG ROLLUP via UNION ALL") {
     withSalesTable {
-      // Each branch independently computes avg(amt) from `sales` at a
-      // different GROUP BY prefix level. No shared inner aggregate.
-      val sql =
-        """
-          |SELECT channel, region, product, avg(amt) AS av
-          |FROM sales GROUP BY channel, region, product
-          |UNION ALL
-          |SELECT channel, region, NULL AS product, avg(amt) AS av
-          |FROM sales GROUP BY channel, region
-          |UNION ALL
-          |SELECT channel, NULL AS region, NULL AS product, avg(amt) AS av
-          |FROM sales GROUP BY channel
-          |UNION ALL
-          |SELECT NULL AS channel, NULL AS region, NULL AS product, avg(amt) AS av
-          |FROM sales
-          |""".stripMargin
-      checkRewriteAndEquivalence(sql)
+      // Each branch independently computes avg(amt) from the source at a
+      // different GROUP BY prefix level. No shared inner aggregate. The extra row
+      // makes the groups unequal in size, so an average of finer-level averages
+      // would differ from the true average and the equivalence check would see it.
+      withTempView("usales") {
+        spark.sql("""CREATE OR REPLACE TEMP VIEW usales AS
+          SELECT * FROM sales UNION ALL SELECT 'store', 'east', 'a', 100""")
+        val sql =
+          """
+            |SELECT channel, region, product, avg(amt) AS av
+            |FROM usales GROUP BY channel, region, product
+            |UNION ALL
+            |SELECT channel, region, NULL AS product, avg(amt) AS av
+            |FROM usales GROUP BY channel, region
+            |UNION ALL
+            |SELECT channel, NULL AS region, NULL AS product, avg(amt) AS av
+            |FROM usales GROUP BY channel
+            |UNION ALL
+            |SELECT NULL AS channel, NULL AS region, NULL AS product, avg(amt) AS av
+            |FROM usales
+            |""".stripMargin
+        checkRewriteAndEquivalence(sql)
+      }
     }
   }
 
@@ -617,16 +634,17 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate: rejects branches with differing aggregate expressions") {
     withSalesTable {
-      // Branch 1 uses avg, branch 2 uses sum -- signatures differ -> reject.
+      // Killed by the per-position signature comparison: branch 1 uses min, the
+      // others max. Both are INT, so no coercion cast lets another guard reject it.
       val sql =
         """
-          |SELECT channel, region, avg(amt) AS m
+          |SELECT channel, region, min(amt) AS m
           |FROM sales GROUP BY channel, region
           |UNION ALL
-          |SELECT channel, NULL AS region, sum(amt) AS m
+          |SELECT channel, NULL AS region, max(amt) AS m
           |FROM sales GROUP BY channel
           |UNION ALL
-          |SELECT NULL AS channel, NULL AS region, sum(amt) AS m
+          |SELECT NULL AS channel, NULL AS region, max(amt) AS m
           |FROM sales
           |""".stripMargin
       checkNotRewritten(sql)
@@ -705,7 +723,9 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate: rejects branches with per-branch non-null literal columns") {
     withSalesTable {
-      // Branches have differing non-null literals at the same position.
+      // Branches have differing non-null literals at the same position. Killed by the
+      // per-position signature comparison (BAD_LITERAL:0 vs BAD_LITERAL:1), before
+      // hasNonNullLiteralOutput runs.
       val sql =
         """
           |SELECT channel, region, 0 AS g, avg(amt) AS av
@@ -721,7 +741,7 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     }
   }
 
-  test("inner-aggregate fold handles CTE pattern (source-aggregate path skips it)") {
+  test("inner-aggregate fold handles CTE pattern") {
     withSalesTable {
       val sql =
         """
@@ -801,17 +821,16 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
   }
 
   test("source-aggregate: rejects a 2-branch union (below the 3-branch minimum)") {
-    // Killed by the `u.children.size >= 3` gate (a 2-branch union can never
-    // form a complete multi-level hierarchy worth rewriting). Hierarchy
-    // COMPLETENESS with >= 3 branches is pinned separately by the inner-fold
-    // 3-of-4 test above.
+    // [channel] + [] is a complete one-key hierarchy, so only the
+    // `u.children.size >= 3` gate rejects it. Hierarchy COMPLETENESS with >= 3
+    // branches is pinned separately by the inner-fold 3-of-4 test above.
     withSalesTable {
       val sql =
         """
-          |SELECT channel, region, sum(amt) AS tot
-          |FROM sales GROUP BY channel, region
+          |SELECT channel, sum(amt) AS tot
+          |FROM sales GROUP BY channel
           |UNION ALL
-          |SELECT NULL AS channel, NULL AS region, sum(amt) AS tot
+          |SELECT NULL AS channel, sum(amt) AS tot
           |FROM sales
           |""".stripMargin
       checkNotRewritten(sql)
@@ -944,11 +963,11 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate: rejects cross-labeled keys hidden behind a " +
       "passthrough Project") {
-    // Killed by the multi-layer verifyKeyPassthroughNamesAligned. The
-    // cross-labeling aliases (b AS a, a AS b) live in the Aggregate's own
-    // output; the passthrough wrapper Project hid them from the previous
-    // top-layer-only check and the rewrite re-derived the reference layout,
-    // un-swapping columns the query had swapped.
+    // Killed by the multi-layer verifyKeyPassthroughNamesAligned
+    // (verifyKeyPositionsAligned rejects it too). The cross-labeling aliases
+    // (b AS a, a AS b) live in the Aggregate's own output; the passthrough wrapper
+    // Project hid them from the previous top-layer-only check and the rewrite
+    // re-derived the reference layout, un-swapping columns the query had swapped.
     withTempView("xl") {
       Seq((1, 10, 100), (2, 20, 200), (2, 30, 300))
         .toDF("a", "b", "x").createOrReplaceTempView("xl")
@@ -1005,11 +1024,11 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate: rejects a temp-view branch whose tz-hiding measure " +
       "froze a different session timezone") {
-    // Killed by the TimeZoneAwareExpression arm of hiddenStateMarkers. A temp
-    // view stores its ANALYZED plan, freezing zoneIds at CREATE time; TimeAdd
-    // (ts + INTERVAL '1' MONTH) hides its timeZoneId from toString, so before
-    // the marker the view branch collided with the inline branches and the
-    // rewrite replayed the session timezone over the view's frozen one.
+    // Killed by the TimeZoneAwareExpression arm of hiddenStateMarkers. A temp view
+    // keeps the timezone it was created under; TimestampAddYMInterval
+    // (ts + INTERVAL '1' MONTH) hides its timeZoneId from toString, so before the
+    // marker the view branch collided with the inline branches and the rewrite
+    // replayed the session timezone over the view's frozen one.
     withTempView("tzbase", "tzv") {
       Seq(("a", "x", "2024-03-30 23:30:00"), ("a", "y", "2024-01-15 12:00:00"),
         ("b", "x", "2024-05-31 22:00:00"))
@@ -1076,11 +1095,11 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("source-aggregate: rejects measures differing only beyond the " +
       "toString truncation limit") {
-    // Killed by the class-sequence component of exprSignature.
     // Expression.toString truncates flat arguments at
-    // spark.sql.debug.maxToStringFields (25), so branches agreeing on the
-    // first 25 coalesce arguments but differing structurally (AND vs OR) in
-    // the 26th collided before the class sequence.
+    // spark.sql.debug.maxToStringFields (25), so branches agreeing on the first 25
+    // coalesce arguments but differing structurally (AND vs OR) in the 26th collided.
+    // exprSignature renders the toString untruncated, which separates them; the
+    // class-sequence component would too.
     withTempView("trunc") {
       Seq((1, 10, 5, -3, 100, 999), (2, 20, -1, 7, 200, 888))
         .toDF("a", "b", "p", "q", "x", "y").createOrReplaceTempView("trunc")
@@ -1185,7 +1204,8 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("inner-fold: rejects an inner whose measure is NAMED AFTER an " +
       "unprojected grouping key") {
-    // Killed by the bare-passthrough key guard. The inner groups by (a, b)
+    // Killed by the bare-passthrough key guard (buildRollupPlan's check that every
+    // grouping column is in its child's output would also bail). The inner groups by (a, b)
     // but projects only b, NAMING its sum "a" -- a coarser branch's GROUP BY
     // then cross-binds the sum-valued column by name, and the rewrite
     // regrouped that level by the raw key (different groups, different sums).
@@ -1205,10 +1225,11 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
 
   test("inner-fold: rejects an inner that projects a key only under a " +
       "value-changing CAST") {
-    // Killed by the bare-passthrough key guard. The inner outputs
-    // CAST(k AS DOUBLE) AS k while grouping by the BIGINT k: the original
-    // level-1 branch groups by the DOUBLE (merging keys that collide above
-    // 2^53), but the rewrite regrouped by the exact BIGINT.
+    // Killed by the bare-passthrough key guard (verifyDiscardedCastsAreRemapCasts
+    // would also reject it: the rewrite keeps the BIGINT key where the union column
+    // is DOUBLE). The inner outputs CAST(k AS DOUBLE) AS k while grouping by the
+    // BIGINT k: the original level-1 branch groups by the DOUBLE (merging keys that
+    // collide above 2^53), but the rewrite regrouped by the exact BIGINT.
     withTempView("xc") {
       Seq((9007199254740992L, 1, 10), (9007199254740993L, 1, 20), (5L, 2, 30))
         .toDF("k", "b", "x").createOrReplaceTempView("xc")
@@ -1380,6 +1401,101 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     }
   }
 
+  test("POSITIVE control: SQL-on-file parquet source fires and stays equivalent") {
+    // Each `parquet.<path>` reference builds its own file index; the branches still
+    // match because InMemoryFileIndex compares root paths.
+    withTempDir { dir =>
+      Seq((1, 1, 10), (1, 2, 20), (2, 1, 30)).toDF("a", "b", "x")
+        .write.mode("overwrite").parquet(dir.getCanonicalPath)
+      val src = s"parquet.`${dir.getCanonicalPath}`"
+      checkRewriteAndEquivalence(s"""
+        SELECT a, b, sum(x) AS s FROM $src GROUP BY a, b
+        UNION ALL
+        SELECT a, NULL AS b, sum(x) AS s FROM $src GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(x) AS s FROM $src
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects same-schema parquet sources in different directories") {
+    // Killed by the source-key check (sourceKeys.size != 1): the two file indexes have
+    // different root paths.
+    withTempDir { dir =>
+      val p1 = new java.io.File(dir, "p1").getCanonicalPath
+      val p2 = new java.io.File(dir, "p2").getCanonicalPath
+      Seq((1, 1, 10), (1, 2, 20), (2, 1, 30)).toDF("a", "b", "x").write.parquet(p1)
+      Seq((1, 1, 999)).toDF("a", "b", "x").write.parquet(p2)
+      checkNotRewritten(s"""
+        SELECT a, b, sum(x) AS s FROM parquet.`$p1` GROUP BY a, b
+        UNION ALL
+        SELECT a, NULL AS b, sum(x) AS s FROM parquet.`$p2` GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(x) AS s FROM parquet.`$p1`
+      """)
+    }
+  }
+
+  test("POSITIVE controls for the different-data, #digit and lambda negatives: the same " +
+      "source and measure in every branch fires") {
+    // Each query is one of the different-data, #digit or lambda negatives in this suite
+    // with the part that differs (dv2's data, or the measure) made the same in every
+    // branch, and the bare NULL fillers kept. Each one fires, so the part it changes is
+    // what rejects the negative.
+    withTempView("dv1", "sfx", "fjx", "tcx", "ltx") {
+      spark.sql("""CREATE OR REPLACE TEMP VIEW dv1 AS
+        SELECT * FROM VALUES (1, 1, 10), (1, 2, 20), (2, 1, 30) AS t(a, b, x)""")
+      checkRewriteAndEquivalence("""
+        SELECT a, b, sum(x) AS s FROM dv1 GROUP BY a, b
+        UNION ALL SELECT a, NULL, sum(x) AS s FROM dv1 GROUP BY a
+        UNION ALL SELECT NULL, NULL, sum(x) AS s FROM dv1
+      """)
+      spark.sql("""CREATE OR REPLACE TEMP VIEW sfx AS
+        SELECT a, b, named_struct('m#1', m1, 'm#2', m2) AS st
+        FROM VALUES (1, 1, 10L, 777L), (1, 2, 20L, 888L), (2, 1, 30L, 999L)
+          AS t(a, b, m1, m2)""")
+      checkRewriteAndEquivalence("""
+        SELECT a, b, sum(st.`m#1`) AS v FROM sfx GROUP BY a, b
+        UNION ALL SELECT a, NULL, sum(st.`m#1`) AS v FROM sfx GROUP BY a
+        UNION ALL SELECT NULL, NULL, sum(st.`m#1`) AS v FROM sfx
+      """)
+      spark.sql("""CREATE OR REPLACE TEMP VIEW fjx AS
+        SELECT a, b, '{"f#1": 1, "f#2": 100}' AS j
+        FROM VALUES (1, 1), (1, 2), (2, 1) AS t(a, b)""")
+      checkRewriteAndEquivalence("""
+        SELECT a, b, sum(from_json(j, 'STRUCT<`f#1`: BIGINT>').`f#1`) AS v
+        FROM fjx GROUP BY a, b
+        UNION ALL SELECT a, NULL, sum(from_json(j, 'STRUCT<`f#1`: BIGINT>').`f#1`) AS v
+        FROM fjx GROUP BY a
+        UNION ALL SELECT NULL, NULL, sum(from_json(j, 'STRUCT<`f#1`: BIGINT>').`f#1`) AS v
+        FROM fjx
+      """)
+      spark.sql("""CREATE OR REPLACE TEMP VIEW tcx AS
+        SELECT a, b, named_struct('p', CAST(NULL AS INT), 'q', x) AS s
+        FROM VALUES (1, 1, 10), (1, 2, 20), (2, 1, 30) AS t(a, b, x)""")
+      checkRewriteAndEquivalence("""
+        SELECT a, b, max(to_csv(s, map('nullValue', 'v#1'))) AS v FROM tcx GROUP BY a, b
+        UNION ALL SELECT a, NULL, max(to_csv(s, map('nullValue', 'v#1'))) AS v
+        FROM tcx GROUP BY a
+        UNION ALL SELECT NULL, NULL, max(to_csv(s, map('nullValue', 'v#1'))) AS v FROM tcx
+      """)
+      spark.sql("""CREATE OR REPLACE TEMP VIEW ltx AS
+        SELECT a, b, array(1, 2) AS arr, array(9) AS arr2
+        FROM VALUES (1, 1), (1, 2), (2, 1) AS t(a, b)""")
+      checkRewriteAndEquivalence("""
+        SELECT a, b,
+          max(transform(arr, `x#1` -> transform(arr2, `x#2` -> `x#1`))) AS v
+        FROM ltx GROUP BY a, b
+        UNION ALL SELECT a, NULL,
+          max(transform(arr, `x#1` -> transform(arr2, `x#2` -> `x#1`))) AS v
+        FROM ltx GROUP BY a
+        UNION ALL SELECT NULL, NULL,
+          max(transform(arr, `x#1` -> transform(arr2, `x#2` -> `x#1`))) AS v
+        FROM ltx
+      """)
+    }
+  }
+
   test("source-aggregate: rejects from_json schemas with #digit field names") {
     // Killed by the jsonschema marker. The schema is a constructor field
     // rendered (and #digit-munged) only via toString; key lookup is BY NAME,
@@ -1473,6 +1589,358 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
     }
   }
 
+  // Rows for the interval-key tests: the 36-hour key truncates to one day, the
+  // 12-hour key to zero days.
+  private def withIntervalTable(body: => Unit): Unit = {
+    withTempView("ivt") {
+      Seq((java.time.Duration.ofHours(36), 1, 5L), (java.time.Duration.ofHours(12), 2, 7L),
+        (java.time.Duration.ofHours(36), 2, 3L))
+        .toDF("a", "b", "x").createOrReplaceTempView("ivt")
+      body
+    }
+  }
+
+  test("inner-fold: rejects an interval key narrowed by a cast the union widens back") {
+    // Killed by verifyDiscardedCastsAreRemapCasts. Cast.canUpCast admits any
+    // day-time interval cast, so a per-cast up-cast check let this through and
+    // the rebuilt level returned 36h / 12h keys where the original truncates to
+    // whole days.
+    withIntervalTable {
+      checkNotRewritten("""
+        WITH ia AS (SELECT a, b, sum(x) AS s FROM ivt GROUP BY a, b)
+        SELECT a, b, s FROM ia
+        UNION ALL
+        SELECT CAST(a AS INTERVAL DAY) AS a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects an interval key narrowed by a cast the union widens " +
+      "back") {
+    // Killed by verifyDiscardedCastsAreRemapCasts. Same hole on the source path,
+    // where the cast sits in a Project above the branch aggregate.
+    withIntervalTable {
+      checkNotRewritten("""
+        SELECT a, b, sum(x) AS s FROM ivt GROUP BY a, b
+        UNION ALL
+        SELECT CAST(a AS INTERVAL DAY) AS a, b, s
+        FROM (SELECT a, NULL AS b, sum(x) AS s FROM ivt GROUP BY a)
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(x) AS s FROM ivt
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects two up-casts in a row whose result differs from " +
+      "the direct cast") {
+    // Killed by verifyDiscardedCastsAreRemapCasts. BIGINT -> DOUBLE -> STRING renders
+    // "15.0", BIGINT -> STRING "15". Both hops pass Cast.canUpCast, but the remap
+    // re-creates only the direct one.
+    withSalesTable {
+      checkNotRewritten("""
+        SELECT channel, region, CAST(CAST(s AS DOUBLE) AS STRING) AS s
+        FROM (SELECT channel, region, sum(amt) AS s FROM sales GROUP BY channel, region)
+        UNION ALL
+        SELECT channel, region, CAST(CAST(s AS DOUBLE) AS STRING) AS s
+        FROM (SELECT channel, NULL AS region, sum(amt) AS s FROM sales GROUP BY channel)
+        UNION ALL
+        SELECT channel, region, CAST(CAST(s AS DOUBLE) AS STRING) AS s
+        FROM (SELECT NULL AS channel, NULL AS region, sum(amt) AS s FROM sales)
+      """)
+    }
+  }
+
+  test("inner-fold: an interval key narrowed by the same cast in every branch fires " +
+      "and stays equivalent") {
+    // POSITIVE control: each branch applies exactly the cast the remap re-creates,
+    // after grouping by the full key, so the rebuilt plan casts in the same place.
+    withIntervalTable {
+      checkRewriteAndEquivalence("""
+        WITH ia AS (SELECT a, b, sum(x) AS s FROM ivt GROUP BY a, b)
+        SELECT CAST(a AS INTERVAL DAY) AS a, b, s FROM ia
+        UNION ALL
+        SELECT CAST(a AS INTERVAL DAY) AS a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects a temp-view branch whose to_char froze the legacy " +
+      "zero format") {
+    // Killed by the ToCharacter arm of hiddenStateMarkers: to_char renders only its
+    // operands, so the view branch collided with the inline ones.
+    withTempView("tc", "tcv") {
+      Seq(("a", "x", 0), ("a", "y", 0), ("b", "x", 5)).toDF("k1", "k2", "d")
+        .createOrReplaceTempView("tc")
+      withSQLConf(SQLConf.LEGACY_TO_CHAR_FORMAT_ZERO_AS_BLANK.key -> "true") {
+        spark.sql(
+          """CREATE OR REPLACE TEMPORARY VIEW tcv AS
+            |SELECT k1, NULL AS k2, max(to_char(d, '999')) AS m
+            |FROM tc GROUP BY k1""".stripMargin)
+      }
+      checkNotRewritten("""
+        SELECT k1, k2, max(to_char(d, '999')) AS m FROM tc GROUP BY k1, k2
+        UNION ALL
+        SELECT k1, k2, m FROM tcv
+        UNION ALL
+        SELECT NULL AS k1, NULL AS k2, max(to_char(d, '999')) AS m FROM tc
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects JSON_ARRAY measures differing only in ON NULL past " +
+      "the toString field limit") {
+    // With nine values the ON NULL behavior is the 28th flat argument, past the
+    // default limit of 25, so it reached the signature only once the toString limit
+    // was lifted around the signature checks.
+    withTempView("ja") {
+      Seq(("a", "x", Option.empty[Int]), ("a", "y", Some(1)), ("b", "x", Option.empty[Int]))
+        .toDF("k1", "k2", "v").createOrReplaceTempView("ja")
+      val vals = List.fill(9)("v").mkString(", ")
+      checkNotRewritten(s"""
+        SELECT k1, k2, max(json_array($vals NULL ON NULL)) AS m FROM ja GROUP BY k1, k2
+        UNION ALL
+        SELECT k1, NULL AS k2, max(json_array($vals ABSENT ON NULL)) AS m FROM ja GROUP BY k1
+        UNION ALL
+        SELECT NULL AS k1, NULL AS k2, max(json_array($vals NULL ON NULL)) AS m FROM ja
+      """)
+    }
+  }
+
+  test("inner-fold: rejects a FLOAT inner measure under a cast on the raw branch") {
+    // Killed by innerFoldAggregateExpressions, which refuses a floating sum under a
+    // cast; verifyDiscardedCastsAreRemapCasts, which runs after it, would reject both
+    // queries too. The rebuilt Sum turns the FLOAT measure into DOUBLE, so the raw level
+    // rendered 1.1f as "1.100000023841858"; summing the one inner row also turned -0.0f
+    // into 0.0.
+    withSQLConf(SQLConf.ANSI_ENABLED.key -> "false") {
+      withTempView("ft") {
+        Seq((1, 1, 1.1), (1, 2, 2.2), (2, 1, -1e-50)).toDF("a", "b", "x")
+          .createOrReplaceTempView("ft")
+        checkNotRewritten("""
+          WITH ia AS (SELECT a, b, CAST(sum(x) AS FLOAT) AS s FROM ft GROUP BY a, b)
+          SELECT a, b, CAST(s AS STRING) AS s FROM ia
+          UNION ALL SELECT a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+          UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+        """)
+        checkNotRewritten("""
+          WITH ia AS (SELECT a, b, CAST(sum(x) AS FLOAT) AS s FROM ft GROUP BY a, b)
+          SELECT a, b, s FROM ia
+          UNION ALL SELECT a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+          UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+        """)
+      }
+    }
+  }
+
+  test("inner-fold: rejects a DECIMAL inner sum cast to FLOAT under a raw-branch cast") {
+    // Killed by verifyDiscardedCastsAreRemapCasts. The floating-sum filter lets a cast of
+    // a DECIMAL sum through, but the rebuilt Sum still turns the FLOAT measure into
+    // DOUBLE before the remap casts it to STRING, so the raw level rendered 1.1f as
+    // "1.100000023841858" where the original renders "1.1".
+    withSQLConf(SQLConf.ANSI_ENABLED.key -> "false") {
+      withTempView("df") {
+        Seq((1, 1, "1.1"), (1, 2, "2.2"), (2, 1, "3.3")).toDF("a", "b", "ds")
+          .selectExpr("a", "b", "CAST(ds AS DECIMAL(10, 1)) AS d")
+          .createOrReplaceTempView("df")
+        checkNotRewritten("""
+          WITH ia AS (SELECT a, b, CAST(sum(d) AS FLOAT) AS s FROM df GROUP BY a, b)
+          SELECT a, b, CAST(s AS STRING) AS s FROM ia
+          UNION ALL SELECT a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+          UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+        """)
+      }
+    }
+  }
+
+  test("inner-fold: rejects a DOUBLE inner sum that a cast round-trips through FLOAT") {
+    // Killed by innerFoldAggregateExpressions: the finest level is rebuilt as a Sum over
+    // one inner row, so the -0.0 that the FLOAT cast makes of -1e-50 came back as 0.0.
+    withTempView("rt") {
+      Seq((1, 1, -1e-50), (1, 2, 2.2)).toDF("a", "b", "x").createOrReplaceTempView("rt")
+      checkNotRewritten("""
+        WITH ia AS (SELECT a, b, CAST(CAST(sum(x) AS FLOAT) AS DOUBLE) AS s
+                    FROM rt GROUP BY a, b)
+        SELECT a, b, s FROM ia
+        UNION ALL SELECT a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+        UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("inner-fold: a bare DOUBLE inner sum fires and stays equivalent") {
+    // POSITIVE control for the floating-sum filter in innerFoldAggregateExpressions:
+    // Spark's Sum starts from 0.0, so a bare sum is never -0.0 and 0.0 + v keeps it.
+    // The values are exact in binary, so summation order cannot change the result.
+    withTempView("dbl") {
+      Seq((1, 1, 0.5), (1, 1, -0.5), (1, 2, 1.25), (2, 1, -0.0), (2, 1, 2.0))
+        .toDF("a", "b", "x").createOrReplaceTempView("dbl")
+      checkRewriteAndEquivalence("""
+        WITH ia AS (SELECT a, b, sum(x) AS s FROM dbl GROUP BY a, b)
+        SELECT a, b, s FROM ia
+        UNION ALL SELECT a, NULL AS b, sum(s) AS s FROM ia GROUP BY a
+        UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("inner-fold: a decimal inner sum cast to DOUBLE fires and stays equivalent") {
+    // POSITIVE control: a cast of a DECIMAL sum cannot produce -0.0, so the
+    // floating-sum filter lets it through.
+    withSalesTable {
+      checkRewriteAndEquivalence("""
+        WITH ia AS (SELECT channel, region, CAST(sum(CAST(amt AS DECIMAL(10, 2))) AS DOUBLE)
+                    AS s FROM sales GROUP BY channel, region)
+        SELECT channel, region, s FROM ia
+        UNION ALL SELECT channel, NULL AS region, sum(s) AS s FROM ia GROUP BY channel
+        UNION ALL SELECT NULL AS channel, NULL AS region, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects a temp-view branch whose date difference froze the " +
+      "legacy interval type") {
+    // Killed by the SubtractDates arm of hiddenStateMarkers: the view branch's d1 - d2 is a
+    // CalendarInterval ("3 days") and the inline ones a DayTimeInterval ("INTERVAL '3'
+    // DAY"); both render as "(d1 - d2)" and the cast to STRING erases the type.
+    withTempView("sd", "sdv") {
+      Seq(("a", "x", "2024-01-04", "2024-01-01"), ("a", "y", "2024-01-03", "2024-01-01"),
+        ("b", "x", "2024-02-02", "2024-02-01")).toDF("k1", "k2", "s1", "s2")
+        .selectExpr("k1", "k2", "CAST(s1 AS DATE) AS d1", "CAST(s2 AS DATE) AS d2")
+        .createOrReplaceTempView("sd")
+      withSQLConf(SQLConf.LEGACY_INTERVAL_ENABLED.key -> "true") {
+        spark.sql(
+          """CREATE OR REPLACE TEMPORARY VIEW sdv AS
+            |SELECT k1, NULL AS k2, max(CAST(d1 - d2 AS STRING)) AS m
+            |FROM sd GROUP BY k1""".stripMargin)
+      }
+      checkNotRewritten("""
+        SELECT k1, k2, max(CAST(d1 - d2 AS STRING)) AS m FROM sd GROUP BY k1, k2
+        UNION ALL SELECT k1, k2, m FROM sdv
+        UNION ALL SELECT NULL AS k1, NULL AS k2, max(CAST(d1 - d2 AS STRING)) AS m FROM sd
+      """)
+    }
+  }
+
+  // Integer keys and values for the typed-NULL and no-op-cast tests below.
+  private def withIntTable(body: => Unit): Unit = {
+    withTempView("it") {
+      Seq((1, 1, 5), (1, 2, 7), (2, 1, 3), (2, 2, 11), (3, 1, 13))
+        .toDF("a", "b", "x").createOrReplaceTempView("it")
+      body
+    }
+  }
+
+  test("source-aggregate: typed NULL fillers fire and stay equivalent") {
+    // A typed NULL filler is NULL at every level, like a bare NULL. The second query's
+    // BIGINT fillers widen both key columns, so each branch that keeps a key carries
+    // one coercion cast at that position; the nullable-key fixture checks that a real
+    // NULL key and a filler NULL still land in different rows.
+    withIntTable {
+      checkRewriteAndEquivalence("""
+        SELECT a, b, sum(x) AS s FROM it GROUP BY a, b
+        UNION ALL
+        SELECT a, CAST(NULL AS INT) AS b, sum(x) AS s FROM it GROUP BY a
+        UNION ALL
+        SELECT CAST(NULL AS INT) AS a, CAST(NULL AS INT) AS b, sum(x) AS s FROM it
+      """)
+      checkRewriteAndEquivalence("""
+        SELECT a, b, sum(x) AS s FROM it GROUP BY a, b
+        UNION ALL
+        SELECT a, CAST(NULL AS BIGINT) AS b, sum(x) AS s FROM it GROUP BY a
+        UNION ALL
+        SELECT CAST(NULL AS BIGINT) AS a, CAST(NULL AS BIGINT) AS b, sum(x) AS s FROM it
+      """)
+    }
+    withNullableSalesTable {
+      checkRewriteAndEquivalence("""
+        SELECT channel, region, sum(amt) AS tot FROM nsales GROUP BY channel, region
+        UNION ALL
+        SELECT channel, CAST(NULL AS STRING) AS region, sum(amt) AS tot
+        FROM nsales GROUP BY channel
+        UNION ALL
+        SELECT CAST(NULL AS STRING) AS channel, CAST(NULL AS STRING) AS region,
+          sum(amt) AS tot FROM nsales
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects a typed NULL where the reference places a measure") {
+    // Killed by the per-position signature comparison: KEY against the reference's AGG.
+    withIntTable {
+      checkNotRewritten("""
+        SELECT a, b, sum(x) AS s FROM it GROUP BY a, b
+        UNION ALL
+        SELECT a, NULL AS b, CAST(NULL AS BIGINT) AS s FROM it GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(x) AS s FROM it
+      """)
+    }
+  }
+
+  test("source-aggregate: rejects a typed NULL at a key the branch still groups by") {
+    // Killed by verifyKeyPositionsAligned: the level-1 branch groups by a but puts a
+    // NULL at a's position, so its rows would not match a rebuilt level.
+    withIntTable {
+      checkNotRewritten("""
+        SELECT a, b, sum(x) AS s FROM it GROUP BY a, b
+        UNION ALL
+        SELECT CAST(NULL AS INT) AS a, NULL AS b, sum(x) AS s FROM it GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(x) AS s FROM it
+      """)
+    }
+  }
+
+  test("inner-fold: a no-op cast above a coerced key fires and stays equivalent") {
+    // CAST(b AS INT) on an INT key returns b unchanged, so the only cast that counts is
+    // the union's INT to BIGINT coercion, which the remap re-creates.
+    withIntTable {
+      checkRewriteAndEquivalence("""
+        WITH ia AS (SELECT a, b, sum(x) AS s FROM it GROUP BY a, b)
+        SELECT CAST(a AS INT) AS a, CAST(b AS INT) AS b, s FROM ia
+        UNION ALL SELECT a, CAST(NULL AS BIGINT) AS b, sum(s) AS s FROM ia GROUP BY a
+        UNION ALL SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("inner-fold: rejects a no-op cast stacked on a narrowing interval cast") {
+    // Killed by verifyDiscardedCastsAreRemapCasts: skipping the no-op cast still leaves
+    // the narrowing cast and the union's widening cast, two casts.
+    withIntervalTable {
+      checkNotRewritten("""
+        WITH ia AS (SELECT a, b, sum(x) AS s FROM ivt GROUP BY a, b)
+        SELECT a, b, s FROM ia
+        UNION ALL
+        SELECT CAST(CAST(a AS INTERVAL DAY) AS INTERVAL DAY) AS a, NULL AS b, sum(s) AS s
+        FROM ia GROUP BY a
+        UNION ALL
+        SELECT NULL AS a, NULL AS b, sum(s) AS s FROM ia
+      """)
+    }
+  }
+
+  test("source-aggregate: NULLIF inside a CASE branch fires and stays equivalent") {
+    // RewriteWithExpression keeps a With in a conditional branch, with ids from a
+    // global counter; exprSignature renumbers them so the branches' copies match.
+    withTempView("ns") {
+      Seq(("a", "x", 1, 2), ("a", "y", 3, -3), ("b", "x", 5, 6)).toDF("k1", "k2", "x", "y")
+        .createOrReplaceTempView("ns")
+      val m = "sum(CASE WHEN x > 0 THEN nullif(x + y, 0) END)"
+      checkRewriteAndEquivalence(s"""
+        SELECT k1, k2, $m AS s FROM ns GROUP BY k1, k2
+        UNION ALL
+        SELECT k1, NULL AS k2, $m AS s FROM ns GROUP BY k1
+        UNION ALL
+        SELECT NULL AS k1, NULL AS k2, $m AS s FROM ns
+      """)
+    }
+  }
+
   test("rule is config-gated: inner-aggregate disabled => Union remains") {
     withSalesTable {
       val sql =
@@ -1488,6 +1956,9 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
           |SELECT NULL AS channel, NULL AS region, sum(tot) AS tot
           |FROM s
           |""".stripMargin
+      withSQLConf(SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "true") {
+        assert(planContainsExpand(sql), "Rule should fire when conf is enabled")
+      }
       withSQLConf(SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "false") {
         assert(!planContainsExpand(sql),
           "Rule should not fire when conf is disabled")
@@ -1508,6 +1979,9 @@ class RewriteUnionAggregateAsRollupSuite extends QueryTest with SharedSparkSessi
           |SELECT NULL AS channel, NULL AS region, avg(amt) AS av
           |FROM sales
           |""".stripMargin
+      withSQLConf(SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "true") {
+        assert(planContainsExpand(sql), "Source-aggregate rule should fire when conf is enabled")
+      }
       withSQLConf(SQLConf.UNION_AGGREGATE_TO_ROLLUP_ENABLED.key -> "false") {
         assert(!planContainsExpand(sql),
           "Source-aggregate rule should not fire when conf is disabled")

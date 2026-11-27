@@ -17,10 +17,12 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
+import org.apache.spark.sql.catalyst.analysis.Resolver
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.variant.VariantGet
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * Cross-branch equivalence fingerprints for [[RewriteUnionAggregateAsRollup]].
@@ -31,8 +33,8 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
  * [[canonicalHash]] a plan. None of them carries rollup knowledge, which is why they
  * sit here rather than in the rule: each can be tested on a pair of expressions.
  *
- * All are total. The rule's guards run outside the `buildRollupPlan` Try, so a
- * fingerprint that threw would fail the query instead of skipping the rewrite.
+ * All are meant to be total. The rule runs them inside a Try, so one that threw would
+ * cost the rewrite rather than the query, and would show up only as a lost rewrite.
  */
 private[optimizer] object RollupRewriteSignatures {
 
@@ -84,7 +86,10 @@ private[optimizer] object RollupRewriteSignatures {
    *     for all levels, silently changing overflow behavior (ANSI throws /
    *     LEGACY wraps / TRY -> NULL).
    */
-  def exprSignature(e: Expression, childOutput: Seq[Attribute]): String = {
+  def exprSignature(e: Expression, childOutput: Seq[Attribute]): String =
+    withUntruncatedToString(untruncatedExprSignature(e, childOutput))
+
+  private def untruncatedExprSignature(e: Expression, childOutput: Seq[Attribute]): String = {
     val ordinalById: Map[ExprId, Int] =
       childOutput.map(_.exprId).zipWithIndex.toMap
     val ords = e.collect { case a: AttributeReference =>
@@ -103,8 +108,7 @@ private[optimizer] object RollupRewriteSignatures {
     // separately-parsed but textually-identical literals, which would
     // nondeterministically over-reject. Residual: binary NESTED inside
     // array/struct literal values still renders identity-based and fails
-    // CLOSED (always-mismatch, conservative). Must never throw (guards run
-    // outside the buildRollupPlan Try); Literal.toString is total.
+    // CLOSED (always-mismatch, conservative). Literal.toString is total.
     val lits = e.collect { case l: Literal =>
       s"${l.dataType.simpleString}:${l.toString}"
     }
@@ -123,17 +127,15 @@ private[optimizer] object RollupRewriteSignatures {
     val lambdas = lambdaIds.map(lambdaFirstIdx)
     // Pre-order class-name:arity sequence over the FULL tree.
     // Expression.toString truncates flat argument lists at
-    // spark.sql.debug.maxToStringFields, so two expressions agreeing on the
-    // leading arguments but differing STRUCTURALLY in the truncated tail
-    // (e.g. AND vs OR inside the 26th argument) would otherwise collide; the
-    // class sequence is truncation-immune. The ARITY makes the encoding a
-    // bijective tree shape: without it, same-class nestings that merely move
-    // children between levels (f(f(a,b),c,d) vs f(f(a,b,c),d)) share the
-    // pre-order class sequence.
+    // spark.sql.debug.maxToStringFields; exprSignature lifts that limit (see
+    // withUntruncatedToString), so this is a second, truncation-immune encoding of the
+    // tree shape. The ARITY makes the encoding a bijective tree shape: without it,
+    // same-class nestings that merely move children between levels (f(f(a,b),c,d) vs
+    // f(f(a,b,c),d)) share the pre-order class sequence.
     val classes = e.collect { case node =>
       s"${node.getClass.getSimpleName}:${node.children.size}"
     }
-    stripIds(e.toString) +
+    stripIds(renumberCommonExprIds(e.toString)) +
       ords.mkString("|ords=[", ",", "]") +
       lits.mkString("|lits=[", ",", "]") +
       subqs.mkString("|subq=[", ",", "]") +
@@ -231,11 +233,19 @@ private[optimizer] object RollupRewriteSignatures {
     case v: VariantGet =>
       s"varianttype=${v.targetType.catalogString}:variantfail=${v.failOnError}:" +
         s"tz=${v.timeZoneId}"
+    // Datetime arithmetic whose toString renders only "$left + $right" or "($left - $right)"
+    // while a flag frozen at analysis decides the value: date + interval throws on a
+    // sub-day part under ANSI and applies it through a timestamp otherwise, and the legacy
+    // interval flag picks CalendarInterval over DayTimeInterval for a timestamp difference.
+    // Both classes are TimeZoneAware, hence above the tzaware arm and with the tz included.
+    case d: DateAddInterval => s"dateaddansi=${d.ansiEnabled}:tz=${d.timeZoneId}"
+    case s: SubtractTimestamps => s"subtslegacy=${s.legacyInterval}:tz=${s.timeZoneId}"
     // EVERY timezone-aware expression, not just Cast: several override
-    // toString to hide their timeZoneId entirely (e.g. TimeAdd renders as
+    // toString to hide their timeZoneId entirely (e.g. TimestampAddInterval renders as
     // "$left + $right"), and canonicalized does not strip the field either --
     // so a branch whose plan was analyzed under a DIFFERENT session timezone
-    // (a temp view stores its ANALYZED plan, freezing zoneIds at CREATE time)
+    // (a temp view keeps the timezone it was created under, as its stored plan or
+    // its captured confs)
     // collides with same-text branches analyzed under the current session.
     // The class name is included so different tz-hiding expressions at the
     // same tree position cannot cross-match. NOTE: this arm precedes the
@@ -264,6 +274,12 @@ private[optimizer] object RollupRewriteSignatures {
     case ab: Abs => s"absfail=${ab.failOnError}"
     case r: Round => s"roundansi=${r.ansiEnabled}"
     case r: BRound => s"roundansi=${r.ansiEnabled}"
+    // to_char: flatArguments renders only the two operands, and the flag decides whether
+    // a zero with no fractional digits keeps its ones digit ('  0' vs '   ').
+    case t: ToCharacter => s"tocharzero=${t.legacyFormatZeroAsBlank}"
+    // A date difference renders only "($left - $right)"; the legacy interval flag picks a
+    // CalendarInterval result over a DayTimeInterval one.
+    case s: SubtractDates => s"subdateslegacy=${s.legacyInterval}"
     // ceil/floor: UnaryMathExpression renders only prettyName(child), so the flag
     // is invisible to toString and no arm above matches these classes. Their
     // Double path branches on it -- ANSI throws on overflow where LEGACY wraps.
@@ -283,8 +299,13 @@ private[optimizer] object RollupRewriteSignatures {
     // the ordinal/name (markers are appended UN-stripped).
     case g: GetStructField => s"structord=${g.ordinal}"
     case g: GetArrayStructFields => s"arrstructord=${g.ordinal}"
-    case w: WithField => s"withfield=${w.name}"
-    case d: DropField => s"dropfield=${d.name}"
+    // These three also capture the session resolver at construction; it decides which
+    // fields the name matches, and toString does not show it.
+    case w: WithField => s"withfield=${w.name}:${resolverMarker(w.resolver)}"
+    case d: DropField => s"dropfield=${d.name}:${resolverMarker(d.resolver)}"
+    // A nested path segment of withField/dropFields; prettyName renders it as WithField,
+    // but it is its own class, so the arm above does not match it.
+    case n: UpdateNestedField => s"nestedfield=${n.name}:${resolverMarker(n.resolver)}"
     // A session variable renders its value inside toString, where stripIds
     // can munge `#<digits>` content; encode the value un-stripped.
     case v: VariableReference => s"varval=${v.varDef.currentValue.sql}"
@@ -313,7 +334,8 @@ private[optimizer] object RollupRewriteSignatures {
    *  so a string-derived identity collides across same-schema sources with
    *  different contents and the rewrite would silently replay one branch's
    *  source for another's level. Case-class equality compares LocalRelation
-   *  data and relation/FileIndex identity exactly.
+   *  data, and file relations by FileIndex equality (InMemoryFileIndex compares its
+   *  root paths).
    *
    *  The supplement adds what `canonicalized` equality under-distinguishes:
    *  [[hiddenStateMarkers]] over every expression in the subtree (eval modes,
@@ -330,7 +352,19 @@ private[optimizer] object RollupRewriteSignatures {
       plan.collect { case node => node.expressions }.flatten
         .flatMap(hiddenStateMarkers)
     }
-    (c, markers.mkString("|", ",", "|"))
+    // Canonicalization rebuilds a struct-field operation whose value reads an attribute,
+    // and the copy takes the resolver in force at that time; read it from `p`, which keeps
+    // the one each node was built with. Canonicalization can also reorder commutative
+    // operands, so a plan mixing both resolvers matches no other plan object.
+    val resolvers = (p +: p.subqueriesAll).flatMap { plan =>
+      plan.collect { case node => node.expressions }.flatten.flatMap(_.collect {
+        case op: StructFieldsOperation => resolverMarker(op.resolver)
+      })
+    }
+    val resolverSig =
+      if (resolvers.distinct.size > 1) s"res=mixed:${System.identityHashCode(p)}"
+      else resolvers.mkString("res=[", ",", "]")
+    (c, markers.mkString("|", ",", "|") + resolverSig)
   }
 
   /** String form of plan identity for embedding in [[exprSignature]] (the
@@ -344,4 +378,39 @@ private[optimizer] object RollupRewriteSignatures {
   }
 
   def stripIds(s: String): String = s.replaceAll("#\\d+", "#")
+
+  private def resolverMarker(r: Resolver): String = if (r("a", "A")) "ci" else "cs"
+
+  /** Runs `f` with `spark.sql.debug.maxToStringFields` lifted, so a `toString` taken in
+   *  it renders every argument. With the default limit of 25, `Expression.toString` drops
+   *  the arguments after the 25th, and a non-child one there (JSON_ARRAY's ON NULL
+   *  behavior once it has nine values) reaches no other part of [[exprSignature]]. The
+   *  settings are copied without re-validation, so building the copy cannot throw.
+   */
+  def withUntruncatedToString[T](f: => T): T = {
+    val current = SQLConf.get
+    if (current.maxToStringFields == Int.MaxValue) {
+      f
+    } else {
+      val untruncated = new SQLConf
+      current.getAllConfs.foreach { case (k, v) => untruncated.settings.put(k, v) }
+      untruncated.settings.put(SQLConf.MAX_TO_STRING_FIELDS.key, Int.MaxValue.toString)
+      SQLConf.withExistingConf(untruncated)(f)
+    }
+  }
+
+  private val commonExprIdPattern = """CommonExpressionId\((\d+),(true|false)\)""".r
+
+  /** Renumbers each `CommonExpressionId(<id>,<flag>)` in a rendered expression by the
+   *  order its id first appears. A `With` left in a conditional branch reaches the rule
+   *  with ids drawn from a global counter, so two branches' copies of one NULLIF would
+   *  never match; renumbering by first appearance keeps which reference names which
+   *  definition, so copies match and differently bound trees still differ.
+   */
+  def renumberCommonExprIds(s: String): String = {
+    val index = commonExprIdPattern.findAllMatchIn(s).map(_.group(1)).toSeq.distinct
+      .zipWithIndex.toMap
+    commonExprIdPattern.replaceAllIn(s, m =>
+      s"CommonExpressionId(c${index(m.group(1))},${m.group(2)})")
+  }
 }

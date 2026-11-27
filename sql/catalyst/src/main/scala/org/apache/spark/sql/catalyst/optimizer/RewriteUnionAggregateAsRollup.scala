@@ -27,7 +27,9 @@ import org.apache.spark.sql.catalyst.optimizer.RollupRewriteSignatures._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project, Union}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{AGGREGATE, UNION}
+import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types._
 
 /**
  * Rewrite a UNION ALL of N aggregates into a single Aggregate with ROLLUP,
@@ -81,13 +83,14 @@ import org.apache.spark.sql.internal.SQLConf
  *    class:arity tree encoding, the DISTINCT flag, the FILTER, and hidden
  *    eval-mode/timezone/function-identity/ANSI-flag state. Branch projections
  *    must be passthroughs: order-preserving above a source-path aggregate,
- *    alias-only name-preserving between an outer and inner aggregate, and any
- *    timezone-dependent wrapper cast must carry the session timezone (the
- *    rewrite re-creates those casts). These rebuild invariants are required
- *    because the rewrite reconstructs every rollup level from a single
- *    reference branch's expressions and binds them to the Union output by
- *    position; a branch that diverges in ANY of them is rejected rather than
- *    silently mis-bound.
+ *    alias-only name-preserving between an outer and inner aggregate, the casts
+ *    they carry must be none or exactly the one cast the rewrite re-creates (or, on
+ *    a raw branch, the widening the rebuilt Sum itself performs), and any
+ *    timezone-dependent wrapper cast must carry the session timezone. These
+ *    rebuild invariants are required because the rewrite reconstructs every rollup
+ *    level from a single reference branch's expressions and binds them to the Union
+ *    output by position; a branch that diverges in ANY of them is rejected rather
+ *    than silently mis-bound.
  *
  * Path-specific rules:
  *  - Inner-aggregate fold: all branches must share ONE inner aggregate whose
@@ -128,7 +131,10 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
         // today, but that file's extension contract keeps adding arms, and one that
         // threw would otherwise fail every >= 3-branch union. A positive test still
         // catches such a regression: the rewrite silently stops happening.
-        Try(tryInnerAggregateFold(u).orElse(trySourceAggregate(u))) match {
+        // withUntruncatedToString lifts the toString field limit once per union, so each
+        // exprSignature call below does not copy the conf again.
+        Try(withUntruncatedToString(
+            tryInnerAggregateFold(u).orElse(trySourceAggregate(u)))) match {
           case Success(rewritten) => rewritten.getOrElse(u)
           case Failure(ex) =>
             logDebug(s"Rollup rewrite skipped, a check failed unexpectedly: ${ex.getMessage}")
@@ -217,7 +223,6 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
       return None
     }
     if (!verifyWrapperCastTimezonesAreSession(u)) return None
-    if (!verifyDiscardedWrapperCastsAreUpCasts(u)) return None
     // Every fold branch must fold the SAME inner measure the aligned inner
     // places at each position (else a same-typed measure permutation is
     // silently rebound); see verifyInnerFoldMeasurePositions.
@@ -226,6 +231,7 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
     // innerFoldAggregateExpressions).
     val foldExprs = innerFoldAggregateExpressions(alignedInner, innerGroupCols)
       .getOrElse(return None)
+    if (!verifyDiscardedCastsAreRemapCasts(u, foldExprs.map(_.dataType))) return None
 
     Try(buildRollupPlan(u, alignedInner, innerGroupCols, foldExprs)) match {
       case Success(rewritten) =>
@@ -443,8 +449,9 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
    *  branch that cross-labels a key (or nulls a key's natural position while
    *  passing the key through under a different name) would otherwise be
    *  rewritten to a standard ROLLUP that places keys differently, silently
-   *  changing results. Consistent renames (every branch aliases a key the same
-   *  way) are conservatively rejected too; that only forgoes an optimization.
+   *  changing results. Consistent renames at a layer where the key still carries
+   *  its grouping ExprId are conservatively rejected too; that only forgoes an
+   *  optimization.
    */
   private def verifyKeyPassthroughNamesAligned(u: Union): Boolean = {
     u.children.forall { child =>
@@ -464,9 +471,12 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
           // so the alignment must hold at the layer it replays. A grouping
           // attribute keeps its ExprId through bare-attribute passthroughs, so
           // checking each layer's aliases against groupAttrIds catches a rename
-          // at whichever layer the key is still visible by ExprId; once a layer
-          // renames it (and is rejected here), upper layers only see the fresh
-          // ExprId of the already-rejected alias.
+          // at whichever layer the key is still visible by ExprId. A layer that
+          // re-aliases the key under its own name (`CAST(a AS BIGINT) AS a`) gives it a
+          // fresh ExprId without being rejected, so a rename above that layer is not
+          // seen here. verifyKeyPositionsAligned compares each position's resolved key,
+          // so it still rejects a rename that moves a key; one that leaves the key in
+          // place only changes its label.
           def layerAligned(outs: Seq[NamedExpression]): Boolean = outs.forall { ne =>
             unwrapAliasesAndCasts(ne) match {
               case a: AttributeReference if groupAttrIds.contains(a.exprId) =>
@@ -563,9 +573,9 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
    *  inner aggregate) contain a timezone-DEPENDENT Cast whose timeZoneId is
    *  not the current session's. [[buildRollupPlan]] DISCARDS those wrappers
    *  and re-creates the Union-output binding cast with the SESSION timezone,
-   *  so a wrapper cast frozen under a different timezone (a temp view stores
-   *  its ANALYZED plan, freezing zoneIds at CREATE time) would have its
-   *  values silently recomputed under the session timezone. Timezone-
+   *  so a wrapper cast frozen under a different timezone (a temp view keeps the
+   *  timezone it was created under, as its stored plan or its captured confs)
+   *  would have its values silently recomputed under the session timezone. Timezone-
    *  independent wrapper casts (decimal/long widening coercion etc.) are
    *  ignored, so ordinary type-coercion Projects never over-reject. Casts
    *  INSIDE aggregate-function arguments are not wrappers (they are replayed
@@ -803,93 +813,103 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
   }
 
   /** True unless some Project layered ABOVE the branch's Aggregate computes a NEW
-   *  value -- i.e. an output that does not unwrap (via [[unwrapAliasesAndCasts]])
-   *  to a passthrough [[AttributeReference]] or a NULL filler, or whose wrapper
-   *  chain narrows a type (see [[castChainIsUpCastOnly]]). Such a Project is
-   *  discarded by [[parseSourceBranch]]/[[buildRollupPlan]] (which roll up the
-   *  aggregate's own expressions), so a value-changing one would be silently
-   *  dropped. Recursion STOPS at the first non-Project node: source-side Projects
-   *  BELOW the Aggregate are part of what the aggregate reads (preserved via
-   *  `canonicalHash(agg.child)`) and may legitimately compute values.
+   *  value -- an output that does not unwrap (via [[unwrapAliasesAndCasts]]) to a
+   *  passthrough [[AttributeReference]] or a NULL filler. [[buildRollupPlan]] rolls up
+   *  the aggregate's own expressions and drops such a Project; the casts it may hold are
+   *  checked by [[verifyDiscardedCastsAreRemapCasts]]. Recursion STOPS at the first
+   *  non-Project node: source-side Projects BELOW the Aggregate are part of what the
+   *  aggregate reads (compared via `canonicalKey(agg.child)`). Today
+   *  [[branchTopProjectsAreOrderPreserving]], called right after it, rejects everything
+   *  this rejects; it stays so that relaxing that check cannot let a computed value
+   *  through.
    */
   private def aboveAggregateProjectsArePassthrough(plan: LogicalPlan): Boolean = plan match {
     case Project(projList, child) =>
       projList.forall { ne =>
-        castChainIsUpCastOnly(ne) && (unwrapAliasesAndCasts(ne) match {
+        unwrapAliasesAndCasts(ne) match {
           case _: AttributeReference => true
           case l: Literal if l.value == null => true
           case _ => false
-        })
+        }
       } && aboveAggregateProjectsArePassthrough(child)
     case _ => true
   }
 
-  /** True if every Cast in an output's alias/cast wrapper chain is an UP-cast.
-   *
-   *  [[buildRollupPlan]] discards these wrappers -- it replays the branch
-   *  aggregate's own expressions and re-applies only the widening to `u.output`'s
-   *  type -- so a cast that can change the value must not be dropped. An up-cast is
-   *  value-preserving, which makes dropping it and re-widening safe; a narrowing one
-   *  (`CAST(sum AS DECIMAL(10,0))`, `CAST(sum AS INT)`) truncates, or throws under
-   *  ANSI, and neither survives the rewrite.
-   *
-   *  The remap's `canUpCast` bail does NOT cover this. It compares the Expand side
-   *  against `u.output`, and when the narrowing cast sits on only SOME branches the
-   *  union type widens back to the un-cast type, leaving the remap a type-level
-   *  no-op. Conservative over-reach: a widening the analyzer admits but `canUpCast`
-   *  does not (decimal to DOUBLE) is rejected here -- a lost rewrite, never a wrong
-   *  result.
+  /** Reject a branch whose discarded layers hold casts the remap does not re-create.
+   *  [[buildRollupPlan]] drops the top Projects of every branch but the grand total (which
+   *  is checked too, conservatively) -- for a fold branch also the outer aggregate's
+   *  outputs and the mid Projects under it -- and applies at most one cast per position,
+   *  from `rebuiltTypes(i)` to `u.output(i).dataType` at the session eval mode. So at each
+   *  position that is not a NULL filler the dropped casts must be none or exactly that
+   *  one, except a raw branch's one cast to the widening the rebuilt Sum itself performs
+   *  (see `isExactSumWidening`). A per-cast `Cast.canUpCast` check is not enough: it
+   *  admits interval narrowing, which truncates, and two up-casts in a row can differ
+   *  from the direct one (BIGINT to DOUBLE to STRING gives "15.0", BIGINT to STRING
+   *  "15"). So a two-cast chain is rejected even when it composes to the direct cast
+   *  (INT to BIGINT to DECIMAL from a nested union's coercion); that only loses the
+   *  rewrite. A cast to its child's own type is not counted: it changes no value.
    */
-  private def castChainIsUpCastOnly(e: Expression): Boolean = e match {
-    case Alias(child, _) => castChainIsUpCastOnly(child)
-    case Cast(child, dt, _, _) =>
-      Cast.canUpCast(child.dataType, dt) && castChainIsUpCastOnly(child)
-    case _ => true
-  }
-
-  /** The inner-fold path's counterpart to the [[castChainIsUpCastOnly]] check that
-   *  [[aboveAggregateProjectsArePassthrough]] performs for the source path: reject a
-   *  branch whose DISCARDED wrapper layers hold a Cast that is not an up-cast.
-   *
-   *  The layers walked are the ones [[buildRollupPlan]] drops: every branch's top
-   *  Projects, plus -- only for a FOLD branch, where the first Aggregate is the outer
-   *  one -- that aggregate's own outputs and the mid Projects beneath it. A
-   *  raw/full-detail branch's first Aggregate IS the shared inner, preserved verbatim
-   *  as the Expand child, so a narrowing cast among ITS outputs is legitimate (both
-   *  the original and the rewrite truncate there) and must not be rejected.
-   *
-   *  Without this, a value-changing but TYPE-PRESERVING chain slips through
-   *  everything: `CAST(CAST(m AS INT) AS BIGINT)` leaves the branch types in
-   *  agreement, so the analyzer adds no coercion Project and the remap's `canUpCast`
-   *  bail sees matching types, while every other fold-path guard resolves the
-   *  position through `unwrapAliasesAndCasts` and never sees the cast.
-   *
-   *  The mid-Project layer is redundant today -- `midProjectsAreNamePreserving`
-   *  rejects any cast there already -- and is walked anyway so relaxing that check
-   *  later cannot silently reopen this hole. Deliberately NOT merged with
-   *  [[verifyWrapperCastTimezonesAreSession]]: that walk also covers a raw branch's
-   *  inner outputs, and narrowing it to match this one would change an existing
-   *  guard's behavior beyond this fix.
-   */
-  private def verifyDiscardedWrapperCastsAreUpCasts(u: Union): Boolean = {
-    def midProjectsOk(plan: LogicalPlan): Boolean = plan match {
-      case Project(projList, child) =>
-        projList.forall(castChainIsUpCastOnly) && midProjectsOk(child)
-      case _ => true
-    }
-    def layersOk(plan: LogicalPlan): Boolean = plan match {
-      case Project(projList, child) =>
-        projList.forall(castChainIsUpCastOnly) && layersOk(child)
-      case agg: Aggregate =>
-        stripProject(agg.child) match {
-          case _: Aggregate =>
-            agg.aggregateExpressions.forall(castChainIsUpCastOnly) &&
-              midProjectsOk(agg.child)
-          case _ => true
+  private def verifyDiscardedCastsAreRemapCasts(
+      u: Union,
+      rebuiltTypes: Seq[DataType]): Boolean = {
+    val sessionMode = EvalMode.fromSQLConf(conf)
+    // The casts from `plan`'s output `id` down to the value the rewrite rebuilds or keeps,
+    // or None at a node it does neither for. `inFold` is set below a fold branch's outer
+    // aggregate, where the next Aggregate is the shared inner.
+    def castsBelow(id: ExprId, plan: LogicalPlan, inFold: Boolean): Option[Seq[Cast]] = {
+      def chain(e: Expression, below: LogicalPlan, belowInFold: Boolean): Option[Seq[Cast]] =
+        e match {
+          case a: Alias => chain(a.child, below, belowInFold)
+          // A cast to its child's own type returns the child's value unchanged in both
+          // the interpreted and the generated path (Cast.castInternal and
+          // Cast.generatesChildCode), so dropping it changes nothing; it is not counted.
+          case c: Cast if c.child.dataType == c.dataType => chain(c.child, below, belowInFold)
+          case c: Cast => chain(c.child, below, belowInFold).map(c +: _)
+          case a: AttributeReference => castsBelow(a.exprId, below, belowInFold)
+          case _: AggregateExpression => Some(Nil)
+          case _ => None
         }
+      plan match {
+        case Project(projList, child) =>
+          projList.find(_.exprId == id).flatMap(chain(_, child, inFold))
+        case agg: Aggregate if !inFold && stripProject(agg.child).isInstanceOf[Aggregate] =>
+          agg.aggregateExpressions.find(_.exprId == id).flatMap(chain(_, agg.child, true))
+        case _: Aggregate => Some(Nil)
+        case _ => None
+      }
+    }
+    def sameType(a: DataType, b: DataType): Boolean = DataTypeUtils.equalsIgnoreNullability(a, b)
+    // A raw branch's measure reaches its cast at the inner's type, which the rebuilt Sum
+    // can widen (DECIMAL(p+10) to DECIMAL(p+20), INT to BIGINT). A raw branch groups like
+    // the inner, so each rebuilt group at its level holds one inner row, and summing one
+    // such value only widens it exactly. FLOAT is left out: summing one FLOAT turns -0.0
+    // into 0.0.
+    def isExactSumWidening(from: DataType, to: DataType): Boolean = (from, to) match {
+      case (f: DecimalType, t: DecimalType) => f.scale == t.scale && f.precision <= t.precision
+      case (_: IntegralType, LongType) => true
       case _ => false
     }
-    u.children.forall(layersOk)
+    def isRemapCast(casts: Option[Seq[Cast]], rebuilt: DataType, target: DataType): Boolean =
+      casts match {
+        case Some(Seq()) => sameType(rebuilt, target)
+        case Some(Seq(c)) =>
+          sameType(c.dataType, target) && c.evalMode == sessionMode &&
+            (sameType(c.child.dataType, rebuilt) ||
+              (sameType(rebuilt, target) && isExactSumWidening(c.child.dataType, rebuilt)))
+        case _ => false
+      }
+    rebuiltTypes.size == u.output.size && u.children.forall { child =>
+      effectiveOutputs(child).exists { eff =>
+        eff.size == u.output.size && eff.indices.forall { i =>
+          eff(i) match {
+            case l: Literal if l.value == null => true
+            case _ =>
+              isRemapCast(castsBelow(child.output(i).exprId, child, inFold = false),
+                rebuiltTypes(i), u.output(i).dataType)
+          }
+        }
+      }
+    }
   }
 
   private def foldableAggregateClassAfterUnwrap(
@@ -1047,6 +1067,10 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
     // order-identical) source output as the same-named reference key.
     if (!verifySourceKeyOrdinalsAligned(byLen, refBranch, refGroupCols)) return None
     if (!verifyWrapperCastTimezonesAreSession(u)) return None
+    if (!verifyDiscardedCastsAreRemapCasts(
+        u, refBranch.agg.aggregateExpressions.map(_.dataType))) {
+      return None
+    }
 
     Try(buildRollupPlan(
         u, refBranch.agg.child, refGroupCols, refBranch.agg.aggregateExpressions)) match {
@@ -1096,16 +1120,14 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
 
   private def parseSourceBranch(child: LogicalPlan): Option[SourceBranch] = {
     // A value-changing Project ABOVE the aggregate (e.g. SELECT sum(x)+1 over a
-    // sub-aggregate, or a narrowing cast) would be stripped below and DROPPED by
-    // buildRollupPlan, which rolls up the aggregate's own expressions and
-    // re-applies only u.output's widening cast -- silently changing results. The
-    // optimizer's operator-optimization batches run AFTER this rule (it is in
-    // the earlier "Replace Operators" batch), so this guard cannot rely on
-    // upstream folding; it makes the source path correct BY CONSTRUCTION. (The
-    // inner-fold path handles its own value-changing wrappers separately: a
-    // narrowing cast wrapping a fold INSIDE the outer aggregate is rejected by
-    // verifyOuterFoldsToInner's bare-fold check, and an above-aggregate
-    // value-changing Project there is rejected by verifyOutputsRollupShaped.)
+    // sub-aggregate) would be stripped below and DROPPED by buildRollupPlan, which
+    // rolls up the aggregate's own expressions and re-applies only u.output's
+    // widening cast -- silently changing results. The optimizer's
+    // operator-optimization batches run AFTER this rule (it is in the earlier
+    // "Replace Operators" batch), so this guard cannot rely on upstream folding.
+    // (On the inner-fold path a cast wrapping a fold INSIDE the outer aggregate is
+    // rejected by verifyOuterFoldsToInner's bare-fold check; the casts this guard looks
+    // through are checked on both paths by verifyDiscardedCastsAreRemapCasts.)
     if (!aboveAggregateProjectsArePassthrough(child)) return None
     // Branch-top Projects must also preserve ORDER: every per-position guard
     // compares the AGGREGATE's own layout across branches, and buildRollupPlan
@@ -1144,9 +1166,9 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
    *  output name, must NOT compare equal to the reference, because
    *  [[buildRollupPlan]] emits the reference branch's expressions for every
    *  rollup level bound to the Union output by position. Markers:
-   *   - grouping-column passthrough OR NULL filler -> "KEY". Bare (no output
-   *     name): a key present at a low level becomes a NULL filler at a higher
-   *     level, and these legitimately carry DIFFERENT output names per branch
+   *   - grouping-column passthrough OR NULL filler, bare or under casts -> "KEY".
+   *     Bare (no output name): a key present at a low level becomes a NULL filler at
+   *     a higher level, and these legitimately carry DIFFERENT output names per branch
    *     (e.g. `ca_county` vs `NULL AS county`); the Union takes its name from
    *     the first branch and rolled-up levels are NULL regardless. Key
    *     cross-labeling (a key routed to a differently-named output) is caught
@@ -1175,6 +1197,12 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
       unwrapped match {
         case _: AttributeReference => "KEY"
         case l: Literal if l.value == null => "KEY"
+        // A typed NULL filler, `CAST(NULL AS INT) AS b`: NULL at every level, like a bare
+        // NULL. The inner-fold path's role layout already reads it as a filler.
+        case c: Cast if (unwrapAliasesAndCasts(c) match {
+            case l: Literal => l.value == null
+            case _ => false
+          }) => "KEY"
         case _: Literal =>
           s"BAD_LITERAL:${unwrapped.toString}"
         case ae: AggregateExpression =>
@@ -1284,13 +1312,13 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
     // u.output (the source path rolls up a real Union branch; the inner-fold path's
     // innerFoldAggregateExpressions builds the fold at the widened result type
     // directly -- e.g. Sum over a Decimal(p+10) inner already yields Decimal(p+20)).
-    // The up-cast below is LOAD-BEARING when the Expand side is genuinely
-    // narrower than the union type (e.g. a DATE key under per-branch
-    // CAST(d AS TIMESTAMP) wrappers: the Expand keeps the DATE and the remap
-    // casts it up); on the common paths it is a type-level no-op. Its other
-    // essential job is the Alias that REBINDS each Expand output to u.output's
-    // exprId/qualifier. The resulting Union's output = the remapped Expand side =
-    // u.output exprIds, which downstream references.
+    // The cast below is LOAD-BEARING when the Expand side's type differs from the
+    // union type (e.g. a DATE key under per-branch CAST(d AS TIMESTAMP) wrappers:
+    // the Expand keeps the DATE and the remap casts it); verifyDiscardedCastsAreRemapCasts
+    // makes it the same cast each branch applied. On the common paths it is a
+    // type-level no-op. Its other essential job is the Alias that REBINDS each Expand
+    // output to u.output's exprId/qualifier. The resulting Union's output = the
+    // remapped Expand side = u.output exprIds, which downstream references.
     val unionOut = u.output
     val expandedOut = expanded.output
     if (unionOut.size != expandedOut.size) {
@@ -1325,7 +1353,11 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
             s"Rollup-rewrite would require unsafe Cast from ${eAttr.dataType.sql} " +
               s"to ${uAttr.dataType.sql} for column ${uAttr.name}")
         }
-        Alias(casted, uAttr.name)(exprId = uAttr.exprId, qualifier = uAttr.qualifier)
+        // Take u.output's metadata too, so the rewritten output carries the same column
+        // metadata (comments, char/varchar annotations) as the Union it replaces rather
+        // than what the rebuilt expression would inherit.
+        Alias(casted, uAttr.name)(exprId = uAttr.exprId, qualifier = uAttr.qualifier,
+          explicitMetadata = Some(uAttr.metadata))
       }
     }
     val remappedRollup = Project(remap, expanded)
@@ -1355,13 +1387,13 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
    *     (it becomes an Expand grouping attribute, nulled at higher levels);
    *   - a foldable measure alias `m` (sum/max/min/count) -> the OUTER fold over
    *     `m`'s attribute: sum-of-sum, max-of-max, min-of-min, sum-of-count, each
-   *     aliased back to `m`'s name/exprId.
+   *     aliased back to `m`'s name under a fresh exprId.
    *
    *  Rolling up the inner's already-materialized measure (rather than the raw
    *  source) reproduces the original two-level accumulation exactly, including
    *  the inner level's decimal width and overflow (NULL/error) behavior. Returns
-   *  None if any position is neither a key passthrough nor a foldable measure
-   *  (the caller then bails).
+   *  None if any position is neither a key passthrough nor a foldable measure, or is
+   *  a FLOAT/DOUBLE sum of floats under a cast (the caller then bails).
    */
   private def innerFoldAggregateExpressions(
       inner: Aggregate,
@@ -1376,7 +1408,14 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
           // expr is a NamedExpression (Aggregate.aggregateExpressions), so its
           // name is directly available -- no non-local return needed.
           val outName = expr.name
-          foldableMeasureAttr(expr).map { case (attr, fnClass) =>
+          foldableMeasureAttr(expr).filter { case (attr, fnClass) =>
+            // The finest level is rebuilt as a Sum over one inner row, 0.0 + v, which turns
+            // -0.0 into 0.0. Spark's own Sum of floats never yields -0.0, and a cast of a
+            // BIGINT or DECIMAL sum cannot make one; a cast of a floating sum can.
+            fnClass != classOf[Sum] || !isFloating(attr.dataType) ||
+              !isFloating(unwrapAliasesAndCasts(expr).dataType) ||
+              unwrapAliasesOnly(expr).isInstanceOf[AggregateExpression]
+          }.map { case (attr, fnClass) =>
             val foldFn: AggregateFunction =
               if (fnClass == classOf[Sum]) Sum(attr)
               else if (fnClass == classOf[Max]) Max(attr)
@@ -1394,6 +1433,11 @@ object RewriteUnionAggregateAsRollup extends Rule[LogicalPlan] {
       }
     }
     if (built.exists(_.isEmpty)) None else Some(built.flatten)
+  }
+
+  private def isFloating(dt: DataType): Boolean = dt match {
+    case _: FloatType | _: DoubleType => true
+    case _ => false
   }
 
   /** If `expr` (an inner aggregate output) is a foldable, non-distinct,

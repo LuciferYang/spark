@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.plans.PlanTest
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{DateType, DecimalType, IntegerType, LongType, StringType}
+import org.apache.spark.sql.types._
 
 class RewriteUnionAggregateAsRollupSuite extends PlanTest {
 
@@ -143,11 +143,17 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
   }
 
   test("does NOT rewrite when fewer than 3 branches") {
-    val inner1 = innerAgg()
-    val inner2 = innerAgg()
-    val unionQuery = Union(Seq(
-      rawBranch(inner1),
-      outerBranch(Seq("c1"), inner2)))
+    // [c1] + [] is a complete one-key hierarchy, so only the >= 3 branch gate rejects it.
+    def oneKeyInner(): LogicalPlan = Aggregate(Seq($"c1"),
+      Seq($"c1", Alias(AggregateExpression(Sum($"x"), Complete, isDistinct = false), "sumx")()),
+      rel)
+    val inner2 = oneKeyInner()
+    val innerSumx = inner2.output.find(_.name == "sumx").get
+    val grandTotal = Aggregate(Nil,
+      Seq(Alias(Literal(null, IntegerType), "c1")(),
+        Alias(AggregateExpression(Sum(innerSumx), Complete, isDistinct = false), "sumx")()),
+      inner2)
+    val unionQuery = Union(Seq(rawBranch(oneKeyInner()), grandTotal))
     val analyzed = unionQuery.analyze
     val optimized = Optimize.execute(analyzed)
     // The Union should still be there (not rewritten).
@@ -307,8 +313,8 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
       "folded by outer SUM") {
     // sum-of-count(distinct) is NOT decomposable: sum of per-subgroup distinct
     // counts != distinct count over the union when a value appears in more than
-    // one finer subgroup. The inner DISTINCT must be rejected (the existing
-    // !isDistinct guard only inspects the OUTER aggregate).
+    // one finer subgroup. The inner DISTINCT must be rejected: collectFoldableAggregations
+    // leaves it out, so the inner's foldable count no longer matches its aggregate count.
     def innerCountDistinct(): LogicalPlan = {
       val dc = Alias(
         AggregateExpression(Count(Seq($"x")), Complete, isDistinct = true), "dc")()
@@ -447,9 +453,9 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
       "which the rewrite preserves verbatim") {
     // The truncation lives in the INNER aggregate's own outputs, and buildRollupPlan
     // keeps that aggregate as the Expand child -- so both plans truncate in the same
-    // place and the rewrite is correct. This pins the narrow half of
-    // verifyDiscardedWrapperCastsAreUpCasts: it must skip a raw branch's first
-    // Aggregate, which IS the shared inner, rather than reject it for narrowing.
+    // place and the rewrite is correct. This pins that verifyDiscardedCastsAreRemapCasts
+    // stops at a raw branch's first Aggregate, which IS the shared inner, rather than
+    // reject it for narrowing.
     def innerWithNarrowedMeasure(): LogicalPlan = {
       val sumX = Alias(
         Cast(AggregateExpression(Sum($"x"), Complete, isDistinct = false), IntegerType),
@@ -486,6 +492,33 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
     val analyzed = unionQuery.analyze
     val optimized = Optimize.execute(analyzed)
     assertNotRewritten(optimized)
+  }
+
+  test("source-aggregate: the rewritten output keeps the Union output's column metadata") {
+    // The first branch's top Project re-aliases a key with column metadata, which the
+    // Union output takes from its first child. The rebuilt key would otherwise carry the
+    // source column's metadata instead.
+    val md = new MetadataBuilder().putString("comment", "the c1 key").build()
+    def sumX: NamedExpression =
+      Alias(AggregateExpression(Sum($"x"), Complete, isDistinct = false), "sx")()
+    val finestAgg = Aggregate(Seq($"c1", $"c2"), Seq($"c1", $"c2", sumX), rel)
+    val finest = Project(
+      Seq(Alias(finestAgg.output.find(_.name == "c1").get, "c1")(explicitMetadata = Some(md)),
+        finestAgg.output.find(_.name == "c2").get,
+        finestAgg.output.find(_.name == "sx").get),
+      finestAgg)
+    val level1 = Aggregate(
+      Seq($"c1"), Seq($"c1", Alias(Literal(null, IntegerType), "c2")(), sumX), rel)
+    val grandTotal = Aggregate(
+      Nil,
+      Seq(Alias(Literal(null, IntegerType), "c1")(),
+        Alias(Literal(null, IntegerType), "c2")(), sumX),
+      rel)
+    val analyzed = Union(Seq(finest, level1, grandTotal)).analyze
+    assert(analyzed.output.head.metadata === md, "precondition: the Union output carries it")
+    val optimized = Optimize.execute(analyzed)
+    assertRewrittenToRollup(optimized)
+    assert(optimized.output.map(_.metadata) === analyzed.output.map(_.metadata))
   }
 
   test("source-aggregate: does NOT rewrite when only SOME branches wrap a measure " +
@@ -832,10 +865,14 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
   }
 
   test("does NOT rewrite when outer uses SUM but inner uses MAX (function mismatch)") {
-    // sum(max(x)) is NOT a valid fold; max-of-max would be the fold.
-    val inner1 = innerAggWith("max")
-    val inner2 = innerAggWith("max")
-    val inner3 = innerAggWith("max")
+    // sum(max(x)) is NOT a valid fold; max-of-max would be the fold. Killed by
+    // outerMatchesInner's class check. x is BIGINT so max and sum share a type: over INT
+    // the union would add a coercion cast and verifyDiscardedCastsAreRemapCasts would
+    // reject the shape without that check.
+    val relL = LocalRelation($"c1".int, $"c2".int, $"x".long)
+    val inner1 = innerAggWith("max", relL)
+    val inner2 = innerAggWith("max", relL)
+    val inner3 = innerAggWith("max", relL)
     val unionQuery = Union(Seq(
       inner1,
       outerBranchWith("sum", Seq("c1"), inner2),  // wrong function!
@@ -1066,8 +1103,9 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
     // concat_ws(a, concat_ws(b, z)) and concat_ws(a, concat_ws(b), z) share
     // the pre-order class sequence, attribute order, and literals, and differ
     // only in arity (2/2 vs 3/1) -- semantically "z" vs a+"z". Hidden behind
-    // 25 leading concat arguments, toString truncation erases the difference;
-    // only the class:ARITY encoding distinguishes them.
+    // 25 leading concat arguments, toString truncation would erase the difference.
+    // The rule renders the toString untruncated, which separates them; the class:ARITY
+    // encoding would too.
     val wideCols = (1 to 25).map(i => AttributeReference(s"s$i", StringType)())
     val wideRel = LocalRelation(
       Seq(AttributeReference("c1", IntegerType)(), AttributeReference("c2", IntegerType)(),
@@ -1189,13 +1227,12 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
   }
 
   test("source-aggregate: does NOT rewrite when branch SOURCES differ only in " +
-      "a needs-timezone cast's timeZoneId (hidden in toString/canonicalized)") {
+      "a needs-timezone cast's timeZoneId (hidden in toString)") {
     // A timestamp->date cast bucket key (needsTimeZone) carries a session
     // timeZoneId that Cast.toString omits and canonicalized PRESERVES (not
     // normalized). Two branches whose key cast uses different timezones bucket
-    // rows into different dates, but canonicalHash(agg.child)/exprSignature would
-    // collide without a tz marker -> the rule would reuse one timezone for all
-    // levels, changing the date grouping. Must be rejected.
+    // rows into different dates; the canonicalized sources already differ, so
+    // canonicalKey rejects this without the tz marker. Must be rejected.
     val relTs = LocalRelation($"c1".int, $"ts".timestamp, $"x".int)
     def srcWithTz(tz: String, keepCols: Seq[String]): LogicalPlan = {
       val src = Project(Seq(
@@ -1583,8 +1620,8 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
   test("inner-fold: does NOT rewrite when an outer branch cross-labels a " +
       "grouping key to a different output name") {
     // Outer branch groups by c1 but outputs it as "c2" (Alias(c1, "c2")) while
-    // nulling "c1". verifyKeyPassthroughNamesAligned must reject this on the
-    // inner-fold path, not just the source path.
+    // nulling "c1". verifyKeyPassthroughNamesAligned rejects this on the inner-fold
+    // path, not just the source path; verifyKeyPositionsAligned rejects it too.
     val inner1 = innerAgg()
     val inner2 = innerAgg()
     val inner3 = innerAgg()
@@ -1703,7 +1740,8 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
     // sumx] -- two columns both named "sumx" (a NULL filler for dropped c2 and
     // the measure). alignInnerToUnionOutput's name-based mapping would resolve
     // both "sumx" positions to the single inner measure, dropping c2 and
-    // duplicating the measure. The duplicate-name guard must make it bail.
+    // duplicating the measure. The duplicate-name guard makes it bail;
+    // verifyInnerFoldMeasurePositions rejects it too.
     val inner1 = innerAgg()
     val inner2 = innerAgg()
     val inner3 = innerAgg()
@@ -1814,8 +1852,10 @@ class RewriteUnionAggregateAsRollupSuite extends PlanTest {
     // level. The optimizer normally folds such an expression INTO the aggregate
     // (CollapseProject) before this rule runs, so this shape is not reachable from
     // SQL -- but the rule must be robust to its input regardless of upstream rule
-    // ordering. aboveAggregateProjectsArePassthrough rejects it. (Fed un-folded:
-    // the catalyst Optimize runs only this rule, no CollapseProject.)
+    // ordering. aboveAggregateProjectsArePassthrough rejects it first;
+    // branchTopProjectsAreOrderPreserving and verifyDiscardedCastsAreRemapCasts
+    // reject it too. (Fed un-folded: the catalyst Optimize runs only this rule, no
+    // CollapseProject.)
     def srcBranchPlus1(
         groupCols: Seq[Expression], keyOuts: Seq[NamedExpression]): LogicalPlan = {
       val sx = Alias(AggregateExpression(Sum($"x"), Complete, isDistinct = false), "sx")()

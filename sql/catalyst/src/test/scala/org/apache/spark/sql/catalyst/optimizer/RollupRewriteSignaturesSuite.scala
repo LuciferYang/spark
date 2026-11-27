@@ -22,8 +22,10 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.RollupRewriteSignatures._
-import org.apache.spark.sql.catalyst.plans.logical.LocalRelation
+import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.CalendarInterval
 
 /**
  * Unit tests for the fingerprints [[RewriteUnionAggregateAsRollup]] compares branches
@@ -40,10 +42,19 @@ class RollupRewriteSignaturesSuite extends SparkFunSuite {
   private val st = AttributeReference("st",
     StructType(Seq(StructField("f1", IntegerType), StructField("f2", IntegerType))))()
   private val dbl = AttributeReference("dbl", DoubleType)()
+  private val ts = AttributeReference("ts", TimestampType)()
 
   private val childOutput = Seq(x, y, d, st, dbl)
 
   private def legacySum(e: Expression): Sum = Sum(e, NumericEvalContext(EvalMode.LEGACY))
+
+  private val nestedDrop = DropField("f")
+
+  private def caseSensitiveConf: SQLConf = {
+    val c = new SQLConf
+    c.setConf(SQLConf.CASE_SENSITIVE, true)
+    c
+  }
 
   /** Expression pairs that differ ONLY in state `toString` (and, for most of them,
    *  `canonicalized`) hides, i.e. the reason [[hiddenStateMarkers]] exists.
@@ -78,7 +89,36 @@ class RollupRewriteSignaturesSuite extends SparkFunSuite {
       StructsToXml(Map("nullValue" -> "n#2"), st, Some("UTC"))),
     // Both render "st.f": only the ordinal says which field is read.
     ("GetStructField ordinal",
-      GetStructField(st, 0, Some("f")), GetStructField(st, 1, Some("f"))))
+      GetStructField(st, 0, Some("f")), GetStructField(st, 1, Some("f"))),
+    // to_char's flatArguments renders only its two operands.
+    ("ToCharacter legacy zero format",
+      ToCharacter(x, Literal("999"), legacyFormatZeroAsBlank = true),
+      ToCharacter(x, Literal("999"), legacyFormatZeroAsBlank = false)),
+    // A nested withField path segment: its own class, rendered as WithField, whose name
+    // stripIds turns into "a#".
+    ("UpdateNestedField name",
+      UpdateNestedField("a#1", Seq(WithField("x", Literal(0)))),
+      UpdateNestedField("a#2", Seq(WithField("x", Literal(0))))),
+    // Datetime arithmetic renders only its operands; the flags are frozen at analysis.
+    ("DateAddInterval ANSI flag",
+      DateAddInterval(d, Literal(new CalendarInterval(0, 1, 3600000000L)), Some("UTC"), true),
+      DateAddInterval(d, Literal(new CalendarInterval(0, 1, 3600000000L)), Some("UTC"), false)),
+    ("SubtractDates legacy interval",
+      SubtractDates(d, d, legacyInterval = true), SubtractDates(d, d, legacyInterval = false)),
+    ("SubtractTimestamps legacy interval",
+      SubtractTimestamps(ts, ts, legacyInterval = true, Some("UTC")),
+      SubtractTimestamps(ts, ts, legacyInterval = false, Some("UTC"))),
+    // The resolver is captured from the session at construction and decides which
+    // fields the name matches.
+    ("WithField resolver",
+      SQLConf.withExistingConf(caseSensitiveConf)(WithField("f", Literal(0))),
+      WithField("f", Literal(0))),
+    ("DropField resolver",
+      SQLConf.withExistingConf(caseSensitiveConf)(DropField("f")), DropField("f")),
+    // The nested op is shared, so only the outer node's resolver differs.
+    ("UpdateNestedField resolver",
+      SQLConf.withExistingConf(caseSensitiveConf)(UpdateNestedField("a", Seq(nestedDrop))),
+      UpdateNestedField("a", Seq(nestedDrop))))
 
   hiddenStatePairs.foreach { case (label, a, b) =>
     test(s"hidden state must change the signature: $label") {
@@ -109,6 +149,34 @@ class RollupRewriteSignaturesSuite extends SparkFunSuite {
       exprSignature(Literal("v#2"), childOutput))
   }
 
+  test("exprSignature sees arguments past the toString field limit") {
+    // Nine values put nullBehavior at flat argument 28, past the default limit of 25.
+    def jsonArray(nulls: JsonConstructorNullBehavior): Expression =
+      JsonArray(Seq.fill(9)(x), Seq.fill(9)(false), Seq.fill(9)(false), nulls, StringType,
+        Some("UTC"))
+    val keep = jsonArray(JsonConstructorNullBehavior.Null)
+    val drop = jsonArray(JsonConstructorNullBehavior.Absent)
+    assert(keep.toString === drop.toString, "precondition: toString truncates the difference")
+    assert(exprSignature(keep, childOutput) !== exprSignature(drop, childOutput))
+  }
+
+  test("exprSignature matches separately built copies of one With") {
+    def nullIfLike(): Expression = With(Add(x, y)) { case Seq(r) =>
+      If(EqualTo(r, Literal(0)), Literal(null, IntegerType), r)
+    }
+    assert(exprSignature(nullIfLike(), childOutput) === exprSignature(nullIfLike(), childOutput))
+  }
+
+  test("exprSignature separates Withs whose references bind differently") {
+    // Guards against over-normalising: a renumbering that collapsed every id to one
+    // token would make these two render identically.
+    def twoDefs(swap: Boolean): Expression = With(x, y) { case Seq(rx, ry) =>
+      if (swap) Subtract(ry, rx) else Subtract(rx, ry)
+    }
+    assert(exprSignature(twoDefs(swap = false), childOutput) !==
+      exprSignature(twoDefs(swap = true), childOutput))
+  }
+
   test("aggMeasureSignature separates DISTINCT and FILTER") {
     val plain = AggregateExpression(legacySum(x), Complete, isDistinct = false)
     assert(aggMeasureSignature(plain, childOutput) !==
@@ -124,6 +192,52 @@ class RollupRewriteSignaturesSuite extends SparkFunSuite {
     assert(one.toString === two.toString, "precondition: toString hides the data")
     assert(canonicalKey(one) !== canonicalKey(two))
     assert(canonicalHash(one) !== canonicalHash(two))
+  }
+
+  test("canonicalKey keeps a struct-field operation's resolver, which canonicalization drops") {
+    // Canonicalization rebuilds a WithField over an attribute, and the rebuilt copy reads
+    // the resolver of the session in force then, not the one the node was built with.
+    val s = AttributeReference("s",
+      StructType(Seq(StructField("a", IntegerType), StructField("b", IntegerType))))()
+    val n = AttributeReference("n", IntegerType)()
+    val rel = LocalRelation(s, n)
+    def withA(): LogicalPlan = Project(
+      Seq(Alias(UpdateFields(s, Seq(WithField("a", Add(n, Literal(1))))), "s2")()), rel)
+    val caseSensitive = SQLConf.withExistingConf(caseSensitiveConf)(withA())
+    val caseInsensitive = withA()
+    assert(caseSensitive.canonicalized === caseInsensitive.canonicalized,
+      "precondition: canonicalized-plan equality does not see the resolver")
+    assert(canonicalKey(caseSensitive) !== canonicalKey(caseInsensitive))
+  }
+
+  test("canonicalKey separates plans that mix resolvers on swapped sides") {
+    // Ordinal 0 of the updated struct is the original `a` when "A" is matched
+    // case-sensitively (a new field is appended) and n + 1 when it is not. The two
+    // plans pair the +42 with opposite resolvers, so they compute different values,
+    // yet Least orders its operands by hash when canonicalized, which makes the
+    // canonicalized plans equal, and both read the resolvers as [cs, ci] in tree order.
+    // Only the mixed-resolver fallback tells them apart.
+    val s = AttributeReference("s",
+      StructType(Seq(StructField("a", IntegerType), StructField("b", IntegerType))))()
+    val n = AttributeReference("n", IntegerType)()
+    val rel = LocalRelation(s, n)
+    def field0(caseSensitive: Boolean): Expression = {
+      val op = if (caseSensitive) {
+        SQLConf.withExistingConf(caseSensitiveConf)(WithField("A", Add(n, Literal(1))))
+      } else {
+        WithField("A", Add(n, Literal(1)))
+      }
+      GetStructField(UpdateFields(s, Seq(op)), 0)
+    }
+    def plan(csAddend: Int, ciAddend: Int): LogicalPlan = Project(Seq(Alias(Least(Seq(
+      Add(field0(caseSensitive = true), Literal(csAddend)),
+      Add(field0(caseSensitive = false), Literal(ciAddend)))), "m")()), rel)
+    val first = plan(csAddend = 42, ciAddend = 0)
+    val second = plan(csAddend = 0, ciAddend = 42)
+    assert(first.canonicalized === second.canonicalized,
+      "precondition: Least operands get reordered and equality does not see the resolver")
+    assert(canonicalKey(first) !== canonicalKey(second))
+    assert(canonicalKey(first) === canonicalKey(first))
   }
 
   test("canonicalKey matches structurally identical relations with fresh ExprIds") {
